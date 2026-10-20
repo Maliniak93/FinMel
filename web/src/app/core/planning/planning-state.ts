@@ -14,8 +14,21 @@ export type OverdueRecurringOccurrence = OverdueOccurrenceResponse & {
   nominalMonth: string;
 };
 
-function isRecurring(item: OverdueOccurrenceResponse): item is OverdueRecurringOccurrence {
-  return item.recurringIncomeId !== null && item.nominalMonth !== null;
+export type OverdueOneOffIncome = OverdueOccurrenceResponse & {
+  oneOffIncomeId: string;
+};
+
+export type OverdueItem = OverdueRecurringOccurrence | OverdueOneOffIncome;
+
+export function isOverdueOneOff(item: OverdueItem): item is OverdueOneOffIncome {
+  return !!item.oneOffIncomeId;
+}
+
+function isOverdueItem(item: OverdueOccurrenceResponse): item is OverdueItem {
+  return (
+    (item.recurringIncomeId !== null && item.nominalMonth !== null) ||
+    (item.oneOffIncomeId !== null && item.oneOffIncomeId !== undefined)
+  );
 }
 
 @Injectable({ providedIn: 'root' })
@@ -45,7 +58,7 @@ export class PlanningState {
   });
 
   readonly overdue = computed(() =>
-    this.overdueResource.hasValue() ? this.overdueResource.value().filter(isRecurring) : [],
+    this.overdueResource.hasValue() ? this.overdueResource.value().filter(isOverdueItem) : [],
   );
 
   readonly todo = computed(() =>

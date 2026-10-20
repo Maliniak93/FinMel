@@ -71,6 +71,7 @@ describe('SettleOccurrenceDialog', () => {
   async function setup(
     data: Record<string, unknown> = occurrence,
     putResponse: () => Response = () => new Response(null, { status: 204 }),
+    dataKey: 'occurrence' | 'oneOffIncome' = 'occurrence',
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -91,7 +92,7 @@ describe('SettleOccurrenceDialog', () => {
       providers: [
         provideI18nTesting(),
         provideNativeDateAdapter(),
-        { provide: MAT_DIALOG_DATA, useValue: { occurrence: data } },
+        { provide: MAT_DIALOG_DATA, useValue: { [dataKey]: data } },
         { provide: MatDialogRef, useValue: dialogRef },
       ],
     }).compileComponents();
@@ -119,6 +120,44 @@ describe('SettleOccurrenceDialog', () => {
       .map((call: unknown[]) => call[0] as Request)
       .filter((request: Request) => request.method === 'PUT');
   }
+
+  it('puts the settlement of a one-off income to its own endpoint', async () => {
+    await setup(
+      {
+        id: 'one-off-1',
+        name: 'Premia',
+        date: '2026-10-05',
+        accountId: plnAccountId,
+        accountName: 'mBank ROR',
+        accountArchived: false,
+        amount: 2500,
+        currency: 'PLN',
+        amountPln: 2500,
+        estimated: false,
+        inMonth: true,
+        status: 'Pending',
+        actualAmount: null,
+        actualDate: null,
+        actualAmountPln: null,
+        difference: null,
+        depositCreated: false,
+        overdue: true,
+      },
+      undefined,
+      'oneOffIncome',
+    );
+
+    await component['onSubmit']();
+
+    const [request] = puts();
+    expect(request.url).toContain('/api/portfolio/one-off-incomes/one-off-1/settlement');
+    expect(await request.json()).toMatchObject({
+      actualAmount: 2500,
+      accountId: plnAccountId,
+      createDeposit: true,
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
 
   it('prefills the plan, today and the planned account, lists only non-archived PLN accounts, rejects a future date and puts amount, date and account', async () => {
     await setup();

@@ -75,8 +75,9 @@ function monthData(
       balance: { planPln: 0, actualPln: 0, pendingPln: 0, differencePln: 0 },
       fxUnavailable: false,
       definitions: [],
+      oneOffs: [],
     },
-    expenses: { payments, costPln: 0, definitions: [] },
+    expenses: { payments, costPln: 0, definitions: [], oneOffs: [] },
     nonBusinessDays: MARCH_NON_BUSINESS_DAYS,
   };
 }
@@ -220,6 +221,78 @@ describe('PlanningCalendar', () => {
     const details = element().querySelector<HTMLElement>('[data-testid="calendar-details"]')!;
     expect(details.textContent).toContain('800+');
     expect(details.textContent).toContain(formatDate('2027-03-25'));
+  });
+
+  it('places one-off entries on their dates', async () => {
+    const data = monthData([], []) as {
+      incomes: Record<string, unknown>;
+      expenses: Record<string, unknown>;
+    };
+    data.incomes['oneOffs'] = [
+      {
+        id: 'one-off-premia',
+        name: 'Premia roczna',
+        date: '2027-03-18',
+        accountId,
+        accountName: 'mBank ROR',
+        accountArchived: false,
+        amount: 8000,
+        currency: 'PLN',
+        amountPln: 8000,
+        estimated: false,
+        inMonth: true,
+        status: 'Pending',
+        actualAmount: null,
+        actualDate: null,
+        actualAmountPln: null,
+        difference: null,
+        depositCreated: false,
+        overdue: false,
+      },
+      {
+        id: 'one-off-later',
+        name: 'Poza miesiącem',
+        date: '2027-04-18',
+        accountId,
+        accountName: 'mBank ROR',
+        accountArchived: false,
+        amount: 100,
+        currency: 'PLN',
+        amountPln: 100,
+        estimated: false,
+        inMonth: false,
+        status: 'Pending',
+        actualAmount: null,
+        actualDate: null,
+        actualAmountPln: null,
+        difference: null,
+        depositCreated: false,
+        overdue: false,
+      },
+    ];
+    data.expenses['oneOffs'] = [
+      {
+        id: 'one-off-expense-przeglad',
+        name: 'Przegląd auta',
+        date: '2027-03-24',
+        amount: 1200,
+        inMonth: true,
+      },
+    ];
+    await render(data);
+
+    const income = itemsOf('2027-03-18');
+    expect(income).toHaveLength(1);
+    expect(income[0].textContent).toContain('Premia roczna');
+    expect(income[0].textContent).toContain(formatMoney(8000, 'PLN'));
+    expect(income[0].dataset['status']).toBe('pending');
+
+    const expense = itemsOf('2027-03-24');
+    expect(expense).toHaveLength(1);
+    expect(expense[0].textContent).toContain('Przegląd auta');
+    expect(expense[0].textContent).toContain(formatMoney(1200, 'PLN'));
+
+    expect(element().textContent).not.toContain('Poza miesiącem');
   });
 
   it('showsThreeItemsAndMoreInACellAndAllInTheDayDetails', async () => {
