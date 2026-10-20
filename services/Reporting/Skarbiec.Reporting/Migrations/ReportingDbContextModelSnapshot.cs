@@ -244,6 +244,41 @@ namespace Skarbiec.Reporting.Migrations
                     b.ToTable("AssetValuations");
                 });
 
+            modelBuilder.Entity("Skarbiec.Reporting.Data.GroupTargetAllocation", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Groups", "Skarbiec.Reporting.Data.GroupTargetAllocation.Groups#TargetAllocationGroup", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.PrimitiveCollection<string>("AssetClasses")
+                                .IsRequired();
+
+                            b1.Property<decimal>("BandPp");
+
+                            b1.Property<string>("Name")
+                                .IsRequired();
+
+                            b1.Property<decimal>("TargetPercent");
+
+                            b1
+                                .ToJson("Groups")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.HasKey("UserId", "GroupId");
+
+                    b.ToTable("GroupTargetAllocations");
+                });
+
             modelBuilder.Entity("Skarbiec.Reporting.Data.HistoryRebuildRequest", b =>
                 {
                     b.Property<Guid>("UserId")

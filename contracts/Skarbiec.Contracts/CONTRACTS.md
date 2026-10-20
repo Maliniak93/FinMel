@@ -52,6 +52,9 @@ to its seeded MarketData instrument id, so changing an id orphans every stored r
 `WatchlistItemAdded` and `WatchlistItemRemoved` (`WatchlistItemId, UserId, InstrumentId, OccurredAtUtc`) are
 Portfolio's facts about a user's watchlist; MarketData counts watchers from them (watchlist part 2).
 
+`AssetGroupDeleted` (`UserId, GroupId, OccurredAtUtc`) is Portfolio's fact that a user deleted an asset group;
+Reporting removes that group's target allocation.
+
 `TargetAllocationSaved` (`UserId, Groups, SavedAtUtc`) and `LatestValuationChanged` (`UserId, Date, IsStale,
 TotalPln, ByAssetClass, OccurredAtUtc`) are Reporting's facts; Portfolio replicates them per user and ignores a
 message older than the stored one (`SavedAtUtc`; `Date` then `OccurredAtUtc`).
