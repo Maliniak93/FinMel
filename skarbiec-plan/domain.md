@@ -165,7 +165,7 @@ erDiagram
 | Entity | Fields | Role |
 |---|---|---|
 | `Currency` | `Code (PK), Name, Symbol, DecimalPlaces, DisplayOrder` | no `FallbackRateToPln`, no `IsPivot` (PLN is the fixed base). Seed: PLN, EUR, USD, GBP, CHF |
-| `Instrument` | `Id, Ticker, Name, Source, QuoteCurrency, AssetClass, Exchange?, VerificationStatus, HistoryCoveredFrom?` | `HistoryCoveredFrom` is the earliest date `HistoryBackfillJob` has covered (the requested date, even when the source clamped it), null until the first backfill. `QuoteCurrency` is unconstrained (whatever the provider quotes), except a Stock/Etf takes it and `Exchange` (the configured name, e.g. GPW, Xetra; null for gold) from the `InstrumentSearch:Exchanges` entry matching its ticker suffix (ADR-030). Portfolio rejects a market asset whose class or currency differs from its instrument's |
+| `Instrument` | `Id, Ticker, Name, Source, QuoteCurrency, AssetClass, Exchange?, VerificationStatus, HistoryCoveredFrom?` | `HistoryCoveredFrom` is the earliest date `HistoryBackfillJob` has covered (the requested date, even when the source clamped it), null until the first backfill. `QuoteCurrency` is unconstrained (whatever the provider quotes), except a Stock/Etf takes it and `Exchange` (the configured name, e.g. GPW, Xetra; null for gold and silver) from the `InstrumentSearch:Exchanges` entry matching its ticker suffix (ADR-030). Portfolio rejects a market asset whose class or currency differs from its instrument's |
 | `PriceQuote` | `InstrumentId, Date, ClosePrice` — unique (instrument, date) | unchanged |
 | `FxRate` | `Pair (e.g. USDPLN), Date, Rate` — unique (pair, date) | unchanged |
 | `SyncRun` | + `Kind: Prices \| Fx \| Backfill \| BondCatalog` | one log shape for all four jobs |
@@ -175,7 +175,7 @@ erDiagram
 | `BondSeries` | `Code (PK, e.g. EDO1036), Type (TreasuryBondType), Isin, SaleStart, SaleEnd, IssuePrice, SwapPrice?, MarginPercent?, UpdatedAtUtc` | global catalog of retail treasury bond series from MF's `Dane_dotyczace_obligacji_detalicznych.xls`; never deleted when a series drops out of the file |
 | `BondSeriesPeriodRate` | `(SeriesCode, PeriodIndex) PK, RatePercent` — FK cascade to `BondSeries` | every period rate MF has published, in percent; `PeriodIndex` 0 is the first period; replaced by the file's on every sync |
 
-Jobs: `FxSyncJob` daily over every catalog currency, 12-month backfill on a currency's first run; `PriceSyncJob` syncs only instruments in use, held or watched (a first `WatchlistItemAdded` also enqueues a backfill from 14 days ago unless `HistoryCoveredFrom` already reaches it); `HistoryBackfillJob` fires from the `AssetPositionChanged` consumer when the earliest `FirstTransactionDate` of an instrument's live holdings predates its `HistoryCoveredFrom` (or nothing is covered yet) — never at instrument creation — and fetches only `[from, HistoryCoveredFrom − 1 day]` (or up to today), clamped to the source's `MaxHistoryDays` (unset for Yahoo and GoldApi), so the history only grows backwards from the first purchase, and on success publishes `InstrumentHistoryBackfilled` with the fetched window through the outbox; `BondCatalogSyncJob` daily (`BondCatalogSync:Cron`, 07:00) scrapes the MF page for the file link, parses the file and upserts the bond catalog by code in one transaction — a failure leaves the catalog unchanged — and runs once at startup when the catalog is empty. All four write a `SyncRun` and respect `Testing:DisableBackgroundJobs`.
+Jobs: `FxSyncJob` daily over every catalog currency, 12-month backfill on a currency's first run; `PriceSyncJob` syncs only instruments in use, held or watched (a first `WatchlistItemAdded` also enqueues a backfill from 14 days ago unless `HistoryCoveredFrom` already reaches it); `HistoryBackfillJob` fires from the `AssetPositionChanged` consumer when the earliest `FirstTransactionDate` of an instrument's live holdings predates its `HistoryCoveredFrom` (or nothing is covered yet) — never at instrument creation — and fetches only `[from, HistoryCoveredFrom − 1 day]` (or up to today), clamped to the source's `MaxHistoryDays` (unset for Yahoo), so the history only grows backwards from the first purchase, and on success publishes `InstrumentHistoryBackfilled` with the fetched window through the outbox; `BondCatalogSyncJob` daily (`BondCatalogSync:Cron`, 07:00) scrapes the MF page for the file link, parses the file and upserts the bond catalog by code in one transaction — a failure leaves the catalog unchanged — and runs once at startup when the catalog is empty. All four write a `SyncRun` and respect `Testing:DisableBackgroundJobs`.
 
 ```mermaid
 erDiagram
@@ -191,7 +191,7 @@ erDiagram
     INSTRUMENT {
         uuid id PK
         string ticker
-        string source "Yahoo GoldApi"
+        string source "Yahoo"
         string quote_currency
         string asset_class
         string verification_status "Verified Unverified Failed"

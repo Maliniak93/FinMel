@@ -47,7 +47,7 @@ Fixed prices served by the stub; see [market-data/README.md](market-data/README.
 | USD/PLN, EUR/PLN, GBP/PLN, CHF/PLN   | 4.0000, 4.2500, 5.0000, 4.5000 |
 | CDR.WA, VWCE.DE                      | 100.00 PLN, 100.00 EUR         |
 | PKO.WA (found by search, not seeded) | 50.00 PLN                      |
-| XAU, XAG                             | 300.00 USD/g, 3.00 USD/g       |
+| GC=F, SI=F (served per gram)         | 300.00 USD/g, 3.00 USD/g       |
 | Bond series OTS0127                  | first-period rate 2.00 %       |
 | NODATA.WA (any unlisted ticker)      | no data                        |
 

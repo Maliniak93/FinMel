@@ -16,15 +16,15 @@ public sealed class AddCustomInstrumentHandler(
 {
     public async Task<Result<AddedInstrument>> HandleAsync(AddCustomInstrumentRequest request, CancellationToken cancellationToken)
     {
+        if (request.AssetClass == AssetClass.PreciousMetal)
+        {
+            return InstrumentErrors.UnsupportedCustomMetal();
+        }
+
         var source = AssetClassPriceSourceMapping.Resolve(request.AssetClass);
         if (source is null)
         {
             return InstrumentErrors.UnsupportedAssetClass(request.AssetClass);
-        }
-
-        if (source == PriceSource.GoldApi)
-        {
-            return InstrumentErrors.UnsupportedCustomSource(source.Value);
         }
 
         // Picking a listing twice answers with the one already stored, so the client needs no conflict path.

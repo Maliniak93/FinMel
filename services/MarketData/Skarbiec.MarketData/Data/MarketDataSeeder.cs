@@ -6,11 +6,11 @@ namespace Skarbiec.MarketData.Data;
 // Illustrative starter instruments plus the currency catalog; idempotent by natural key, so safe on every startup.
 public static class MarketDataSeeder
 {
-    // Metals carry their fixed MetalInstruments id and are priced per gram of fine metal, despite the ounce-style tickers.
+    // Metals carry their fixed MetalInstruments id; Yahoo futures quote per troy ounce, MetalQuoteUnit serves them per gram.
     private static readonly (Guid? Id, string Ticker, string Name, PriceSource Source, string QuoteCurrency, AssetClass AssetClass, string? Exchange)[] SeedInstruments =
     [
-        (MetalInstruments.Gold, "XAU", "Gold (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal, null),
-        (MetalInstruments.Silver, "XAG", "Silver (1 g)", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal, null),
+        (MetalInstruments.Gold, "GC=F", "Gold (1 g)", PriceSource.Yahoo, "USD", AssetClass.PreciousMetal, null),
+        (MetalInstruments.Silver, "SI=F", "Silver (1 g)", PriceSource.Yahoo, "USD", AssetClass.PreciousMetal, null),
         (null, "CDR.WA", "CD Projekt", PriceSource.Yahoo, "PLN", AssetClass.Stock, "GPW"),
         (null, "VWCE.DE", "Vanguard FTSE All-World UCITS ETF (Acc)", PriceSource.Yahoo, "EUR", AssetClass.Etf, "Xetra"),
     ];

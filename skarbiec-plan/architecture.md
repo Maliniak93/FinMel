@@ -64,7 +64,6 @@ flowchart LR
     end
     NBP["NBP API<br/>FX"]
     STOOQ["Stooq<br/>GPW / ETF"]
-    GA["gold-api.com<br/>gold / silver spot"]
     MF["Ministry of Finance (gov.pl)<br/>retail treasury bond file"]
 
     U -->|HTTPS| SPA
@@ -74,7 +73,6 @@ flowchart LR
     SVC --> DB
     SVC -->|"jobs, daily"| NBP
     SVC -->|"jobs, daily"| STOOQ
-    SVC -->|"jobs, daily"| GA
     SVC -->|"jobs, daily"| MF
 ```
 
@@ -102,7 +100,7 @@ flowchart TB
     MD --> MDB[("marketdata_db")]
     RP --> RDB[("reporting_db")]
 
-    MD -->|"HTTP, jobs"| EXT["NBP / Stooq / gold-api.com / MF"]
+    MD -->|"HTTP, jobs"| EXT["NBP / Stooq / Yahoo (stocks, ETFs, gold and silver futures) / MF"]
 
     ASPIRE["Aspire dashboard<br/>(traces, logs, metrics)"]
     ASPIRE -.-> GW & ID & PF & MD & RP

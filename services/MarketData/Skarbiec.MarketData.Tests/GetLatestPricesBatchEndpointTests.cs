@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.GetLatestPricesBatch;
 using Skarbiec.MarketData.Tests.Fixtures;
@@ -56,6 +57,32 @@ public sealed class GetLatestPricesBatchEndpointTests(SkarbiecContainersFixture 
         Assert.Equal("USD", quote.QuoteCurrency);
         Assert.Equal(new DateOnly(2026, 8, 5), quote.Date);
         Assert.Equal(160m, quote.Close);
+    }
+
+    [Fact]
+    public async Task Metal_IsServedPerGram_StockUnchanged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var seedDb = CreateDbContext();
+        var goldId = await seedDb.SeedInstrumentAsync("GC=F", "Gold (1 g)", PriceSource.Yahoo, "USD", cancellationToken, AssetClass.PreciousMetal);
+        var stockId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
+        var friday = new DateOnly(2026, 1, 9);
+        await seedDb.SeedQuoteAsync(goldId, friday, 9331.04304m, cancellationToken);
+        await seedDb.SeedQuoteAsync(stockId, friday, 160m, cancellationToken);
+
+        using var client = Factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            InternalLatestPricesBatchUri,
+            new { InstrumentIds = new[] { goldId, stockId }, AsOfDate = new DateOnly(2026, 1, 11) },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<LatestPricesBatchResponse>(cancellationToken);
+        var gold = Assert.Single(body!.Quotes, q => q.InstrumentId == goldId);
+        var stock = Assert.Single(body.Quotes, q => q.InstrumentId == stockId);
+        Assert.Equal(friday, gold.Date);
+        Assert.Equal(300m, gold.Close);
+        Assert.Equal(160m, stock.Close);
     }
 
     [Fact]

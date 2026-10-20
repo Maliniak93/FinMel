@@ -34,13 +34,15 @@ public sealed class MarketDataSeederTests(SkarbiecContainersFixture containers) 
         await MarketDataSeeder.SeedAsync(context, cancellationToken);
 
         var instruments = await context.Instruments.ToListAsync(cancellationToken);
-        var gold = Assert.Single(instruments, i => i.Ticker == "XAU");
-        var silver = Assert.Single(instruments, i => i.Ticker == "XAG");
+        var gold = Assert.Single(instruments, i => i.Ticker == "GC=F");
+        var silver = Assert.Single(instruments, i => i.Ticker == "SI=F");
+        Assert.DoesNotContain(instruments, i => i.Ticker is "XAU" or "XAG");
+        Assert.Equal([PriceSource.Yahoo], Enum.GetValues<PriceSource>());
         Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Gold), gold.Id);
         Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Silver), silver.Id);
         Assert.All([gold, silver], i =>
         {
-            Assert.Equal(PriceSource.GoldApi, i.Source);
+            Assert.Equal(PriceSource.Yahoo, i.Source);
             Assert.Equal("USD", i.QuoteCurrency);
             Assert.Equal(AssetClass.PreciousMetal, i.AssetClass);
         });

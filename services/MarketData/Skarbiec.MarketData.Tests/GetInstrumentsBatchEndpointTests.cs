@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.Testing.Containers;
@@ -48,6 +49,28 @@ public sealed class GetInstrumentsBatchEndpointTests(SkarbiecContainersFixture c
             () => Assert.Equal("PLN", cdr.GetProperty("quoteCurrency").GetString()),
             () => Assert.Equal(JsonValueKind.Null, cdr.GetProperty("lastPrice").ValueKind),
             () => Assert.Equal(JsonValueKind.Null, cdr.GetProperty("lastPriceDate").ValueKind));
+    }
+
+    [Fact]
+    public async Task Metal_LastPriceIsPerGram()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Guid goldId;
+        await using (var seedDb = CreateDbContext())
+        {
+            goldId = await seedDb.SeedInstrumentAsync("GC=F", "Gold (1 g)", PriceSource.Yahoo, "USD", cancellationToken, AssetClass.PreciousMetal);
+            await seedDb.SeedQuoteAsync(goldId, new DateOnly(2026, 1, 5), 6220.69536m, cancellationToken);
+            await seedDb.SeedQuoteAsync(goldId, new DateOnly(2026, 1, 20), 9331.04304m, cancellationToken);
+        }
+
+        using var client = Factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            InternalInstrumentsBatchUri, new { instrumentIds = new[] { goldId } }, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        var gold = Assert.Single(document.RootElement.GetProperty("instruments").EnumerateArray());
+        Assert.Equal(300m, gold.GetProperty("lastPrice").GetDecimal());
     }
 
     [Fact]

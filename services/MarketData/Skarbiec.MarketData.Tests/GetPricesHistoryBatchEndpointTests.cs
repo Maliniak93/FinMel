@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.GetPricesHistoryBatch;
 using Skarbiec.MarketData.Tests.Fixtures;
@@ -37,6 +38,32 @@ public sealed class GetPricesHistoryBatchEndpointTests(SkarbiecContainersFixture
             new[] { new DateOnly(2026, 1, 2), new DateOnly(2026, 1, 5), new DateOnly(2026, 1, 6) },
             series.Quotes.Select(q => q.Date));
         Assert.Equal(new[] { 100m, 105m, 106m }, series.Quotes.Select(q => q.Close));
+    }
+
+    [Fact]
+    public async Task Metal_IsServedPerGram_WeekendCarriesLastClose()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var seedDb = CreateDbContext();
+        var goldId = await seedDb.SeedInstrumentAsync("GC=F", "Gold (1 g)", PriceSource.Yahoo, "USD", cancellationToken, AssetClass.PreciousMetal);
+        var stockId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
+        await seedDb.SeedQuoteAsync(goldId, new DateOnly(2026, 1, 8), 6220.69536m, cancellationToken);
+        await seedDb.SeedQuoteAsync(goldId, new DateOnly(2026, 1, 9), 9331.04304m, cancellationToken);
+        await seedDb.SeedQuoteAsync(stockId, new DateOnly(2026, 1, 9), 160m, cancellationToken);
+
+        using var client = Factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            InternalPricesHistoryBatchUri,
+            new { InstrumentIds = new[] { goldId, stockId }, From = new DateOnly(2026, 1, 8), To = new DateOnly(2026, 1, 11) },
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<PricesHistoryBatchResponse>(cancellationToken);
+        var gold = Assert.Single(body!.Series, s => s.InstrumentId == goldId);
+        var stock = Assert.Single(body.Series, s => s.InstrumentId == stockId);
+        Assert.Equal(new[] { 200m, 300m }, gold.Quotes.Select(q => q.Close));
+        Assert.Equal(new DateOnly(2026, 1, 9), gold.Quotes[^1].Date);
+        Assert.Equal(160m, Assert.Single(stock.Quotes).Close);
     }
 
     [Fact]

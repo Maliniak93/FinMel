@@ -219,9 +219,9 @@ public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) 
         var errorInstrument = new Instrument
         {
             Id = Guid.NewGuid(),
-            Ticker = "XAU",
+            Ticker = "GC=F",
             Name = "Gold",
-            Source = PriceSource.GoldApi,
+            Source = PriceSource.Yahoo,
             QuoteCurrency = "USD",
             AssetClass = AssetClass.PreciousMetal,
             HistoryCoveredFrom = new DateOnly(2026, 1, 1),
@@ -229,16 +229,21 @@ public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) 
         db.Instruments.AddRange(noDataInstrument, errorInstrument);
         await db.SaveChangesAsync(cancellationToken);
 
-        IPriceSource[] sources =
-        [
-            new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.NoData()),
-            new ScriptedPriceSource(PriceSource.GoldApi, historyResult: PriceFetchResult<InstrumentQuote>.Error("down")),
-        ];
-
-        var job = new HistoryBackfillJob(db, sources, publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
+        var noDataJob = new HistoryBackfillJob(
+            db,
+            [new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.NoData())],
+            publishEndpoint,
+            TimeProvider.System,
+            NullLogger<HistoryBackfillJob>.Instance);
+        var errorJob = new HistoryBackfillJob(
+            db,
+            [new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Error("down"))],
+            publishEndpoint,
+            TimeProvider.System,
+            NullLogger<HistoryBackfillJob>.Instance);
         var from = new DateOnly(2025, 3, 1);
-        await job.RunAsync(noDataInstrument.Id, from, cancellationToken);
-        await job.RunAsync(errorInstrument.Id, from, cancellationToken);
+        await noDataJob.RunAsync(noDataInstrument.Id, from, cancellationToken);
+        await errorJob.RunAsync(errorInstrument.Id, from, cancellationToken);
 
         var run = await db.SyncRuns.Where(r => r.Kind == SyncRunKind.Backfill).ToListAsync(cancellationToken);
         Assert.Equal(2, run.Count);

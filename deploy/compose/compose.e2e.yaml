@@ -51,7 +51,6 @@ services:
     environment:
       Yahoo__BaseUrl: http://market-stub:8080/yahoo/
       Nbp__BaseUrl: http://market-stub:8080/nbp/api/
-      GoldApi__BaseUrl: http://market-stub:8080/gold/
       BondCatalog__PageUrl: http://market-stub:8080/mf/page
       PriceSync__Cron: "0/15 * * * * ?"
       FxSync__Cron: "0/15 * * * * ?"

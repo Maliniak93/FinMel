@@ -7,7 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
-using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing;
@@ -26,7 +25,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
     private static readonly DateOnly Today = new(2026, 8, 3);
 
     [Fact]
-    public async Task RunAsync_OneSourceFails_OtherSynced_RunRecordedAsPartial()
+    public async Task RunAsync_SourceAnswersForOneInstrumentOnly_RunRecordedAsPartial()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
@@ -34,16 +33,15 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var goldInstrument = NewUsedInstrument(db, "XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
+        var goldInstrument = NewUsedInstrument(db, "GC=F", PriceSource.Yahoo, "USD", AssetClass.PreciousMetal);
         var yahooInstrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
         await db.SaveChangesAsync(cancellationToken);
 
+        // The source answers for one instrument only; the other counts as failed.
         IPriceSource[] sources =
         [
-            new ScriptedPriceSource(PriceSource.GoldApi, PriceFetchResult<InstrumentQuote>.Success(
+            new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Success(
                 [new InstrumentQuote(goldInstrument.Id, Today, 350.12m)])),
-            // One source errors out entirely; the other must still sync.
-            new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Error("yahoo is down")),
         ];
 
         var job = new PriceSyncJob(db, sources, publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
@@ -63,7 +61,7 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
     }
 
     [Fact]
-    public async Task RunAsync_UsedMetal_StoresTodaysGramQuoteFromGoldApi()
+    public async Task RunAsync_UsedMetal_StoresTodaysOunceQuoteFromYahoo()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
@@ -71,18 +69,18 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var gold = NewUsedInstrument(db, "XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
+        var gold = NewUsedInstrument(db, "GC=F", PriceSource.Yahoo, "USD", AssetClass.PreciousMetal);
         await db.SaveChangesAsync(cancellationToken);
 
-        var client = new FakeGoldApiClient().WithPricePerOunce("XAU", 4165.5m, DateTimeOffset.UtcNow);
-        var source = new GoldApiPriceSource(client, NullLogger<GoldApiPriceSource>.Instance);
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, PriceFetchResult<InstrumentQuote>.Success(
+            [new InstrumentQuote(gold.Id, Today, 4165.5m)]));
 
         var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
         await job.RunAsync(cancellationToken);
 
         var quote = await db.PriceQuotes.SingleAsync(q => q.InstrumentId == gold.Id, cancellationToken);
-        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), quote.Date);
-        Assert.Equal(Math.Round(4165.5m / 31.1034768m, 8), quote.Close);
+        Assert.Equal(Today, quote.Date);
+        Assert.Equal(4165.5m, quote.Close);
     }
 
     [Fact]
