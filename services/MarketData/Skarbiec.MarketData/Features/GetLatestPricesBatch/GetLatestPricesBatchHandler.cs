@@ -9,10 +9,11 @@ public sealed class GetLatestPricesBatchHandler(MarketDataDbContext dbContext)
     {
         var instrumentIds = request.InstrumentIds.Distinct().ToList();
 
-        var quoteCurrencies = await dbContext.Instruments
+        var instruments = await dbContext.Instruments
             .AsNoTracking()
             .Where(i => instrumentIds.Contains(i.Id))
-            .ToDictionaryAsync(i => i.Id, i => i.QuoteCurrency, cancellationToken);
+            .Select(i => new { i.Id, i.QuoteCurrency, i.AssetClass })
+            .ToDictionaryAsync(i => i.Id, cancellationToken);
 
         var latestQuotes = await dbContext.PriceQuotes
             .AsNoTracking()
@@ -22,13 +23,13 @@ public sealed class GetLatestPricesBatchHandler(MarketDataDbContext dbContext)
             .ToListAsync(cancellationToken);
 
         var quotes = latestQuotes
-            .Where(q => quoteCurrencies.ContainsKey(q.InstrumentId))
+            .Where(q => instruments.ContainsKey(q.InstrumentId))
             .Select(q => new InstrumentQuoteResult
             {
                 InstrumentId = q.InstrumentId,
-                QuoteCurrency = quoteCurrencies[q.InstrumentId],
+                QuoteCurrency = instruments[q.InstrumentId].QuoteCurrency,
                 Date = q.Date,
-                Close = q.Close,
+                Close = MetalQuoteUnit.ToServedPrice(instruments[q.InstrumentId].AssetClass, q.Close),
             })
             .ToList();
 

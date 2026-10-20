@@ -29,12 +29,24 @@
       "quoteType": "EQUITY",
       "currency": "PLN",
       "close": "50.00"
+    },
+    {
+      "symbol": "GC=F",
+      "name": "Gold Dec 26",
+      "exchange": "CMX",
+      "quoteType": "FUTURE",
+      "currency": "USD",
+      "close": "9331.04304"
+    },
+    {
+      "symbol": "SI=F",
+      "name": "Silver Dec 26",
+      "exchange": "CMX",
+      "quoteType": "FUTURE",
+      "currency": "USD",
+      "close": "93.3104304"
     }
   ],
-  "metals": {
-    "XAU": { "usdPerOunce": "9331.04304" },
-    "XAG": { "usdPerOunce": "93.3104304" }
-  },
   "bondFile": "mf-bonds.xls",
   "bondFileName": "Dane_dotyczace_obligacji_detalicznych.xls"
 }

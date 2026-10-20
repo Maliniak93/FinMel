@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
-using Skarbiec.MarketData.Sources.GoldApi;
 
 namespace Skarbiec.MarketData.Features.GetMetalPrices;
 
@@ -52,17 +51,17 @@ public sealed class GetMetalPricesHandler(MarketDataDbContext dbContext, TimePro
             .Select(r => (decimal?)r.Rate)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var pricePerGramPln = quote.Close * rate;
+        var pricePerGramUsd = MetalQuoteUnit.ToServedPrice(AssetClass.PreciousMetal, quote.Close);
 
         return new MetalPriceResponse
         {
             Metal = metal,
             InstrumentId = instrumentId,
             Date = quote.Date,
-            PricePerGramUsd = quote.Close,
+            PricePerGramUsd = pricePerGramUsd,
             UsdPlnRate = rate,
-            PricePerGramPln = RoundToCents(pricePerGramPln),
-            PricePerTroyOuncePln = RoundToCents(pricePerGramPln * GoldApiPriceSource.GramsPerTroyOunce),
+            PricePerGramPln = RoundToCents(pricePerGramUsd * rate),
+            PricePerTroyOuncePln = RoundToCents(quote.Close * rate),
             IsStale = quote.Date < today.AddDays(-StaleAfterDays),
         };
     }

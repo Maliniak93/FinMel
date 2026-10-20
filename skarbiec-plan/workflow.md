@@ -158,7 +158,7 @@ writes the reproduction steps.
 
 **Market data facts** a plan can rely on:
 
-- The seeder adds, on every startup, the instruments gold `XAU` and silver `XAG` (per gram of fine metal, GoldApi), `CDR.WA`
+- The seeder adds, on every startup, the instruments gold `GC=F` and silver `SI=F` (Yahoo futures priced per troy ounce, served per gram of fine metal), `CDR.WA`
   (CD Projekt, GPW, PLN) and `VWCE.DE` (Vanguard FTSE All-World, Xetra, EUR), plus the currencies PLN, EUR, USD, GBP, CHF.
 - Prices sync on a 2-minute cron. After a holding is added, the sync button on Settings pulls its price at once instead of
   waiting for the cron.

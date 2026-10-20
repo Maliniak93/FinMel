@@ -1,6 +1,6 @@
-namespace Skarbiec.MarketData.Sources.GoldApi;
+namespace Skarbiec.MarketData.Sources.StooqApi;
 
-public interface IGoldApiClient
+public interface IStooqApiClient
 {
     Task<decimal> GetPriceAsync(string symbol, CancellationToken cancellationToken);
 }

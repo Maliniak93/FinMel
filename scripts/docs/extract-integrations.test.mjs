@@ -23,12 +23,12 @@ const integration = (client) => {
 test("a literal base URL and an Options default overridden in appsettings.json both show as the effective base URL", () => {
   assert.ok(mentions(integration("YahooApiClient"), "https://yahoo.fixture.test/"));
 
-  const gold = integration("GoldApiClient");
-  assert.ok(mentions(gold, "https://gold.fixture.test/"), "appsettings.json override");
-  assert.ok(!mentions(gold, "api.gold-api.com"), "the Options default is overridden, not shown");
+  const stooq = integration("StooqApiClient");
+  assert.ok(mentions(stooq, "https://stooq.fixture.test/"), "appsettings.json override");
+  assert.ok(!mentions(stooq, "api.stooq.example"), "the Options default is overridden, not shown");
 });
 
 test("each client shows its caller chain client, then source class, then job, with IEnumerable<IPriceSource> resolved", () => {
   assert.ok(inOrderTokens(integration("YahooApiClient"), ["YahooApiClient", "YahooPriceSource", "PriceSyncJob"]));
-  assert.ok(inOrderTokens(integration("GoldApiClient"), ["GoldApiClient", "GoldApiPriceSource", "PriceSyncJob"]));
+  assert.ok(inOrderTokens(integration("StooqApiClient"), ["StooqApiClient", "StooqApiPriceSource", "PriceSyncJob"]));
 });

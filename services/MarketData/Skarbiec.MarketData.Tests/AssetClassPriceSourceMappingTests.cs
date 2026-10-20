@@ -33,9 +33,9 @@ public sealed class AssetClassPriceSourceMappingTests
     }
 
     [Fact]
-    public void Resolve_PreciousMetal_IsPricedByGoldApi()
+    public void Resolve_PreciousMetal_IsPricedByYahoo()
     {
-        Assert.Equal(PriceSource.GoldApi, AssetClassPriceSourceMapping.Resolve(AssetClass.PreciousMetal));
+        Assert.Equal(PriceSource.Yahoo, AssetClassPriceSourceMapping.Resolve(AssetClass.PreciousMetal));
     }
 
     [Fact]

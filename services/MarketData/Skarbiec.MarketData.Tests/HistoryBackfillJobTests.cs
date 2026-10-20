@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Sources;
-using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing.Containers;
@@ -57,12 +56,12 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var instrument = NewInstrument("XAU", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
+        var instrument = NewInstrument("GC=F", PriceSource.Yahoo, "USD", AssetClass.PreciousMetal);
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
         var quotes = OneYearOfDates().Select(d => new InstrumentQuote(instrument.Id, d, 350m)).ToList();
-        var source = new ScriptedPriceSource(PriceSource.GoldApi, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
         var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, OneYearAgo, cancellationToken);
@@ -72,7 +71,7 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
     }
 
     [Fact]
-    public async Task RunAsync_NewlyUsedMetal_BackfillsTodaysQuote()
+    public async Task RunAsync_MetalWithPastPurchase_BackfillsDailyOunceQuotes()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
@@ -80,19 +79,26 @@ public sealed class HistoryBackfillJobTests(SkarbiecContainersFixture containers
         var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
-        var instrument = NewInstrument("XAG", PriceSource.GoldApi, "USD", AssetClass.PreciousMetal);
+        var instrument = NewInstrument("SI=F", PriceSource.Yahoo, "USD", AssetClass.PreciousMetal);
         db.Instruments.Add(instrument);
         await db.SaveChangesAsync(cancellationToken);
 
-        var client = new FakeGoldApiClient().WithPricePerOunce("XAG", 62.2m, DateTimeOffset.UtcNow);
-        var source = new GoldApiPriceSource(client, NullLogger<GoldApiPriceSource>.Instance);
+        var quotes = new[]
+        {
+            new InstrumentQuote(instrument.Id, OneYearAgo, 62.2m),
+            new InstrumentQuote(instrument.Id, OneYearAgo.AddDays(1), 63.4m),
+            new InstrumentQuote(instrument.Id, OneYearAgo.AddDays(4), 61.9m),
+        };
+        var source = new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(quotes));
 
         var job = new HistoryBackfillJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<HistoryBackfillJob>.Instance);
         await job.RunAsync(instrument.Id, OneYearAgo, cancellationToken);
 
-        var quote = await db.PriceQuotes.SingleAsync(q => q.InstrumentId == instrument.Id, cancellationToken);
-        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), quote.Date);
-        Assert.Equal(Math.Round(62.2m / 31.1034768m, 8), quote.Close);
+        var stored = await db.PriceQuotes.Where(q => q.InstrumentId == instrument.Id).OrderBy(q => q.Date).ToListAsync(cancellationToken);
+        Assert.Equal(new[] { 62.2m, 63.4m, 61.9m }, stored.Select(q => q.Close));
+        Assert.Equal(quotes.Select(q => q.Date), stored.Select(q => q.Date));
+        var outboxMessages = await db.Set<MassTransit.EntityFrameworkCoreIntegration.OutboxMessage>().ToListAsync(cancellationToken);
+        Assert.Contains(outboxMessages, m => m.MessageType.Contains("InstrumentHistoryBackfilled"));
     }
 
     [Fact]

@@ -28,7 +28,7 @@ test.describe('market data stub', () => {
     expect(body.results.map((r) => r.ticker)).toContain('PKO.WA');
   });
 
-  test('market data: MarketData fetched NBP and gold-api from the stub', async ({
+  test('market data: MarketData fetched NBP rates and the gold future from the stub', async ({
     request,
     accessToken,
   }) => {
@@ -42,8 +42,11 @@ test.describe('market data stub', () => {
     // The FX and price crons fire every 15 seconds in the e2e stack.
     await expect(async () => {
       const log = await request.get(`${STUB_URL}/__requests`);
-      const providers = new Set(((await log.json()) as StubRequest[]).map((r) => r.provider));
-      expect([...providers]).toEqual(expect.arrayContaining(['nbp', 'gold']));
+      const calls = (await log.json()) as StubRequest[];
+      expect(calls.map((r) => r.provider)).toContain('nbp');
+      expect(calls.map((r) => decodeURIComponent(r.path))).toContainEqual(
+        expect.stringContaining('/chart/GC=F'),
+      );
     }).toPass({ timeout: 60_000, intervals: [2_000] });
   });
 });

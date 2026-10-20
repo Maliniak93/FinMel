@@ -89,7 +89,6 @@ test("facts on this repository lists the three scheduled jobs with their cron, a
     for (const [client, caller] of [
       ["YahooApiClient", "PriceSyncJob"],
       ["NbpApiClient", "FxSyncJob"],
-      ["GoldApiClient", "PriceSyncJob"],
       ["MfBondSource", "BondCatalogSyncJob"],
     ]) {
       const integration = integrations.find((i) => mentions(i, client));

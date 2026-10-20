@@ -28,7 +28,7 @@ A multi-user web application for managing personal wealth. The user enters asset
 - Portfolios: create, edit, archive.
 - Assets in two valuation modes: market (ticker-priced) and currency-valued.
 - Transactions: buy, sell, deposit, withdrawal, dividend, interest — asset quantity derived from transaction history.
-- Automatic FX rates (NBP) and quotes (Yahoo, gold-api.com) — daily job.
+- Automatic FX rates (NBP) and quotes (Yahoo, including gold and silver futures) — daily job.
 - Ticker verification before a market asset is created, so a typo doesn't silently create a dead instrument (ADR-018).
 - Portfolio valuation in PLN, net-worth dashboard, value history.
 - Dark theme.

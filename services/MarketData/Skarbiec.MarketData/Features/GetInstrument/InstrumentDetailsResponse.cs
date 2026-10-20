@@ -26,6 +26,6 @@ public static class InstrumentDetailsMappingExtensions
         instrument.Exchange,
         instrument.Source,
         instrument.VerificationStatus,
-        latestQuote?.Close,
+        MetalQuoteUnit.ToServedPrice(instrument.AssetClass, latestQuote?.Close),
         latestQuote?.Date);
 }

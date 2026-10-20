@@ -18,7 +18,7 @@ public sealed class GetMetalPricesEndpointTests(SkarbiecContainersFixture contai
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await SeedAsync(
-            goldDate: new DateOnly(2026, 10, 6), goldPricePerGramUsd: 133.92m,
+            goldDate: new DateOnly(2026, 10, 6), goldCloseUsdPerOunce: 9331.04304m,
             rateDate: new DateOnly(2026, 10, 5), usdPlnRate: 3.9m, cancellationToken);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
@@ -31,10 +31,10 @@ public sealed class GetMetalPricesEndpointTests(SkarbiecContainersFixture contai
         var gold = Assert.Single(items, i => i.Metal == Metal.Gold);
         Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Gold), gold.InstrumentId);
         Assert.Equal(new DateOnly(2026, 10, 6), gold.Date);
-        Assert.Equal(133.92m, gold.PricePerGramUsd);
+        Assert.Equal(300m, gold.PricePerGramUsd);
         Assert.Equal(3.9m, gold.UsdPlnRate);
-        Assert.Equal(522.29m, gold.PricePerGramPln);
-        Assert.Equal(Math.Round(133.92m * 3.9m * 31.1034768m, 2), gold.PricePerTroyOuncePln);
+        Assert.Equal(1170m, gold.PricePerGramPln);
+        Assert.Equal(Math.Round(9331.04304m * 3.9m, 2), gold.PricePerTroyOuncePln);
         var silver = Assert.Single(items, i => i.Metal == Metal.Silver);
         Assert.Equal(MetalInstruments.InstrumentIdFor(Metal.Silver), silver.InstrumentId);
         Assert.Null(silver.Date);
@@ -50,7 +50,7 @@ public sealed class GetMetalPricesEndpointTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         await SeedAsync(
-            goldDate: today.AddDays(-10), goldPricePerGramUsd: 133.92m,
+            goldDate: today.AddDays(-10), goldCloseUsdPerOunce: 9331.04304m,
             rateDate: today.AddDays(-10), usdPlnRate: 3.9m, cancellationToken);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
@@ -72,7 +72,7 @@ public sealed class GetMetalPricesEndpointTests(SkarbiecContainersFixture contai
     }
 
     private async Task SeedAsync(
-        DateOnly goldDate, decimal goldPricePerGramUsd, DateOnly rateDate, decimal usdPlnRate, CancellationToken cancellationToken)
+        DateOnly goldDate, decimal goldCloseUsdPerOunce, DateOnly rateDate, decimal usdPlnRate, CancellationToken cancellationToken)
     {
         await using var db = CreateDbContext();
         await MarketDataSeeder.SeedAsync(db, cancellationToken);
@@ -81,7 +81,7 @@ public sealed class GetMetalPricesEndpointTests(SkarbiecContainersFixture contai
             Id = Guid.NewGuid(),
             InstrumentId = MetalInstruments.InstrumentIdFor(Metal.Gold),
             Date = goldDate,
-            Close = goldPricePerGramUsd,
+            Close = goldCloseUsdPerOunce,
         });
         db.FxRates.Add(new FxRate { Id = Guid.NewGuid(), Pair = "USDPLN", Date = rateDate, Rate = usdPlnRate });
         await db.SaveChangesAsync(cancellationToken);
