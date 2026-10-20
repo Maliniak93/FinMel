@@ -4,6 +4,38 @@
   gap: 16px;
 }
 
+.allocation-page__scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.allocation-page__scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--mat-sys-outline);
+  border-radius: 16px;
+  background: transparent;
+  color: var(--mat-sys-on-surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+.allocation-page__scope-chip--selected {
+  border-color: transparent;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.allocation-page__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
 .allocation-page__state {
   display: flex;
   flex-direction: column;

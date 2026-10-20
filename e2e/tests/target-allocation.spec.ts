@@ -616,7 +616,7 @@ test('target allocation: the editor, the deviations table, the dashboard card, E
   await test.step('Krok 12: renaming Kruszce to akcje/etf blocks the save as a taken name and Anuluj leaves the view unchanged', async () => {
     await startEditing(page);
     await editorRow(page, 2).getByTestId('group-name').fill('akcje/etf');
-    await expect(page.getByRole('alert')).toContainText('Nazwy grup muszą się różnić.');
+    await expect(page.getByRole('alert')).toContainText('Nazwy grup klas muszą się różnić.');
     await expect(page.getByTestId('save')).toBeDisabled();
     await page.getByTestId('cancel').click();
     await expect(page.getByTestId('allocation-view')).toBeVisible();
