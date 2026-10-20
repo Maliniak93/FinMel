@@ -158,3 +158,57 @@ export type PutApiReportingTargetAllocationResponses = {
 };
 
 export type PutApiReportingTargetAllocationResponse = PutApiReportingTargetAllocationResponses[keyof PutApiReportingTargetAllocationResponses];
+
+export type DeleteApiReportingTargetAllocationGroupsByGroupIdData = {
+    body?: never;
+    path: {
+        groupId: string;
+    };
+    query?: never;
+    url: '/api/reporting/target-allocation/groups/{groupId}';
+};
+
+export type DeleteApiReportingTargetAllocationGroupsByGroupIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiReportingTargetAllocationGroupsByGroupIdResponse = DeleteApiReportingTargetAllocationGroupsByGroupIdResponses[keyof DeleteApiReportingTargetAllocationGroupsByGroupIdResponses];
+
+export type GetApiReportingTargetAllocationGroupsByGroupIdData = {
+    body?: never;
+    path: {
+        groupId: string;
+    };
+    query?: never;
+    url: '/api/reporting/target-allocation/groups/{groupId}';
+};
+
+export type GetApiReportingTargetAllocationGroupsByGroupIdResponses = {
+    /**
+     * OK
+     */
+    200: TargetAllocationResponse;
+};
+
+export type GetApiReportingTargetAllocationGroupsByGroupIdResponse = GetApiReportingTargetAllocationGroupsByGroupIdResponses[keyof GetApiReportingTargetAllocationGroupsByGroupIdResponses];
+
+export type PutApiReportingTargetAllocationGroupsByGroupIdData = {
+    body: SaveTargetAllocationRequest;
+    path: {
+        groupId: string;
+    };
+    query?: never;
+    url: '/api/reporting/target-allocation/groups/{groupId}';
+};
+
+export type PutApiReportingTargetAllocationGroupsByGroupIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiReportingTargetAllocationGroupsByGroupIdResponse = PutApiReportingTargetAllocationGroupsByGroupIdResponses[keyof PutApiReportingTargetAllocationGroupsByGroupIdResponses];

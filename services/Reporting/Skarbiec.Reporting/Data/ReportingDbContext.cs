@@ -17,6 +17,7 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
     public DbSet<LatestFxRate> LatestFxRates => Set<LatestFxRate>();
     public DbSet<HistoryRebuildRequest> HistoryRebuildRequests => Set<HistoryRebuildRequest>();
     public DbSet<TargetAllocation> TargetAllocations => Set<TargetAllocation>();
+    public DbSet<GroupTargetAllocation> GroupTargetAllocations => Set<GroupTargetAllocation>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -49,6 +50,15 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
         {
             allocation.HasKey(a => a.UserId);
             allocation.Property(a => a.UserId).ValueGeneratedNever();
+
+            allocation.ComplexCollection(a => a.Groups, groups => groups.ToJson());
+        });
+
+        modelBuilder.Entity<GroupTargetAllocation>(allocation =>
+        {
+            allocation.HasKey(a => new { a.UserId, a.GroupId });
+            allocation.Property(a => a.UserId).ValueGeneratedNever();
+            allocation.Property(a => a.GroupId).ValueGeneratedNever();
 
             allocation.ComplexCollection(a => a.Groups, groups => groups.ToJson());
         });

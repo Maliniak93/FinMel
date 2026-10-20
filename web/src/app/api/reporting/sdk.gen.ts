@@ -2,7 +2,7 @@
 
 import { client } from './client.gen.js';
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client/index.js';
-import type { GetApiReportingDashboardData, GetApiReportingDashboardResponses, GetApiReportingNetWorthHistoryData, GetApiReportingNetWorthHistoryResponses, GetApiReportingTargetAllocationData, GetApiReportingTargetAllocationResponses, PutApiReportingTargetAllocationData, PutApiReportingTargetAllocationResponses } from './types.gen.js';
+import type { DeleteApiReportingTargetAllocationGroupsByGroupIdData, DeleteApiReportingTargetAllocationGroupsByGroupIdResponses, GetApiReportingDashboardData, GetApiReportingDashboardResponses, GetApiReportingNetWorthHistoryData, GetApiReportingNetWorthHistoryResponses, GetApiReportingTargetAllocationData, GetApiReportingTargetAllocationGroupsByGroupIdData, GetApiReportingTargetAllocationGroupsByGroupIdResponses, GetApiReportingTargetAllocationResponses, PutApiReportingTargetAllocationData, PutApiReportingTargetAllocationGroupsByGroupIdData, PutApiReportingTargetAllocationGroupsByGroupIdResponses, PutApiReportingTargetAllocationResponses } from './types.gen.js';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -26,6 +26,19 @@ export const getApiReportingTargetAllocation = <ThrowOnError extends boolean = f
 
 export const putApiReportingTargetAllocation = <ThrowOnError extends boolean = false>(options: Options<PutApiReportingTargetAllocationData, ThrowOnError>): RequestResult<PutApiReportingTargetAllocationResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiReportingTargetAllocationResponses, unknown, ThrowOnError>({
     url: '/api/reporting/target-allocation',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+export const deleteApiReportingTargetAllocationGroupsByGroupId = <ThrowOnError extends boolean = false>(options: Options<DeleteApiReportingTargetAllocationGroupsByGroupIdData, ThrowOnError>): RequestResult<DeleteApiReportingTargetAllocationGroupsByGroupIdResponses, unknown, ThrowOnError> => (options.client ?? client).delete<DeleteApiReportingTargetAllocationGroupsByGroupIdResponses, unknown, ThrowOnError>({ url: '/api/reporting/target-allocation/groups/{groupId}', ...options });
+
+export const getApiReportingTargetAllocationGroupsByGroupId = <ThrowOnError extends boolean = false>(options: Options<GetApiReportingTargetAllocationGroupsByGroupIdData, ThrowOnError>): RequestResult<GetApiReportingTargetAllocationGroupsByGroupIdResponses, unknown, ThrowOnError> => (options.client ?? client).get<GetApiReportingTargetAllocationGroupsByGroupIdResponses, unknown, ThrowOnError>({ url: '/api/reporting/target-allocation/groups/{groupId}', ...options });
+
+export const putApiReportingTargetAllocationGroupsByGroupId = <ThrowOnError extends boolean = false>(options: Options<PutApiReportingTargetAllocationGroupsByGroupIdData, ThrowOnError>): RequestResult<PutApiReportingTargetAllocationGroupsByGroupIdResponses, unknown, ThrowOnError> => (options.client ?? client).put<PutApiReportingTargetAllocationGroupsByGroupIdResponses, unknown, ThrowOnError>({
+    url: '/api/reporting/target-allocation/groups/{groupId}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
