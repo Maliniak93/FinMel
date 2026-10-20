@@ -4,6 +4,7 @@ import { MatTooltip } from '@angular/material/tooltip';
 import { provideRouter } from '@angular/router';
 
 import {
+  TRANSLATIONS,
   attributesOf,
   matchesTranslation,
   polishProblems,
@@ -34,6 +35,11 @@ import {
   cashPlacesResponse,
   dashboard,
   dashboardWithClasses,
+  dashboardWithGroups,
+  groups,
+  RETIREMENT_GROUP_ID,
+  INVESTMENTS_GROUP_ID,
+  CUSHION_GROUP_ID,
   jsonResponse,
   lastHistoryParams,
   mockApi,
@@ -600,5 +606,278 @@ describe('Dashboard', () => {
     expect(summary.querySelector('app-allocation-card')?.textContent).toContain(
       '2 z 3 grup poza pasmem',
     );
+  });
+
+  describe('groups', () => {
+    const groupCard = '.dashboard-page__group-card';
+
+    function groupCircles(element: HTMLElement): SVGElement[] {
+      return [...element.querySelectorAll<SVGElement>(`${groupCard} app-pie-chart circle`)];
+    }
+
+    function groupLegend(element: HTMLElement): HTMLButtonElement[] {
+      return [
+        ...element.querySelectorAll<HTMLButtonElement>('.dashboard-page__group-legend button'),
+      ];
+    }
+
+    function groupLegendRow(element: HTMLElement, name: string): HTMLButtonElement {
+      const row = groupLegend(element).find((button) => textOf(button).includes(name));
+      if (!row) {
+        throw new Error(`No group legend row for "${name}".`);
+      }
+      return row;
+    }
+
+    function groupChip(element: HTMLElement, label: string): HTMLButtonElement {
+      const chip = [
+        ...element.querySelectorAll<HTMLButtonElement>(
+          'mat-chip-listbox.net-worth-chart__groups mat-chip-option button[role="option"]',
+        ),
+      ].find((button) => textOf(button) === label);
+      if (!chip) {
+        throw new Error(`No group chip labelled "${label}".`);
+      }
+      return chip;
+    }
+
+    function selectedGroupChips(element: HTMLElement): string[] {
+      return textsOf(
+        element,
+        'mat-chip-listbox.net-worth-chart__groups mat-chip-option button[aria-selected="true"]',
+      );
+    }
+
+    function clickSvg(target: SVGElement): void {
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    }
+
+    function progressOf(row: HTMLElement): string | null | undefined {
+      return row.parentElement?.querySelector('mat-progress-bar')?.getAttribute('aria-valuenow');
+    }
+
+    it('renders the group pie', async () => {
+      await setup(jsonResponse(dashboardWithGroups()), undefined, {
+        groups: jsonResponse(groups),
+      });
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(element.querySelectorAll('app-pie-chart')).toHaveLength(2);
+      expect(groupCircles(element).map((circle) => circle.getAttribute('stroke'))).toEqual([
+        '#4C6EF5',
+        '#12B886',
+        '#F76707',
+        '#868E96',
+      ]);
+      expect(groupLegend(element).map((button) => textOf(button).split(' ')[0])).toEqual([
+        'Emerytura',
+        'Inwestycje',
+        'Poduszka',
+        'No',
+      ]);
+    });
+
+    it('shows the groups hint without groups', async () => {
+      await setup(
+        jsonResponse(dashboardWithGroups([{ groupId: null, valuePln: 15000, percentage: 100 }])),
+      );
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(groupCircles(element)).toHaveLength(0);
+      expect(element.querySelector(`${groupCard} a[href="/groups"]`)).not.toBeNull();
+    });
+
+    it('hides non-positive groups from the pie only', async () => {
+      await setup(
+        jsonResponse(
+          dashboardWithGroups([
+            { groupId: RETIREMENT_GROUP_ID, valuePln: 75000, percentage: 100 },
+            { groupId: INVESTMENTS_GROUP_ID, valuePln: 0, percentage: 0 },
+            { groupId: CUSHION_GROUP_ID, valuePln: -500, percentage: -0.5 },
+          ]),
+        ),
+        undefined,
+        { groups: jsonResponse(groups) },
+      );
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(groupCircles(element)).toHaveLength(1);
+      const legend = groupLegend(element).map((button) => textOf(button));
+      expect(legend.some((text) => text.includes('Inwestycje'))).toBe(true);
+      expect(legend.some((text) => text.includes('Poduszka'))).toBe(true);
+    });
+
+    it('shows target progress', async () => {
+      await setup(jsonResponse(dashboardWithGroups()), undefined, {
+        groups: jsonResponse(groups),
+      });
+      await switchLanguage(fixture, 'pl');
+      const element = fixture.nativeElement as HTMLElement;
+
+      const row = groupLegendRow(element, 'Poduszka');
+      expect(normalised(textOf(row))).toMatch(
+        /28\s000(,00)?\s*\/\s*30\s000(,00)?\s*zł\s*\(93\s?%\)/,
+      );
+      expect(progressOf(row)).toBe('93');
+      expect(progressOf(groupLegendRow(element, 'Emerytura'))).toBeUndefined();
+    });
+
+    it('caps the bar at 100', async () => {
+      await setup(
+        jsonResponse(
+          dashboardWithGroups([{ groupId: CUSHION_GROUP_ID, valuePln: 33000, percentage: 100 }]),
+        ),
+        undefined,
+        { groups: jsonResponse(groups) },
+      );
+      await switchLanguage(fixture, 'pl');
+      const element = fixture.nativeElement as HTMLElement;
+
+      const row = groupLegendRow(element, 'Poduszka');
+      expect(normalised(textOf(row))).toMatch(
+        /33\s000(,00)?\s*\/\s*30\s000(,00)?\s*zł\s*\(110\s?%\)/,
+      );
+      expect(progressOf(row)).toBe('100');
+    });
+
+    it('treats an unknown group as ungrouped', async () => {
+      await setup(
+        jsonResponse(
+          dashboardWithGroups([
+            { groupId: RETIREMENT_GROUP_ID, valuePln: 75000, percentage: 96.2 },
+            { groupId: 'deadbeef-dead-beef-dead-beefdeadbeef', valuePln: 3000, percentage: 3.8 },
+          ]),
+        ),
+        undefined,
+        { groups: jsonResponse(groups) },
+      );
+      await switchLanguage(fixture, 'pl');
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(normalised(textOf(groupLegendRow(element, 'Bez grupy')))).toMatch(/3\s?000/);
+      expect(groupCircles(element).map((circle) => circle.getAttribute('stroke'))).toContain(
+        '#868E96',
+      );
+    });
+
+    it('sends group and class filters', async () => {
+      await setup(
+        jsonResponse({
+          ...dashboardWithGroups(),
+          byAssetClass: dashboardWithClasses.byAssetClass,
+        }),
+        undefined,
+        { groups: jsonResponse(groups) },
+      );
+      const element = fixture.nativeElement as HTMLElement;
+      expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
+      expect(lastHistoryParams(fetchSpy).has('ungrouped')).toBe(false);
+
+      groupChip(element, 'Emerytura').click();
+      await fixture.whenStable();
+      expect(lastHistoryParams(fetchSpy).get('groupId')).toBe(RETIREMENT_GROUP_ID);
+      expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
+
+      chipOption(element, 'ETF').click();
+      await fixture.whenStable();
+      const both = lastHistoryParams(fetchSpy);
+      expect(both.get('groupId')).toBe(RETIREMENT_GROUP_ID);
+      expect(both.get('assetClass')).toBe('3');
+
+      groupChip(element, 'No group').click();
+      await fixture.whenStable();
+      const ungrouped = lastHistoryParams(fetchSpy);
+      expect(ungrouped.get('ungrouped')).toBe('true');
+      expect(ungrouped.has('groupId')).toBe(false);
+    });
+
+    it('selects the group filter from the legend', async () => {
+      await setup(jsonResponse(dashboardWithGroups()), undefined, {
+        groups: jsonResponse(groups),
+      });
+      const element = fixture.nativeElement as HTMLElement;
+
+      groupLegendRow(element, 'Emerytura').click();
+      await fixture.whenStable();
+      expect(lastHistoryParams(fetchSpy).get('groupId')).toBe(RETIREMENT_GROUP_ID);
+      expect(selectedGroupChips(element)).toEqual(['Emerytura']);
+
+      groupLegendRow(element, 'Emerytura').click();
+      await fixture.whenStable();
+      expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
+
+      clickSvg(groupCircles(element)[1]);
+      await fixture.whenStable();
+      expect(lastHistoryParams(fetchSpy).get('groupId')).toBe(INVESTMENTS_GROUP_ID);
+
+      groupLegendRow(element, 'No group').click();
+      await fixture.whenStable();
+      expect(lastHistoryParams(fetchSpy).get('ungrouped')).toBe('true');
+    });
+
+    it('resets a deleted group filter', async () => {
+      let current = groups;
+      await setup(jsonResponse(dashboardWithGroups()), undefined, {
+        groups: () => jsonResponse(current),
+      });
+      const element = fixture.nativeElement as HTMLElement;
+
+      groupLegendRow(element, 'Emerytura').click();
+      await fixture.whenStable();
+      expect(lastHistoryParams(fetchSpy).get('groupId')).toBe(RETIREMENT_GROUP_ID);
+
+      current = groups.filter((group) => group.id !== RETIREMENT_GROUP_ID);
+      component['groupsResource'].reload();
+      await fixture.whenStable();
+
+      expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
+      expect(selectedGroupChips(element)).toEqual(['All']);
+    });
+
+    it('stacks the pies on a narrow container', async () => {
+      await setup(jsonResponse(dashboardWithGroups()), undefined, {
+        groups: jsonResponse(groups),
+      });
+      const element = fixture.nativeElement as HTMLElement;
+
+      expect(
+        element.querySelectorAll(
+          '.dashboard-page__pies > * app-pie-chart, .dashboard-page__pies > app-pie-chart',
+        ),
+      ).toHaveLength(2);
+      // jsdom cannot evaluate container queries, so read the component's compiled stylesheet.
+      const css =
+        [...document.querySelectorAll('style')]
+          .map((style) => style.textContent ?? '')
+          .find((text) => text.includes('.dashboard-page__pies')) ?? '';
+      const split = css.indexOf('@container (min-width: 720px)');
+      expect(split).toBeGreaterThan(-1);
+      expect(css.slice(split)).toMatch(
+        /\.dashboard-page__pies[^{]*\{[^}]*grid-template-columns:\s*repeat\(2/,
+      );
+      expect(css.slice(0, split)).toMatch(/\.dashboard-page__pies[^{]*\{/);
+      expect(css.slice(0, split)).not.toMatch(/\.dashboard-page__pies[^{]*\{[^}]*repeat\(2/);
+    });
+  });
+});
+
+describe('dashboard.groups translations', () => {
+  it('has every dashboard.groups key in both languages', () => {
+    const keysOf = (lang: 'en' | 'pl') =>
+      Object.keys(TRANSLATIONS[lang])
+        .filter((key) => key.startsWith('dashboard.groups.'))
+        .sort();
+
+    expect(keysOf('en')).toEqual(
+      expect.arrayContaining([
+        'dashboard.groups.title',
+        'dashboard.groups.ungrouped',
+        'dashboard.groups.hint',
+        'dashboard.groups.link',
+        'dashboard.groups.progress',
+        'dashboard.groups.filter',
+      ]),
+    );
+    expect(keysOf('pl')).toEqual(keysOf('en'));
   });
 });

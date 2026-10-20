@@ -28,6 +28,11 @@ const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 const Y_TICK_COUNT = 5;
 const Y_LABEL_FRACTION_DIGITS = 2;
 
+export interface NetWorthChartGroup {
+  readonly key: string;
+  readonly label: string;
+}
+
 interface ChartPoint {
   readonly x: number;
   readonly y: number;
@@ -52,11 +57,14 @@ export class NetWorthChart {
   readonly range = model<ChartRange>('1Y');
   readonly classes = input<readonly AssetClass[]>([]);
   readonly assetClass = model<AssetClass | null>(null);
+  readonly groups = input<readonly NetWorthChartGroup[]>([]);
+  readonly group = model<string | null>(null);
   readonly loading = input(false);
   readonly loadError = input<string | null>(null);
   readonly retry = output<void>();
 
-  private readonly listbox = viewChild(MatChipListbox);
+  private readonly classBox = viewChild<MatChipListbox>('classBox');
+  private readonly groupBox = viewChild<MatChipListbox>('groupBox');
 
   protected readonly ranges = RANGES;
   protected readonly allClasses = ALL_CLASSES;
@@ -86,6 +94,10 @@ export class NetWorthChart {
     const selected = this.assetClass();
     return selected === null ? '' : assetClassLabel(selected);
   });
+
+  protected readonly groupLabel = computed(
+    () => this.groups().find((option) => option.key === this.group())?.label ?? null,
+  );
 
   private readonly hoveredIndex = signal<number | null>(null);
 
@@ -147,9 +159,18 @@ export class NetWorthChart {
   protected onClassChange(value: AssetClass | typeof ALL_CLASSES | undefined): void {
     const next = typeof value === 'number' ? value : null;
     this.assetClass.set(next);
-    const listbox = this.listbox();
+    const listbox = this.classBox();
     if (next === null && listbox) {
       // The All chip cannot be deselected: reselect it when the user clicked it while selected.
+      listbox.value = ALL_CLASSES;
+    }
+  }
+
+  protected onGroupChange(value: string | undefined): void {
+    const next = typeof value === 'string' && value !== ALL_CLASSES ? value : null;
+    this.group.set(next);
+    const listbox = this.groupBox();
+    if (next === null && listbox) {
       listbox.value = ALL_CLASSES;
     }
   }

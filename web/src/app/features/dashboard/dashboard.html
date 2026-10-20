@@ -66,6 +66,9 @@
                       assetClassLabel(selectedClass) | transloco
                     }}</span>
                   }
+                  @if (selectedGroupLabel(); as groupLabel) {
+                    <span class="dashboard-page__change-class">{{ groupLabel }}</span>
+                  }
                   <span class="dashboard-page__change-range">{{ range() }}</span>
                 </p>
               } @else {
@@ -75,42 +78,118 @@
           </mat-card-content>
         </mat-card>
 
-        <mat-card class="dashboard-page__card">
-          <mat-card-content>
-            <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
-            <div class="dashboard-page__breakdown">
-              <app-pie-chart
-                [segments]="pieSegments()"
-                [selected]="selectedKey()"
-                (segmentClick)="onSegmentClick($event)"
-                class="dashboard-page__chart"
-              />
+        <div class="dashboard-page__pies">
+          <mat-card class="dashboard-page__card">
+            <mat-card-content>
+              <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
+              <div class="dashboard-page__breakdown">
+                <app-pie-chart
+                  [segments]="pieSegments()"
+                  [selected]="selectedKey()"
+                  (segmentClick)="onSegmentClick($event)"
+                  class="dashboard-page__chart"
+                />
 
-              <ul class="dashboard-page__legend">
-                @for (entry of dashboard.byAssetClass; track entry.assetClass) {
-                  <li>
-                    <button
-                      type="button"
-                      class="dashboard-page__legend-item"
-                      [class.dashboard-page__legend-item--dimmed]="
-                        assetClass() !== null && assetClass() !== entry.assetClass
-                      "
-                      [attr.aria-pressed]="assetClass() === entry.assetClass"
-                      (click)="selectClass(entry.assetClass)"
-                    >
-                      <span
-                        class="dashboard-page__swatch"
-                        [style.background]="assetClassColor(entry.assetClass)"
-                      ></span>
-                      {{ assetClassLabel(entry.assetClass) | transloco }} —
-                      {{ formatMoney(entry.valuePln) }} ({{ entry.percentage }}%)
-                    </button>
-                  </li>
-                }
-              </ul>
-            </div>
-          </mat-card-content>
-        </mat-card>
+                <ul class="dashboard-page__legend">
+                  @for (entry of dashboard.byAssetClass; track entry.assetClass) {
+                    <li>
+                      <button
+                        type="button"
+                        class="dashboard-page__legend-item"
+                        [class.dashboard-page__legend-item--dimmed]="
+                          assetClass() !== null && assetClass() !== entry.assetClass
+                        "
+                        [attr.aria-pressed]="assetClass() === entry.assetClass"
+                        (click)="selectClass(entry.assetClass)"
+                      >
+                        <span
+                          class="dashboard-page__swatch"
+                          [style.background]="assetClassColor(entry.assetClass)"
+                        ></span>
+                        {{ assetClassLabel(entry.assetClass) | transloco }} —
+                        {{ formatMoney(entry.valuePln) }} ({{ entry.percentage }}%)
+                      </button>
+                    </li>
+                  }
+                </ul>
+              </div>
+            </mat-card-content>
+          </mat-card>
+
+          <mat-card class="dashboard-page__card dashboard-page__group-card">
+            <mat-card-content>
+              <h2 class="dashboard-page__card-title">{{ 'dashboard.groups.title' | transloco }}</h2>
+              @if (groupsResource.error(); as groupsError) {
+                <div class="dashboard-page__state" role="alert">
+                  <p>{{ groupsError.message }}</p>
+                  <button mat-button type="button" (click)="groupsResource.reload()">
+                    {{ 'common.retry' | transloco }}
+                  </button>
+                </div>
+              } @else if (groupsResource.isLoading() && !groupsResource.hasValue()) {
+                <div class="dashboard-page__state">
+                  <mat-spinner diameter="32" />
+                </div>
+              } @else if (groupsResource.hasValue() && groupsResource.value().length === 0) {
+                <div class="dashboard-page__state">
+                  <p>{{ 'dashboard.groups.hint' | transloco }}</p>
+                  <a mat-button routerLink="/groups">{{ 'dashboard.groups.link' | transloco }}</a>
+                </div>
+              } @else {
+                <div class="dashboard-page__breakdown">
+                  <app-pie-chart
+                    [segments]="groupSegments()"
+                    [selected]="group()"
+                    (segmentClick)="selectGroup($event)"
+                    class="dashboard-page__chart"
+                  />
+
+                  <ul class="dashboard-page__legend dashboard-page__group-legend">
+                    @for (row of groupRows(); track row.key) {
+                      <li>
+                        <button
+                          type="button"
+                          class="dashboard-page__legend-item"
+                          [class.dashboard-page__legend-item--dimmed]="
+                            group() !== null && group() !== row.key
+                          "
+                          [attr.aria-pressed]="group() === row.key"
+                          (click)="selectGroup(row.key)"
+                        >
+                          <span
+                            class="dashboard-page__swatch"
+                            [style.background]="row.color"
+                          ></span>
+                          {{ row.label }} —
+                          @if (row.progress; as progress) {
+                            {{
+                              'dashboard.groups.progress'
+                                | transloco
+                                  : {
+                                      value: formatAmount(row.valuePln),
+                                      target: formatMoney(row.targetPln ?? 0),
+                                      percent: progress.percent,
+                                    }
+                            }}
+                          } @else {
+                            {{ formatMoney(row.valuePln) }}
+                          }
+                        </button>
+                        @if (row.progress; as progress) {
+                          <mat-progress-bar
+                            mode="determinate"
+                            [value]="progress.bar"
+                            [attr.aria-label]="row.label"
+                          />
+                        }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+        </div>
 
         <mat-card class="dashboard-page__card dashboard-page__chart-card">
           <mat-card-content>
@@ -122,6 +201,8 @@
               [(range)]="range"
               [classes]="classes()"
               [(assetClass)]="assetClass"
+              [groups]="groupOptions()"
+              [(group)]="group"
               [loading]="historyResource.isLoading()"
               [loadError]="historyResource.error()?.message ?? null"
               (retry)="historyResource.reload()"
