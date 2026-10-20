@@ -7,10 +7,14 @@ public sealed record OverdueOccurrencesResponse
 
 public sealed record OverdueOccurrenceResponse
 {
-    public required Guid RecurringIncomeId { get; init; }
+    /// <summary>Set for a recurring income occurrence, null for a one-off income.</summary>
+    public required Guid? RecurringIncomeId { get; init; }
 
-    /// <summary>The month the rule produced the date for (yyyy-MM).</summary>
-    public required string NominalMonth { get; init; }
+    /// <summary>The month the rule produced the date for (yyyy-MM); null for a one-off income.</summary>
+    public required string? NominalMonth { get; init; }
+
+    /// <summary>Set for a one-off income, null for a recurring income occurrence.</summary>
+    public required Guid? OneOffIncomeId { get; init; }
 
     public required DateOnly Date { get; init; }
     public required string Name { get; init; }

@@ -140,6 +140,60 @@ public sealed class OneOffIncomeEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task Update_WhenSettled_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var id = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 1_000m, new DateOnly(2026, 10, 10));
+        await client.SettleOneOffIncomeAsync(id, account.AccountId, 1_000m, new DateOnly(2026, 10, 10), cancellationToken);
+
+        var response = await client.PutAsJsonAsync(
+            OneOffIncomeUri(id), NewOneOffIncomeBody(account.AccountId, "Zmieniona", 2_000m, new DateOnly(2026, 10, 11)), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, OneOffIncomeSettledErrorCode, cancellationToken);
+        var row = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes.OneOff(id);
+        Assert.Equal(("Premia", 1_000m), (row.Name, row.Amount));
+    }
+
+    [Fact]
+    public async Task Delete_WhenSettled_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var id = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 1_000m, new DateOnly(2026, 10, 10));
+        await client.SettleOneOffIncomeAsync(id, account.AccountId, 1_000m, new DateOnly(2026, 10, 10), cancellationToken);
+
+        var response = await client.DeleteAsync(OneOffIncomeUri(id), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, OneOffIncomeSettledErrorCode, cancellationToken);
+        Assert.Equal("Settled", (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes.OneOff(id).Status);
+    }
+
+    [Fact]
+    public async Task EditAfterUndo_Succeeds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var id = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 1_000m, new DateOnly(2026, 10, 10));
+        await client.SettleOneOffIncomeAsync(id, account.AccountId, 1_000m, new DateOnly(2026, 10, 10), cancellationToken);
+        await client.UndoOneOffIncomeSettlementAsync(id, cancellationToken);
+
+        var update = await client.PutAsJsonAsync(
+            OneOffIncomeUri(id), NewOneOffIncomeBody(account.AccountId, "Zmieniona", 2_000m, new DateOnly(2026, 10, 11)), cancellationToken);
+
+        Assert.True(update.IsSuccessStatusCode, $"update returned {(int)update.StatusCode}.");
+        Assert.Equal("Zmieniona", (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes.OneOff(id).Name);
+        var delete = await client.DeleteAsync(OneOffIncomeUri(id), cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+    }
+
+    [Fact]
     public async Task UnknownId_Returns404()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

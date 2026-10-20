@@ -47,22 +47,26 @@ internal sealed class PlanningForecast
         PlannedIn(month)
             .Where(p => p.Stored?.Status != OccurrenceStatus.Settled)
             .Select(p => accounts[p.PlannedAccountId].Currency)
-            .Concat(OneOffIncomes.Where(i => YearMonth.From(i.Date) == month).Select(i => accounts[i.AccountId].Currency))
+            .Concat(OneOffIncomes.Where(i => !i.IsSettled && YearMonth.From(i.Date) == month).Select(i => accounts[i.AccountId].Currency))
             .Where(c => c != CashPlaceBalances.BaseCurrency)
             .Distinct()
             .ToList();
 
-    public IReadOnlyList<OneOffIncomeResponse> OneOffIncomesIn(YearMonth month, IReadOnlyDictionary<string, decimal> rates) =>
+    public IReadOnlyList<OneOffIncomeResponse> OneOffIncomesIn(
+        YearMonth month, IReadOnlyDictionary<string, decimal> rates, DateOnly today) =>
         OneOffIncomes
             .OrderBy(i => i.Date)
             .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
             .Select(i =>
             {
-                var account = accounts[i.AccountId];
-                var estimated = account.Currency != CashPlaceBalances.BaseCurrency;
-                decimal? amountPln = !estimated
-                    ? i.Amount
-                    : rates.TryGetValue(account.Currency, out var rate) ? Round(i.Amount * rate) : null;
+                var account = accounts[i.ActualAccountId ?? i.AccountId];
+                var currency = accounts[i.AccountId].Currency;
+                var estimated = !i.IsSettled && currency != CashPlaceBalances.BaseCurrency;
+                decimal? amountPln = i.IsSettled
+                    ? Round(i.Amount * i.FxRateToPln!.Value)
+                    : !estimated
+                        ? i.Amount
+                        : rates.TryGetValue(currency, out var rate) ? Round(i.Amount * rate) : null;
 
                 return new OneOffIncomeResponse
                 {
@@ -73,10 +77,17 @@ internal sealed class PlanningForecast
                     AccountName = account.Name,
                     AccountArchived = account.IsArchived,
                     Amount = i.Amount,
-                    Currency = account.Currency,
+                    Currency = currency,
                     AmountPln = amountPln,
                     Estimated = estimated,
-                    InMonth = YearMonth.From(i.Date) == month
+                    InMonth = YearMonth.From(i.Date) == month,
+                    Status = i.IsSettled ? OccurrenceStatus.Settled : OccurrenceStatus.Pending,
+                    ActualAmount = i.ActualAmount,
+                    ActualDate = i.ActualDate,
+                    ActualAmountPln = i.IsSettled ? Round(i.ActualAmount!.Value * i.FxRateToPln!.Value) : null,
+                    Difference = i.IsSettled ? i.ActualAmount - i.Amount : null,
+                    DepositCreated = i.TransactionId is not null,
+                    Overdue = !i.IsSettled && i.Date < today
                 };
             })
             .ToList();
@@ -149,16 +160,19 @@ internal sealed class PlanningForecast
     public static IncomeBalanceResponse BalanceOf(
         IReadOnlyList<IncomeOccurrenceResponse> occurrences, IReadOnlyList<OneOffIncomeResponse> oneOffs)
     {
-        var oneOffPln = oneOffs.Where(o => o.InMonth).Sum(o => o.AmountPln ?? 0m);
+        var inMonth = oneOffs.Where(o => o.InMonth).ToList();
+        var settledOneOffs = inMonth.Where(o => o.Status == OccurrenceStatus.Settled).ToList();
 
         return new IncomeBalanceResponse
         {
-            PlanPln = occurrences.Sum(o => o.AmountPln ?? 0m) + oneOffPln,
-            ActualPln = occurrences.Sum(o => o.ActualAmountPln ?? 0m),
-            PendingPln = occurrences.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m) + oneOffPln,
+            PlanPln = occurrences.Sum(o => o.AmountPln ?? 0m) + inMonth.Sum(o => o.AmountPln ?? 0m),
+            ActualPln = occurrences.Sum(o => o.ActualAmountPln ?? 0m) + settledOneOffs.Sum(o => o.ActualAmountPln ?? 0m),
+            PendingPln = occurrences.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m)
+                + inMonth.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m),
             DifferencePln = occurrences
                 .Where(o => o.Status != OccurrenceStatus.Pending)
                 .Sum(o => (o.ActualAmountPln ?? 0m) - (o.AmountPln ?? 0m))
+                + settledOneOffs.Sum(o => (o.ActualAmountPln ?? 0m) - (o.AmountPln ?? 0m))
         };
     }
 
@@ -168,7 +182,7 @@ internal sealed class PlanningForecast
 
     public MonthFigures FiguresIn(YearMonth month, IReadOnlyDictionary<string, decimal> rates, DateOnly today)
     {
-        var balance = BalanceOf(OccurrencesIn(month, rates, today), OneOffIncomesIn(month, rates));
+        var balance = BalanceOf(OccurrencesIn(month, rates, today), OneOffIncomesIn(month, rates, today));
         var cost = CostIn(month);
 
         return new MonthFigures(balance.ActualPln + balance.PendingPln - cost, cost);

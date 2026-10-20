@@ -14,6 +14,11 @@ public sealed class DeleteOneOffIncomeHandler(PortfolioDbContext dbContext)
             return OneOffIncomeErrors.NotFound(id);
         }
 
+        if (income.IsSettled)
+        {
+            return OneOffIncomeErrors.Settled(id);
+        }
+
         dbContext.OneOffIncomes.Remove(income);
         await dbContext.SaveChangesAsync(cancellationToken);
 

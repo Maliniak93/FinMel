@@ -70,7 +70,7 @@ internal static class PlanningMonthBuilder
             })
             .ToList();
 
-        var oneOffIncomes = forecast.OneOffIncomesIn(viewed, rates);
+        var oneOffIncomes = forecast.OneOffIncomesIn(viewed, rates, today);
         var balance = PlanningForecast.BalanceOf(occurrences, oneOffIncomes);
         var fxUnavailable = forecast.ForeignIn(viewed).Any(c => !rates.ContainsKey(c));
 

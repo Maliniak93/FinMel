@@ -240,7 +240,7 @@ public sealed record PlanningIncomesResponse
 
     public required IReadOnlyList<IncomeDefinitionResponse> Definitions { get; init; }
 
-    /// <summary>Every one-off income of the user, ordered by date; only those in the viewed month count towards the balance.</summary>
+    /// <summary>Every one-off income of the user, ordered by date; only those in the viewed month count towards the balance, a settled one stays in its planned month.</summary>
     public required IReadOnlyList<OneOffIncomeResponse> OneOffs { get; init; }
 }
 
@@ -255,13 +255,27 @@ public sealed record OneOffIncomeResponse
     public required decimal Amount { get; init; }
     public required string Currency { get; init; }
 
-    /// <summary>The amount in PLN at the latest rate (null when the rate is missing).</summary>
+    /// <summary>The amount in PLN: at the rate frozen on settlement, else the latest-rate estimate (null when the rate is missing).</summary>
     public required decimal? AmountPln { get; init; }
 
     public required bool Estimated { get; init; }
 
     /// <summary>True when the date falls in the viewed month.</summary>
     public required bool InMonth { get; init; }
+
+    public required OccurrenceStatus Status { get; init; }
+    public required decimal? ActualAmount { get; init; }
+    public required DateOnly? ActualDate { get; init; }
+    public required decimal? ActualAmountPln { get; init; }
+
+    /// <summary>Actual minus planned in the currency, null while pending.</summary>
+    public required decimal? Difference { get; init; }
+
+    /// <summary>True when the settlement created a cash deposit on its account.</summary>
+    public required bool DepositCreated { get; init; }
+
+    /// <summary>True when the income is pending and dated before today.</summary>
+    public required bool Overdue { get; init; }
 }
 
 public sealed record IncomeBalanceResponse

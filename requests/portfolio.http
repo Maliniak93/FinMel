@@ -1302,7 +1302,7 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/portfolio/planning/years/2026
 Authorization: Bearer {{authToken}}
 
-### List the overdue occurrences: pending, planned before today and not before the income was created, by date then name
+### List the overdue occurrences: pending, planned before today and not before the income was created, by date then name; a pending one-off income dated before today is listed too (oneOffIncomeId set, recurringIncomeId and nominalMonth null)
 GET {{baseUrl}}/api/portfolio/planning/overdue
 Authorization: Bearer {{authToken}}
 
@@ -1398,7 +1398,23 @@ Content-Type: application/json
   "date": "2026-12-15"
 }
 
-### Change a one-off income: name, amount, date and account (204; 404 NotFound.OneOffIncome)
+### Settle a one-off income, or edit its settlement: actual date not after today, an unarchived account in the planned currency, the FX rate of actualDate frozen (204; 400 Validation.ActualDateInFuture / Validation.CurrencyMismatch / Validation.FxRateMissing / Validation.InsufficientFunds; 404 NotFound.OneOffIncome; 409 Conflict.AccountArchived); createDeposit (default false) also writes, moves or removes a locked Deposit on the account's cash
+PUT {{baseUrl}}/api/portfolio/one-off-incomes/{{createOneOffIncome.response.body.id}}/settlement
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "actualAmount": 8900,
+  "actualDate": "2026-10-20",
+  "accountId": "{{createMbankAccount.response.body.id}}",
+  "createDeposit": true
+}
+
+### Undo a one-off income's settlement: pending again, its deposit removed (204; 404 NotFound.OneOffIncomeSettlement when it is not settled; 400 Validation.InsufficientFunds when a later withdrawal spent the deposit)
+DELETE {{baseUrl}}/api/portfolio/one-off-incomes/{{createOneOffIncome.response.body.id}}/settlement
+Authorization: Bearer {{authToken}}
+
+### Change a one-off income: name, amount, date and account (204; 404 NotFound.OneOffIncome; 409 Conflict.OneOffIncomeSettled while it is settled)
 PUT {{baseUrl}}/api/portfolio/one-off-incomes/{{createOneOffIncome.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -1410,7 +1426,7 @@ Content-Type: application/json
   "date": "2026-12-20"
 }
 
-### Delete a one-off income (204; 404 NotFound.OneOffIncome)
+### Delete a one-off income (204; 404 NotFound.OneOffIncome; 409 Conflict.OneOffIncomeSettled while it is settled)
 DELETE {{baseUrl}}/api/portfolio/one-off-incomes/{{createOneOffIncome.response.body.id}}
 Authorization: Bearer {{authToken}}
 

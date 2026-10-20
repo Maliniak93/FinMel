@@ -1,9 +1,22 @@
 import { Injectable, computed, resource, signal } from '@angular/core';
 
-import { getApiPortfolioPlanningOverdue, getApiPortfolioPlanningTodo } from '../../api/portfolio';
+import {
+  getApiPortfolioPlanningOverdue,
+  getApiPortfolioPlanningTodo,
+  type OverdueOccurrenceResponse,
+} from '../../api/portfolio';
 import { readProblemDetails } from '../auth/problem-details';
 
 const DEFAULT_PAYMENT_LEAD_DAYS = 7;
+
+export type OverdueRecurringOccurrence = OverdueOccurrenceResponse & {
+  recurringIncomeId: string;
+  nominalMonth: string;
+};
+
+function isRecurring(item: OverdueOccurrenceResponse): item is OverdueRecurringOccurrence {
+  return item.recurringIncomeId !== null && item.nominalMonth !== null;
+}
 
 @Injectable({ providedIn: 'root' })
 export class PlanningState {
@@ -32,7 +45,7 @@ export class PlanningState {
   });
 
   readonly overdue = computed(() =>
-    this.overdueResource.hasValue() ? this.overdueResource.value() : [],
+    this.overdueResource.hasValue() ? this.overdueResource.value().filter(isRecurring) : [],
   );
 
   readonly todo = computed(() =>

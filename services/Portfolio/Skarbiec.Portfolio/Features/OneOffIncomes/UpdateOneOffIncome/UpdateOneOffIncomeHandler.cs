@@ -15,6 +15,11 @@ public sealed class UpdateOneOffIncomeHandler(PortfolioDbContext dbContext)
             return OneOffIncomeErrors.NotFound(id);
         }
 
+        if (income.IsSettled)
+        {
+            return OneOffIncomeErrors.Settled(id);
+        }
+
         var account = await dbContext.Accounts
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == request.AccountId, cancellationToken);

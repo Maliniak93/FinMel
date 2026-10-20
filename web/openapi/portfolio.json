@@ -2023,6 +2023,60 @@
         }
       }
     },
+    "/api/portfolio/one-off-incomes/{id}/settlement": {
+      "put": {
+        "tags": [
+          "SettleOneOffIncomeEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleOneOffIncomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "UndoOneOffIncomeSettlementEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/one-off-expenses": {
       "post": {
         "tags": [
@@ -6678,7 +6732,14 @@
           "currency",
           "amountPln",
           "estimated",
-          "inMonth"
+          "inMonth",
+          "status",
+          "actualAmount",
+          "actualDate",
+          "actualAmountPln",
+          "difference",
+          "depositCreated",
+          "overdue"
         ],
         "type": "object",
         "properties": {
@@ -6728,6 +6789,49 @@
           },
           "inMonth": {
             "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OccurrenceStatus"
+          },
+          "actualAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "actualDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "actualAmountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "difference": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "depositCreated": {
+            "type": "boolean"
+          },
+          "overdue": {
+            "type": "boolean"
           }
         }
       },
@@ -6735,6 +6839,7 @@
         "required": [
           "recurringIncomeId",
           "nominalMonth",
+          "oneOffIncomeId",
           "date",
           "name",
           "accountId",
@@ -6746,11 +6851,24 @@
         "type": "object",
         "properties": {
           "recurringIncomeId": {
-            "type": "string",
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "nominalMonth": {
-            "type": "string"
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "oneOffIncomeId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           },
           "date": {
             "type": "string",
@@ -7818,6 +7936,37 @@
         }
       },
       "SettleOccurrenceRequest": {
+        "required": [
+          "actualAmount",
+          "actualDate",
+          "accountId"
+        ],
+        "type": "object",
+        "properties": {
+          "actualAmount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "actualDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createDeposit": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SettleOneOffIncomeRequest": {
         "required": [
           "actualAmount",
           "actualDate",
@@ -9551,6 +9700,12 @@
     },
     {
       "name": "DeleteOneOffIncomeEndpoint"
+    },
+    {
+      "name": "SettleOneOffIncomeEndpoint"
+    },
+    {
+      "name": "UndoOneOffIncomeSettlementEndpoint"
     },
     {
       "name": "CreateOneOffExpenseEndpoint"
