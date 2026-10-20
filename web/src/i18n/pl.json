@@ -1115,6 +1115,18 @@
       "dayInvalid": "Podaj dzień od 1 do 31.",
       "shift": "Przesunięcie na dzień roboczy"
     },
+    "oneOff": {
+      "mode": "Rodzaj wpisu",
+      "recurring": "Cykliczny",
+      "oneOff": "Jednorazowy",
+      "mark": "jednorazowy",
+      "lockedHint": "Cofnij rozliczenie, aby edytować lub usunąć wpis.",
+      "delete": {
+        "title": "Usunąć wpis jednorazowy?",
+        "message": "„{{ name }}” zniknie z planu.",
+        "failed": "Nie udało się usunąć wpisu."
+      }
+    },
     "todo": {
       "badge": "Do zrobienia"
     }

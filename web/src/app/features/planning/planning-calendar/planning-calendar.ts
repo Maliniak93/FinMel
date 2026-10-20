@@ -38,7 +38,7 @@ interface CalendarItem {
   amount: number | string;
   currency: string;
   actualDate: string | null;
-  settleable: IncomeOccurrenceResponse | null;
+  settleable: SettleOccurrenceDialogData | null;
 }
 
 interface CalendarCell {
@@ -73,7 +73,9 @@ const KIND_KEYS: Record<CalendarItemKind, string> = {
   bond: 'planning.calendar.kind.bond',
 };
 
-function incomeStatus(occurrence: IncomeOccurrenceResponse): CalendarItemStatus {
+function incomeStatus(
+  occurrence: Pick<IncomeOccurrenceResponse, 'status' | 'overdue'>,
+): CalendarItemStatus {
   if (occurrence.status === 'Settled') {
     return 'settled';
   }
@@ -162,7 +164,22 @@ export class PlanningCalendar {
         amount: settled ? (occurrence.actualAmount ?? occurrence.amount) : occurrence.amount,
         currency: occurrence.currency,
         actualDate: settled ? (occurrence.actualDate ?? null) : null,
-        settleable: status === 'pending' || status === 'overdue' ? occurrence : null,
+        settleable: status === 'pending' || status === 'overdue' ? { occurrence } : null,
+      });
+    }
+
+    for (const oneOff of data.incomes.oneOffs.filter((entry) => entry.inMonth)) {
+      const status = incomeStatus(oneOff);
+      const settled = status === 'settled';
+      add(oneOff.date, {
+        key: `income-one-off-${oneOff.id}`,
+        kind: 'income',
+        name: oneOff.name,
+        status,
+        amount: settled ? (oneOff.actualAmount ?? oneOff.amount) : oneOff.amount,
+        currency: oneOff.currency,
+        actualDate: settled ? (oneOff.actualDate ?? null) : null,
+        settleable: status === 'pending' || status === 'overdue' ? { oneOffIncome: oneOff } : null,
       });
     }
 
@@ -173,6 +190,19 @@ export class PlanningCalendar {
         name: payment.name,
         status: null,
         amount: payment.amount,
+        currency: 'PLN',
+        actualDate: null,
+        settleable: null,
+      });
+    }
+
+    for (const oneOff of data.expenses.oneOffs.filter((entry) => entry.inMonth)) {
+      add(oneOff.date, {
+        key: `payment-one-off-${oneOff.id}`,
+        kind: 'payment',
+        name: oneOff.name,
+        status: null,
+        amount: oneOff.amount,
         currency: 'PLN',
         actualDate: null,
         settleable: null,
@@ -253,9 +283,8 @@ export class PlanningCalendar {
     }
   }
 
-  protected openSettleDialog(occurrence: IncomeOccurrenceResponse, event: Event): void {
+  protected openSettleDialog(data: SettleOccurrenceDialogData, event: Event): void {
     event.stopPropagation();
-    const data: SettleOccurrenceDialogData = { occurrence };
     const ref = this.dialog.open(SettleOccurrenceDialog, { width: '420px', data });
     ref.afterClosed().subscribe((saved) => {
       if (saved) {

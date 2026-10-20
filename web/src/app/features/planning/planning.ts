@@ -16,6 +16,9 @@ import { firstValueFrom } from 'rxjs';
 import {
   deleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonth,
   deleteApiPortfolioAllocationPlanVersionsByMonth,
+  deleteApiPortfolioOneOffExpensesById,
+  deleteApiPortfolioOneOffIncomesById,
+  deleteApiPortfolioOneOffIncomesByIdSettlement,
   deleteApiPortfolioRecurringExpensesById,
   deleteApiPortfolioRecurringExpensesByIdChangesByMonth,
   deleteApiPortfolioRecurringIncomesById,
@@ -37,6 +40,8 @@ import {
   type IncomeDefinitionResponse,
   type IncomeOccurrenceResponse,
   type OccurrenceStatus,
+  type OneOffExpenseResponse,
+  type OneOffIncomeResponse,
   type RecurringIncomeStatus,
   type TransferMarker,
   type TransferPlanFallbackReason,
@@ -44,7 +49,12 @@ import {
   type TransferRowResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
-import { type OverdueRecurringOccurrence, PlanningState } from '../../core/planning/planning-state';
+import {
+  type OverdueItem,
+  type OverdueOneOffIncome,
+  PlanningState,
+  isOverdueOneOff,
+} from '../../core/planning/planning-state';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { fromDateOnly } from '../../shared/date-only';
 import { formatDate, formatMoney, formatMonth, formatPercent } from '../../shared/format';
@@ -122,6 +132,10 @@ const TRANSFER_STATUS_KEYS: Record<TransferPlanStatus, string | null> = {
   Completed: 'planning.transferPlan.status.completed',
   Skipped: 'planning.transferPlan.status.skipped',
 };
+
+type IncomeRow =
+  | { oneOff: false; key: string; item: IncomeOccurrenceResponse }
+  | { oneOff: true; key: string; item: OneOffIncomeResponse };
 
 interface TransferBatchGroup {
   number: number | null;
@@ -222,6 +236,28 @@ export class Planning {
 
   protected readonly expenses = computed(() =>
     this.monthResource.hasValue() ? this.monthResource.value().expenses : null,
+  );
+
+  protected readonly incomeRows = computed<IncomeRow[]>(() => {
+    const plan = this.incomes();
+    if (!plan) {
+      return [];
+    }
+
+    return [
+      ...plan.occurrences.map((item): IncomeRow => ({
+        oneOff: false,
+        key: item.recurringIncomeId + item.nominalMonth,
+        item,
+      })),
+      ...plan.oneOffs
+        .filter((item) => item.inMonth)
+        .map((item): IncomeRow => ({ oneOff: true, key: `one-off-${item.id}`, item })),
+    ];
+  });
+
+  protected readonly monthOneOffExpenses = computed(() =>
+    (this.expenses()?.oneOffs ?? []).filter((item) => item.inMonth),
   );
 
   protected readonly freeFunds = computed(() =>
@@ -354,10 +390,39 @@ export class Planning {
     this.reloadWhenSaved(ref.afterClosed());
   }
 
-  protected openSettleDialog(occurrence: IncomeOccurrenceResponse): void {
-    const data: SettleOccurrenceDialogData = { occurrence };
-    const ref = this.dialog.open(SettleOccurrenceDialog, { width: '420px', data });
+  protected openSettleDialog(row: IncomeRow): void {
+    const data: SettleOccurrenceDialogData = row.oneOff
+      ? { oneOffIncome: row.item }
+      : { occurrence: row.item };
+    this.openSettle(data);
+  }
+
+  protected isOneOffOverdue(item: OverdueItem): item is OverdueOneOffIncome {
+    return isOverdueOneOff(item);
+  }
+
+  protected openEditOneOffIncomeDialog(oneOff: OneOffIncomeResponse): void {
+    const data: RecurringIncomeFormDialogData = { oneOff };
+    const ref = this.dialog.open(RecurringIncomeFormDialog, { width: '520px', data });
     this.reloadWhenSaved(ref.afterClosed());
+  }
+
+  protected openEditOneOffExpenseDialog(oneOff: OneOffExpenseResponse): void {
+    const data: RecurringExpenseFormDialogData = { oneOff };
+    const ref = this.dialog.open(RecurringExpenseFormDialog, { width: '520px', data });
+    this.reloadWhenSaved(ref.afterClosed());
+  }
+
+  protected async removeOneOffIncome(oneOff: OneOffIncomeResponse): Promise<void> {
+    await this.removeOneOff(oneOff.name, () =>
+      deleteApiPortfolioOneOffIncomesById({ path: { id: oneOff.id } }),
+    );
+  }
+
+  protected async removeOneOffExpense(oneOff: OneOffExpenseResponse): Promise<void> {
+    await this.removeOneOff(oneOff.name, () =>
+      deleteApiPortfolioOneOffExpensesById({ path: { id: oneOff.id } }),
+    );
   }
 
   protected async skipOccurrence(
@@ -377,32 +442,50 @@ export class Planning {
     this.reloadAll();
   }
 
-  protected openSettleOverdueDialog(item: OverdueRecurringOccurrence): void {
-    this.openSettleDialog({
-      ...item,
+  protected openSettleOverdueDialog(item: OverdueItem): void {
+    const common = {
+      accountId: item.accountId,
+      accountName: item.accountName,
+      accountArchived: item.accountArchived,
+      name: item.name,
+      date: item.date,
+      amount: item.amount,
+      currency: item.currency,
       amountPln: null,
       estimated: false,
-      status: 'Pending',
-      outOfRule: false,
-      plannedAccountId: item.accountId,
+      status: 'Pending' as const,
       actualAmount: null,
       actualDate: null,
       difference: null,
       actualAmountPln: null,
       depositCreated: false,
       overdue: true,
+    };
+    if (isOverdueOneOff(item)) {
+      this.openSettle({ oneOffIncome: { ...common, id: item.oneOffIncomeId, inMonth: true } });
+      return;
+    }
+
+    this.openSettle({
+      occurrence: {
+        ...common,
+        recurringIncomeId: item.recurringIncomeId,
+        nominalMonth: item.nominalMonth,
+        outOfRule: false,
+        plannedAccountId: item.accountId,
+      },
     });
   }
 
-  protected async undoOccurrence(occurrence: IncomeOccurrenceResponse): Promise<void> {
+  protected async undoOccurrence(row: IncomeRow): Promise<void> {
     const confirmed = await firstValueFrom(
       this.dialog
         .open(ConfirmDialog, {
           data: {
             title: translate('planning.occurrence.undoTitle'),
             message: translate('planning.occurrence.undoMessage', {
-              name: occurrence.name,
-              date: formatDate(occurrence.date),
+              name: row.item.name,
+              date: formatDate(row.item.date),
             }),
             confirmLabel: translate('planning.occurrence.undo'),
             destructive: true,
@@ -414,9 +497,11 @@ export class Planning {
       return;
     }
 
-    const result = await deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth({
-      path: { id: occurrence.recurringIncomeId, month: occurrence.nominalMonth },
-    });
+    const result = row.oneOff
+      ? await deleteApiPortfolioOneOffIncomesByIdSettlement({ path: { id: row.item.id } })
+      : await deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth({
+          path: { id: row.item.recurringIncomeId, month: row.item.nominalMonth },
+        });
     if (result.error) {
       this.snackBar.open(
         readProblemDetails(result.error).detail ?? translate('planning.occurrence.undoFailed'),
@@ -857,6 +942,43 @@ export class Planning {
     }
 
     this.settingsResource.reload();
+    this.reloadAll();
+  }
+
+  private openSettle(data: SettleOccurrenceDialogData): void {
+    const ref = this.dialog.open(SettleOccurrenceDialog, { width: '420px', data });
+    this.reloadWhenSaved(ref.afterClosed());
+  }
+
+  private async removeOneOff(
+    name: string,
+    call: () => Promise<{ error?: unknown }>,
+  ): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('planning.oneOff.delete.title'),
+            message: translate('planning.oneOff.delete.message', { name }),
+            confirmLabel: translate('common.delete'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const result = await call();
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.oneOff.delete.failed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
     this.reloadAll();
   }
 

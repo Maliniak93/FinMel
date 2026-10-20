@@ -1115,6 +1115,18 @@
       "dayInvalid": "Enter a day from 1 to 31.",
       "shift": "Business-day shift"
     },
+    "oneOff": {
+      "mode": "Entry type",
+      "recurring": "Recurring",
+      "oneOff": "One-off",
+      "mark": "one-off",
+      "lockedHint": "Undo the settlement first to edit or delete this entry.",
+      "delete": {
+        "title": "Delete the one-off entry?",
+        "message": "\"{{ name }}\" will be removed from the plan.",
+        "failed": "Could not delete the entry."
+      }
+    },
     "todo": {
       "badge": "Things to do"
     }

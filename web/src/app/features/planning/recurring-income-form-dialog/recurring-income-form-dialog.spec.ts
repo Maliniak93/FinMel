@@ -210,6 +210,140 @@ describe('RecurringIncomeFormDialog', () => {
     expect(component['form'].controls.effectiveFrom.hasError('monthOutOfRange')).toBe(true);
   });
 
+  function modeToggles(): HTMLElement[] {
+    return Array.from(element().querySelectorAll<HTMLElement>('mat-button-toggle button'));
+  }
+
+  async function chooseOneOff(): Promise<void> {
+    modeToggles()
+      .find((button) => /jednorazowy|one-off/i.test(button.textContent ?? ''))!
+      .click();
+    await settle();
+  }
+
+  function oneOff(extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: 'one-off-1',
+      name: 'Premia roczna',
+      date: '2026-12-15',
+      accountId: plnAccountId,
+      accountName: 'mBank ROR',
+      accountArchived: false,
+      amount: 8000,
+      currency: 'PLN',
+      amountPln: 8000,
+      estimated: false,
+      inMonth: false,
+      status: 'Pending',
+      actualAmount: null,
+      actualDate: null,
+      actualAmountPln: null,
+      difference: null,
+      depositCreated: false,
+      overdue: false,
+      ...extra,
+    };
+  }
+
+  it('switches between recurring and one-off fields', async () => {
+    await setup();
+
+    expect(element().querySelector('mat-button-toggle-group')).not.toBeNull();
+    expect(modeToggles()).toHaveLength(2);
+    expect(field('dayOfMonth')).not.toBeNull();
+    expect(field('startDate')).not.toBeNull();
+    expect(field('date')).toBeNull();
+
+    await chooseOneOff();
+
+    expect(field('name')).not.toBeNull();
+    expect(field('amount')).not.toBeNull();
+    expect(field('accountId')).not.toBeNull();
+    expect(field('date')).not.toBeNull();
+    expect(field('startDate')).toBeNull();
+    expect(field('endDate')).toBeNull();
+    expect(field('intervalMonths')).toBeNull();
+    expect(field('dayOfMonth')).toBeNull();
+    expect(field('shift')).toBeNull();
+  });
+
+  it('posts a one-off income', async () => {
+    await setup();
+    await chooseOneOff();
+
+    component['form'].controls.name.setValue('Premia roczna');
+    component['form'].controls.amount.setValue(8000);
+    component['form'].controls.accountId.setValue(plnAccountId);
+    component['form'].controls.date.setValue(new Date(2026, 11, 15));
+    await settle();
+    await component['onSubmit']();
+
+    const [request] = posts();
+    expect(request.url).toContain('/api/portfolio/one-off-incomes');
+    expect(await request.json()).toMatchObject({
+      name: 'Premia roczna',
+      amount: 8000,
+      accountId: plnAccountId,
+      date: '2026-12-15',
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('rejects a date out of range', async () => {
+    await setup();
+    await chooseOneOff();
+
+    component['form'].controls.name.setValue('Premia roczna');
+    component['form'].controls.amount.setValue(8000);
+    component['form'].controls.accountId.setValue(plnAccountId);
+    component['form'].controls.date.setValue(new Date(2100, 0, 1));
+    await settle();
+    await component['onSubmit']();
+
+    expect(posts()).toHaveLength(0);
+    expect(component['form'].controls.date.hasError('dateOutOfRange')).toBe(true);
+    expect(dialogRef.close).not.toHaveBeenCalled();
+
+    fetchSpy.mockImplementation(async () =>
+      jsonResponse({ detail: 'Invalid.', errors: { date: ['Date is not allowed.'] } }, 400),
+    );
+    component['form'].controls.date.setValue(new Date(2026, 11, 15));
+    await component['onSubmit']();
+
+    expect(component['form'].controls.date.getError('server')).toContain('Date is not allowed.');
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('edits a one-off income', async () => {
+    await setup({ oneOff: oneOff() } as never);
+
+    expect(modeToggles()).toHaveLength(0);
+    expect(field('date')).not.toBeNull();
+    expect(field('startDate')).toBeNull();
+    expect(component['form'].getRawValue()).toMatchObject({
+      name: 'Premia roczna',
+      amount: 8000,
+      accountId: plnAccountId,
+    });
+    expect((component['form'].getRawValue().date as Date).toDateString()).toBe(
+      new Date(2026, 11, 15).toDateString(),
+    );
+
+    component['form'].controls.amount.setValue(8500);
+    await component['onSubmit']();
+
+    expect(posts()).toHaveLength(0);
+    const [request] = puts();
+    expect(request.url).toContain('/api/portfolio/one-off-incomes/one-off-1');
+    expect(await request.json()).toMatchObject({
+      name: 'Premia roczna',
+      amount: 8500,
+      accountId: plnAccountId,
+      date: '2026-12-15',
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
   it('has no effective month field when adding', async () => {
     await setup();
 
