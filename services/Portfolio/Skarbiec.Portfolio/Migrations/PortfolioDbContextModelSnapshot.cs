@@ -714,6 +714,63 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("MetalHoldings");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.OneOffExpense", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("OneOffExpenses");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.OneOffIncome", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.ToTable("OneOffIncomes");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.PlanningSettings", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1400,6 +1457,15 @@ namespace Skarbiec.Portfolio.Migrations
                         .WithOne()
                         .HasForeignKey("Skarbiec.Portfolio.Data.MetalHolding", "AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.OneOffIncome", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

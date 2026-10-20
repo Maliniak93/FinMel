@@ -1940,6 +1940,172 @@
         }
       }
     },
+    "/api/portfolio/one-off-incomes": {
+      "post": {
+        "tags": [
+          "CreateOneOffIncomeEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOneOffIncomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateOneOffIncomeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/one-off-incomes/{id}": {
+      "put": {
+        "tags": [
+          "UpdateOneOffIncomeEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOneOffIncomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeleteOneOffIncomeEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/portfolio/one-off-expenses": {
+      "post": {
+        "tags": [
+          "CreateOneOffExpenseEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOneOffExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateOneOffExpenseResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/one-off-expenses/{id}": {
+      "put": {
+        "tags": [
+          "UpdateOneOffExpenseEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOneOffExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeleteOneOffExpenseEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/recurring-incomes": {
       "post": {
         "tags": [
@@ -5160,6 +5326,91 @@
           }
         }
       },
+      "CreateOneOffExpenseRequest": {
+        "required": [
+          "name",
+          "amount",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "amount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "CreateOneOffExpenseResponse": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "CreateOneOffIncomeRequest": {
+        "required": [
+          "name",
+          "amount",
+          "accountId",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "amount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "CreateOneOffIncomeResponse": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "CreateRecurringExpenseRequest": {
         "required": [
           "name",
@@ -6381,6 +6632,105 @@
           "Skipped"
         ]
       },
+      "OneOffExpenseResponse": {
+        "required": [
+          "id",
+          "name",
+          "date",
+          "amount",
+          "inMonth"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "inMonth": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OneOffIncomeResponse": {
+        "required": [
+          "id",
+          "name",
+          "date",
+          "accountId",
+          "accountName",
+          "accountArchived",
+          "amount",
+          "currency",
+          "amountPln",
+          "estimated",
+          "inMonth"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "accountArchived": {
+            "type": "boolean"
+          },
+          "amount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "estimated": {
+            "type": "boolean"
+          },
+          "inMonth": {
+            "type": "boolean"
+          }
+        }
+      },
       "OverdueOccurrenceResponse": {
         "required": [
           "recurringIncomeId",
@@ -6503,7 +6853,8 @@
         "required": [
           "payments",
           "costPln",
-          "definitions"
+          "definitions",
+          "oneOffs"
         ],
         "type": "object",
         "properties": {
@@ -6526,6 +6877,12 @@
             "items": {
               "$ref": "#/components/schemas/ExpenseDefinitionResponse"
             }
+          },
+          "oneOffs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OneOffExpenseResponse"
+            }
           }
         }
       },
@@ -6534,7 +6891,8 @@
           "occurrences",
           "balance",
           "fxUnavailable",
-          "definitions"
+          "definitions",
+          "oneOffs"
         ],
         "type": "object",
         "properties": {
@@ -6554,6 +6912,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/IncomeDefinitionResponse"
+            }
+          },
+          "oneOffs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OneOffIncomeResponse"
             }
           }
         }
@@ -8511,6 +8875,67 @@
           }
         }
       },
+      "UpdateOneOffExpenseRequest": {
+        "required": [
+          "name",
+          "amount",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "amount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "UpdateOneOffIncomeRequest": {
+        "required": [
+          "name",
+          "amount",
+          "accountId",
+          "date"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 200,
+            "type": "string"
+          },
+          "amount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
       "UpdateRecurringExpenseRequest": {
         "required": [
           "name",
@@ -9117,6 +9542,24 @@
     },
     {
       "name": "RestoreCashPlaceEndpoint"
+    },
+    {
+      "name": "CreateOneOffIncomeEndpoint"
+    },
+    {
+      "name": "UpdateOneOffIncomeEndpoint"
+    },
+    {
+      "name": "DeleteOneOffIncomeEndpoint"
+    },
+    {
+      "name": "CreateOneOffExpenseEndpoint"
+    },
+    {
+      "name": "UpdateOneOffExpenseEndpoint"
+    },
+    {
+      "name": "DeleteOneOffExpenseEndpoint"
     },
     {
       "name": "CreateRecurringIncomeEndpoint"

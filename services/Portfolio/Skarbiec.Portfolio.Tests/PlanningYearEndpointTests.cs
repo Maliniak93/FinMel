@@ -42,6 +42,31 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task OneOffs_AppearInTheirMonth()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken);
+        await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 8_000m, new DateOnly(2026, 3, 10));
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Wakacje", 1_200m, new DateOnly(2026, 8, 5));
+        await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Stara premia", 100m, new DateOnly(2025, 5, 5));
+
+        var year = await client.GetPlanningYearAsync(2026, cancellationToken);
+        var earlier = await client.GetPlanningYearAsync(2025, cancellationToken);
+
+        var march = year.Months.Single(m => m.Month == "2026-03");
+        var august = year.Months.Single(m => m.Month == "2026-08");
+        Assert.True(march.HasDefinitions);
+        Assert.Equal(8_000m, march.IncomePlanPln);
+        Assert.True(august.HasDefinitions);
+        Assert.Equal(1_200m, august.CostPln);
+        Assert.False(year.Months.Single(m => m.Month == "2026-04").HasDefinitions);
+        Assert.Equal(2025, earlier.FirstYear);
+        Assert.Equal(100m, earlier.Months.Single(m => m.Month == "2025-05").IncomePlanPln);
+    }
+
+    [Fact]
     public async Task ActualAndEmptyMonths()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

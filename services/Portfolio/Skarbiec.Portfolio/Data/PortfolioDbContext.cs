@@ -30,6 +30,8 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<RecurringIncomeOccurrence> RecurringIncomeOccurrences => Set<RecurringIncomeOccurrence>();
     public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
     public DbSet<RecurringExpenseVersion> RecurringExpenseVersions => Set<RecurringExpenseVersion>();
+    public DbSet<OneOffIncome> OneOffIncomes => Set<OneOffIncome>();
+    public DbSet<OneOffExpense> OneOffExpenses => Set<OneOffExpense>();
     public DbSet<AllocationBucket> AllocationBuckets => Set<AllocationBucket>();
     public DbSet<AllocationPlanVersion> AllocationPlanVersions => Set<AllocationPlanVersion>();
     public DbSet<AllocationPlanEntry> AllocationPlanEntries => Set<AllocationPlanEntry>();
@@ -321,6 +323,24 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             version.Property(v => v.Amount).HasPrecision(18, 2);
             version.Property(v => v.DayKind).HasConversion<string>().HasMaxLength(20);
             version.Property(v => v.Shift).HasConversion<string>().HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<OneOffIncome>(income =>
+        {
+            income.Property(i => i.Name).HasMaxLength(200);
+            income.Property(i => i.Amount).HasPrecision(18, 2);
+
+            // Restrict: an account that a one-off income targets is never deleted under it.
+            income.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(i => i.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<OneOffExpense>(expense =>
+        {
+            expense.Property(e => e.Name).HasMaxLength(200);
+            expense.Property(e => e.Amount).HasPrecision(18, 2);
         });
 
         modelBuilder.Entity<AllocationBucket>(bucket =>

@@ -88,6 +88,24 @@ public sealed class DeleteAccountEndpointTests(SkarbiecContainersFixture contain
     }
 
     [Fact]
+    public async Task WithOneOffIncome_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        var income = await client.CreateOneOffIncomeAsync(accountId, cancellationToken);
+
+        var blocked = await client.DeleteAsync(AccountUri(accountId), cancellationToken);
+
+        await blocked.AssertProblemAsync(HttpStatusCode.Conflict, PlanningApi.AccountHasOneOffIncomesErrorCode, cancellationToken);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync(AccountUri(accountId), cancellationToken)).StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.DeleteAsync(PlanningApi.OneOffIncomeUri(income), cancellationToken)).StatusCode);
+        var deleted = await client.DeleteAsync(AccountUri(accountId), cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+    }
+
+    [Fact]
     public async Task Returns409_WhenRecurringIncomeTargetsAccount()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

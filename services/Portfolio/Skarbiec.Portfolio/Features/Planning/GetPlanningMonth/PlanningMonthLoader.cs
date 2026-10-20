@@ -30,6 +30,14 @@ public sealed class PlanningMonthLoader(
             .Include(e => e.Versions)
             .ToListAsync(cancellationToken);
 
+        var oneOffIncomes = await dbContext.OneOffIncomes
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var oneOffExpenses = await dbContext.OneOffExpenses
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
         var versions = await dbContext.AllocationPlanVersions
             .AsNoTracking()
             .Include(v => v.Entries)
@@ -43,7 +51,7 @@ public sealed class PlanningMonthLoader(
             .AsNoTracking()
             .ToDictionaryAsync(b => b.Id, b => b.Kind, cancellationToken);
 
-        var forecast = new PlanningForecast(incomes, accounts, stored, expenseRows);
+        var forecast = new PlanningForecast(incomes, accounts, stored, expenseRows, oneOffIncomes, oneOffExpenses);
 
         var foreign = new List<string>();
         for (var walked = AllocationLedger.WalkStart(first, versions, kinds); walked <= last; walked = walked.AddMonths(1))
