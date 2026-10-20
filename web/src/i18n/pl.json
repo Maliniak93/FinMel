@@ -398,8 +398,24 @@
     "outOfBand": "Poza pasmem",
     "outside": "Poza alokacją",
     "summary": "baza {{ base }} z {{ total }}",
+    "scope": {
+      "label": "Zakres alokacji",
+      "whole": "Całość"
+    },
+    "group": {
+      "empty": "Ta grupa aktywów nie ma jeszcze alokacji docelowej.",
+      "create": "Utwórz alokację",
+      "copy": "Skopiuj z całości",
+      "delete": "Usuń alokację",
+      "planNote": "Plan przelewów jest liczony z alokacji „Całość”, nie z tej grupy aktywów.",
+      "noValue": "Ta grupa aktywów nie ma jeszcze wartości, więc widać tylko cele i pasma."
+    },
+    "delete": {
+      "title": "Usunąć alokację grupy?",
+      "message": "Alokacja docelowa grupy aktywów „{{ name }}” zostanie usunięta. Alokacja całości się nie zmieni."
+    },
     "columns": {
-      "group": "Grupa",
+      "group": "Grupa klas",
       "value": "Wartość",
       "current": "Udział obecny",
       "target": "Cel",
@@ -413,20 +429,20 @@
       "metals": "Kruszce"
     },
     "editor": {
-      "proposalIntro": "Propozycja podziału majątku. Ustaw cel dla każdej grupy i zapisz.",
-      "name": "Nazwa grupy",
+      "proposalIntro": "Propozycja podziału majątku. Ustaw cel dla każdej grupy klas i zapisz.",
+      "name": "Nazwa grupy klas",
       "classes": "Klasy aktywów",
       "target": "Cel (%)",
       "band": "Pasmo ± (pp)",
-      "addGroup": "Dodaj grupę",
-      "removeGroup": "Usuń grupę",
+      "addGroup": "Dodaj grupę klas",
+      "removeGroup": "Usuń grupę klas",
       "sum": "Suma celów: {{ sum }}"
     },
     "errors": {
-      "nameRequired": "Podaj nazwę grupy.",
+      "nameRequired": "Podaj nazwę grupy klas.",
       "classesRequired": "Wybierz co najmniej jedną klasę aktywów.",
       "percent": "Podaj wartość 0–100 z najwyżej jednym miejscem po przecinku.",
-      "duplicateNames": "Nazwy grup muszą się różnić."
+      "duplicateNames": "Nazwy grup klas muszą się różnić."
     }
   },
   "dashboard": {
