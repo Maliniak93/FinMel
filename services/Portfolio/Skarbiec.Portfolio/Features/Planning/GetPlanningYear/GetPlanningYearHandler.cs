@@ -19,6 +19,8 @@ public sealed class GetPlanningYearHandler(PlanningMonthLoader loader)
         var currentMonth = YearMonth.From(data.Today);
         var starts = data.Incomes.Select(i => i.StartDate)
             .Concat(data.Forecast.Plans.Select(p => p.Expense.StartDate))
+            .Concat(data.Forecast.OneOffIncomes.Select(i => i.Date))
+            .Concat(data.Forecast.OneOffExpenses.Select(e => e.Date))
             .ToList();
         var firstYear = starts.Count == 0 ? currentMonth.Year : starts.Min().Year;
         var lastYear = currentMonth.Year + 1;
@@ -56,7 +58,9 @@ public sealed class GetPlanningYearHandler(PlanningMonthLoader loader)
     private static PlanningYearMonthResponse BuildMonth(PlanningMonthData data, YearMonth month, YearMonth currentMonth)
     {
         var covered = data.Incomes.Any(i => Covers(i.StartDate, i.EndDate, month))
-            || data.Forecast.Plans.Any(p => Covers(p.Expense.StartDate, p.Expense.EndDate, month));
+            || data.Forecast.Plans.Any(p => Covers(p.Expense.StartDate, p.Expense.EndDate, month))
+            || data.Forecast.OneOffIncomes.Any(i => YearMonth.From(i.Date) == month)
+            || data.Forecast.OneOffExpenses.Any(e => YearMonth.From(e.Date) == month);
         if (!covered)
         {
             return new PlanningYearMonthResponse

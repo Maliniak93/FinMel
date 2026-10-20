@@ -145,6 +145,20 @@ public sealed record PlanningExpensesResponse
     public required decimal CostPln { get; init; }
 
     public required IReadOnlyList<ExpenseDefinitionResponse> Definitions { get; init; }
+
+    /// <summary>Every one-off expense of the user, ordered by date; only those in the viewed month count towards the cost.</summary>
+    public required IReadOnlyList<OneOffExpenseResponse> OneOffs { get; init; }
+}
+
+public sealed record OneOffExpenseResponse
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required DateOnly Date { get; init; }
+    public required decimal Amount { get; init; }
+
+    /// <summary>True when the date falls in the viewed month.</summary>
+    public required bool InMonth { get; init; }
 }
 
 public sealed record ExpensePaymentResponse
@@ -225,6 +239,29 @@ public sealed record PlanningIncomesResponse
     public required bool FxUnavailable { get; init; }
 
     public required IReadOnlyList<IncomeDefinitionResponse> Definitions { get; init; }
+
+    /// <summary>Every one-off income of the user, ordered by date; only those in the viewed month count towards the balance.</summary>
+    public required IReadOnlyList<OneOffIncomeResponse> OneOffs { get; init; }
+}
+
+public sealed record OneOffIncomeResponse
+{
+    public required Guid Id { get; init; }
+    public required string Name { get; init; }
+    public required DateOnly Date { get; init; }
+    public required Guid AccountId { get; init; }
+    public required string AccountName { get; init; }
+    public required bool AccountArchived { get; init; }
+    public required decimal Amount { get; init; }
+    public required string Currency { get; init; }
+
+    /// <summary>The amount in PLN at the latest rate (null when the rate is missing).</summary>
+    public required decimal? AmountPln { get; init; }
+
+    public required bool Estimated { get; init; }
+
+    /// <summary>True when the date falls in the viewed month.</summary>
+    public required bool InMonth { get; init; }
 }
 
 public sealed record IncomeBalanceResponse
