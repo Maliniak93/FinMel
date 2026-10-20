@@ -16,7 +16,7 @@ Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, th
 | One-shot verification, scoped to the changed files (`--all`: everything; `--fix` reformats the changed files first; `--cache` answers a tree already proven green, a green wider run counts; every failing project reported; 120-min deadline) | `node scripts/verify.mjs [--quick\|--all\|--projects A,B] [--fix] [--cache] [--cache-check]` |
 | Preflight for /build: checks node/dotnet/gh/git, starts Docker, stops the stack, installs web deps | `node scripts/preflight.mjs [--dry-run] [--no-web]` |
 | Live plan status (spec issues on the GitHub project vs. git vs. open PRs); `--write` refreshes the block in `skarbiec-plan/README.md` | `node scripts/plan-status.mjs [--write] [--no-gh]` |
-| Spec issues on the FinMel project: read, list, move a card, comment, tick ACs | `node scripts/gh-project.mjs get\|list\|set\|comment\|tick` |
+| Spec issues on the FinMel project: read, list, move a card, comment, tick ACs, heal a missing Branch | `node scripts/gh-project.mjs get\|list\|set\|heal\|comment\|tick` |
 | /idea prompts (local, gitignored `skarbiec-plan/prompts/`): context digest, list, show, validate + copy, set status, file path | `node scripts/idea.mjs context\|list\|show\|check\|mark\|path` |
 | Local offline code guide (gitignored `skarbiec-plan/przewodnik/`): extract facts, build from Claude's prose; `/docs` drives both | `node scripts/docs.mjs facts\|build` |
 | Local offline workflow map (gitignored `skarbiec-plan/flows/`): extract commands, workflows, agents, scripts, build from Claude's step descriptions; `/flows` drives both | `node scripts/flows.mjs facts\|build` |

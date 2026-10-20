@@ -104,9 +104,9 @@ node scripts/gh-project.mjs create --title "Fix: <symptom>" --body-file <scratch
   --slug <slug> --tier <1|2> --kind fix --area <area> --priority <P0|P1>
 ```
 
-It prints `{"number","url","branch"}` — the branch is `fix/<slug>`. If it fails after the issue exists it
-prints the URL: finish the missing fields with `node scripts/gh-project.mjs set <number> <field> <value>`
-instead of creating a duplicate. For a split: the umbrella first (`--epic`), then each part in build order
+It prints `{"number","url","branch"}` — the branch is `fix/<slug>`. It reads the card back and rewrites a missing field once;
+if a Branch or Tier is still missing it exits non-zero with the ready `node scripts/gh-project.mjs set <number> <field> <value>`
+commands (a missing Area or Priority is only a warning) — run those instead of creating a duplicate. For a split: the umbrella first (`--epic`), then each part in build order
 with `--parent <umbrella number>` and its own `--area` (no `--priority`); the umbrella takes `--priority` and no `--area`.
 
 Then build it — for a split, the **first part only**; each next part is `/build #<n>` for the user once the

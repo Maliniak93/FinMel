@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { areaWarning, mayStart, nextWork, pickNext, planFrom, planLines, runQueue, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { areaWarning, ensureBranch, mayStart, nextWork, pickNext, planFrom, planLines, postSkipOnce, runQueue, skipMarker, skippedLine, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 import { queueOf } from "./queue.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -107,8 +107,8 @@ const flowCards = () => [
   { number: 436, title: "Part two", status: "Todo", parent: 434, area: "Backend" },
   { number: 437, title: "Part three", status: "Todo", parent: 434, area: "Backend" },
   { number: 440, title: "Other", status: "Todo", epic: false, parent: null, priority: "P2", area: "Scripts" },
-];
-const urgent = { number: 450, title: "Fire", status: "Todo", epic: false, parent: null, priority: "P0", area: "Scripts" };
+].map((c) => ({ tier: "1", ...c }));
+const urgent = { number: 450, title: "Fire", status: "Todo", epic: false, parent: null, priority: "P0", area: "Scripts", tier: "1" };
 const setStatus = (cards, number, status) => cards.map((c) => (c.number === number ? { ...c, status } : c));
 
 test("pickNext takes a new P0 between parts", () => {
@@ -175,6 +175,114 @@ test("a merged part is not built again while its card lags behind the closed iss
 
   assert.deepEqual(built, [436, 437, 440]);
   assert.deepEqual(finishedEpics, [434]);
+});
+
+const standalone = (number, extra = {}) => ({ number, title: `Card ${number}`, status: "Todo", epic: false, parent: null, priority: "P2", area: "Scripts", tier: "1", dependsOn: [], ...extra });
+
+async function drive(cards, hooks = {}) {
+  const built = [];
+  const logs = [];
+  const skips = [];
+  const finishedEpics = [];
+  const result = await runQueue({
+    readCards: async () => cards,
+    buildPart: async (item, part) => {
+      built.push(part);
+      cards = setStatus(cards, part, "Done");
+    },
+    finishEpic: async (item) => void finishedEpics.push(item.number),
+    onSkip: async (skip) => void skips.push(skip),
+    log: (line) => logs.push(line),
+    ...hooks,
+  });
+  return { built, logs, skips, finishedEpics, result, cards };
+}
+
+test("missing branch is healed", () => {
+  const healed = [];
+  const heal = (number) => {
+    healed.push(number);
+    return { branch: "feat/derived", healed: true, source: "derived" };
+  };
+
+  assert.equal(ensureBranch({ number: 466, branch: null }, heal).branch, "feat/derived");
+  assert.deepEqual(healed, [466]);
+  assert.equal(ensureBranch({ number: 5, branch: "feat/set" }, heal).branch, "feat/set");
+  assert.deepEqual(healed, [466]);
+  assert.throws(() => ensureBranch({ number: 7, branch: null }, () => ({ branch: null })), /#7 has no Branch/);
+});
+
+test("unfixable card is skipped", async () => {
+  for (const tier of [null, "3"]) {
+    const cards = [standalone(440, { tier }), standalone(441), standalone(442)];
+    const { built, logs, skips, cards: after } = await drive(cards);
+
+    assert.deepEqual(built, [441, 442]);
+    assert.deepEqual(skips, [{ number: 440, reason: "brak Tier" }]);
+    assert.ok(logs.includes("pominięto #440: brak Tier"), logs.join("\n"));
+    assert.equal(after.find((c) => c.number === 440).status, "Todo");
+  }
+});
+
+test("skip propagates to epic parts and dependents", async () => {
+  const cards = [
+    { ...standalone(434), epic: true, subIssues: [435, 436, 437], priority: "P2", area: null, status: "In progress" },
+    standalone(435, { status: "Done", parent: 434 }),
+    standalone(436, { tier: null, parent: 434 }),
+    standalone(437, { parent: 434 }),
+    standalone(440, { dependsOn: [436] }),
+    standalone(441, { dependsOn: [440] }),
+    standalone(442),
+  ];
+  const { built, logs, skips, finishedEpics } = await drive(cards);
+
+  assert.deepEqual(built, [442]);
+  assert.deepEqual(skips, [
+    { number: 436, reason: "brak Tier" },
+    { number: 437, reason: "zależy od #436" },
+    { number: 440, reason: "zależy od #436" },
+    { number: 441, reason: "zależy od #440" },
+  ]);
+  assert.ok(logs.includes("pominięto #437: zależy od #436"), logs.join("\n"));
+  assert.deepEqual(finishedEpics, []);
+});
+
+test("skip comment posted once", async () => {
+  const comments = [];
+  const post = async (body) => void comments.push({ body });
+  const cards = [standalone(466, { tier: null }), standalone(467)];
+  const runs = [];
+
+  for (let i = 0; i < 2; i++) {
+    runs.push(
+      await drive(cards, {
+        onSkip: ({ number, reason }) => postSkipOnce({ number, reason, comments: async () => comments, post }),
+      }),
+    );
+  }
+
+  assert.ok(runs.every((r) => r.logs.includes("pominięto #466: brak Tier")));
+  assert.equal(comments.length, 1);
+  assert.ok(comments[0].body.includes(skipMarker(466)));
+  assert.ok(comments[0].body.includes("brak Tier"));
+});
+
+test("run with skips ends done", async () => {
+  const cards = [standalone(466, { tier: null }), { ...standalone(468), epic: true, subIssues: [469], dependsOn: [466] }, standalone(469, { parent: 468 }), standalone(470)];
+  const { built, result } = await drive(cards);
+
+  assert.deepEqual(built, [470]);
+  assert.deepEqual(result.skipped, [
+    { number: 466, reason: "brak Tier" },
+    { number: 469, reason: "zależy od #466" },
+  ]);
+  assert.equal(skippedLine(result.skipped), "pominięte: #466 (brak Tier), #469 (zależy od #466)");
+  assert.equal(skippedLine([]), null);
+});
+
+test("autobuild heals a part through ensureBranch", () => {
+  const source = readFileSync(path.join(root, "scripts/autobuild.mjs"), "utf8");
+  assert.match(source, /ensureBranch\(getIssue/);
 });
 
 test("plan lines show priority", () => {

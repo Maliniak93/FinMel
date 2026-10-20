@@ -1,5 +1,6 @@
 // Usage: imported by autobuild.mjs - the queue plan, the next piece of work, the start and window times; pure, injectable, runs nothing on import
 
+import { postOnce } from "./autobuild-gh.mjs";
 import { shortOf } from "./priority.mjs";
 import { itemTag, queueOf } from "./queue.mjs";
 
@@ -48,11 +49,49 @@ export function pickNext(queue, { started = new Set(), items = Infinity, include
   );
 }
 
-export async function runQueue({ items = Infinity, includeManual = false, only = null, readCards, buildPart, isClosed = async () => false, finishEpic = async () => {}, log = () => {} }) {
+export const tierProblem = (card) => (["1", "2"].includes(String(card?.tier ?? "")) ? null : "brak Tier");
+
+export const skipMarker = (number) => `<!-- skarbiec-autobuild-skip:${number} -->`;
+
+export const skippedLine = (skipped) => (skipped.length ? `pominięte: ${skipped.map((s) => `#${s.number} (${s.reason})`).join(", ")}` : null);
+
+export function ensureBranch(part, heal) {
+  if (part.branch) return part;
+  const { branch } = heal(part.number);
+  if (!branch) throw new Error(`#${part.number} has no Branch field and heal gave none`);
+  return { ...part, branch };
+}
+
+export function postSkipOnce({ number, reason, comments, post }) {
+  return postOnce({
+    comments,
+    marker: skipMarker(number),
+    body: `Autobuild pominął #${number}: ${reason}. Karta zostaje w obecnym statusie, a kolejny przebieg oceni ją ponownie.`,
+    post,
+  });
+}
+
+function skipReason(card, item, blocked) {
+  const problem = tierProblem(card);
+  if (problem) return problem;
+  const dependency = [...(item.dependsOn ?? []), ...(card.dependsOn ?? [])].find((d) => blocked.has(d));
+  return dependency === undefined ? null : `zależy od #${dependency}`;
+}
+
+export async function runQueue({ items = Infinity, includeManual = false, only = null, readCards, buildPart, isClosed = async () => false, finishEpic = async () => {}, onSkip = async () => {}, log = () => {} }) {
   const started = new Set();
   const finished = new Set();
   const closedParts = new Set();
+  const skipped = [];
+  const blocked = new Set();
   let previous = null;
+
+  const skip = async (number, reason) => {
+    skipped.push({ number, reason });
+    blocked.add(number);
+    log(`pominięto #${number}: ${reason}`);
+    await onSkip({ number, reason });
+  };
 
   for (;;) {
     // the project's "Item closed" workflow moves a merged part's card to Done asynchronously, so a closed issue is Done here already
@@ -67,13 +106,29 @@ export async function runQueue({ items = Infinity, includeManual = false, only =
     }
 
     const item = only !== null && only !== undefined ? planOne(queue, Number(only), cards)[0] : pickNext(queue, { started, items, includeManual });
-    if (!item) return;
+    if (!item) return { skipped };
+
+    const part = nextWork(item, cards);
+    const partCard = part === null ? null : cards.find((c) => c.number === part);
+    const reason = partCard ? skipReason(partCard, item, blocked) : null;
+    if (reason) {
+      await skip(part, reason);
+      if (item.epic) {
+        const numbers = partNumbers(item);
+        for (const n of numbers.slice(numbers.indexOf(part) + 1)) {
+          const later = cards.find((c) => c.number === n);
+          if (later && later.status !== "Done") await skip(n, `zależy od #${part}`);
+        }
+      }
+      blocked.add(item.number);
+      finished.add(item.number);
+      continue;
+    }
 
     const continuation = queue.find((q) => q.number === previous && q.epic && q.next !== null);
     if (continuation && continuation.number !== item.number) log(`kolejka zmieniona: #${item.number} (${shortOf(item.priority)}) przed #${continuation.number}`);
 
     started.add(item.number);
-    const part = nextWork(item, cards);
     if (part === null) {
       await finishEpic(item, cards);
       finished.add(item.number);
