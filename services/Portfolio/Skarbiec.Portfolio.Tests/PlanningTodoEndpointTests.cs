@@ -41,6 +41,28 @@ public sealed class PlanningTodoEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task OneOffIncome_Overdue_IsListed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var overdue = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 500m, new DateOnly(2026, 9, 10));
+        var settled = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Zwrot", 300m, new DateOnly(2026, 9, 12));
+        await client.SettleOneOffIncomeAsync(settled, account.AccountId, 300m, new DateOnly(2026, 9, 12), cancellationToken);
+
+        var todo = await client.GetTodoAsync(cancellationToken);
+
+        var item = Assert.Single(todo.Items, i => i.Name == "Premia");
+        Assert.Equal((new DateOnly(2026, 9, 10), 500m, "PLN"), (item.Date, item.Amount, item.Currency));
+        Assert.DoesNotContain(todo.Items, i => i.Name == "Zwrot");
+
+        await client.SettleOneOffIncomeAsync(overdue, account.AccountId, 500m, new DateOnly(2026, 9, 10), cancellationToken);
+
+        Assert.DoesNotContain((await client.GetTodoAsync(cancellationToken)).Items, i => i.Name == "Premia");
+    }
+
+    [Fact]
     public async Task TransferPlans()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

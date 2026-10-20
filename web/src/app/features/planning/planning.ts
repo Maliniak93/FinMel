@@ -37,7 +37,6 @@ import {
   type IncomeDefinitionResponse,
   type IncomeOccurrenceResponse,
   type OccurrenceStatus,
-  type OverdueOccurrenceResponse,
   type RecurringIncomeStatus,
   type TransferMarker,
   type TransferPlanFallbackReason,
@@ -45,7 +44,7 @@ import {
   type TransferRowResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
-import { PlanningState } from '../../core/planning/planning-state';
+import { type OverdueRecurringOccurrence, PlanningState } from '../../core/planning/planning-state';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { fromDateOnly } from '../../shared/date-only';
 import { formatDate, formatMoney, formatMonth, formatPercent } from '../../shared/format';
@@ -378,7 +377,7 @@ export class Planning {
     this.reloadAll();
   }
 
-  protected openSettleOverdueDialog(item: OverdueOccurrenceResponse): void {
+  protected openSettleOverdueDialog(item: OverdueRecurringOccurrence): void {
     this.openSettleDialog({
       ...item,
       amountPln: null,

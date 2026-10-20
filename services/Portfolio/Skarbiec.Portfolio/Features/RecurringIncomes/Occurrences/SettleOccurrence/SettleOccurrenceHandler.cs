@@ -80,12 +80,14 @@ public sealed class SettleOccurrenceHandler(
             return TransactionErrors.FxRateMissing(plannedCurrency, request.ActualDate);
         }
 
-        var synced = await SyncDepositAsync(occurrence, account.Id, request, fxRateToPln, cancellationToken);
+        var synced = await dbContext.SyncIncomeDepositAsync(
+            occurrence.TransactionId, account.Id, request.CreateDeposit, request.ActualAmount, request.ActualDate, fxRateToPln, cancellationToken);
         if (synced.IsFailure)
         {
             return synced.Error;
         }
 
+        occurrence.TransactionId = synced.Value.TransactionId;
         occurrence.Status = OccurrenceStatus.Settled;
         occurrence.ActualAmount = request.ActualAmount;
         occurrence.ActualDate = request.ActualDate;
@@ -97,7 +99,7 @@ public sealed class SettleOccurrenceHandler(
             dbContext.RecurringIncomeOccurrences.Add(occurrence);
         }
 
-        foreach (var money in synced.Value)
+        foreach (var money in synced.Value.Touched)
         {
             await positionEventPublisher.PublishChangedAsync(money, cancellationToken);
         }
@@ -112,93 +114,5 @@ public sealed class SettleOccurrenceHandler(
         }
 
         return Result.Success();
-    }
-
-    // Stages the deposit's create, update, move or removal and returns the money assets whose position changed.
-    private async Task<Result<List<Asset>>> SyncDepositAsync(
-        RecurringIncomeOccurrence occurrence,
-        Guid accountId,
-        SettleOccurrenceRequest request,
-        decimal fxRateToPln,
-        CancellationToken cancellationToken)
-    {
-        var existing = occurrence.TransactionId is { } existingId
-            ? await dbContext.Transactions.FirstOrDefaultAsync(t => t.Id == existingId, cancellationToken)
-            : null;
-        var oldMoney = existing is null
-            ? null
-            : await dbContext.Assets.FirstAsync(a => a.Id == existing.AssetId, cancellationToken);
-        var newMoney = request.CreateDeposit ? await dbContext.LoadAccountCashAsync(accountId, cancellationToken) : null;
-
-        List<Asset> touched = [];
-        if (oldMoney is null && newMoney is null)
-        {
-            return touched;
-        }
-
-        foreach (var money in new[] { oldMoney, newMoney })
-        {
-            if (money is not null && await dbContext.ReadOnlyErrorAsync(money, cancellationToken) is { } readOnly)
-            {
-                return readOnly;
-            }
-        }
-
-        var candidate = newMoney is null
-            ? null
-            : new Transaction
-            {
-                Id = existing is not null && existing.AssetId == newMoney.Id ? existing.Id : Guid.NewGuid(),
-                AssetId = newMoney.Id,
-                Type = TransactionType.Deposit,
-                Quantity = request.ActualAmount,
-                UnitPriceAmount = 1m,
-                FxRateToPln = fxRateToPln,
-                Date = request.ActualDate
-            };
-
-        foreach (var money in new[] { oldMoney, newMoney }.OfType<Asset>().DistinctBy(a => a.Id))
-        {
-            var others = await dbContext.Transactions
-                .AsNoTracking()
-                .Where(t => t.AssetId == money.Id && (existing == null || t.Id != existing.Id))
-                .ToListAsync(cancellationToken);
-            if (candidate?.AssetId == money.Id)
-            {
-                others.Add(candidate);
-            }
-
-            var recomputed = TransactionQuantityCalculator.Recompute(others, money.OversellError(TransactionErrors.MutationBreaksHistory));
-            if (recomputed.IsFailure)
-            {
-                return recomputed.Error;
-            }
-
-            money.Quantity = recomputed.Value;
-            touched.Add(money);
-        }
-
-        if (existing is not null && candidate?.Id == existing.Id)
-        {
-            existing.Quantity = candidate.Quantity;
-            existing.Date = candidate.Date;
-            existing.FxRateToPln = candidate.FxRateToPln;
-        }
-        else
-        {
-            if (existing is not null)
-            {
-                dbContext.Transactions.Remove(existing);
-            }
-
-            if (candidate is not null)
-            {
-                dbContext.Transactions.Add(candidate);
-            }
-        }
-
-        occurrence.TransactionId = candidate?.Id;
-
-        return touched;
     }
 }

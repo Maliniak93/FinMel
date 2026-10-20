@@ -329,11 +329,24 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
         {
             income.Property(i => i.Name).HasMaxLength(200);
             income.Property(i => i.Amount).HasPrecision(18, 2);
+            income.Property(i => i.ActualAmount).HasPrecision(18, 2);
+            income.Property(i => i.FxRateToPln).HasPrecision(18, 6);
 
             // Restrict: an account that a one-off income targets is never deleted under it.
             income.HasOne<Account>()
                 .WithMany()
                 .HasForeignKey(i => i.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            income.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(i => i.ActualAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Restrict: a transaction a settlement references is never deleted under it; the index also serves the transaction-lock lookups.
+            income.HasOne<Transaction>()
+                .WithMany()
+                .HasForeignKey(i => i.TransactionId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

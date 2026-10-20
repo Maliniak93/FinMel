@@ -28,7 +28,7 @@ public sealed class DeleteAccountHandler(
             return AccountErrors.HasRecurringIncome(id);
         }
 
-        if (await dbContext.OneOffIncomes.AnyAsync(i => i.AccountId == id, cancellationToken))
+        if (await dbContext.OneOffIncomes.AnyAsync(i => i.AccountId == id || i.ActualAccountId == id, cancellationToken))
         {
             return AccountErrors.HasOneOffIncomes(id);
         }

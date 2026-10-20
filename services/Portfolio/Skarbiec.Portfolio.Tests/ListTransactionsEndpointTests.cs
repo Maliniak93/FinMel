@@ -9,6 +9,7 @@ using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.PlanningApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -314,5 +315,21 @@ public sealed class ListTransactionsEndpointTests(SkarbiecContainersFixture cont
         Assert.Equal(1, credit.GetProperty("bondInterestPeriodIndex").GetInt32());
         var opening = Assert.Single(items, i => i.GetProperty("quantity").GetDecimal() == 5_000m);
         Assert.True(!opening.TryGetProperty("bondInterestPeriodIndex", out var value) || value.ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task OneOffDeposit_CarriesIncomeName()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningApi.PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var deposit = await client.CreateOneOffIncomeDepositAsync(cancellationToken);
+        var manualId = await client.RecordTransactionAsync(
+            deposit.Account.MoneyAssetId, TransactionType.Deposit, 50m, new DateOnly(2026, 9, 1), cancellationToken, unitPrice: 1m);
+
+        var items = (await client.ListTransactionsAsync(deposit.Account.MoneyAssetId, cancellationToken)).Items;
+
+        Assert.Equal("Premia", Assert.Single(items, t => t.Id == deposit.TransactionId).RecurringIncomeName);
+        Assert.Null(Assert.Single(items, t => t.Id == manualId).RecurringIncomeName);
     }
 }

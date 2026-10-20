@@ -749,6 +749,16 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("ActualAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ActualAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly?>("ActualDate")
+                        .HasColumnType("date");
+
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -756,10 +766,17 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<decimal?>("FxRateToPln")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
@@ -767,6 +784,10 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AccountId");
+
+                    b.HasIndex("ActualAccountId");
+
+                    b.HasIndex("TransactionId");
 
                     b.ToTable("OneOffIncomes");
                 });
@@ -1467,6 +1488,16 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Skarbiec.Portfolio.Data.Account", null)
+                        .WithMany()
+                        .HasForeignKey("ActualAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Skarbiec.Portfolio.Data.Transaction", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpenseVersion", b =>

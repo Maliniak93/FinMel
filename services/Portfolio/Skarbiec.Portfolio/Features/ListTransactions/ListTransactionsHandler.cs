@@ -69,12 +69,20 @@ public sealed class ListTransactionsHandler(PortfolioDbContext dbContext)
             .Where(s => transactionIds.Contains(s.CreditTransactionId))
             .ToDictionaryAsync(s => s.CreditTransactionId!.Value, s => s.PeriodIndex, cancellationToken);
 
-        var incomeNames = await (
+        var recurringIncomeNames = await (
                 from occurrence in dbContext.RecurringIncomeOccurrences.AsNoTracking()
                 where transactionIds.Contains(occurrence.TransactionId)
                 join income in dbContext.RecurringIncomes.AsNoTracking() on occurrence.RecurringIncomeId equals income.Id
                 select new { TransactionId = occurrence.TransactionId!.Value, income.Name })
             .ToDictionaryAsync(i => i.TransactionId, i => i.Name, cancellationToken);
+        var incomeNames = await dbContext.OneOffIncomes
+            .AsNoTracking()
+            .Where(i => transactionIds.Contains(i.TransactionId))
+            .ToDictionaryAsync(i => i.TransactionId!.Value, i => i.Name, cancellationToken);
+        foreach (var (transactionId, name) in recurringIncomeNames)
+        {
+            incomeNames[transactionId] = name;
+        }
 
         return new PagedResponse<TransactionResponse>
         {

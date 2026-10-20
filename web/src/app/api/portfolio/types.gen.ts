@@ -665,11 +665,19 @@ export type OneOffIncomeResponse = {
     amountPln: null | number | string;
     estimated: boolean;
     inMonth: boolean;
+    status: OccurrenceStatus;
+    actualAmount: null | number | string;
+    actualDate: null | string;
+    actualAmountPln: null | number | string;
+    difference: null | number | string;
+    depositCreated: boolean;
+    overdue: boolean;
 };
 
 export type OverdueOccurrenceResponse = {
-    recurringIncomeId: string;
-    nominalMonth: string;
+    recurringIncomeId: null | string;
+    nominalMonth: null | string;
+    oneOffIncomeId: null | string;
     date: string;
     name: string;
     accountId: string;
@@ -875,6 +883,13 @@ export type SettleDepositRequest = {
 };
 
 export type SettleOccurrenceRequest = {
+    actualAmount: number | string;
+    actualDate: string;
+    accountId: string;
+    createDeposit?: boolean;
+};
+
+export type SettleOneOffIncomeRequest = {
     actualAmount: number | string;
     actualDate: string;
     accountId: string;
@@ -2257,6 +2272,42 @@ export type PutApiPortfolioOneOffIncomesByIdResponses = {
 };
 
 export type PutApiPortfolioOneOffIncomesByIdResponse = PutApiPortfolioOneOffIncomesByIdResponses[keyof PutApiPortfolioOneOffIncomesByIdResponses];
+
+export type DeleteApiPortfolioOneOffIncomesByIdSettlementData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-incomes/{id}/settlement';
+};
+
+export type DeleteApiPortfolioOneOffIncomesByIdSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioOneOffIncomesByIdSettlementResponse = DeleteApiPortfolioOneOffIncomesByIdSettlementResponses[keyof DeleteApiPortfolioOneOffIncomesByIdSettlementResponses];
+
+export type PutApiPortfolioOneOffIncomesByIdSettlementData = {
+    body: SettleOneOffIncomeRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-incomes/{id}/settlement';
+};
+
+export type PutApiPortfolioOneOffIncomesByIdSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioOneOffIncomesByIdSettlementResponse = PutApiPortfolioOneOffIncomesByIdSettlementResponses[keyof PutApiPortfolioOneOffIncomesByIdSettlementResponses];
 
 export type PostApiPortfolioOneOffExpensesData = {
     body: CreateOneOffExpenseRequest;
