@@ -1,0 +1,676 @@
+#!/usr/bin/env node
+// Usage: node scripts/test-timings.mjs [--only dotnet,web,e2e] [--check]  measure the time of every test suite on a quiet machine and compare it with the previous run (skarbiec-plan/test-timings/last-run.json)
+//   --only <list>  measure only these suites (dotnet, web, e2e); the others keep their entries
+//   --check        only check that the machine is quiet: exit 0 quiet, 3 busy (every source listed as "działa: ...")
+// Exit codes: 0 measured and nothing red, 1 a red test, 3 environment (machine busy, Docker down, a suite unmeasured, another instance running)
+
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { GhLimitError, REPO, exitOnGhLimit, gh } from "./gh.mjs";
+import { findStack, listProcesses } from "./stop-stack.mjs";
+
+const IS_WIN = process.platform === "win32";
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const WEB_DIR = path.join(REPO_ROOT, "web");
+const E2E_RESULTS_JSON = path.join(REPO_ROOT, "e2e", "test-results", "results.json");
+const DATA_DIR = path.join(REPO_ROOT, "skarbiec-plan", "test-timings");
+const DATA_FILE = path.join(DATA_DIR, "last-run.json");
+const NPM = IS_WIN ? "npm.cmd" : "npm";
+const COMMAND_TIMEOUT_MS = 90 * 60 * 1000;
+const COMPOSE_PROJECTS = ["skarbiec-local", "skarbiec-e2e"];
+const GROUPS = ["dotnet", "web", "e2e"];
+const DATA_VERSION = 1;
+const SLOWDOWNS_KEPT = 10;
+
+const DOTNET_PROJECTS = [
+  { name: "Skarbiec.Contracts.Tests", rel: "contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj" },
+  { name: "Skarbiec.Gateway.Tests", rel: "gateway/Skarbiec.Gateway.Tests/Skarbiec.Gateway.Tests.csproj" },
+  { name: "Skarbiec.Identity.Tests", rel: "services/Identity/Skarbiec.Identity.Tests/Skarbiec.Identity.Tests.csproj" },
+  { name: "Skarbiec.MarketData.Tests", rel: "services/MarketData/Skarbiec.MarketData.Tests/Skarbiec.MarketData.Tests.csproj" },
+  { name: "Skarbiec.Portfolio.Tests", rel: "services/Portfolio/Skarbiec.Portfolio.Tests/Skarbiec.Portfolio.Tests.csproj" },
+  { name: "Skarbiec.Reporting.Tests", rel: "services/Reporting/Skarbiec.Reporting.Tests/Skarbiec.Reporting.Tests.csproj" },
+  { name: "Skarbiec.ServiceDefaults.Tests", rel: "Skarbiec.ServiceDefaults.Tests/Skarbiec.ServiceDefaults.Tests.csproj" },
+  { name: "Skarbiec.Testing.Tests", rel: "Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj" },
+];
+
+export const ALL_KEYS = [...DOTNET_PROJECTS.map((p) => `dotnet:${p.name}`), "web", "e2e"];
+
+const round1 = (n) => Math.round(n * 10) / 10;
+const groupOf = (key) => key.split(":")[0];
+export const labelOf = (key) => (key.startsWith("dotnet:") ? key.slice("dotnet:".length) : key);
+const projectOf = (key) => DOTNET_PROJECTS.find((p) => `dotnet:${p.name}` === key);
+
+export function parseArgs(argv) {
+  const args = { only: null, check: false, help: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--check") args.check = true;
+    else if (a === "--help" || a === "-h") args.help = true;
+    else if (a === "--only") args.only = String(argv[++i] ?? "");
+    else if (a.startsWith("--only=")) args.only = a.slice("--only=".length);
+    else return { error: `unknown argument: ${a}` };
+  }
+  if (args.only !== null) {
+    const groups = args.only.split(",").map((s) => s.trim()).filter(Boolean);
+    const unknown = groups.filter((g) => !GROUPS.includes(g));
+    if (!groups.length || unknown.length) return { error: `--only takes ${GROUPS.join(",")}${unknown.length ? ` (unknown: ${unknown.join(", ")})` : ""}` };
+    args.only = groups;
+  }
+  return args;
+}
+
+export function selectSuites(only, available = ALL_KEYS) {
+  const groups = only ?? GROUPS;
+  return available.filter((key) => groups.includes(groupOf(key)));
+}
+
+export const dockerRequired = (keys) => keys.some((key) => groupOf(key) !== "web");
+
+const isAliveDefault = (pid) => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return e.code === "EPERM";
+  }
+};
+
+const AUTOBUILD_RE = /scripts[\\/]autobuild\.mjs/;
+
+export function detectBusy({ processes = [], pidFiles = {}, containers = {}, runners = null, isAlive = isAliveDefault, ownPid = process.pid } = {}) {
+  const busy = [];
+  const warnings = [];
+
+  const stack = findStack(processes);
+  if (stack.length) {
+    const kinds = new Map();
+    for (const p of stack) kinds.set(p.what, (kinds.get(p.what) ?? 0) + 1);
+    busy.push(`działa: lokalny stos (${[...kinds].map(([what, n]) => `${what} ×${n}`).join(", ")})`);
+  }
+
+  for (const p of processes) {
+    if (p.pid !== ownPid && /^node(\.exe)?$/i.test(p.name ?? "") && AUTOBUILD_RE.test(p.cmd ?? "")) busy.push(`działa: autobuild.mjs (pid ${p.pid})`);
+  }
+
+  const pidSources = [
+    ["verify", "verify.mjs"],
+    ["e2e", "e2e.mjs"],
+    ["timings", "inny test-timings.mjs"],
+  ];
+  for (const [field, label] of pidSources) {
+    const info = pidFiles[field];
+    if (info && Number.isInteger(info.pid) && info.pid !== ownPid && isAlive(info.pid)) busy.push(`działa: ${label} (pid ${info.pid})`);
+  }
+
+  for (const project of COMPOSE_PROJECTS) {
+    const ids = containers[project] ?? [];
+    if (ids.length) busy.push(`działa: kontenery ${project} (${ids.length})`);
+  }
+
+  if (runners === null || runners === undefined) warnings.push("runner nie sprawdzony");
+  else {
+    for (const r of runners) {
+      if (r.status === "online" && r.busy === true) busy.push(`działa: runner ${r.name} (zajęty)`);
+    }
+  }
+
+  return { busy, warnings };
+}
+
+export function evaluateSilence({ keys, dockerUp = true, ...busyInputs }) {
+  const { busy, warnings } = detectBusy(busyInputs);
+  const lines = [...busy];
+  if (!dockerUp && dockerRequired(keys)) lines.push("Docker nie jest uruchomiony (wymagany dla dotnet i e2e)");
+  return { lines, warnings };
+}
+
+const unquote = (s) =>
+  s.replace(/&(lt|gt|amp|quot|apos);/g, (_, e) => ({ lt: "<", gt: ">", amp: "&", quot: '"', apos: "'" })[e]);
+
+function attributes(text) {
+  const out = {};
+  for (const m of text.matchAll(/([\w:]+)="([^"]*)"/g)) out[m[1]] = unquote(m[2]);
+  return out;
+}
+
+function durationMs(text) {
+  const m = /^(?:(\d+)\.)?(\d+):(\d+):(\d+(?:\.\d+)?)$/.exec(text ?? "");
+  if (!m) return 0;
+  return ((Number(m[1] ?? 0) * 24 + Number(m[2])) * 3600 + Number(m[3]) * 60 + Number(m[4])) * 1000;
+}
+
+const SEVERITY = { skipped: 0, passed: 1, failed: 2 };
+
+export function aggregate(rows) {
+  const counts = { passed: 0, failed: 0, skipped: 0 };
+  const classes = {};
+  const tests = {};
+  for (const { id, cls, ms, outcome } of rows) {
+    counts[outcome]++;
+    const c = (classes[cls] ??= { ms: 0, count: 0 });
+    c.ms += ms;
+    c.count++;
+    const t = tests[id];
+    if (!t) tests[id] = { ms, outcome };
+    else {
+      t.ms += ms;
+      if (SEVERITY[outcome] > SEVERITY[t.outcome]) t.outcome = outcome;
+    }
+  }
+  for (const c of Object.values(classes)) c.ms = round1(c.ms);
+  for (const t of Object.values(tests)) t.ms = round1(t.ms);
+  return { counts, classes, tests };
+}
+
+const TRX_OUTCOME = { Passed: "passed", NotExecuted: "skipped", Inconclusive: "skipped", NotRunnable: "skipped" };
+
+export function parseTrx(xml) {
+  const rows = [];
+  for (const m of xml.matchAll(/<UnitTestResult\b([^>]*?)\/?>/g)) {
+    const a = attributes(m[1]);
+    const name = a.testName ?? "";
+    const paren = name.indexOf("(");
+    const id = paren === -1 ? name : name.slice(0, paren);
+    rows.push({ id, cls: id.includes(".") ? id.slice(0, id.lastIndexOf(".")) : id, ms: durationMs(a.duration), outcome: TRX_OUTCOME[a.outcome] ?? "failed" });
+  }
+  return aggregate(rows);
+}
+
+const VITEST_OUTCOME = { passed: "passed", failed: "failed" };
+
+export function parseVitestJson(source, { root = null } = {}) {
+  const report = typeof source === "string" ? JSON.parse(source) : source;
+  const normalizedRoot = root ? root.replaceAll("\\", "/").replace(/\/?$/, "/") : null;
+  const relative = (name) => {
+    const file = String(name ?? "").replaceAll("\\", "/");
+    if (normalizedRoot && file.startsWith(normalizedRoot)) return file.slice(normalizedRoot.length);
+    const web = file.indexOf("/web/");
+    return web === -1 ? file : file.slice(web + "/web/".length);
+  };
+  const rows = [];
+  for (const file of report.testResults ?? []) {
+    const spec = relative(file.name);
+    for (const t of file.assertionResults ?? []) {
+      const id = [spec, ...(t.ancestorTitles ?? []), t.title].join(" › ");
+      rows.push({ id, cls: spec, ms: Number(t.duration ?? 0), outcome: VITEST_OUTCOME[t.status] ?? "skipped" });
+    }
+  }
+  return aggregate(rows);
+}
+
+const PLAYWRIGHT_OUTCOME = { expected: "passed", flaky: "passed", unexpected: "failed", skipped: "skipped" };
+
+function walkPlaywright(suite, chain, file, rows) {
+  for (const spec of suite.specs ?? []) {
+    const specFile = spec.file ?? file;
+    for (const test of spec.tests ?? []) {
+      const last = test.results?.at(-1);
+      rows.push({
+        id: [specFile, ...chain, spec.title].join(" › "),
+        cls: specFile,
+        ms: Number(last?.duration ?? 0),
+        outcome: PLAYWRIGHT_OUTCOME[test.status] ?? "failed",
+      });
+    }
+  }
+  for (const child of suite.suites ?? []) walkPlaywright(child, [...chain, child.title], file, rows);
+}
+
+export function parsePlaywrightJson(source, { commandStartedAt }) {
+  const report = typeof source === "string" ? JSON.parse(source) : source;
+  const rows = [];
+  for (const suite of report.suites ?? []) walkPlaywright(suite, [], suite.file ?? suite.title, rows);
+  const startedAt = Date.parse(report.stats?.startTime);
+  return {
+    ...aggregate(rows),
+    testMs: Math.round(Number(report.stats?.duration ?? 0)),
+    setupMs: Number.isFinite(startedAt) ? Math.max(0, Math.round(startedAt - commandStartedAt)) : 0,
+  };
+}
+
+export function dotnetCommands(csproj, { trxName, resultsDir }) {
+  return {
+    build: { bin: "dotnet", args: ["build", csproj] },
+    test: { bin: "dotnet", args: ["test", csproj, "--no-build", "--logger", `trx;LogFileName=${trxName}`, "--results-directory", resultsDir] },
+  };
+}
+
+export function webCommands({ outputFile }) {
+  return {
+    install: { bin: NPM, args: ["install", "--no-audit", "--no-fund"] },
+    test: { bin: NPM, args: ["test", "--", "--watch=false", "--reporters=json", `--output-file=${outputFile}`] },
+  };
+}
+
+export function parseDataFile(text) {
+  try {
+    const data = JSON.parse(text);
+    if (data?.version !== DATA_VERSION || typeof data.suites !== "object" || data.suites === null || Array.isArray(data.suites)) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+const totalTests = (counts) => counts.passed + counts.failed + counts.skipped;
+
+export function mergeSuite(data, key, outcome, meta) {
+  const base = data ?? { version: DATA_VERSION, run: null, suites: {} };
+  if (!outcome.measured) return { data: base, status: "unmeasured", reason: outcome.reason };
+  if (totalTests(outcome.counts) === 0) return { data: base, status: "unmeasured", reason: "0 testów" };
+
+  const old = base.suites[key] ?? null;
+  let previous = null;
+  if (old) {
+    const { previous: _dropped, ...rest } = old;
+    previous = rest;
+  }
+  const entry = {
+    kind: outcome.kind,
+    measuredAt: meta.measuredAt,
+    commit: meta.commit,
+    dirty: meta.dirty,
+    branch: meta.branch,
+    status: outcome.counts.failed > 0 ? "failed" : "passed",
+    setupMs: Math.round(outcome.setupMs),
+    testMs: Math.round(outcome.testMs),
+    counts: outcome.counts,
+    classes: outcome.classes,
+    tests: outcome.tests,
+    previous,
+  };
+  return { data: { ...base, suites: { ...base.suites, [key]: entry } }, status: entry.status };
+}
+
+const isRed = (e) => e.status === "failed" || (e.counts?.failed ?? 0) > 0;
+
+function compareMaps(current, previous) {
+  const both = {};
+  for (const name of Object.keys(current)) {
+    const before = previous[name];
+    if (!before) continue;
+    both[name] = { ms: current[name].ms, previousMs: before.ms, deltaMs: round1(current[name].ms - before.ms) };
+    if ("count" in current[name]) {
+      both[name].count = current[name].count;
+      both[name].previousCount = before.count;
+    }
+  }
+  return both;
+}
+
+const largest = (map) =>
+  Object.entries(map)
+    .filter(([, d]) => d.deltaMs > 0)
+    .sort((a, b) => b[1].deltaMs - a[1].deltaMs)
+    .slice(0, SLOWDOWNS_KEPT)
+    .map(([id, d]) => ({ id, deltaMs: d.deltaMs }));
+
+export function computeDeltas(entry) {
+  const prev = entry?.previous;
+  if (!prev) return null;
+  const classes = compareMaps(entry.classes, prev.classes);
+  const tests = compareMaps(entry.tests, prev.tests);
+  const count = totalTests(entry.counts);
+  const previousCount = totalTests(prev.counts);
+  return {
+    uncertain: isRed(entry) || isRed(prev),
+    setupMs: { ms: entry.setupMs, previousMs: prev.setupMs, deltaMs: entry.setupMs - prev.setupMs },
+    testMs: { ms: entry.testMs, previousMs: prev.testMs, deltaMs: entry.testMs - prev.testMs },
+    testCount: { count, previousCount, delta: count - previousCount },
+    classes,
+    tests,
+    newTests: Object.keys(entry.tests).filter((id) => !(id in prev.tests)),
+    removedTests: Object.keys(prev.tests).filter((id) => !(id in entry.tests)),
+    slowdowns: largest(tests),
+    classSlowdowns: largest(classes),
+  };
+}
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
+export function formatDuration(ms) {
+  const s = Math.round(Math.abs(ms) / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return h > 0 ? `${h}:${pad2(m)}:${pad2(sec)}` : `${m}:${pad2(sec)}`;
+}
+
+export const formatDelta = (ms) => `${ms < 0 ? "-" : "+"}${formatDuration(ms)}`;
+
+const formatCount = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+const formatCountDelta = (n) => `${n < 0 ? "-" : "+"}${formatCount(Math.abs(n))}`;
+
+function localDate(iso) {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+export function progressLine(index, total, key, outcome) {
+  const prefix = `[${index}/${total}] ${key.startsWith("dotnet:") ? `dotnet ${labelOf(key)}` : key}`;
+  if (outcome.status === "unmeasured") return `${prefix} — niezmierzony: ${outcome.reason}`;
+  const { entry } = outcome;
+  return `${prefix} — setup ${formatDuration(entry.setupMs)}, testy ${formatDuration(entry.testMs)}, ${formatCount(totalTests(entry.counts))} testów, ${entry.counts.failed} czerwonych`;
+}
+
+export function summarize(measured) {
+  if (!measured.length) return "Nic nie zmierzono.";
+  const entries = measured.map(({ key, entry }) => ({ key, entry }));
+  const total = (e) => e.setupMs + e.testMs;
+  const sum = (list, f) => list.reduce((acc, x) => acc + f(x), 0);
+  const nowMs = sum(entries, ({ entry }) => total(entry));
+  const tests = sum(entries, ({ entry }) => totalTests(entry.counts));
+  const red = sum(entries, ({ entry }) => entry.counts.failed);
+  const compared = entries.filter(({ entry }) => entry.previous);
+
+  if (!compared.length) return `Razem ${formatDuration(nowMs)} (brak poprzedniego przebiegu), testów ${formatCount(tests)}, ${red} czerwonych.`;
+
+  const timeDelta = sum(compared, ({ entry }) => total(entry) - total(entry.previous));
+  const testsDelta = sum(compared, ({ entry }) => totalTests(entry.counts) - totalTests(entry.previous.counts));
+  const since = compared.map(({ entry }) => entry.previous.measuredAt).sort()[0];
+  const grew = compared
+    .map(({ key, entry }) => ({ key, delta: total(entry) - total(entry.previous) }))
+    .filter((x) => x.delta > 0)
+    .sort((a, b) => b.delta - a.delta)[0];
+  const uncertain = compared.filter(({ entry }) => computeDeltas(entry).uncertain).map(({ key }) => labelOf(key));
+
+  let line = `Razem ${formatDuration(nowMs)} (${formatDelta(timeDelta)} vs ${localDate(since)}), testów ${formatCount(tests)} (${formatCountDelta(testsDelta)}), ${red} czerwonych.`;
+  if (grew) line += ` Najwięcej urosło: ${labelOf(grew.key)} ${formatDelta(grew.delta)}`;
+  if (uncertain.length) line += `${grew ? "." : ""} Porównanie niepewne (czerwone testy): ${uncertain.join(", ")}`;
+  return line;
+}
+
+export function exitCodeFor(results) {
+  if (results.some((r) => r.status === "failed")) return 1;
+  if (results.some((r) => r.status === "unmeasured")) return 3;
+  return 0;
+}
+
+export function buildRun({ startedAt, git, keys, results, pendingReason }) {
+  const suites = {};
+  const reasons = {};
+  for (const key of ALL_KEYS) suites[key] = "not-selected";
+  for (const key of keys) {
+    const result = results.find((r) => r.key === key);
+    if (result && result.status !== "unmeasured") suites[key] = "measured";
+    else {
+      suites[key] = "unmeasured";
+      reasons[key] = result?.reason ?? pendingReason;
+    }
+  }
+  return { startedAt, commit: git.commit, dirty: git.dirty, branch: git.branch, suites, reasons };
+}
+
+export async function runSuites({ keys, data, check, measure, write, git, now = () => new Date(), onSuite = () => {} }) {
+  const startedAt = now().toISOString();
+  const results = [];
+  let current = data;
+  const record = () => {
+    current = { ...(current ?? { version: DATA_VERSION, suites: {} }), run: buildRun({ startedAt, git, keys, results, pendingReason: "przebieg w toku lub przerwany" }) };
+    write(current);
+  };
+
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const lines = await check(keys.slice(i), i);
+    if (lines.length) {
+      if (i === 0) return { data, results, refused: lines, interrupted: null };
+      const reason = `maszyna zajęta: ${lines.join("; ")}`;
+      for (const rest of keys.slice(i)) {
+        const result = { key: rest, status: "unmeasured", reason };
+        results.push(result);
+        onSuite(i + 1 + (results.length - 1 - i), keys.length, rest, result);
+      }
+      record();
+      return { data: current, results, refused: null, interrupted: lines };
+    }
+
+    const outcome = await measure(key);
+    const merged = mergeSuite(current, key, outcome, { measuredAt: now().toISOString(), ...git });
+    current = merged.data;
+    const result = { key, status: merged.status, reason: merged.reason, entry: merged.status === "unmeasured" ? undefined : current.suites[key] };
+    results.push(result);
+    record();
+    onSuite(i + 1, keys.length, key, result);
+  }
+  return { data: current, results, refused: null, interrupted: null };
+}
+
+function quoteArg(a) {
+  const s = String(a);
+  if (s === "") return '""';
+  if (/[\s"&|<>^%;]/.test(s)) return `"${s.replace(/"/g, '\\"')}"`;
+  return s;
+}
+
+function killTree(pid) {
+  if (!pid) return;
+  if (IS_WIN) spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { encoding: "utf8", windowsHide: true });
+  else {
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      // Already gone.
+    }
+  }
+}
+
+function exec(bin, args, { cwd = REPO_ROOT } = {}) {
+  const startedAt = Date.now();
+  return new Promise((resolve) => {
+    let tail = "";
+    const keepTail = (d) => {
+      tail = (tail + d.toString("utf8")).slice(-4000);
+    };
+    const child = spawn([bin, ...args].map(quoteArg).join(" "), { cwd, shell: true, windowsHide: true, detached: !IS_WIN, stdio: ["ignore", "pipe", "pipe"] });
+    child.stdout.on("data", keepTail);
+    child.stderr.on("data", keepTail);
+    const timer = setTimeout(() => killTree(child.pid), COMMAND_TIMEOUT_MS);
+    const done = (status, error) => {
+      clearTimeout(timer);
+      resolve({ status, error, tail, ms: Date.now() - startedAt, startedAt });
+    };
+    child.on("error", (e) => done(null, e));
+    child.on("close", (code) => done(code, null));
+  });
+}
+
+function failureReason(label, res) {
+  const lines = res.tail.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const hint = [...lines].reverse().find((l) => /error|fail|błąd/i.test(l)) ?? lines.at(-1) ?? res.error?.message ?? "";
+  return `${label} (kod ${res.status ?? "brak"})${hint ? `: ${hint.slice(0, 200)}` : ""}`;
+}
+
+const readText = (file) => (existsSync(file) ? readFileSync(file, "utf8") : null);
+
+async function measureDotnet(key) {
+  const project = projectOf(key);
+  const dir = mkdtempSync(path.join(tmpdir(), "test-timings-"));
+  try {
+    const commands = dotnetCommands(path.join(REPO_ROOT, project.rel), { trxName: "result.trx", resultsDir: dir });
+    const build = await exec(commands.build.bin, commands.build.args);
+    if (build.status !== 0) return { measured: false, reason: failureReason("build nie przeszedł", build) };
+    const test = await exec(commands.test.bin, commands.test.args);
+    const trx = readText(path.join(dir, "result.trx"));
+    if (!trx || (test.status !== 0 && test.status !== 1)) return { measured: false, reason: failureReason("brak wyniku testów", test) };
+    return { measured: true, kind: "dotnet", setupMs: build.ms, testMs: test.ms, ...parseTrx(trx) };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+async function measureWeb() {
+  const dir = mkdtempSync(path.join(tmpdir(), "test-timings-"));
+  try {
+    const outputFile = path.join(dir, "vitest.json");
+    const commands = webCommands({ outputFile });
+    const install = await exec(commands.install.bin, commands.install.args, { cwd: WEB_DIR });
+    if (install.status !== 0) return { measured: false, reason: failureReason("npm install nie przeszedł", install) };
+    const test = await exec(commands.test.bin, commands.test.args, { cwd: WEB_DIR });
+    const json = readText(outputFile);
+    if (!json || (test.status !== 0 && test.status !== 1)) return { measured: false, reason: failureReason("brak wyniku testów", test) };
+    return { measured: true, kind: "web", setupMs: install.ms, testMs: test.ms, ...parseVitestJson(json, { root: WEB_DIR }) };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+async function measureE2e() {
+  rmSync(E2E_RESULTS_JSON, { force: true });
+  const run = await exec(process.execPath, [path.join(REPO_ROOT, "scripts", "e2e.mjs"), "run"]);
+  const json = readText(E2E_RESULTS_JSON);
+  if (!json || (run.status !== 0 && run.status !== 1)) return { measured: false, reason: failureReason("e2e nie zostało uruchomione", run) };
+  return { measured: true, kind: "e2e", ...parsePlaywrightJson(json, { commandStartedAt: run.startedAt }) };
+}
+
+function measure(key) {
+  if (key === "web") return measureWeb();
+  if (key === "e2e") return measureE2e();
+  return measureDotnet(key);
+}
+
+function git(argv) {
+  const res = spawnSync("git", argv, { cwd: REPO_ROOT, encoding: "utf8", windowsHide: true });
+  return res.status === 0 ? res.stdout.trim() : null;
+}
+
+const gitDir = () => {
+  const out = git(["rev-parse", "--git-dir"]);
+  return out ? path.resolve(REPO_ROOT, out) : path.join(REPO_ROOT, ".git");
+};
+
+const pidPath = (name) => path.join(gitDir(), `${name}.pid`);
+
+function readPidInfo(name) {
+  try {
+    return JSON.parse(readFileSync(pidPath(name), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function claimPidFile() {
+  const other = readPidInfo("test-timings");
+  if (other && other.pid !== process.pid && isAliveDefault(other.pid)) return;
+  writeFileSync(pidPath("test-timings"), JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
+}
+
+function releasePidFile() {
+  if (readPidInfo("test-timings")?.pid === process.pid) rmSync(pidPath("test-timings"), { force: true });
+}
+
+function gitInfo() {
+  return {
+    commit: git(["rev-parse", "HEAD"]),
+    branch: git(["rev-parse", "--abbrev-ref", "HEAD"]),
+    dirty: Boolean(git(["status", "--porcelain"])),
+  };
+}
+
+function dockerIsUp() {
+  const res = spawnSync("docker", ["info", "--format", "{{.ServerVersion}}"], { encoding: "utf8", windowsHide: true, timeout: 30_000 });
+  return res.status === 0;
+}
+
+function runningContainers(project) {
+  const res = spawnSync("docker", ["ps", "-q", "--filter", `label=com.docker.compose.project=${project}`], { encoding: "utf8", windowsHide: true, timeout: 30_000 });
+  return res.status === 0 ? res.stdout.split(/\s+/).filter(Boolean) : [];
+}
+
+function fetchRunners() {
+  try {
+    return JSON.parse(gh(["api", `repos/${REPO}/actions/runners`, "--jq", "[.runners[] | {name, status, busy}]"], { timeout: 30_000 }));
+  } catch (err) {
+    if (err instanceof GhLimitError) exitOnGhLimit(err);
+    return null;
+  }
+}
+
+function snapshot() {
+  const dockerUp = dockerIsUp();
+  return {
+    dockerUp,
+    processes: listProcesses(),
+    pidFiles: { verify: readPidInfo("verify"), e2e: readPidInfo("e2e"), timings: readPidInfo("test-timings") },
+    containers: dockerUp ? Object.fromEntries(COMPOSE_PROJECTS.map((p) => [p, runningContainers(p)])) : {},
+    runners: fetchRunners(),
+  };
+}
+
+function writeAtomically(file, data) {
+  mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(data)}\n`);
+  renameSync(tmp, file);
+}
+
+async function main(argv) {
+  const args = parseArgs(argv);
+  if (args.error) {
+    console.error(`test-timings.mjs: ${args.error}`);
+    return 2;
+  }
+  if (args.help) {
+    console.log("Usage: node scripts/test-timings.mjs [--only dotnet,web,e2e] [--check]");
+    return 0;
+  }
+
+  const present = ALL_KEYS.filter((key) => !projectOf(key) || existsSync(path.join(REPO_ROOT, projectOf(key).rel)));
+  const keys = selectSuites(args.only, present);
+  const warned = new Set();
+  const check = async (remaining) => {
+    const { lines, warnings } = evaluateSilence({ keys: remaining, ...snapshot() });
+    for (const w of warnings) {
+      if (!warned.has(w)) console.warn(`UWAGA: ${w}`);
+      warned.add(w);
+    }
+    return lines;
+  };
+
+  if (args.check) {
+    const lines = await check(keys);
+    if (!lines.length) {
+      console.log("cisza: maszyna wolna, można mierzyć");
+      return 0;
+    }
+    for (const line of lines) console.log(line);
+    return 3;
+  }
+
+  claimPidFile();
+  try {
+    const previous = parseDataFile(readText(DATA_FILE) ?? "");
+    const outcome = await runSuites({
+      keys,
+      data: previous,
+      check,
+      measure,
+      write: (data) => writeAtomically(DATA_FILE, data),
+      git: gitInfo(),
+      onSuite: (index, total, key, result) => console.log(progressLine(index, total, key, result)),
+    });
+    if (outcome.refused) {
+      for (const line of outcome.refused) console.log(line);
+      console.log("Nic nie zmierzono, plik z wynikami bez zmian.");
+      return 3;
+    }
+    const measured = outcome.results.filter((r) => r.entry).map((r) => ({ key: r.key, entry: r.entry }));
+    console.log(summarize(measured));
+    console.log(`Wyniki: ${path.relative(REPO_ROOT, DATA_FILE).replaceAll("\\", "/")}`);
+    for (const r of outcome.results.filter((x) => x.status === "unmeasured")) console.log(`Niezmierzony: ${labelOf(r.key)} — ${r.reason}`);
+    return exitCodeFor(outcome.results);
+  } finally {
+    releasePidFile();
+  }
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  process.on("SIGINT", () => {
+    releasePidFile();
+    process.exit(130);
+  });
+  process.exitCode = await main(process.argv.slice(2));
+}
