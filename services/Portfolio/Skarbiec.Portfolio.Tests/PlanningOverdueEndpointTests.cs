@@ -43,6 +43,27 @@ public sealed class PlanningOverdueEndpointTests(SkarbiecContainersFixture conta
     }
 
     [Fact]
+    public async Task OneOffIncome_PastAndPending_IsOverdue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var past = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 500m, new DateOnly(2026, 9, 10));
+        var settled = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Zwrot", 300m, new DateOnly(2026, 9, 12));
+        var future = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Bonus", 200m, new DateOnly(2026, 12, 1));
+        await client.SettleOneOffIncomeAsync(settled, account.AccountId, 300m, new DateOnly(2026, 9, 12), cancellationToken);
+
+        var overdue = await client.GetOverdueNamesAsync(cancellationToken);
+
+        Assert.Equal([("Premia", new DateOnly(2026, 9, 10))], overdue);
+        var september = (await client.GetPlanningMonthAsync("2026-09", cancellationToken)).Incomes;
+        Assert.True(september.OneOff(past).Overdue);
+        Assert.False(september.OneOff(settled).Overdue);
+        Assert.False(september.OneOff(future).Overdue);
+    }
+
+    [Fact]
     public async Task CreatedOn_NeverMoves()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -70,10 +70,11 @@ internal static class PlanningMonthBuilder
             })
             .ToList();
 
-        var balance = PlanningForecast.BalanceOf(occurrences);
+        var oneOffIncomes = forecast.OneOffIncomesIn(viewed, rates, today);
+        var balance = PlanningForecast.BalanceOf(occurrences, oneOffIncomes);
         var fxUnavailable = forecast.ForeignIn(viewed).Any(c => !rates.ContainsKey(c));
 
-        var expenses = BuildExpenses(viewed, forecast.Plans);
+        var expenses = BuildExpenses(viewed, forecast);
         var viewedFigures = new MonthFigures(balance.ActualPln + balance.PendingPln - expenses.CostPln, expenses.CostPln);
         var allocation = BuildAllocation(
             viewed,
@@ -104,7 +105,8 @@ internal static class PlanningMonthBuilder
                 Occurrences = occurrences,
                 Balance = balance,
                 FxUnavailable = fxUnavailable,
-                Definitions = definitions
+                Definitions = definitions,
+                OneOffs = oneOffIncomes
             },
             Expenses = expenses,
             FreeFunds = new FreeFundsResponse
@@ -231,9 +233,9 @@ internal static class PlanningMonthBuilder
         };
     }
 
-    private static PlanningExpensesResponse BuildExpenses(
-        YearMonth viewed, IReadOnlyList<(RecurringExpense Expense, ReservePlan Plan)> plans)
+    private static PlanningExpensesResponse BuildExpenses(YearMonth viewed, PlanningForecast forecast)
     {
+        var plans = forecast.Plans;
         var payments = plans
             .SelectMany(p => ReserveSchedule.PaymentsIn(viewed, p.Plan).Select(payment => new ExpensePaymentResponse
             {
@@ -292,8 +294,9 @@ internal static class PlanningMonthBuilder
         return new PlanningExpensesResponse
         {
             Payments = payments,
-            CostPln = plans.Sum(p => ReserveSchedule.CostIn(viewed, p.Plan)),
-            Definitions = definitions
+            CostPln = forecast.CostIn(viewed),
+            Definitions = definitions,
+            OneOffs = forecast.OneOffExpensesIn(viewed)
         };
     }
 

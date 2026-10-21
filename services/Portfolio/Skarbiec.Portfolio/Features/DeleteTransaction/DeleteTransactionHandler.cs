@@ -64,7 +64,8 @@ public sealed class DeleteTransactionHandler(PortfolioDbContext dbContext, Posit
         }
 
         // A settlement's deposit goes only by undoing or editing its settlement.
-        if (await dbContext.RecurringIncomeOccurrences.AnyAsync(o => o.TransactionId == id, cancellationToken))
+        if (await dbContext.RecurringIncomeOccurrences.AnyAsync(o => o.TransactionId == id, cancellationToken)
+            || await dbContext.OneOffIncomes.AnyAsync(i => i.TransactionId == id, cancellationToken))
         {
             return OccurrenceErrors.IncomeDepositManaged;
         }

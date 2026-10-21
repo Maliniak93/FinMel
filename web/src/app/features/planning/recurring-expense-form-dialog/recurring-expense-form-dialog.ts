@@ -8,6 +8,7 @@ import {
   type ValidationErrors,
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -16,9 +17,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
+  postApiPortfolioOneOffExpenses,
   postApiPortfolioRecurringExpenses,
+  putApiPortfolioOneOffExpensesById,
   putApiPortfolioRecurringExpensesById,
   type ExpenseDefinitionResponse,
+  type OneOffExpenseResponse,
 } from '../../../api/portfolio';
 import {
   applyFieldErrors,
@@ -39,15 +43,16 @@ import {
 
 const MIN_DATE = new Date(2011, 0, 1);
 const MAX_DATE = new Date(2099, 11, 31);
-export interface RecurringExpenseFormDialogData {
-  definition: ExpenseDefinitionResponse;
-}
+export type RecurringExpenseFormDialogData =
+  | { definition: ExpenseDefinitionResponse; oneOff?: undefined }
+  | { oneOff: OneOffExpenseResponse; definition?: undefined };
 
 @Component({
   selector: 'app-recurring-expense-form-dialog',
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
+    MatButtonToggleModule,
     MatDatepickerModule,
     MatDialogModule,
     MatFormFieldModule,
@@ -63,11 +68,15 @@ export class RecurringExpenseFormDialog {
   private readonly formBuilder = inject(FormBuilder);
   private readonly dialogRef = inject(MatDialogRef<RecurringExpenseFormDialog>);
 
-  private readonly editing =
-    inject<RecurringExpenseFormDialogData | null>(MAT_DIALOG_DATA, { optional: true })
-      ?.definition ?? null;
+  private readonly data = inject<RecurringExpenseFormDialogData | null>(MAT_DIALOG_DATA, {
+    optional: true,
+  });
+  private readonly editing = this.data?.definition ?? null;
+  private readonly editingOneOff = this.data?.oneOff ?? null;
+  private readonly prefill = this.editing ?? this.editingOneOff;
 
-  protected readonly isEdit = this.editing !== null;
+  protected readonly isEdit = this.prefill !== null;
+  protected readonly oneOff = signal(this.editingOneOff !== null);
   protected readonly minDate = MIN_DATE;
   protected readonly maxDate = MAX_DATE;
   protected readonly minMonth = MIN_MONTH;
@@ -77,10 +86,14 @@ export class RecurringExpenseFormDialog {
   protected readonly formError = signal<string | null>(null);
 
   protected readonly form = this.formBuilder.nonNullable.group({
-    name: [this.editing?.name ?? '', [Validators.required, Validators.maxLength(200)]],
+    name: [this.prefill?.name ?? '', [Validators.required, Validators.maxLength(200)]],
     amount: [
-      this.editing ? Number(this.editing.amount) : (null as number | null),
+      this.prefill ? Number(this.prefill.amount) : (null as number | null),
       [Validators.required, Validators.min(0.01)],
+    ],
+    date: [
+      this.editingOneOff ? fromDateOnly(this.editingOneOff.date) : (null as Date | null),
+      [Validators.required, (control: AbstractControl) => this.withinRange(control)],
     ],
     effectiveFrom: [
       currentWarsawMonth(),
@@ -120,9 +133,17 @@ export class RecurringExpenseFormDialog {
 
     bindDayControls(this.form.controls);
 
-    if (!this.isEdit) {
+    if (!this.editing) {
       this.form.controls.effectiveFrom.disable();
     }
+
+    this.applyMode(this.oneOff());
+  }
+
+  protected setOneOff(oneOff: boolean): void {
+    this.oneOff.set(oneOff);
+    this.applyMode(oneOff);
+    this.formError.set(null);
   }
 
   protected async onSubmit(): Promise<void> {
@@ -138,24 +159,7 @@ export class RecurringExpenseFormDialog {
     this.submitting.set(true);
     this.formError.set(null);
 
-    const values = this.form.getRawValue();
-    const usesDay = values.dayKind === DAY_KIND.DayOfMonth;
-    const body = {
-      name: values.name.trim(),
-      amount: Number(values.amount),
-      startDate: toDateOnly(values.startDate!),
-      endDate: values.endDate ? toDateOnly(values.endDate) : null,
-      intervalMonths: Number(values.intervalMonths),
-      dayKind: values.dayKind,
-      dayOfMonth: usesDay ? Number(values.dayOfMonth) : null,
-      shift: usesDay ? values.shift : SHIFT.None,
-    };
-    const result = this.editing
-      ? await putApiPortfolioRecurringExpensesById({
-          path: { id: this.editing.id },
-          body: { ...body, effectiveFrom: values.effectiveFrom },
-        })
-      : await postApiPortfolioRecurringExpenses({ body });
+    const result = this.oneOff() ? await this.saveOneOff() : await this.saveRecurring();
 
     this.submitting.set(false);
 
@@ -169,6 +173,57 @@ export class RecurringExpenseFormDialog {
 
   protected cancel(): void {
     this.dialogRef.close(false);
+  }
+
+  private saveOneOff() {
+    const values = this.form.getRawValue();
+    const body = {
+      name: values.name.trim(),
+      amount: Number(values.amount),
+      date: toDateOnly(values.date!),
+    };
+    return this.editingOneOff
+      ? putApiPortfolioOneOffExpensesById({ path: { id: this.editingOneOff.id }, body })
+      : postApiPortfolioOneOffExpenses({ body });
+  }
+
+  private saveRecurring() {
+    const values = this.form.getRawValue();
+    const usesDay = values.dayKind === DAY_KIND.DayOfMonth;
+    const body = {
+      name: values.name.trim(),
+      amount: Number(values.amount),
+      startDate: toDateOnly(values.startDate!),
+      endDate: values.endDate ? toDateOnly(values.endDate) : null,
+      intervalMonths: Number(values.intervalMonths),
+      dayKind: values.dayKind,
+      dayOfMonth: usesDay ? Number(values.dayOfMonth) : null,
+      shift: usesDay ? values.shift : SHIFT.None,
+    };
+    return this.editing
+      ? putApiPortfolioRecurringExpensesById({
+          path: { id: this.editing.id },
+          body: { ...body, effectiveFrom: values.effectiveFrom },
+        })
+      : postApiPortfolioRecurringExpenses({ body });
+  }
+
+  private applyMode(oneOff: boolean): void {
+    const { date, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift } =
+      this.form.controls;
+    if (oneOff) {
+      date.enable();
+      for (const control of [startDate, endDate, intervalMonths, dayOfMonth, shift]) {
+        control.disable();
+      }
+      return;
+    }
+
+    date.disable();
+    for (const control of [startDate, endDate, intervalMonths]) {
+      control.enable();
+    }
+    dayKind.updateValueAndValidity();
   }
 
   private withinRange(control: AbstractControl): ValidationErrors | null {

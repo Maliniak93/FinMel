@@ -88,7 +88,8 @@ public sealed class UpdateTransactionHandler(
         }
 
         // A settlement's deposit changes only through its settlement.
-        if (await dbContext.RecurringIncomeOccurrences.AnyAsync(o => o.TransactionId == id, cancellationToken))
+        if (await dbContext.RecurringIncomeOccurrences.AnyAsync(o => o.TransactionId == id, cancellationToken)
+            || await dbContext.OneOffIncomes.AnyAsync(i => i.TransactionId == id, cancellationToken))
         {
             return OccurrenceErrors.IncomeDepositManaged;
         }

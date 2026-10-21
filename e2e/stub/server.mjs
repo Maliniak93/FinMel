@@ -1,4 +1,4 @@
-// Market-data stub for the e2e stack: impersonates Yahoo, NBP, gold-api and the MF bond page from e2e/market-data/data.json.
+// Market-data stub for the e2e stack: impersonates Yahoo, NBP and the MF bond page from e2e/market-data/data.json.
 // Every price is constant and every date is relative to today (UTC), so the data set never goes stale.
 
 import { createServer } from 'node:http';
@@ -122,13 +122,6 @@ function nbpTables(res, segments) {
   return send(res, 200, `[${days.map(nbpTable).join(',')}]`);
 }
 
-function goldPrice(res, symbol) {
-  const metal = data.metals[symbol.toUpperCase()];
-  if (!metal) return send(res, 404, 'Not Found', 'text/plain');
-  const body = `{"currency":"USD","price":${metal.usdPerOunce},"symbol":"${symbol.toUpperCase()}","updatedAt":"${new Date().toISOString()}"}`;
-  return send(res, 200, body);
-}
-
 function mfPage(res) {
   const html = `<html><body><h3>Materials</h3>
 <a class="file-download" href="/mf/file/attachment-1" target="_blank" download aria-label="download">
@@ -177,7 +170,6 @@ function route(req, res) {
   ) {
     return nbpTables(res, rest.slice(4));
   }
-  if (provider === 'gold' && rest[0] === 'price' && rest[1]) return goldPrice(res, rest[1]);
   if (provider === 'mf' && rest[0] === 'page') return mfPage(res);
   if (provider === 'mf' && rest[0] === 'file')
     return send(res, 200, bondFile, 'application/vnd.ms-excel');

@@ -4,6 +4,7 @@ import {
   computed,
   effect,
   inject,
+  input,
   resource,
   signal,
   untracked,
@@ -20,6 +21,7 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -27,10 +29,16 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
+import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
+import { getApiPortfolioAssetGroups } from '../../api/portfolio';
 import {
+  deleteApiReportingTargetAllocationGroupsByGroupId,
   getApiReportingTargetAllocation,
+  getApiReportingTargetAllocationGroupsByGroupId,
   putApiReportingTargetAllocation,
+  putApiReportingTargetAllocationGroupsByGroupId,
   type TargetAllocationGroupResponse,
 } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
@@ -39,11 +47,13 @@ import {
   formatDate,
   formatMoney,
   formatPercent,
-  formatQuantity,
+  formatPercentNumber,
   formatSignedMoney,
   formatSignedPoints,
 } from '../../shared/format';
+import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { ASSET_CLASS, ASSET_CLASSES, assetClassLabel } from '../assets/asset-class';
+import { groupColor } from '../groups/group-color';
 
 interface GroupControls {
   name: FormControl<string>;
@@ -124,7 +134,64 @@ export class Allocation {
   private readonly language = inject(LanguageService).language;
   private readonly pendingTasks = inject(PendingTasks);
 
+  private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
+
+  readonly group = input<string>();
+
+  protected readonly groups = resource({
+    loader: async ({ abortSignal }) => {
+      try {
+        const result = await getApiPortfolioAssetGroups({ signal: abortSignal });
+        return result.error ? [] : result.data;
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  protected readonly groupId = computed<string | null | undefined>(() => {
+    const requested = this.group();
+    if (!requested) {
+      return null;
+    }
+    if (!this.groups.hasValue()) {
+      return undefined;
+    }
+    return this.groups.value().some((entry) => entry.id === requested) ? requested : null;
+  });
+
+  protected readonly isGroupScope = computed(() => !!this.groupId());
+
+  protected readonly selectedGroup = computed(() =>
+    this.groups.hasValue()
+      ? this.groups.value().find((entry) => entry.id === this.groupId())
+      : undefined,
+  );
+
   protected readonly allocation = resource({
+    params: () => {
+      const groupId = this.groupId();
+      return groupId === undefined ? undefined : { groupId };
+    },
+    loader: async ({ params, abortSignal }) => {
+      const result = params.groupId
+        ? await getApiReportingTargetAllocationGroupsByGroupId({
+            path: { groupId: params.groupId },
+            signal: abortSignal,
+          })
+        : await getApiReportingTargetAllocation({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('allocation.loadFailed'),
+        );
+      }
+      return result.data;
+    },
+  });
+
+  private readonly whole = resource({
+    params: () => (this.isGroupScope() ? true : undefined),
     loader: async ({ abortSignal }) => {
       const result = await getApiReportingTargetAllocation({ signal: abortSignal });
       if (result.error) {
@@ -158,8 +225,25 @@ export class Allocation {
     if (!this.allocation.hasValue()) {
       return false;
     }
-    return !this.allocation.value().isConfigured || this.editing();
+    return this.editing() || (!this.isGroupScope() && !this.allocation.value().isConfigured);
   });
+
+  protected readonly showEmptyState = computed(
+    () =>
+      this.isGroupScope() && this.allocation.hasValue() && !this.allocation.value().isConfigured,
+  );
+
+  protected readonly canCopyFromWhole = computed(
+    () => this.whole.hasValue() && this.whole.value().isConfigured,
+  );
+
+  protected readonly groupNoValue = computed(
+    () =>
+      this.isGroupScope() &&
+      this.allocation.hasValue() &&
+      this.allocation.value().isConfigured &&
+      Number(this.allocation.value().totalPln) === 0,
+  );
 
   protected readonly showAmounts = computed(() => {
     if (!this.allocation.hasValue()) {
@@ -227,10 +311,17 @@ export class Allocation {
     );
   });
 
+  protected readonly groupColor = groupColor;
+
   constructor() {
     effect(() => {
+      this.groupId();
+      untracked(() => this.resetEditor());
+    });
+
+    effect(() => {
       const data = this.allocation.hasValue() ? this.allocation.value() : null;
-      if (data && !data.isConfigured && this.rows.length === 0) {
+      if (data && this.groupId() === null && !data.isConfigured && this.rows.length === 0) {
         untracked(() => this.fillProposal());
       }
     });
@@ -246,7 +337,7 @@ export class Allocation {
   }
 
   protected bandLabel(group: TargetAllocationGroupResponse): string {
-    return `${formatQuantity(group.bandLowPercent)}–${formatPercent(group.bandHighPercent)}`;
+    return `${formatPercentNumber(group.bandLowPercent)}–${formatPercent(group.bandHighPercent)}`;
   }
 
   protected startEdit(groups: readonly TargetAllocationGroupResponse[]): void {
@@ -264,6 +355,60 @@ export class Allocation {
     }
     this.saveError.set(null);
     this.editing.set(true);
+  }
+
+  protected copyFromWhole(): void {
+    if (this.whole.hasValue()) {
+      this.startEdit(this.whole.value().groups);
+    }
+  }
+
+  protected selectScope(groupId: string | null): void {
+    if (groupId === (this.group() ?? null)) {
+      return;
+    }
+    void this.router.navigate([], {
+      queryParams: { group: groupId },
+      queryParamsHandling: 'merge',
+    });
+  }
+
+  protected async remove(): Promise<void> {
+    const groupId = this.groupId();
+    if (!groupId) {
+      return;
+    }
+
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open(ConfirmDialog, {
+          data: {
+            title: translate('allocation.delete.title'),
+            message: translate('allocation.delete.message', {
+              name: this.selectedGroup()?.name ?? '',
+            }),
+            confirmLabel: translate('common.delete'),
+            destructive: true,
+          },
+        })
+        .afterClosed(),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    this.saveError.set(null);
+    const done = this.pendingTasks.add();
+    try {
+      const result = await deleteApiReportingTargetAllocationGroupsByGroupId({ path: { groupId } });
+      if (result.error) {
+        this.saveError.set(readProblemDetails(result.error).detail ?? translate('errors.generic'));
+        return;
+      }
+      this.allocation.reload();
+    } finally {
+      done();
+    }
   }
 
   protected cancel(): void {
@@ -298,7 +443,13 @@ export class Allocation {
           bandPp: Number(value.bandPp),
         };
       });
-      const result = await putApiReportingTargetAllocation({ body: { groups } });
+      const groupId = this.groupId();
+      const result = groupId
+        ? await putApiReportingTargetAllocationGroupsByGroupId({
+            path: { groupId },
+            body: { groups },
+          })
+        : await putApiReportingTargetAllocation({ body: { groups } });
       if (result.error) {
         this.saveError.set(readProblemDetails(result.error).detail ?? translate('errors.generic'));
         return;
@@ -309,6 +460,13 @@ export class Allocation {
       this.saving.set(false);
       done();
     }
+  }
+
+  private resetEditor(): void {
+    this.proposalKeys.clear();
+    this.rows.clear();
+    this.editing.set(false);
+    this.saveError.set(null);
   }
 
   private fillProposal(): void {

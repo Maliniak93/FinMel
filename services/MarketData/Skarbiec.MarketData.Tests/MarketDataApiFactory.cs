@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.MarketData.Sources;
-using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Sources.Verification;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
@@ -18,8 +17,6 @@ public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
 
     public FakeInstrumentSearchSource InstrumentSearch { get; } = new();
 
-    public FakeGoldApiClient GoldApi { get; } = new();
-
     public FakeHistoryBackfillTrigger BackfillTrigger { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -30,7 +27,6 @@ public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
         {
             services.AddSingleton<ITickerVerifier>(TickerVerifier);
             services.AddSingleton<IInstrumentSearchSource>(InstrumentSearch);
-            services.AddSingleton<IGoldApiClient>(GoldApi);
             services.AddSingleton<IHistoryBackfillTrigger>(BackfillTrigger);
         });
     }

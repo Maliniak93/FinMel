@@ -171,4 +171,76 @@ describe('RecurringExpenseFormDialog', () => {
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
+
+  function modeToggles(): HTMLElement[] {
+    return Array.from(element().querySelectorAll<HTMLElement>('mat-button-toggle button'));
+  }
+
+  async function chooseOneOff(): Promise<void> {
+    modeToggles()
+      .find((button) => /jednorazowy|one-off/i.test(button.textContent ?? ''))!
+      .click();
+    await settle();
+  }
+
+  it('posts a one-off expense', async () => {
+    await setup();
+    expect(modeToggles()).toHaveLength(2);
+
+    await chooseOneOff();
+
+    expect(field('name')).not.toBeNull();
+    expect(field('amount')).not.toBeNull();
+    expect(field('date')).not.toBeNull();
+    expect(field('accountId')).toBeNull();
+    expect(field('startDate')).toBeNull();
+    expect(field('intervalMonths')).toBeNull();
+    expect(field('dayOfMonth')).toBeNull();
+
+    component['form'].controls.name.setValue('Przegląd auta');
+    component['form'].controls.amount.setValue(1200);
+    component['form'].controls.date.setValue(new Date(2026, 10, 10));
+    await settle();
+    await component['onSubmit']();
+
+    const [request] = posts();
+    expect(request.url).toContain('/api/portfolio/one-off-expenses');
+    const body = await request.json();
+    expect(body).toMatchObject({ name: 'Przegląd auta', amount: 1200, date: '2026-11-10' });
+    expect(body.accountId).toBeUndefined();
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('edits a one-off expense', async () => {
+    await setup({
+      oneOff: {
+        id: 'one-off-expense-1',
+        name: 'Przegląd auta',
+        date: '2026-11-10',
+        amount: 1200,
+        inMonth: false,
+      },
+    } as never);
+
+    expect(modeToggles()).toHaveLength(0);
+    expect(field('date')).not.toBeNull();
+    expect(field('startDate')).toBeNull();
+    expect(component['form'].getRawValue()).toMatchObject({ name: 'Przegląd auta', amount: 1200 });
+    expect((component['form'].getRawValue().date as Date).toDateString()).toBe(
+      new Date(2026, 10, 10).toDateString(),
+    );
+
+    component['form'].controls.amount.setValue(1350);
+    await component['onSubmit']();
+
+    expect(posts()).toHaveLength(0);
+    const [request] = puts();
+    expect(request.url).toContain('/api/portfolio/one-off-expenses/one-off-expense-1');
+    expect(await request.json()).toMatchObject({
+      name: 'Przegląd auta',
+      amount: 1350,
+      date: '2026-11-10',
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
 });

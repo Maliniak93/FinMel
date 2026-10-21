@@ -45,9 +45,9 @@ public sealed class GetInstrumentsBatchHandler(MarketDataDbContext dbContext, Ti
                     Name = i.Name,
                     Exchange = i.Exchange,
                     QuoteCurrency = i.QuoteCurrency,
-                    LastPrice = quote?.Close,
+                    LastPrice = MetalQuoteUnit.ToServedPrice(i.AssetClass, quote?.Close),
                     LastPriceDate = quote?.Date,
-                    PreviousClose = previous?.Close,
+                    PreviousClose = MetalQuoteUnit.ToServedPrice(i.AssetClass, previous?.Close),
                     PreviousCloseDate = previous?.Date
                 };
             })

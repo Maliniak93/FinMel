@@ -18,16 +18,16 @@
     <!-- Pinned above the transitive 2.0.0, which NU1903 flags for GHSA-v5pm-xwqc-g5wc. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="3.11.0" />
     <!-- Pinned above the transitive 2.5.302 that Aspire.Hosting 13.6 brings in, which NU1902 flags for GHSA-qhrr-8q5h-9q3h. -->
-    <PackageVersion Include="MessagePack" Version="2.5.307" />
+    <PackageVersion Include="MessagePack" Version="3.1.12" />
     <!-- Build-time OpenAPI generation, so gen:api needs no running stack. -->
     <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.11.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.19.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.20.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.20.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.20.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.20.0" />
 
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.6.1" />
     <PackageVersion Include="Aspire.Hosting.PostgreSQL" Version="13.6.1" />
@@ -63,7 +63,7 @@
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery.Yarp" Version="10.11.0" />
 
     <!-- Quartz 4 carries DI, hosting, System.Text.Json serialization and the health check itself; Quartz.AspNetCore is only the HTTP API. -->
-    <PackageVersion Include="Quartz" Version="4.5.0" />
+    <PackageVersion Include="Quartz" Version="4.6.0" />
 
     <!-- MF publishes its retail bond data only as a BIFF8 .xls (code page 1250). -->
     <PackageVersion Include="ExcelDataReader" Version="3.9.0" />

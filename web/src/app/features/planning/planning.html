@@ -57,7 +57,10 @@
           <h2>{{ 'planning.overdue.title' | transloco }}</h2>
           <table class="planning-table">
             <tbody>
-              @for (item of overdue(); track item.recurringIncomeId + item.nominalMonth) {
+              @for (
+                item of overdue();
+                track item.oneOffIncomeId ?? `${item.recurringIncomeId}${item.nominalMonth}`
+              ) {
                 <tr data-testid="overdue-row">
                   <td>{{ formatDate(item.date) }}</td>
                   <td>{{ item.name }}</td>
@@ -74,14 +77,16 @@
                     >
                       {{ 'planning.occurrence.settle' | transloco }}
                     </button>
-                    <button
-                      mat-button
-                      type="button"
-                      data-testid="skip-overdue"
-                      (click)="skipOccurrence(item)"
-                    >
-                      {{ 'planning.occurrence.skip' | transloco }}
-                    </button>
+                    @if (!isOneOffOverdue(item)) {
+                      <button
+                        mat-button
+                        type="button"
+                        data-testid="skip-overdue"
+                        (click)="skipOccurrence(item)"
+                      >
+                        {{ 'planning.occurrence.skip' | transloco }}
+                      </button>
+                    }
                   </td>
                 </tr>
               }
@@ -119,7 +124,7 @@
                 </button>
               </div>
 
-              @if (plan.occurrences.length === 0) {
+              @if (incomeRows().length === 0) {
                 <p class="planning-section__empty">{{ 'planning.incomes.empty' | transloco }}</p>
               } @else {
                 <table class="planning-table">
@@ -140,10 +145,8 @@
                     </tr>
                   </thead>
                   <tbody>
-                    @for (
-                      occurrence of plan.occurrences;
-                      track occurrence.recurringIncomeId + occurrence.nominalMonth
-                    ) {
+                    @for (row of incomeRows(); track row.key) {
+                      @let occurrence = row.item;
                       <tr
                         data-testid="occurrence-row"
                         [class.planning-table__row--overdue]="occurrence.overdue"
@@ -186,7 +189,7 @@
                               {{ 'planning.occurrence.depositCreated' | transloco }}
                             </span>
                           }
-                          @if (occurrence.outOfRule) {
+                          @if (!row.oneOff && row.item.outOfRule) {
                             <span class="planning-table__warning" data-testid="out-of-rule">
                               {{ 'planning.occurrence.outOfRule' | transloco }}
                             </span>
@@ -220,17 +223,17 @@
                               mat-button
                               type="button"
                               data-testid="settle-occurrence"
-                              (click)="openSettleDialog(occurrence)"
+                              (click)="openSettleDialog(row)"
                             >
                               {{ 'planning.occurrence.settle' | transloco }}
                             </button>
                           }
-                          @if (occurrence.status === 'Pending') {
+                          @if (!row.oneOff && row.item.status === 'Pending') {
                             <button
                               mat-button
                               type="button"
                               data-testid="skip-occurrence"
-                              (click)="skipOccurrence(occurrence)"
+                              (click)="skipOccurrence(row.item)"
                             >
                               {{ 'planning.occurrence.skip' | transloco }}
                             </button>
@@ -240,7 +243,7 @@
                               mat-button
                               type="button"
                               data-testid="edit-settlement"
-                              (click)="openSettleDialog(occurrence)"
+                              (click)="openSettleDialog(row)"
                             >
                               {{ 'planning.occurrence.edit' | transloco }}
                             </button>
@@ -250,7 +253,7 @@
                               mat-button
                               type="button"
                               data-testid="undo-occurrence"
-                              (click)="undoOccurrence(occurrence)"
+                              (click)="undoOccurrence(row)"
                             >
                               {{ 'planning.occurrence.undo' | transloco }}
                             </button>
@@ -290,7 +293,7 @@
               </div>
 
               <h3>{{ 'planning.definitions.title' | transloco }}</h3>
-              @if (plan.definitions.length === 0) {
+              @if (plan.definitions.length === 0 && plan.oneOffs.length === 0) {
                 <p class="planning-section__empty">
                   {{ 'planning.definitions.empty' | transloco }}
                 </p>
@@ -362,6 +365,52 @@
                       </div>
                     </li>
                   }
+                  @for (oneOff of plan.oneOffs; track oneOff.id) {
+                    @let locked = oneOff.status === 'Settled';
+                    <li class="planning-definition" data-testid="one-off-income-row">
+                      <div class="planning-definition__main">
+                        <span class="planning-definition__name">{{ oneOff.name }}</span>
+                        <mat-chip-set>
+                          <mat-chip data-testid="one-off-mark">{{
+                            'planning.oneOff.mark' | transloco
+                          }}</mat-chip>
+                        </mat-chip-set>
+                      </div>
+                      <div class="planning-definition__details">
+                        <span>{{ formatMoney(oneOff.amount, oneOff.currency) }}</span>
+                        <span>{{ oneOff.accountName }}</span>
+                        <span data-testid="one-off-date">{{ formatDate(oneOff.date) }}</span>
+                        @if (locked) {
+                          <span
+                            class="planning-definition__change"
+                            data-testid="one-off-locked-hint"
+                          >
+                            {{ 'planning.oneOff.lockedHint' | transloco }}
+                          </span>
+                        }
+                      </div>
+                      <div class="planning-definition__actions">
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="edit-one-off-income"
+                          [disabled]="locked"
+                          (click)="openEditOneOffIncomeDialog(oneOff)"
+                        >
+                          {{ 'planning.edit.action' | transloco }}
+                        </button>
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="delete-one-off-income"
+                          [disabled]="locked"
+                          (click)="removeOneOffIncome(oneOff)"
+                        >
+                          {{ 'common.delete' | transloco }}
+                        </button>
+                      </div>
+                    </li>
+                  }
                 </ul>
               }
             </section>
@@ -382,7 +431,7 @@
                   </button>
                 </div>
 
-                @if (spending.payments.length === 0) {
+                @if (spending.payments.length === 0 && monthOneOffExpenses().length === 0) {
                   <p class="planning-section__empty">{{ 'planning.expenses.empty' | transloco }}</p>
                 } @else {
                   <table class="planning-table">
@@ -406,6 +455,15 @@
                           </td>
                         </tr>
                       }
+                      @for (oneOff of monthOneOffExpenses(); track oneOff.id) {
+                        <tr data-testid="expense-payment-row">
+                          <td>{{ formatDate(oneOff.date) }}</td>
+                          <td>{{ oneOff.name }}</td>
+                          <td class="planning-table__amount">
+                            {{ formatMoney(oneOff.amount, 'PLN') }}
+                          </td>
+                        </tr>
+                      }
                     </tbody>
                   </table>
                 }
@@ -420,7 +478,7 @@
                 </div>
 
                 <h3>{{ 'planning.expenses.definitions.title' | transloco }}</h3>
-                @if (spending.definitions.length === 0) {
+                @if (spending.definitions.length === 0 && spending.oneOffs.length === 0) {
                   <p class="planning-section__empty">
                     {{ 'planning.expenses.definitions.empty' | transloco }}
                   </p>
@@ -503,6 +561,40 @@
                             {{ 'planning.end.action' | transloco }}
                           </button>
                           <button mat-button type="button" (click)="removeExpense(definition)">
+                            {{ 'common.delete' | transloco }}
+                          </button>
+                        </div>
+                      </li>
+                    }
+                    @for (oneOff of spending.oneOffs; track oneOff.id) {
+                      <li class="planning-definition" data-testid="one-off-expense-row">
+                        <div class="planning-definition__main">
+                          <span class="planning-definition__name">{{ oneOff.name }}</span>
+                          <mat-chip-set>
+                            <mat-chip data-testid="one-off-mark">{{
+                              'planning.oneOff.mark' | transloco
+                            }}</mat-chip>
+                          </mat-chip-set>
+                        </div>
+                        <div class="planning-definition__details">
+                          <span>{{ formatMoney(oneOff.amount, 'PLN') }}</span>
+                          <span data-testid="one-off-date">{{ formatDate(oneOff.date) }}</span>
+                        </div>
+                        <div class="planning-definition__actions">
+                          <button
+                            mat-button
+                            type="button"
+                            data-testid="edit-one-off-expense"
+                            (click)="openEditOneOffExpenseDialog(oneOff)"
+                          >
+                            {{ 'planning.edit.action' | transloco }}
+                          </button>
+                          <button
+                            mat-button
+                            type="button"
+                            data-testid="delete-one-off-expense"
+                            (click)="removeOneOffExpense(oneOff)"
+                          >
                             {{ 'common.delete' | transloco }}
                           </button>
                         </div>

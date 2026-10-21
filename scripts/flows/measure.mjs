@@ -102,7 +102,7 @@ function autobuildSamples(base, add) {
       const at = line.indexOf("done in this run:");
       if (at < 0) continue;
       for (const part of line.slice(at).split(";")) {
-        const m = part.match(/#\d+ PR #\d+ \((?:build (\d+) min|ship retried), CI (\d+) min\)/);
+        const m = part.match(/#\d+ PR #\d+ \((?:build (\d+) min|ship retried), CI (\d+) min(?:, CI rerun \d+)?\)/);
         if (!m) continue;
         if (m[1] !== undefined) add("autobuild:build", started, Number(m[1]));
         add("autobuild:ci", started, Number(m[2]));

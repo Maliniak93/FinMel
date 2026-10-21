@@ -110,11 +110,12 @@ describe('Metals', () => {
     await setup();
 
     expect(rows()).toHaveLength(2);
-    const gold = rowFor('Krugerrand').textContent ?? '';
+    const gold = (rowFor('Krugerrand').textContent ?? '').replace(/\s+/g, ' ');
     expect(gold).toContain('Gold');
-    expect(gold).toContain('1 oz');
+    expect(gold).toContain('31.1 g (1 oz)');
+    expect(gold).toContain('62.21 g');
     const goldValue = Math.round(2 * OUNCE_IN_GRAMS * 522.29 * 100) / 100;
-    expect(gold).toContain(formatMoney(goldValue, 'PLN'));
+    expect(gold).toContain(formatMoney(goldValue, 'PLN').replace(/\s+/g, ' '));
 
     const silver = rowFor('Silver bar').textContent ?? '';
     expect(silver).toContain('Silver');

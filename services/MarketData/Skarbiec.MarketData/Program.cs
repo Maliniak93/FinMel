@@ -20,7 +20,6 @@ using Skarbiec.MarketData.Features.SearchInstruments;
 using Skarbiec.MarketData.Features.TriggerSync;
 using Skarbiec.MarketData.Messaging;
 using Skarbiec.MarketData.Sources;
-using Skarbiec.MarketData.Sources.GoldApi;
 using Skarbiec.MarketData.Sources.MfBonds;
 using Skarbiec.MarketData.Sources.Nbp;
 using Skarbiec.MarketData.Sources.Verification;
@@ -51,7 +50,6 @@ if (!OpenApiBuildTime.IsActive)
 
     builder.AddNbpSources();
     builder.AddYahooSource();
-    builder.AddGoldApiSource();
     builder.AddMfBondSource();
     builder.AddPriceSyncJob();
     // After AddPriceSyncJob: it reuses that call's scheduler.

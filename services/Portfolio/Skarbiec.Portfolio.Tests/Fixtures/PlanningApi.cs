@@ -80,8 +80,34 @@ internal static class PlanningApi
 
     public sealed record BalanceView(decimal PlanPln, decimal ActualPln, decimal PendingPln, decimal DifferencePln);
 
+    public sealed record OneOffIncomeView(
+        Guid Id,
+        string Name,
+        DateOnly Date,
+        Guid AccountId,
+        string AccountName,
+        bool AccountArchived,
+        decimal Amount,
+        string Currency,
+        decimal? AmountPln,
+        bool Estimated,
+        bool InMonth,
+        string? Status = null,
+        decimal? ActualAmount = null,
+        DateOnly? ActualDate = null,
+        decimal? ActualAmountPln = null,
+        decimal? Difference = null,
+        bool DepositCreated = false,
+        bool Overdue = false);
+
+    public sealed record OneOffExpenseView(Guid Id, string Name, DateOnly Date, decimal Amount, bool InMonth);
+
     public sealed record IncomesView(
-        List<OccurrenceView> Occurrences, BalanceView Balance, bool FxUnavailable, List<DefinitionView> Definitions);
+        List<OccurrenceView> Occurrences,
+        BalanceView Balance,
+        bool FxUnavailable,
+        List<DefinitionView> Definitions,
+        List<OneOffIncomeView>? OneOffs = null);
 
     public sealed record ExpensePaymentView(
         Guid RecurringExpenseId, string NominalMonth, DateOnly Date, string Name, decimal Amount);
@@ -113,7 +139,10 @@ internal static class PlanningApi
         JsonElement Shift);
 
     public sealed record ExpensesView(
-        List<ExpensePaymentView> Payments, decimal CostPln, List<ExpenseDefinitionView> Definitions);
+        List<ExpensePaymentView> Payments,
+        decimal CostPln,
+        List<ExpenseDefinitionView> Definitions,
+        List<OneOffExpenseView>? OneOffs = null);
 
     public sealed record FreeFundsView(decimal PlanPln, decimal ForecastPln, bool Incomplete);
 
@@ -920,6 +949,121 @@ internal static class PlanningApi
     {
         var response = await client.DeleteAsync(RecurringIncomeUri(id), cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    public const string OneOffIncomesUri = "/api/portfolio/one-off-incomes";
+
+    public const string OneOffExpensesUri = "/api/portfolio/one-off-expenses";
+
+    public const string AccountHasOneOffIncomesErrorCode = "Conflict.AccountHasOneOffIncomes";
+
+    public static string OneOffIncomeUri(Guid id) => $"{OneOffIncomesUri}/{id}";
+
+    public static string OneOffExpenseUri(Guid id) => $"{OneOffExpensesUri}/{id}";
+
+    public const string OneOffIncomeSettledErrorCode = "Conflict.OneOffIncomeSettled";
+
+    public static string OneOffIncomeSettlementUri(Guid id) => $"{OneOffIncomeUri(id)}/settlement";
+
+    public static OneOffIncomeView OneOff(this IncomesView incomes, Guid id) => incomes.OneOffs!.Single(o => o.Id == id);
+
+    public static async Task SettleOneOffIncomeAsync(
+        this HttpClient client,
+        Guid id,
+        Guid accountId,
+        decimal actualAmount,
+        DateOnly actualDate,
+        CancellationToken cancellationToken,
+        bool createDeposit = false)
+    {
+        var response = await client.PutAsJsonAsync(
+            OneOffIncomeSettlementUri(id),
+            SettleOccurrenceBody(accountId, actualAmount, actualDate, createDeposit),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task UndoOneOffIncomeSettlementAsync(
+        this HttpClient client, Guid id, CancellationToken cancellationToken)
+    {
+        var response = await client.DeleteAsync(OneOffIncomeSettlementUri(id), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public sealed record OneOffIncomeDeposit(BankAccountsApi.BankAccount Account, Guid IncomeId, Guid TransactionId);
+
+    // Settles a 2026-09-30 "Premia" of 2 500 onto a fresh PLN "mBank ROR" with a deposit; the caller's clock must be past 2026-09-30.
+    public static async Task<OneOffIncomeDeposit> CreateOneOffIncomeDepositAsync(
+        this HttpClient client, CancellationToken cancellationToken, decimal actualAmount = 2_500m)
+    {
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var incomeId = await client.CreateOneOffIncomeAsync(
+            account.AccountId, cancellationToken, "Premia", 2_500m, SeptemberLastDay);
+        await client.SettleOneOffIncomeAsync(
+            incomeId, account.AccountId, actualAmount, SeptemberLastDay, cancellationToken, createDeposit: true);
+        var deposit = Assert.Single((await client.ListTransactionsAsync(account.MoneyAssetId, cancellationToken)).Items);
+
+        return new OneOffIncomeDeposit(account, incomeId, deposit.Id);
+    }
+
+    public static async Task<List<(string Name, DateOnly Date)>> GetOverdueNamesAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(OverdueUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        return body.GetProperty("items").EnumerateArray()
+            .Select(i => (i.GetProperty("name").GetString()!, DateOnly.Parse(i.GetProperty("date").GetString()!)))
+            .ToList();
+    }
+
+    public static object NewOneOffIncomeBody(
+        Guid accountId, string name = "Premia", decimal amount = 1_000m, DateOnly? date = null) => new
+        {
+            name,
+            amount,
+            accountId,
+            date = date ?? new DateOnly(2026, 11, 15)
+        };
+
+    public static object NewOneOffExpenseBody(
+        string name = "Wakacje", decimal amount = 1_000m, DateOnly? date = null) => new
+        {
+            name,
+            amount,
+            date = date ?? new DateOnly(2026, 11, 15)
+        };
+
+    public static async Task<Guid> CreateOneOffIncomeAsync(
+        this HttpClient client,
+        Guid accountId,
+        CancellationToken cancellationToken,
+        string name = "Premia",
+        decimal amount = 1_000m,
+        DateOnly? date = null)
+    {
+        var response = await client.PostAsJsonAsync(
+            OneOffIncomesUri, NewOneOffIncomeBody(accountId, name, amount, date), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        return created.GetProperty("id").GetGuid();
+    }
+
+    public static async Task<Guid> CreateOneOffExpenseAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        string name = "Wakacje",
+        decimal amount = 1_000m,
+        DateOnly? date = null)
+    {
+        var response = await client.PostAsJsonAsync(
+            OneOffExpensesUri, NewOneOffExpenseBody(name, amount, date), cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var created = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        return created.GetProperty("id").GetGuid();
     }
 
     public static async Task<PlanningMonthView> GetPlanningMonthAsync(

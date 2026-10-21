@@ -4,6 +4,22 @@
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
+    @if (!isEdit) {
+      <mat-button-toggle-group
+        class="recurring-expense-form-dialog__mode"
+        [value]="oneOff()"
+        (change)="setOneOff($event.value)"
+        [attr.aria-label]="'planning.oneOff.mode' | transloco"
+      >
+        <mat-button-toggle [value]="false">{{
+          'planning.oneOff.recurring' | transloco
+        }}</mat-button-toggle>
+        <mat-button-toggle [value]="true">{{
+          'planning.oneOff.oneOff' | transloco
+        }}</mat-button-toggle>
+      </mat-button-toggle-group>
+    }
+
     <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
       <mat-label>{{ 'common.name' | transloco }}</mat-label>
       <input matInput type="text" formControlName="name" autocomplete="off" />
@@ -16,7 +32,7 @@
       }
     </mat-form-field>
 
-    @if (isEdit) {
+    @if (isEdit && !oneOff()) {
       <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
         <mat-label>{{ 'planning.form.effectiveFrom' | transloco }}</mat-label>
         <input
@@ -45,55 +61,81 @@
       }
     </mat-form-field>
 
-    <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
-      <mat-label>{{ 'planning.form.startDate' | transloco }}</mat-label>
-      <input
-        matInput
-        [matDatepicker]="startPicker"
-        [min]="minDate"
-        [max]="maxDate"
-        formControlName="startDate"
-      />
-      <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
-      <mat-datepicker #startPicker></mat-datepicker>
-      @if (form.controls.startDate.hasError('required')) {
-        <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
-      } @else if (
-        form.controls.startDate.hasError('dateOutOfRange') ||
-        form.controls.startDate.hasError('matDatepickerMin') ||
-        form.controls.startDate.hasError('matDatepickerMax')
-      ) {
-        <mat-error>{{ 'planning.form.dateOutOfRange' | transloco }}</mat-error>
-      } @else if (form.controls.startDate.hasError('server')) {
-        <mat-error>{{ form.controls.startDate.getError('server') }}</mat-error>
-      }
-    </mat-form-field>
+    @if (oneOff()) {
+      <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
+        <mat-label>{{ 'common.date' | transloco }}</mat-label>
+        <input
+          matInput
+          [matDatepicker]="datePicker"
+          [min]="minDate"
+          [max]="maxDate"
+          formControlName="date"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="datePicker"></mat-datepicker-toggle>
+        <mat-datepicker #datePicker></mat-datepicker>
+        @if (form.controls.date.hasError('required')) {
+          <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
+        } @else if (
+          form.controls.date.hasError('dateOutOfRange') ||
+          form.controls.date.hasError('matDatepickerMin') ||
+          form.controls.date.hasError('matDatepickerMax')
+        ) {
+          <mat-error>{{ 'planning.form.dateOutOfRange' | transloco }}</mat-error>
+        } @else if (form.controls.date.hasError('server')) {
+          <mat-error>{{ form.controls.date.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
+    } @else {
+      <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
+        <mat-label>{{ 'planning.form.startDate' | transloco }}</mat-label>
+        <input
+          matInput
+          [matDatepicker]="startPicker"
+          [min]="minDate"
+          [max]="maxDate"
+          formControlName="startDate"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="startPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startPicker></mat-datepicker>
+        @if (form.controls.startDate.hasError('required')) {
+          <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
+        } @else if (
+          form.controls.startDate.hasError('dateOutOfRange') ||
+          form.controls.startDate.hasError('matDatepickerMin') ||
+          form.controls.startDate.hasError('matDatepickerMax')
+        ) {
+          <mat-error>{{ 'planning.form.dateOutOfRange' | transloco }}</mat-error>
+        } @else if (form.controls.startDate.hasError('server')) {
+          <mat-error>{{ form.controls.startDate.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
 
-    <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
-      <mat-label>{{ 'planning.form.endDate' | transloco }}</mat-label>
-      <input
-        matInput
-        [matDatepicker]="endPicker"
-        [min]="minDate"
-        [max]="maxDate"
-        formControlName="endDate"
-      />
-      <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
-      <mat-datepicker #endPicker></mat-datepicker>
-      @if (form.controls.endDate.hasError('endBeforeStart')) {
-        <mat-error>{{ 'planning.form.endBeforeStart' | transloco }}</mat-error>
-      } @else if (
-        form.controls.endDate.hasError('dateOutOfRange') ||
-        form.controls.endDate.hasError('matDatepickerMin') ||
-        form.controls.endDate.hasError('matDatepickerMax')
-      ) {
-        <mat-error>{{ 'planning.form.dateOutOfRange' | transloco }}</mat-error>
-      } @else if (form.controls.endDate.hasError('server')) {
-        <mat-error>{{ form.controls.endDate.getError('server') }}</mat-error>
-      }
-    </mat-form-field>
+      <mat-form-field appearance="outline" class="recurring-expense-form-dialog__field">
+        <mat-label>{{ 'planning.form.endDate' | transloco }}</mat-label>
+        <input
+          matInput
+          [matDatepicker]="endPicker"
+          [min]="minDate"
+          [max]="maxDate"
+          formControlName="endDate"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="endPicker"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker></mat-datepicker>
+        @if (form.controls.endDate.hasError('endBeforeStart')) {
+          <mat-error>{{ 'planning.form.endBeforeStart' | transloco }}</mat-error>
+        } @else if (
+          form.controls.endDate.hasError('dateOutOfRange') ||
+          form.controls.endDate.hasError('matDatepickerMin') ||
+          form.controls.endDate.hasError('matDatepickerMax')
+        ) {
+          <mat-error>{{ 'planning.form.dateOutOfRange' | transloco }}</mat-error>
+        } @else if (form.controls.endDate.hasError('server')) {
+          <mat-error>{{ form.controls.endDate.getError('server') }}</mat-error>
+        }
+      </mat-form-field>
 
-    <app-recurrence-rule-fields [dayKind]="dayKind()" />
+      <app-recurrence-rule-fields [dayKind]="dayKind()" />
+    }
 
     @if (formError()) {
       <p class="recurring-expense-form-dialog__error" role="alert">{{ formError() }}</p>

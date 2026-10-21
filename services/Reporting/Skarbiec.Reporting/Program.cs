@@ -3,7 +3,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Features.GetNetWorthHistory;
+using Skarbiec.Reporting.Features.TargetAllocation.DeleteGroupTargetAllocation;
+using Skarbiec.Reporting.Features.TargetAllocation.GetGroupTargetAllocation;
 using Skarbiec.Reporting.Features.TargetAllocation.GetTargetAllocation;
+using Skarbiec.Reporting.Features.TargetAllocation.SaveGroupTargetAllocation;
 using Skarbiec.Reporting.Features.TargetAllocation.SaveTargetAllocation;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
@@ -23,6 +26,9 @@ builder.Services.AddScoped<GetDashboardHandler>();
 builder.Services.AddScoped<GetNetWorthHistoryHandler>();
 builder.Services.AddScoped<GetTargetAllocationHandler>();
 builder.Services.AddScoped<SaveTargetAllocationHandler>();
+builder.Services.AddScoped<GetGroupTargetAllocationHandler>();
+builder.Services.AddScoped<SaveGroupTargetAllocationHandler>();
+builder.Services.AddScoped<DeleteGroupTargetAllocationHandler>();
 
 if (!OpenApiBuildTime.IsActive)
 {
@@ -41,6 +47,7 @@ if (!OpenApiBuildTime.IsActive)
             x.AddConsumer<DailyPricesSyncedConsumer>(typeof(DailyPricesSyncedConsumerDefinition));
             x.AddConsumer<AssetPositionChangedConsumer>(typeof(AssetPositionChangedConsumerDefinition));
             x.AddConsumer<AssetRemovedConsumer>(typeof(AssetRemovedConsumerDefinition));
+            x.AddConsumer<AssetGroupDeletedConsumer>(typeof(AssetGroupDeletedConsumerDefinition));
             x.AddConsumer<HistoryRebuildConsumer>(typeof(HistoryRebuildConsumerDefinition));
             x.AddConsumer<InstrumentHistoryBackfilledConsumer>(typeof(InstrumentHistoryBackfilledConsumerDefinition));
         });
@@ -62,6 +69,9 @@ app.MapGetDashboardEndpoint();
 app.MapGetNetWorthHistoryEndpoint();
 app.MapGetTargetAllocationEndpoint();
 app.MapSaveTargetAllocationEndpoint();
+app.MapGetGroupTargetAllocationEndpoint();
+app.MapSaveGroupTargetAllocationEndpoint();
+app.MapDeleteGroupTargetAllocationEndpoint();
 
 // Production applies migrations as an explicit deploy step instead (see deploy/README.md).
 if (!OpenApiBuildTime.IsActive && app.Environment.IsDevelopment())

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { awaitReady, buildWithResume, decideOnLimit, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
+import { awaitReady, buildWithResume, decideOnLimit, finishShutdown, fixWithResume, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MIN = 60e3;
@@ -97,6 +97,76 @@ test("resume rebuilds the same part uncounted", async () => {
   assert.deepEqual(events, ["build", "limit", "ready", "build"]);
   assert.equal(ctx.builds, 1);
   assert.equal(result.limit, undefined);
+});
+
+test("fix session honours the usage limit", async () => {
+  const events = [];
+  const prompts = [];
+  const results = [{ limitHit: true, resetsAt: after(40 * MIN) }, { text: "FIX_RESULT: ..." }];
+  const result = await fixWithResume({
+    prompt: "/fix ci:#7",
+    run: async (prompt) => (prompts.push(prompt), events.push("run"), results.shift()),
+    onLimit: async (limit) => void events.push(["limit", limit.resetsAt.getTime()]),
+    rearm: async () => void events.push("rearm"),
+    awaitReady: async () => void events.push("ready"),
+  });
+  assert.deepEqual(prompts, ["/fix ci:#7", "/fix ci:#7"]);
+  assert.deepEqual(events, ["run", ["limit", after(40 * MIN).getTime()], "rearm", "ready", "run"]);
+  assert.equal(result.text, "FIX_RESULT: ...");
+
+  const stopped = [];
+  const exit = await handleLimit({ ...base, resetsAt: after(40 * MIN), onLimit: "exit" }, powerFakes("yes"));
+  assert.deepEqual([exit.action, exit.reason], ["end", "limit"]);
+  const onLimit = async () => {
+    if (exit.action === "end") throw new Error(`stop ${exit.reason}`);
+  };
+  await assert.rejects(
+    fixWithResume({ prompt: "/fix ci:#7", run: async () => (stopped.push("run"), { limitHit: true, resetsAt: after(40 * MIN) }), onLimit, awaitReady: async () => stopped.push("ready") }),
+    /stop limit/,
+  );
+  assert.deepEqual(stopped, ["run"]);
+
+  for (const done of [{ limitHit: true, timedOut: true }, { limitHit: true, hung: { hung: true } }, { limitHit: false }]) {
+    let runs = 0;
+    const out = await fixWithResume({ prompt: "p", run: async () => (runs++, done), onLimit: async () => assert.fail("no limit wait"), awaitReady: async () => {} });
+    assert.equal(out, done);
+    assert.equal(runs, 1);
+  }
+});
+
+test("wake rearms the guard before readiness", async () => {
+  const events = [];
+  const results = [{ limit: { resetsAt: after(40 * MIN) } }, {}];
+  await buildWithResume({
+    part: { number: 7 },
+    build: async () => (events.push("build"), results.shift()),
+    onLimit: async () => void events.push("limit"),
+    rearm: async () => void events.push("rearm"),
+    awaitReady: async () => (events.push("ready"), { ready: true }),
+  });
+  assert.deepEqual(events, ["build", "limit", "rearm", "ready", "build"]);
+
+  const lines = [];
+  const guard = await rearmGuard({ start: async () => (events.push("start"), { active: true }), log: (l) => lines.push(l), line: () => "blocked" });
+  assert.equal(guard.active, true);
+  assert.deepEqual(lines, ["blocked"]);
+});
+
+test("failed rearm retries once then warns", async () => {
+  const lines = [];
+  const line = (g) => (g.active ? "blocked" : `UWAGA: ${g.reason}`);
+  const answers = [{ active: false, reason: "first" }, { active: true }];
+  const recovered = await rearmGuard({ start: async () => answers.shift(), log: (l) => lines.push(l), line });
+  assert.equal(recovered.active, true);
+  assert.equal(answers.length, 0);
+  assert.equal(lines.at(-1), "blocked");
+
+  let starts = 0;
+  lines.length = 0;
+  const failed = await rearmGuard({ start: async () => (starts++, { active: false, reason: "no ready" }), log: (l) => lines.push(l), line });
+  assert.equal(starts, 2);
+  assert.equal(failed.active, false);
+  assert.equal(lines.at(-1), "UWAGA: no ready");
 });
 
 test("shutdown asks first", async () => {

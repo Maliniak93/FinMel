@@ -398,8 +398,24 @@
     "outOfBand": "Out of band",
     "outside": "Outside the allocation",
     "summary": "base {{ base }} of {{ total }}",
+    "scope": {
+      "label": "Allocation scope",
+      "whole": "Whole portfolio"
+    },
+    "group": {
+      "empty": "This asset group has no target allocation yet.",
+      "create": "Create allocation",
+      "copy": "Copy from the whole",
+      "delete": "Delete allocation",
+      "planNote": "The transfer plan is computed from the allocation of \"Whole portfolio\", not from this asset group.",
+      "noValue": "This asset group has no value yet, so only the targets and bands are shown."
+    },
+    "delete": {
+      "title": "Delete the group allocation?",
+      "message": "The target allocation of the asset group \"{{ name }}\" will be deleted. The allocation of the whole portfolio stays as it is."
+    },
     "columns": {
-      "group": "Group",
+      "group": "Class group",
       "value": "Value",
       "current": "Current share",
       "target": "Target",
@@ -413,20 +429,20 @@
       "metals": "Metals"
     },
     "editor": {
-      "proposalIntro": "A proposed split of your assets. Set a target for each group and save.",
-      "name": "Group name",
+      "proposalIntro": "A proposed split of your assets. Set a target for each class group and save.",
+      "name": "Class group name",
       "classes": "Asset classes",
       "target": "Target (%)",
       "band": "Band ± (pp)",
-      "addGroup": "Add group",
-      "removeGroup": "Remove group",
+      "addGroup": "Add class group",
+      "removeGroup": "Remove class group",
       "sum": "Sum of targets: {{ sum }}"
     },
     "errors": {
-      "nameRequired": "Enter a group name.",
+      "nameRequired": "Enter a class group name.",
       "classesRequired": "Pick at least one asset class.",
       "percent": "Enter 0–100 with at most one decimal.",
-      "duplicateNames": "Group names must differ."
+      "duplicateNames": "Class group names must differ."
     }
   },
   "dashboard": {
@@ -434,6 +450,15 @@
     "netWorth": "Net worth",
     "change": "Change",
     "allocation": "Allocation",
+    "groups": {
+      "title": "By group",
+      "ungrouped": "No group",
+      "hint": "Split your wealth into groups such as retirement or an emergency cushion to see how it divides.",
+      "link": "Manage groups",
+      "progress": "{{ value }} / {{ target }} ({{ percent }}%)",
+      "filter": "Group",
+      "loadFailed": "Failed to load groups."
+    },
     "empty": "You haven't entered any wealth yet.",
     "stale": "Stale",
     "staleTooltip": "At least one holding's valuation hasn't refreshed in a while — this total may be out of date.",
@@ -1089,6 +1114,18 @@
       "dayOfMonth": "Day of the month",
       "dayInvalid": "Enter a day from 1 to 31.",
       "shift": "Business-day shift"
+    },
+    "oneOff": {
+      "mode": "Entry type",
+      "recurring": "Recurring",
+      "oneOff": "One-off",
+      "mark": "one-off",
+      "lockedHint": "Undo the settlement first to edit or delete this entry.",
+      "delete": {
+        "title": "Delete the one-off entry?",
+        "message": "\"{{ name }}\" will be removed from the plan.",
+        "failed": "Could not delete the entry."
+      }
     },
     "todo": {
       "badge": "Things to do"

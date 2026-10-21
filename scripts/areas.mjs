@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Usage: node scripts/areas.mjs [of <path…> | outside <Area> [path…]]   no argument prints the area -> paths table; `of` prints the area of the given files (— when none)
+// Usage: node scripts/areas.mjs [of <path…> | outside <Area> [path…] | profile <Area> [--no-tests]]   no argument prints the area -> paths table; `of` prints the area of the given files (— when none)
 //   outside prints the paths outside the ticket Area, one per line (no paths: the uncommitted change incl. untracked files)
+//   profile prints the build profile of the Area as JSON (the workflow's `profile` arg); --no-tests drops the test-writer (a /fix ci:#<n> session: implementer → reviewer)
 
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -142,6 +143,7 @@ function uncommittedFiles() {
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const [verb, ...rest] = process.argv.slice(2);
   if (verb === "of") console.log(areaOfFiles(rest) ?? "—");
+  else if (verb === "profile") console.log(JSON.stringify(profileOf(rest.find((a) => !a.startsWith("--")), { skip: rest.includes("--no-tests") ? ["tests"] : [] })));
   else if (verb === "outside") {
     const [area, ...paths] = rest;
     for (const f of outsideArea(area, paths.length ? paths : uncommittedFiles())) console.log(f);

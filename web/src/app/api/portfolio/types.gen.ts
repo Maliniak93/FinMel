@@ -386,6 +386,27 @@ export type CreateCashPlaceRequest = {
     currencies?: Array<string>;
 };
 
+export type CreateOneOffExpenseRequest = {
+    name: string;
+    amount: number | string;
+    date: string;
+};
+
+export type CreateOneOffExpenseResponse = {
+    id: string;
+};
+
+export type CreateOneOffIncomeRequest = {
+    name: string;
+    amount: number | string;
+    accountId: string;
+    date: string;
+};
+
+export type CreateOneOffIncomeResponse = {
+    id: string;
+};
+
 export type CreateRecurringExpenseRequest = {
     name: string;
     amount: number | string;
@@ -624,9 +645,39 @@ export type MetalResponse = {
 
 export type OccurrenceStatus = 'Pending' | 'Settled' | 'Skipped';
 
+export type OneOffExpenseResponse = {
+    id: string;
+    name: string;
+    date: string;
+    amount: number | string;
+    inMonth: boolean;
+};
+
+export type OneOffIncomeResponse = {
+    id: string;
+    name: string;
+    date: string;
+    accountId: string;
+    accountName: string;
+    accountArchived: boolean;
+    amount: number | string;
+    currency: string;
+    amountPln: null | number | string;
+    estimated: boolean;
+    inMonth: boolean;
+    status: OccurrenceStatus;
+    actualAmount: null | number | string;
+    actualDate: null | string;
+    actualAmountPln: null | number | string;
+    difference: null | number | string;
+    depositCreated: boolean;
+    overdue: boolean;
+};
+
 export type OverdueOccurrenceResponse = {
-    recurringIncomeId: string;
-    nominalMonth: string;
+    recurringIncomeId: null | string;
+    nominalMonth: null | string;
+    oneOffIncomeId: null | string;
     date: string;
     name: string;
     accountId: string;
@@ -655,6 +706,7 @@ export type PlanningExpensesResponse = {
     payments: Array<ExpensePaymentResponse>;
     costPln: number | string;
     definitions: Array<ExpenseDefinitionResponse>;
+    oneOffs: Array<OneOffExpenseResponse>;
 };
 
 export type PlanningIncomesResponse = {
@@ -662,6 +714,7 @@ export type PlanningIncomesResponse = {
     balance: IncomeBalanceResponse;
     fxUnavailable: boolean;
     definitions: Array<IncomeDefinitionResponse>;
+    oneOffs: Array<OneOffIncomeResponse>;
 };
 
 export type PlanningMonthResponse = {
@@ -830,6 +883,13 @@ export type SettleDepositRequest = {
 };
 
 export type SettleOccurrenceRequest = {
+    actualAmount: number | string;
+    actualDate: string;
+    accountId: string;
+    createDeposit?: boolean;
+};
+
+export type SettleOneOffIncomeRequest = {
     actualAmount: number | string;
     actualDate: string;
     accountId: string;
@@ -1023,6 +1083,19 @@ export type UpdateMetalRequest = {
     metal: Metal;
     fineWeight: number | string;
     weightUnit: WeightUnit;
+};
+
+export type UpdateOneOffExpenseRequest = {
+    name: string;
+    amount: number | string;
+    date: string;
+};
+
+export type UpdateOneOffIncomeRequest = {
+    name: string;
+    amount: number | string;
+    accountId: string;
+    date: string;
 };
 
 export type UpdateRecurringExpenseRequest = {
@@ -2147,6 +2220,146 @@ export type PostApiPortfolioCashPlacesByIdRestoreResponses = {
 };
 
 export type PostApiPortfolioCashPlacesByIdRestoreResponse = PostApiPortfolioCashPlacesByIdRestoreResponses[keyof PostApiPortfolioCashPlacesByIdRestoreResponses];
+
+export type PostApiPortfolioOneOffIncomesData = {
+    body: CreateOneOffIncomeRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/one-off-incomes';
+};
+
+export type PostApiPortfolioOneOffIncomesResponses = {
+    /**
+     * Created
+     */
+    201: CreateOneOffIncomeResponse;
+};
+
+export type PostApiPortfolioOneOffIncomesResponse = PostApiPortfolioOneOffIncomesResponses[keyof PostApiPortfolioOneOffIncomesResponses];
+
+export type DeleteApiPortfolioOneOffIncomesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-incomes/{id}';
+};
+
+export type DeleteApiPortfolioOneOffIncomesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioOneOffIncomesByIdResponse = DeleteApiPortfolioOneOffIncomesByIdResponses[keyof DeleteApiPortfolioOneOffIncomesByIdResponses];
+
+export type PutApiPortfolioOneOffIncomesByIdData = {
+    body: UpdateOneOffIncomeRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-incomes/{id}';
+};
+
+export type PutApiPortfolioOneOffIncomesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioOneOffIncomesByIdResponse = PutApiPortfolioOneOffIncomesByIdResponses[keyof PutApiPortfolioOneOffIncomesByIdResponses];
+
+export type DeleteApiPortfolioOneOffIncomesByIdSettlementData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-incomes/{id}/settlement';
+};
+
+export type DeleteApiPortfolioOneOffIncomesByIdSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioOneOffIncomesByIdSettlementResponse = DeleteApiPortfolioOneOffIncomesByIdSettlementResponses[keyof DeleteApiPortfolioOneOffIncomesByIdSettlementResponses];
+
+export type PutApiPortfolioOneOffIncomesByIdSettlementData = {
+    body: SettleOneOffIncomeRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-incomes/{id}/settlement';
+};
+
+export type PutApiPortfolioOneOffIncomesByIdSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioOneOffIncomesByIdSettlementResponse = PutApiPortfolioOneOffIncomesByIdSettlementResponses[keyof PutApiPortfolioOneOffIncomesByIdSettlementResponses];
+
+export type PostApiPortfolioOneOffExpensesData = {
+    body: CreateOneOffExpenseRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/one-off-expenses';
+};
+
+export type PostApiPortfolioOneOffExpensesResponses = {
+    /**
+     * Created
+     */
+    201: CreateOneOffExpenseResponse;
+};
+
+export type PostApiPortfolioOneOffExpensesResponse = PostApiPortfolioOneOffExpensesResponses[keyof PostApiPortfolioOneOffExpensesResponses];
+
+export type DeleteApiPortfolioOneOffExpensesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-expenses/{id}';
+};
+
+export type DeleteApiPortfolioOneOffExpensesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioOneOffExpensesByIdResponse = DeleteApiPortfolioOneOffExpensesByIdResponses[keyof DeleteApiPortfolioOneOffExpensesByIdResponses];
+
+export type PutApiPortfolioOneOffExpensesByIdData = {
+    body: UpdateOneOffExpenseRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-expenses/{id}';
+};
+
+export type PutApiPortfolioOneOffExpensesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioOneOffExpensesByIdResponse = PutApiPortfolioOneOffExpensesByIdResponses[keyof PutApiPortfolioOneOffExpensesByIdResponses];
 
 export type PostApiPortfolioRecurringIncomesData = {
     body: CreateRecurringIncomeRequest;

@@ -55,6 +55,7 @@ public sealed class GetOverdueOccurrencesHandler(PortfolioDbContext dbContext, T
                     {
                         RecurringIncomeId = income.Id,
                         NominalMonth = occurrence.NominalMonth.ToString(),
+                        OneOffIncomeId = null,
                         Date = occurrence.Date,
                         Name = income.Name,
                         AccountId = account.Id,
@@ -66,6 +67,30 @@ public sealed class GetOverdueOccurrencesHandler(PortfolioDbContext dbContext, T
                 }
             }
         }
+
+        var oneOffs = await dbContext.OneOffIncomes
+            .AsNoTracking()
+            .Where(i => i.ActualAmount == null && i.Date < today)
+            .ToListAsync(cancellationToken);
+
+        items.AddRange(oneOffs.Select(income =>
+        {
+            var account = accounts[income.AccountId];
+
+            return new OverdueOccurrenceResponse
+            {
+                RecurringIncomeId = null,
+                NominalMonth = null,
+                OneOffIncomeId = income.Id,
+                Date = income.Date,
+                Name = income.Name,
+                AccountId = account.Id,
+                AccountName = account.Name,
+                AccountArchived = account.IsArchived,
+                Amount = income.Amount,
+                Currency = account.Currency
+            };
+        }));
 
         return new OverdueOccurrencesResponse
         {

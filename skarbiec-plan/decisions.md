@@ -36,7 +36,7 @@ Abbreviated format. Status: ✅ accepted / 🕐 pending / ❌ rejected. ADR-001�
 
 ## ADR-007 ✅ Prices only from our own database (jobs in MarketData)
 
-**Decision:** external APIs (NBP, Yahoo, gold-api.com) are queried exclusively by Quartz jobs in MarketData; the rest of the system reads via the MarketData API or read models. Narrowed by ADR-018 (ticker verification only). CoinGecko was dropped with the Crypto class (accounts epic part 1).
+**Decision:** external APIs (NBP, Yahoo) are queried exclusively by Quartz jobs in MarketData; the rest of the system reads via the MarketData API or read models. Narrowed by ADR-018 (ticker verification only). CoinGecko was dropped with the Crypto class (accounts epic part 1).
 
 ## ADR-008 ✅ PLN base currency, `decimal` everywhere
 
@@ -229,7 +229,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-034 ✅ An isolated e2e stack on stubbed market data, started by agents
 
-**Context:** the e2e suite needs exact expected amounts, so market data must be fixed and must never come from Yahoo, gold-api, NBP or MF. It must also run unattended inside `autobuild.mjs`, while CLAUDE.md reserves starting and stopping the stack for the user.
+**Context:** the e2e suite needs exact expected amounts, so market data must be fixed and must never come from Yahoo, NBP or MF. It must also run unattended inside `autobuild.mjs`, while CLAUDE.md reserves starting and stopping the stack for the user.
 
 **Decision:** e2e runs only through `node scripts/e2e.mjs`, on a second compose project `skarbiec-e2e`: images `skarbiec-e2e/<svc>` built from the working tree, its own host ports (web `:18080`), Postgres and RabbitMQ on tmpfs, `down --volumes` after every run. A stub container serves a documented data set by impersonating the providers; only the e2e override points MarketData's base URLs at it, so MarketData's sources, parsers and jobs run unchanged and ADR-007 stands. Agents may start and stop this project, and only this one; the user's `skarbiec-local` stack and Aspire stay the user's.
 
@@ -275,3 +275,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Context:** the user sorts assets into groups (name, colour, optional PLN target) and net worth is reported by group (epic #472). Portfolio owns the assignment; Reporting values from events (ADR-021).
 **Decision:** `Asset.GroupId` (plain id, no FK, ADR-003) is part of the position state, published as `AssetPositionChanged.GroupId` (`Guid?`, null = no group) by `PositionEventPublisher` for every publish. Assigning assets to a group, clearing them and deleting a group each republish every asset whose group changes through `PublishChangedAsync` (`Version + 1`) in the same save; assigning an asset to the group it is already in publishes nothing. Renaming, recolouring and retargeting a group publish nothing, since the event carries only the id. Amends ADR-021.
 **Consequences:** a group change fans out one event per asset; consumers ignore `GroupId` until they adopt it (MarketData never will).
+
+## ADR-041 🕐 A group's target allocation lives in Reporting and is cleaned up by `AssetGroupDeleted`
+
+**Context:** each asset group can have its own target allocation compared with that group's assets (epic idea `alokacja-grupy`); Reporting holds no group replica (ADR-040) and the transfer plan reads only the global allocation (ADR-038).
+**Decision:** `GroupTargetAllocation (UserId, GroupId)` in `reporting_db` holds the class groups; the comparison joins the latest valuation lines to `Position.GroupId`; saving it publishes nothing; Portfolio publishes `AssetGroupDeleted` through its outbox on deleting a group and Reporting's idempotent consumer deletes the allocation. The loser, cleaning at read time, needs a group list Reporting does not have.
+**Consequences:** an allocation saved for an id Portfolio does not know is unreachable from the app; a late `AssetGroupDeleted` is harmless. Amends ADR-021.

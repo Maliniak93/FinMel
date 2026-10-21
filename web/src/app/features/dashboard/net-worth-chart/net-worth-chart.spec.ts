@@ -228,4 +228,43 @@ describe('NetWorthChart', () => {
     expect(polishProblems(english, labels())).toEqual([]);
     expect(textsOf(element, 'mat-button-toggle')).toEqual(['1M', '1Y', 'YTD', 'MAX']);
   });
+
+  it('group chips', async () => {
+    await TestBed.configureTestingModule({
+      imports: [NetWorthChart],
+      providers: [provideI18nTesting()],
+    }).compileComponents();
+    fixture = TestBed.createComponent(NetWorthChart);
+    fixture.componentRef.setInput('points', yearPoints);
+    fixture.componentRef.setInput('range', '1Y');
+    fixture.componentRef.setInput('classes', CLASSES);
+    fixture.componentRef.setInput('groups', [
+      { key: 'g-1', label: 'Emerytura' },
+      { key: 'ungrouped', label: 'Bez grupy' },
+    ]);
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    const groupChips = () =>
+      textsOf(element, 'mat-chip-listbox.net-worth-chart__groups mat-chip-option');
+    const selected = () =>
+      textsOf(
+        element,
+        'mat-chip-listbox.net-worth-chart__groups mat-chip-option button[aria-selected="true"]',
+      );
+
+    expect(groupChips()).toEqual(['All', 'Emerytura', 'Bez grupy']);
+    expect(selected()).toEqual(['All']);
+
+    const chip = [
+      ...element.querySelectorAll<HTMLButtonElement>(
+        'mat-chip-listbox.net-worth-chart__groups mat-chip-option button[role="option"]',
+      ),
+    ].find((button) => textOf(button) === 'Emerytura') as HTMLButtonElement;
+    chip.click();
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.group()).toBe('g-1');
+    expect(fixture.componentInstance.assetClass()).toBeNull();
+    expect(selected()).toEqual(['Emerytura']);
+  });
 });

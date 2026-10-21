@@ -17,8 +17,11 @@
 //   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
+//   a part without Branch is healed first (gh-project.mjs heal); a card with a missing or invalid Tier is skipped with the later open parts of its epic and the cards whose Depends on names it (a log line and one comment each, Status unchanged) and the run ends `done` listing them as `pominięte: …`
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
+//   a red CI with fewer than 5 failed tests (or only cancelled/timed-out jobs) reruns its failed jobs once per head SHA (GitHub's run_attempt is the counter), with a fresh 90 min wait; any other red, or a red after the rerun, starts one fix session per PR (the PR comment marker `<!-- skarbiec-ci-fix -->` is the counter): `/fix ci:#<n>` on the PR branch (tree kept on a dirty PR branch, `dirty-tree` for any other dirty tree), `ship.mjs --fix-pr` pushes to the same PR, a fresh 90 min wait follows; never counted towards --max-tasks, no session after --until, with the stop file or in a dry run; red after the fix reruns once when < 5 tests failed, otherwise stops `ci-failed` with the job link and the resume line, a session that stops or moves no head `ci-failed` / `blocked`
 //   a GitHub rate limit (primary or secondary) is waited out with no upper bound, then the same call or step reruns (a child ending on the GITHUB_LIMIT marker or ship.mjs exit 4 included); the wait does not count towards the build or CI timeouts, and writes already done (merge, close, summary comment) are skipped
+//   the sleep guard is confirmed (`ready`) and re-armed after every wake; PC sleep gaps are logged (`PC spał …`) and do not count towards the 4 h build limit; a build with no progress for 45 awake minutes (no live dotnet/verify/e2e process) is killed and replayed once per part, a second hang stops the run with reason `hang`
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
 import { spawn, spawnSync } from "node:child_process";
@@ -29,17 +32,18 @@ import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
+import { CI_FIX_MARKER, CI_POLICY_LINE, driveCi, partLine, runCiFix, summaryPartLine } from "./autobuild-ci.mjs";
 import { postRunVerify } from "./autobuild-verify.mjs";
-import { awaitReady, buildWithResume, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
-import { areaWarning, mayStart, planFrom, planLines, runQueue, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
+import { awaitReady, buildWithResume, finishShutdown, fixWithResume, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
+import { BUILD_LIMIT_MS, buildThroughHangs, createAwakeClock, createHangDetector, createHangPolicy, hangLabel, liveWork, summaryLines } from "./autobuild-watch.mjs";
+import { areaWarning, ensureBranch, mayStart, planFrom, planLines, postSkipOnce, runQueue, skipMarker, skippedLine, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 import { UsageError, WizardCancelled, parseFlags, runWizard } from "./autobuild-wizard.mjs";
-import { confirmPower, suspendUntil, wakeTimers } from "./power.mjs";
+import { confirmPower, guardLine, startGuard, suspendUntil, wakeTimers } from "./power.mjs";
 import { itemTag, queueOf } from "./queue.mjs";
 import { REPO, TRANSIENT_RE, checkBuckets, hasRunMarker, limitFromGhFailure, limitFromText, limitWait, GhLimitError, rateLimit, spawnGh, usageLine } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const IS_WIN = process.platform === "win32";
-const BUILD_TIMEOUT_MS = 4 * 3600e3;
 const CI_POLL_MS = 30e3;
 const CI_MISSING_MS = 10 * 60e3;
 const CI_TIMEOUT_MS = 90 * 60e3;
@@ -292,18 +296,18 @@ async function ship(number, flags) {
 
 let sleepGuard = null;
 
-function startSleepGuard() {
-  if (!IS_WIN) return;
-  // 0x80000003 = ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED - the display staying on also keeps the idle lock off
-  const script = [
-    "$sig = '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint esFlags);'",
-    "Add-Type -MemberDefinition $sig -Name Power -Namespace Skarbiec | Out-Null",
-    "[Skarbiec.Power]::SetThreadExecutionState([uint32]2147483651) | Out-Null",
-    `Wait-Process -Id ${process.pid} -ErrorAction SilentlyContinue`,
-  ].join("; ");
-  sleepGuard = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", script], { windowsHide: true, stdio: "ignore" });
-  sleepGuard.on("error", () => {});
-  say("sleep, display-off and idle lock blocked while the run lasts (closing the lid still sleeps)");
+async function restartSleepGuard() {
+  killTree(sleepGuard);
+  sleepGuard = null;
+  if (!IS_WIN) return { active: true, reason: null };
+  const guard = await startGuard({ parentPid: process.pid });
+  sleepGuard = guard.active ? guard.child : null;
+  return guard;
+}
+
+async function armSleepGuard() {
+  const guard = await rearmGuard({ start: restartSleepGuard, log: say, line: guardLine });
+  if (!guard.active) ctx.guardWarning = guardLine(guard);
 }
 
 function killTree(child) {
@@ -333,7 +337,7 @@ const span = (ms) => {
 // resetsAt is epoch seconds in the stream; accept milliseconds as well
 const resetClock = (t) => (t ? clock(new Date(t > 1e12 ? t : t * 1000)) : "unknown");
 
-function createReporter(number) {
+function createReporter(number, watch) {
   const rep = { limitHit: false, resetsAt: null, sessionId: null, result: null, ghLimit: null };
   const toolNames = new Map();
   const agents = new Map();
@@ -353,6 +357,7 @@ function createReporter(number) {
   const onAgent = (a) => {
     const prev = agents.get(a.agentId);
     agents.set(a.agentId, a);
+    if (!prev || a.state !== prev.state) watch.agentEvent();
     if (!prev) {
       if (!phases.has(a.phaseTitle)) {
         phases.add(a.phaseTitle);
@@ -369,6 +374,7 @@ function createReporter(number) {
     for (const entry of obj.workflow_progress ?? []) if (entry.type === "workflow_agent") onAgent(entry);
     const running = [...agents.values()].filter((a) => ACTIVE_STATES.has(a.state)).sort((a, b) => (b.lastProgressAt ?? 0) - (a.lastProgressAt ?? 0))[0];
     latest = { phase: String(obj.description ?? "").split(":")[0], agent: running?.agentType, tokens: obj.usage?.total_tokens, tools: obj.usage?.tool_uses };
+    watch.progress(latest);
   };
 
   const onAssistant = (obj) => {
@@ -435,7 +441,10 @@ function build(claude, number, title) {
 
 function runClaude(claude, number, heading, prompt, model) {
   const startedAt = Date.now();
-  const reporter = createReporter(number);
+  const awake = createAwakeClock();
+  let pid = null;
+  const detector = createHangDetector({ clock: awake, hasWork: () => liveWork(pid) });
+  const reporter = createReporter(number, detector);
   say(`══ #${number} ${heading}`);
 
   const spec = claudeSpawn(claude, ["-p", prompt, "--model", model, "--permission-mode", "auto", "--output-format", "stream-json", "--verbose"]);
@@ -448,14 +457,37 @@ function runClaude(claude, number, heading, prompt, model) {
       stdio: ["ignore", "pipe", "pipe"],
     });
     buildChild = child;
+    pid = child.pid;
     let buffer = "";
     let errTail = "";
     let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      killTree(child);
-    }, BUILD_TIMEOUT_MS);
-    const beat = setInterval(reporter.heartbeat, 60e3);
+    let hung = null;
+    let checking = false;
+    const beat = setInterval(async () => {
+      reporter.heartbeat();
+      const slept = awake.tick();
+      if (slept) {
+        say(slept.line);
+        ctx.sleptMs += slept.ms;
+      }
+      if (timedOut || hung) return;
+      if (awake.expired(BUILD_LIMIT_MS)) {
+        timedOut = true;
+        killTree(child);
+        return;
+      }
+      if (checking) return;
+      checking = true;
+      try {
+        const verdict = await detector.check();
+        if (verdict.hung && !timedOut && !hung) {
+          hung = verdict;
+          killTree(child);
+        }
+      } finally {
+        checking = false;
+      }
+    }, 60e3);
 
     const handleLine = (line) => {
       if (!line.trim()) return;
@@ -479,13 +511,12 @@ function runClaude(claude, number, heading, prompt, model) {
       errTail = err.message;
     });
     child.on("close", (code) => {
-      clearTimeout(timer);
       clearInterval(beat);
       handleLine(buffer);
       buildChild = null;
       reportBuildEnd(number, code, reporter.result, Date.now() - startedAt);
       if (code !== 0 && errTail.trim()) say(`exit ${code}: ${errTail.trim().split(/\r?\n/).slice(-3).join(" | ")}`);
-      resolve({ code, timedOut, limitHit: reporter.limitHit, resetsAt: reporter.resetsAt, ghLimit: reporter.ghLimit, sessionId: reporter.sessionId, text: String(reporter.result?.result ?? ""), ms: Date.now() - startedAt });
+      resolve({ code, timedOut, hung, limitHit: reporter.limitHit, resetsAt: reporter.resetsAt, ghLimit: reporter.ghLimit, sessionId: reporter.sessionId, text: String(reporter.result?.result ?? ""), ms: Date.now() - startedAt });
     });
   });
 }
@@ -507,8 +538,95 @@ function readChecks(pr) {
   }
 }
 
-async function waitForCi(pr) {
-  const startedAt = Date.now();
+function readJobs(runId) {
+  const res = retryTransient("run jobs", () => gh(["api", `repos/${REPO}/actions/runs/${runId}/jobs?per_page=100`, "--jq", ".jobs"]));
+  try {
+    if (!res.ok) throw new Error(res.firstErr);
+    return JSON.parse(res.out);
+  } catch (err) {
+    say(`CI: could not read the jobs of run ${runId} (${short(err.message, 120)})`);
+    return null;
+  }
+}
+
+function readJobLog(jobId) {
+  const res = retryTransient("job log", () => gh(["api", `repos/${REPO}/actions/jobs/${jobId}/logs`]));
+  return res.ok ? res.out : null;
+}
+
+function rerunFailedJobs(runId) {
+  const res = retryTransient("rerun failed jobs", () => gh(["api", "-X", "POST", `repos/${REPO}/actions/runs/${runId}/rerun-failed-jobs`]));
+  if (!res.ok) say(`CI: rerun of run ${runId} failed (${short(res.firstErr, 120)})`);
+  return res.ok;
+}
+
+function prHead(number) {
+  const res = retryTransient("pr head", () => gh(["api", `repos/${REPO}/pulls/${number}`, "--jq", ".head.sha"]));
+  return res.ok && res.out ? res.out : null;
+}
+
+function fixMarked(number) {
+  const jq = `[.[] | select(.body | contains("${CI_FIX_MARKER}"))] | length`;
+  const res = retryTransient("pr comments", () => gh(["api", "--paginate", `repos/${REPO}/issues/${number}/comments?per_page=100`, "--jq", jq]));
+  if (!res.ok) throw new Stop("github", `PR #${number}: could not read the comments (${short(res.firstErr, 120)})`);
+  return res.out.split(/\r?\n/).some((line) => Number(line) > 0);
+}
+
+// a dirty tree on the PR branch is an interrupted fix and is kept; any other dirty tree stops
+function enterPrBranch(part) {
+  const dirty = dirtyFiles();
+  if (currentBranch() === part.branch) {
+    if (dirty.length) say(`CI fix: continuing on ${part.branch} with ${dirty.length} uncommitted file(s) of an interrupted fix`);
+    return;
+  }
+  if (dirty.length) throw new Stop("dirty-tree", `the working tree is not clean on ${currentBranch()}, the CI fix of #${part.number} needs ${part.branch}:\n${dirty.slice(0, 10).join("\n")}`);
+  const step = git(["switch", part.branch]);
+  if (!step.ok) throw new Stop("sync-failed", `git switch ${part.branch}: ${step.firstErr}`);
+}
+
+function leavePrBranch() {
+  if (dirtyFiles().length) {
+    say("CI fix: the tree is not clean - staying on the PR branch");
+    return;
+  }
+  const step = git(["switch", "master"]);
+  if (!step.ok) throw new Stop("sync-failed", `git switch master: ${step.firstErr}`);
+}
+
+function fixSession(part) {
+  return fixWithResume({
+    prompt: `/fix ci:#${part.number}`,
+    run: async (prompt) => {
+      const fixed = await runClaude(ctx.claude, part.number, `${part.title} — CI fix`, prompt, FIX_MODEL);
+      if (fixed.timedOut) throw new Stop("timeout", `#${part.number}: the CI fix exceeded 4 h of awake time and was killed`);
+      if (fixed.hung) throw new Stop("hang", `#${part.number}: the CI fix made no progress for 45 min (${hangLabel(fixed.hung)}); resume with ${resumeCommand(ctx)}`);
+      return fixed;
+    },
+    onLimit: (limit) => onUsageLimit(limit, part.number),
+    rearm: armSleepGuard,
+    awaitReady: () => waitForReady(part.number),
+  });
+}
+
+function fixCi(part, pr, { failures, reason }) {
+  return runCiFix({
+    pr,
+    part: part.number,
+    failures,
+    reason,
+    resume: resumeCommand(ctx),
+    guards: { stopRequested: () => existsSync(stopFile()), windowClosed: () => Boolean(mayStart(ctx.until, new Date())), dryRun: ctx.dryRun },
+    headSha: () => prHead(pr.number),
+    markerPosted: () => fixMarked(pr.number),
+    prepare: () => enterPrBranch(part),
+    session: () => fixSession(part),
+    restore: leavePrBranch,
+    say,
+    stop: (kind, detail) => new Stop(kind, detail),
+  });
+}
+
+async function waitForCi(pr, entry, part) {
   const budgets = [];
   const track = (ms) => {
     const budget = createTimeoutBudget(ms);
@@ -516,35 +634,30 @@ async function waitForCi(pr) {
     budgets.push(budget);
     return budget;
   };
-  const total = track(CI_TIMEOUT_MS);
-  let missing = track(CI_MISSING_MS);
-  let lastStatus = "";
-  let greenPolls = 0;
   try {
-    while (true) {
-      const checks = readChecks(pr.number);
-      if (!checks) {
-        greenPolls = 0;
-        if (total.expired()) throw new Stop("ci-timeout", `PR ${pr.url}: checks not readable or not green after 90 min`);
-        await sleep(CI_POLL_MS);
-        continue;
-      }
-      if (checks.length) missing = null;
-      else missing ??= track(CI_MISSING_MS);
-      const count = (...buckets) => checks.filter((c) => buckets.includes(c.bucket)).length;
-      const failed = checks.filter((c) => ["fail", "cancel"].includes(c.bucket));
-      const status = `pass ${count("pass")} · skipping ${count("skipping")} · pending ${count("pending")} · fail ${failed.length}`;
-      if (checks.length && status !== lastStatus) say(`CI PR #${pr.number}: ${status}`);
-      lastStatus = status;
-
-      if (failed.length) throw new Stop("ci-failed", `PR ${pr.url}: ${failed.map((c) => `${c.name} (${c.link})`).join(", ")}`);
-      if (missing?.expired()) throw new Stop("ci-missing", `PR ${pr.url}: no checks after 10 min - the runner did not pick up the job`);
-      greenPolls = checks.length && checks.every((c) => ["pass", "skipping"].includes(c.bucket)) ? greenPolls + 1 : 0;
-      // two green polls in a row: a late-registered check must not slip past the merge
-      if (greenPolls >= 2) return Date.now() - startedAt;
-      if (total.expired()) throw new Stop("ci-timeout", `PR ${pr.url}: checks not green after 90 min`);
-      await sleep(CI_POLL_MS);
-    }
+    return await driveCi({
+      pr,
+      readChecks: () => readChecks(pr.number),
+      readJobs,
+      readLog: readJobLog,
+      rerun: rerunFailedJobs,
+      fix: (input) => fixCi(part, pr, input),
+      fixMarked: () => fixMarked(pr.number),
+      resume: resumeCommand(ctx),
+      sleep,
+      say,
+      budget: track,
+      pollMs: CI_POLL_MS,
+      missingMs: CI_MISSING_MS,
+      timeoutMs: CI_TIMEOUT_MS,
+      stop: (reason, detail) => new Stop(reason, detail),
+      onRerun: () => {
+        entry.ciReruns = (entry.ciReruns ?? 0) + 1;
+      },
+      onFix: () => {
+        entry.ciFixes = (entry.ciFixes ?? 0) + 1;
+      },
+    });
   } finally {
     budgets.forEach((budget) => waitBudgets.delete(budget));
   }
@@ -660,22 +773,45 @@ async function waitForReady(number) {
   say("wake: ready - building the same part again");
 }
 
+function replayStart(part) {
+  try {
+    const found = findReplay({ issue: part.number, args: { tier: part.tier, skip: part.skipTests ? ["tests"] : [], e2e: Boolean(part.e2e) } });
+    return found?.ok ? (found.liveFrom ?? "ship") : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildThroughLimit(part) {
   return buildWithResume({
     part,
     build: async () => {
-      const result = await build(ctx.claude, part.number, part.title);
-      return result.limitHit && !result.timedOut ? { ...result, limit: { resetsAt: result.resetsAt } } : result;
+      const result = await buildThroughHangs({
+        part,
+        build: () => build(ctx.claude, part.number, part.title),
+        policy: ctx.hangs,
+        stopStack: () => run(NODE, ["scripts/stop-stack.mjs"], { timeout: 10 * 60e3 }),
+        resumeFrom: replayStart,
+        log: say,
+      });
+      return result.limitHit && !result.timedOut && !result.hangStop ? { ...result, limit: { resetsAt: result.resetsAt } } : result;
     },
     onLimit: (limit) => onUsageLimit(limit, part.number),
+    rearm: armSleepGuard,
     awaitReady: () => waitForReady(part.number),
   });
 }
 
+function healBranch(number) {
+  const res = retryTransient(`project heal ${number}`, () => project(["heal", String(number)]));
+  if (!res.ok) throw new Stop("github", `gh-project.mjs heal ${number}: ${res.firstErr}`);
+  say(res.err.split(/\r?\n/).find((l) => l.startsWith(`#${number}:`)) ?? `#${number}: Branch healed`);
+  return JSON.parse(res.out);
+}
+
 async function handlePart(sub, ctx) {
-  const part = getIssue(sub.number);
-  if (!part.branch) throw new Stop("no-branch", `#${part.number} has no Branch field`);
-  const entry = { item: ctx.item, number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null };
+  const part = ensureBranch(getIssue(sub.number), healBranch);
+  const entry = { item: ctx.item, number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null, ciReruns: 0, ciFixes: 0 };
   let pr = openPr(part.branch);
 
   if (!pr) {
@@ -693,12 +829,13 @@ async function handlePart(sub, ctx) {
       // a build that ends on the GitHub limit without a PR is rerun after the reset; the workflow journal replays what it finished
       const { built, pr: builtPr } = await runStepWithLimit(async () => {
         const result = await startWork({ item: ctx.item, part: part.number, gh: labelAsRun, build: () => buildThroughLimit(part) });
-        const stopped = result.timedOut;
+        const stopped = result.timedOut || result.hangStop;
         const found = stopped ? null : openPr(part.branch);
         return { code: result.code, output: result.ghLimit && !found && !stopped ? `GITHUB_LIMIT ${JSON.stringify(result.ghLimit)}` : "", built: result, pr: found };
       }, stepWait);
       entry.buildMin = minutes(built.ms);
-      if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h and was killed`);
+      if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h of awake time and was killed`);
+      if (built.hangStop) throw new Stop("hang", `#${part.number}: no progress for 45 min again after a restart (${hangLabel(built.hung)}); resume with ${resumeCommand(ctx)}`);
       pr = builtPr;
       const blockedAtE2e = pr ? null : e2eBlock(part.number);
       if (blockedAtE2e) return repairE2e(part, blockedAtE2e, ctx);
@@ -709,7 +846,8 @@ async function handlePart(sub, ctx) {
 
   entry.prUrl = pr.url;
   ctx.parts.push(entry);
-  entry.ciMin = minutes(await waitForCi(pr));
+  const ci = await waitForCi(pr, entry, part);
+  entry.ciMin = minutes(ci.ms);
   await mergeAndSync(pr, part.branch, part.number);
 }
 
@@ -731,7 +869,8 @@ async function repairE2e(part, block, ctx) {
   ctx.builds++;
   say(`#${part.number}: e2e app failure, ${block.where} - unattended repair ${blocks}/${MAX_E2E_REPAIRS}`);
   const fixed = await runClaude(ctx.claude, part.number, `${part.title} — e2e repair`, `/fix e2e:#${part.number}`, FIX_MODEL);
-  if (fixed.timedOut) throw new Stop("timeout", `#${part.number}: the e2e repair exceeded 4 h and was killed`);
+  if (fixed.timedOut) throw new Stop("timeout", `#${part.number}: the e2e repair exceeded 4 h of awake time and was killed`);
+  if (fixed.hung) throw new Stop("hang", `#${part.number}: the e2e repair made no progress for 45 min (${hangLabel(fixed.hung)}); resume with ${resumeCommand(ctx)}`);
   if (fixed.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached during the e2e repair, resets ${resetClock(fixed.resetsAt)}; resume with ${resumeCommand(ctx)}`);
   const result = parseFixResult(fixed.text);
   if (!result?.ok) throw giveUp(result ? `the repair stopped: ${result.summary}` : `the repair gave no FIX_RESULT (exit ${fixed.code})`);
@@ -773,7 +912,10 @@ function preChecks(first, flags) {
   if (dirty.length) {
     const next = partsOf(getIssue(first.number)).find((s) => s.state !== "CLOSED");
     const part = next ? getIssue(next.number) : null;
-    if (part?.branch && currentBranch() === part.branch && !openPr(part.branch)) {
+    const prOfBranch = part?.branch && currentBranch() === part.branch ? openPr(part.branch) : null;
+    if (prOfBranch) {
+      say(`${flags["dry-run"] ? "dry-run: would be resumed - " : ""}continuing the CI fix of #${part.number} on ${part.branch} with ${dirty.length} uncommitted file(s)`);
+    } else if (part?.branch && currentBranch() === part.branch) {
       const shipping = partPlan(part, dirty.length) === "ship";
       const verb = shipping ? "retrying the ship step of" : "resuming";
       const found = shipping ? null : findReplay({ issue: part.number, args: { tier: part.tier, skip: part.skipTests ? ["tests"] : [], e2e: Boolean(part.e2e) } });
@@ -802,7 +944,7 @@ function dryRunTable(issue) {
         const pr = branch ? openPr(branch) : null;
         const dirtyCount = dirtyFiles().length;
         const plan = branch && !pr ? partPlan({ number: sub.number, branch }, dirtyCount) : "build";
-        if (!branch) action = "stop: no Branch field";
+        if (!branch) action = "heal Branch from the title, then build";
         else if (pr) action = `CI → merge PR ${pr.url}`;
         else if (plan === "ship") action = "retry ship (previous ship step failed)";
         else if (plan === "resume") action = `resume build (${dirtyCount} uncommitted file(s) on ${branch})`;
@@ -816,7 +958,7 @@ function dryRunTable(issue) {
 function summary(reason, detail, parts, resume, costLine, verifyLine) {
   const lines = [`## Autobuild run: ${reason}`, ""];
   lines.push(parts.length ? "Parts handled in this run:" : "No part was merged in this run.");
-  for (const p of parts) lines.push(`- #${p.number} ${p.title} - ${p.prUrl ?? "no PR"} (${p.shipOnly ? "ship retried" : `build ${p.buildMin ?? "-"} min`}, CI ${p.ciMin ?? "-"} min)`);
+  for (const p of parts) lines.push(summaryPartLine(p));
   if (detail) lines.push("", "Detail:", "", "```", detail, "```");
   if (verifyLine) lines.push("", verifyLine);
   if (costLine) lines.push("", costLine);
@@ -865,14 +1007,14 @@ async function postSummary(epic, body) {
   return failure;
 }
 
-const prNumber = (url) => url?.split("/").pop();
-const partLine = (p) => `#${p.number} PR #${prNumber(p.prUrl)} (${p.shipOnly ? "ship retried" : `build ${Math.round(p.buildMin ?? 0)} min`}, CI ${Math.round(p.ciMin ?? 0)} min)`;
-
 async function finishRun(reason, detail, ctx) {
   const ok = reason === "done" || reason === "dry-run";
   say(`run: ${reason}${detail ? ` — ${detail}` : ""}`);
   if (ctx.itemsDone.length) say(`items done in this run: ${ctx.itemsDone.map((n) => `#${n}`).join(", ")}`);
-  if (ctx.parts.length) say(`done in this run: ${ctx.parts.map(partLine).join("; ")}`);
+  const done = [...ctx.parts.map(partLine), ...summaryLines({ restarts: ctx.hangs.restarts(), sleptMs: ctx.sleptMs, guardWarning: ctx.guardWarning })];
+  if (done.length) say(`done in this run: ${done.join("; ")}`);
+  const skippedText = skippedLine(ctx.skipped);
+  if (skippedText) say(skippedText);
   const resume = resumeCommand(ctx);
   if (!ok && reason !== "usage") say(`resume: ${resume}`);
   const verifyLine = await postRunVerify({
@@ -905,6 +1047,27 @@ async function finishEpic(item) {
     if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
   }
   ctx.itemsDone.push(number);
+}
+
+// A skipped card never stops the run: a failed comment is only reported
+async function noteSkip({ number, reason }) {
+  ctx.skipped.push({ number, reason });
+  const file = path.join(os.tmpdir(), `skarbiec-autobuild-${number}-skip.md`);
+  try {
+    await postSkipOnce({
+      number,
+      reason,
+      comments: () => epicComments(number),
+      post: (text) => {
+        writeFileSync(file, text, "utf8");
+        const res = retryTransient(`comment ${number}`, () => project(["comment", String(number), "--body-file", file]), { alreadyDone: () => hasRunMarker(epicComments(number), skipMarker(number)) });
+        rmSync(file, { force: true });
+        if (!res.ok) say(`could not post the skip comment on #${number}: ${res.firstErr}`);
+      },
+    });
+  } catch (err) {
+    say(`could not post the skip comment on #${number}: ${String(err.message).split(/\r?\n/)[0]}`);
+  }
 }
 
 async function buildPart(item, part, cards) {
@@ -986,7 +1149,7 @@ async function startWizard(flags) {
   }
 }
 
-const ctx = { item: null, touched: new Set(), itemsDone: [], parts: [], merged: 0, builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, maxWaitHours: 12, power: { works: false, hibernateAvailable: false, hint: "not read" }, until: null, claude: null };
+const ctx = { item: null, touched: new Set(), itemsDone: [], skipped: [], parts: [], merged: 0, builds: 0, envRetried: new Set(), started: false, dryRun: false, flags: {}, maxTasks: Infinity, maxWaitHours: 12, power: { works: false, hibernateAvailable: false, hint: "not read" }, until: null, claude: null, hangs: createHangPolicy(), sleptMs: 0, guardWarning: null };
 
 async function powerTest(mode, minutesAhead) {
   const planned = new Date(Date.now() + minutesAhead * 60e3);
@@ -1048,13 +1211,17 @@ try {
   if (!ctx.dryRun) {
     openLog();
     rmSync(stopFile(), { force: true });
-    startSleepGuard();
+    await armSleepGuard();
     ctx.power = wakeTimers();
     say(wakeLine(ctx.power));
-    if (times.start.getTime() > Date.now()) waitUntil(times.start);
+    if (times.start.getTime() > Date.now()) {
+      waitUntil(times.start);
+      await armSleepGuard();
+    }
   } else {
     ctx.power = wakeTimers();
     say(wakeLine(ctx.power));
+    say(CI_POLICY_LINE);
   }
   ctx.claude = resolveClaude();
   if (!ctx.dryRun) runPreflight();
@@ -1085,6 +1252,7 @@ try {
     buildPart,
     isClosed: async (number) => getIssue(number).state === "CLOSED",
     finishEpic,
+    onSkip: noteSkip,
     log: say,
   });
   await finishRun("done", null, ctx);

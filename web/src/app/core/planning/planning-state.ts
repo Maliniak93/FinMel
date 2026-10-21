@@ -1,9 +1,35 @@
 import { Injectable, computed, resource, signal } from '@angular/core';
 
-import { getApiPortfolioPlanningOverdue, getApiPortfolioPlanningTodo } from '../../api/portfolio';
+import {
+  getApiPortfolioPlanningOverdue,
+  getApiPortfolioPlanningTodo,
+  type OverdueOccurrenceResponse,
+} from '../../api/portfolio';
 import { readProblemDetails } from '../auth/problem-details';
 
 const DEFAULT_PAYMENT_LEAD_DAYS = 7;
+
+export type OverdueRecurringOccurrence = OverdueOccurrenceResponse & {
+  recurringIncomeId: string;
+  nominalMonth: string;
+};
+
+export type OverdueOneOffIncome = OverdueOccurrenceResponse & {
+  oneOffIncomeId: string;
+};
+
+export type OverdueItem = OverdueRecurringOccurrence | OverdueOneOffIncome;
+
+export function isOverdueOneOff(item: OverdueItem): item is OverdueOneOffIncome {
+  return !!item.oneOffIncomeId;
+}
+
+function isOverdueItem(item: OverdueOccurrenceResponse): item is OverdueItem {
+  return (
+    (item.recurringIncomeId !== null && item.nominalMonth !== null) ||
+    (item.oneOffIncomeId !== null && item.oneOffIncomeId !== undefined)
+  );
+}
 
 @Injectable({ providedIn: 'root' })
 export class PlanningState {
@@ -32,7 +58,7 @@ export class PlanningState {
   });
 
   readonly overdue = computed(() =>
-    this.overdueResource.hasValue() ? this.overdueResource.value() : [],
+    this.overdueResource.hasValue() ? this.overdueResource.value().filter(isOverdueItem) : [],
   );
 
   readonly todo = computed(() =>

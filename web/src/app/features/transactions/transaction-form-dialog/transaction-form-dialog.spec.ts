@@ -135,6 +135,30 @@ describe('TransactionFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
+  it('saves an untouched quantity with its exact stored value', async () => {
+    const transaction = { ...existingTransaction, quantity: 0.123456 };
+    await setup({ assetId, assetClass, transaction });
+    fetchSpy.mockResolvedValue(jsonResponse(transaction));
+
+    await component['onSubmit']();
+
+    const body = await (fetchSpy.mock.calls[0][0] as Request).json();
+    expect(body.quantity).toBe(0.123456);
+  });
+
+  it('sends a typed quantity with more than two decimals unrounded', async () => {
+    await setup({ assetId, assetClass });
+    fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction }, 201));
+
+    component['form'].controls.quantity.setValue(0.123456);
+    component['form'].controls.unitPrice.setValue(100);
+
+    await component['onSubmit']();
+
+    const body = await (fetchSpy.mock.calls[0][0] as Request).json();
+    expect(body.quantity).toBe(0.123456);
+  });
+
   it('sends unit price 1 for a Deposit, where the unit-price field is hidden', async () => {
     await setup({ assetId, assetClass: ASSET_CLASS.Cash });
     fetchSpy.mockResolvedValue(jsonResponse({ ...existingTransaction, type: 2 }, 201));

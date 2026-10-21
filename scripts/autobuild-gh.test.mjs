@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { closeUnlessClosed, createTimeoutBudget, detectChildLimit, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
+import { skipMarker } from "./autobuild-queue.mjs";
 
 const RESET = 1_800_000_600;
 const marker = (kind, resetAt) => `GITHUB_LIMIT ${JSON.stringify({ kind, resetAt })}`;
@@ -88,6 +89,18 @@ test("close skipped when closed", async () => {
   assert.equal(closes, 0);
   assert.equal(await closeUnlessClosed({ state: async () => "OPEN", close: async () => void closes++ }), "done");
   assert.equal(closes, 1);
+});
+
+test("skip comment is once per card", async () => {
+  const posted = [];
+  const post = async (body) => void posted.push({ body });
+  const comments = async () => posted;
+
+  assert.equal(await postOnce({ comments, marker: skipMarker(466), body: "skipped", post }), "done");
+  assert.equal(await postOnce({ comments, marker: skipMarker(466), body: "skipped", post }), "skipped");
+  assert.equal(await postOnce({ comments, marker: skipMarker(467), body: "skipped", post }), "done");
+  assert.equal(posted.length, 2);
+  assert.match(posted[0].body, /<!-- skarbiec-autobuild-skip:466 -->/);
 });
 
 test("summary posted once", async () => {

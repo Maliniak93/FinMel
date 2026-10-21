@@ -18,8 +18,10 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
   getApiPortfolioAccounts,
+  putApiPortfolioOneOffIncomesByIdSettlement,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlement,
   type IncomeOccurrenceResponse,
+  type OneOffIncomeResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails, type ApiProblemDetails } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
@@ -27,9 +29,9 @@ import { currentWarsawDate } from '../recurrence';
 
 const MIN_DATE = new Date(2011, 0, 1);
 
-export interface SettleOccurrenceDialogData {
-  occurrence: IncomeOccurrenceResponse;
-}
+export type SettleOccurrenceDialogData =
+  | { occurrence: IncomeOccurrenceResponse; oneOffIncome?: undefined }
+  | { oneOffIncome: OneOffIncomeResponse; occurrence?: undefined };
 
 @Component({
   selector: 'app-settle-occurrence-dialog',
@@ -52,7 +54,9 @@ export class SettleOccurrenceDialog {
   private readonly formBuilder = inject(FormBuilder);
   private readonly dialogRef = inject(MatDialogRef<SettleOccurrenceDialog>);
 
-  protected readonly occurrence = inject<SettleOccurrenceDialogData>(MAT_DIALOG_DATA).occurrence;
+  private readonly data = inject<SettleOccurrenceDialogData>(MAT_DIALOG_DATA);
+  protected readonly occurrence: IncomeOccurrenceResponse | OneOffIncomeResponse =
+    this.data.occurrence ?? this.data.oneOffIncome;
   protected readonly isEdit = this.occurrence.status === 'Settled';
   protected readonly minDate = MIN_DATE;
   protected readonly maxDate = currentWarsawDate();
@@ -109,15 +113,24 @@ export class SettleOccurrenceDialog {
     this.formError.set(null);
 
     const values = this.form.getRawValue();
-    const result = await putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlement({
-      path: { id: this.occurrence.recurringIncomeId, month: this.occurrence.nominalMonth },
-      body: {
-        actualAmount: Number(values.actualAmount),
-        actualDate: toDateOnly(values.actualDate!),
-        accountId: values.accountId!,
-        createDeposit: values.createDeposit,
-      },
-    });
+    const body = {
+      actualAmount: Number(values.actualAmount),
+      actualDate: toDateOnly(values.actualDate!),
+      accountId: values.accountId!,
+      createDeposit: values.createDeposit,
+    };
+    const result = this.data.oneOffIncome
+      ? await putApiPortfolioOneOffIncomesByIdSettlement({
+          path: { id: this.data.oneOffIncome.id },
+          body,
+        })
+      : await putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlement({
+          path: {
+            id: this.data.occurrence.recurringIncomeId,
+            month: this.data.occurrence.nominalMonth,
+          },
+          body,
+        });
 
     this.submitting.set(false);
 

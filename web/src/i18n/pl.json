@@ -398,8 +398,24 @@
     "outOfBand": "Poza pasmem",
     "outside": "Poza alokacją",
     "summary": "baza {{ base }} z {{ total }}",
+    "scope": {
+      "label": "Zakres alokacji",
+      "whole": "Całość"
+    },
+    "group": {
+      "empty": "Ta grupa aktywów nie ma jeszcze alokacji docelowej.",
+      "create": "Utwórz alokację",
+      "copy": "Skopiuj z całości",
+      "delete": "Usuń alokację",
+      "planNote": "Plan przelewów jest liczony z alokacji „Całość”, nie z tej grupy aktywów.",
+      "noValue": "Ta grupa aktywów nie ma jeszcze wartości, więc widać tylko cele i pasma."
+    },
+    "delete": {
+      "title": "Usunąć alokację grupy?",
+      "message": "Alokacja docelowa grupy aktywów „{{ name }}” zostanie usunięta. Alokacja całości się nie zmieni."
+    },
     "columns": {
-      "group": "Grupa",
+      "group": "Grupa klas",
       "value": "Wartość",
       "current": "Udział obecny",
       "target": "Cel",
@@ -413,20 +429,20 @@
       "metals": "Kruszce"
     },
     "editor": {
-      "proposalIntro": "Propozycja podziału majątku. Ustaw cel dla każdej grupy i zapisz.",
-      "name": "Nazwa grupy",
+      "proposalIntro": "Propozycja podziału majątku. Ustaw cel dla każdej grupy klas i zapisz.",
+      "name": "Nazwa grupy klas",
       "classes": "Klasy aktywów",
       "target": "Cel (%)",
       "band": "Pasmo ± (pp)",
-      "addGroup": "Dodaj grupę",
-      "removeGroup": "Usuń grupę",
+      "addGroup": "Dodaj grupę klas",
+      "removeGroup": "Usuń grupę klas",
       "sum": "Suma celów: {{ sum }}"
     },
     "errors": {
-      "nameRequired": "Podaj nazwę grupy.",
+      "nameRequired": "Podaj nazwę grupy klas.",
       "classesRequired": "Wybierz co najmniej jedną klasę aktywów.",
       "percent": "Podaj wartość 0–100 z najwyżej jednym miejscem po przecinku.",
-      "duplicateNames": "Nazwy grup muszą się różnić."
+      "duplicateNames": "Nazwy grup klas muszą się różnić."
     }
   },
   "dashboard": {
@@ -434,6 +450,15 @@
     "netWorth": "Wartość majątku",
     "change": "Zmiana",
     "allocation": "Struktura majątku",
+    "groups": {
+      "title": "Wg grup",
+      "ungrouped": "Bez grupy",
+      "hint": "Podziel majątek na grupy, np. emeryturę albo poduszkę finansową, aby zobaczyć jego strukturę.",
+      "link": "Przejdź do grup",
+      "progress": "{{ value }} / {{ target }} ({{ percent }}%)",
+      "filter": "Grupa",
+      "loadFailed": "Nie udało się wczytać grup."
+    },
     "empty": "Nie wprowadzono jeszcze żadnego majątku.",
     "stale": "Nieaktualne",
     "staleTooltip": "Wycena co najmniej jednej pozycji od dawna się nie odświeżyła — ta suma może być nieaktualna.",
@@ -1089,6 +1114,18 @@
       "dayOfMonth": "Dzień miesiąca",
       "dayInvalid": "Podaj dzień od 1 do 31.",
       "shift": "Przesunięcie na dzień roboczy"
+    },
+    "oneOff": {
+      "mode": "Rodzaj wpisu",
+      "recurring": "Cykliczny",
+      "oneOff": "Jednorazowy",
+      "mark": "jednorazowy",
+      "lockedHint": "Cofnij rozliczenie, aby edytować lub usunąć wpis.",
+      "delete": {
+        "title": "Usunąć wpis jednorazowy?",
+        "message": "„{{ name }}” zniknie z planu.",
+        "failed": "Nie udało się usunąć wpisu."
+      }
     },
     "todo": {
       "badge": "Do zrobienia"

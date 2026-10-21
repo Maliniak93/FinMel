@@ -5,10 +5,10 @@ namespace Skarbiec.MarketData.Features;
 
 internal static class InstrumentErrors
 {
-    public static Error UnsupportedCustomSource(PriceSource source) =>
+    public static Error UnsupportedCustomMetal() =>
         new(
             "Validation.UnsupportedInstrumentSource",
-            $"Custom instruments can't use source '{source}' — it serves only the built-in gold and silver instruments.");
+            "Gold and silver are built-in instruments — custom metal instruments can't be added.");
 
     public static Error UnsupportedAssetClass(AssetClass assetClass) =>
         new(

@@ -178,9 +178,9 @@ Change an existing item's priority with `/prio #<n> P<k>` (an amend never uses `
 
 For a split: first the umbrella with `--epic` (its `--tier` is the highest of its parts, its
 `--kind` the one most parts share), then each part in build order with `--parent <umbrella number>`
-and its own `--slug`, `--tier`, `--kind`, `--area`, `--skip-tests`, the e2e part last with `--e2e` (which defaults `--area` to E2E). The umbrella takes no `--area`. The script prints `{"number","url","branch"}` per issue; if it fails
-after the issue exists, it prints the URL — finish the missing fields with
-`node scripts/gh-project.mjs set <number> <field> <value>` instead of creating a duplicate.
+and its own `--slug`, `--tier`, `--kind`, `--area`, `--skip-tests`, the e2e part last with `--e2e` (which defaults `--area` to E2E). The umbrella takes no `--area`. The script prints `{"number","url","branch"}` per issue. It reads the card back and rewrites a missing field once; a
+Branch or Tier still missing makes it exit non-zero listing the ready `node scripts/gh-project.mjs set <number> <field> <value>`
+commands (a missing Area, Priority or Kind is only a warning) — run those instead of creating a duplicate.
 
 **Amending an existing issue** (step 1 found one, or `/build` stopped on a spec that needs fixing):
 start the draft from `node scripts/gh-project.mjs get <n> --out <scratchpad>/<slug>.md --raw`, edit

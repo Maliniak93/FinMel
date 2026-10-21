@@ -119,6 +119,20 @@ test("profileOf without area", () => {
   }
 });
 
+test("profile verb prints the profile as JSON", () => {
+  const profile = (args) => {
+    const res = spawnSync(process.execPath, [SCRIPT, "profile", ...args], { encoding: "utf8", windowsHide: true });
+    assert.equal(res.status, 0, res.stderr);
+    return JSON.parse(res.stdout);
+  };
+  assert.equal(profile(["Backend"]).label, "Backend (test-writer → implementer → reviewer)");
+  const fix = profile(["Backend", "--no-tests"]);
+  assert.equal(fix.label, "Backend (implementer → reviewer)");
+  assert.equal(fix.tests, false);
+  assert.deepEqual(fix.implementerPlaybooks, [playbook("backend-playbook")]);
+  assert.equal(profile(["--no-tests"]).label, "Brak obszaru — pełna ścieżka");
+});
+
 test("profileOf overrides", () => {
   const { profileOf } = areasModule;
   for (const area of ["Backend", "Scripts"]) {

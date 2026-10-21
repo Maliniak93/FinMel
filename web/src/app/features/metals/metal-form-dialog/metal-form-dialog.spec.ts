@@ -104,6 +104,16 @@ describe('MetalFormDialog', () => {
       expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
 
+    it('POSTs a typed weight with more than two decimals unrounded', async () => {
+      await setup({});
+      await fill({ metal: METAL.Gold, name: 'Coin', fineWeight: 0.123456, weightUnit: 'Gram' });
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect((await request.json()).fineWeight).toBe(0.123456);
+    });
+
     it('sends groupId', async () => {
       await setup({});
       await fill({ metal: METAL.Gold, name: 'Krugerrand', fineWeight: 1, weightUnit: 'TroyOunce' });
@@ -133,6 +143,17 @@ describe('MetalFormDialog', () => {
   });
 
   describe('edit', () => {
+    it('saves an untouched weight with its exact stored value', async () => {
+      const holding = metalResponse({ fineWeightGramsPerPiece: 31.1034768 });
+      await setup({ metal: holding }, () => jsonResponse(holding));
+
+      await component['onSubmit']();
+
+      const [request] = writeRequests();
+      expect(request.method).toBe('PUT');
+      expect((await request.json()).fineWeight).toBe(31.1034768);
+    });
+
     it('pre-fills the holding, hides the first purchase and PUTs name, metal and weight only', async () => {
       const holding = metalResponse({
         name: 'Gold bar',

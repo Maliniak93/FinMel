@@ -45,14 +45,14 @@
             }
           } @else {
             @for (item of cell.items.slice(0, maxItemsInCell); track item.key) {
-              @if (item.settleable; as occurrence) {
+              @if (item.settleable; as settle) {
                 <button
                   type="button"
                   class="planning-calendar__item planning-calendar__item--action"
                   data-testid="calendar-item"
                   [attr.data-status]="item.status"
                   [attr.data-kind]="item.kind"
-                  (click)="openSettleDialog(occurrence, $event)"
+                  (click)="openSettleDialog(settle, $event)"
                 >
                   <ng-container
                     [ngTemplateOutlet]="itemContent"
@@ -113,12 +113,12 @@
                   'planning.calendar.settledOn' | transloco: { date: formatDate(item.actualDate) }
                 }}</span>
               }
-              @if (item.settleable; as occurrence) {
+              @if (item.settleable; as settle) {
                 <button
                   mat-button
                   type="button"
                   data-testid="calendar-detail-settle"
-                  (click)="openSettleDialog(occurrence, $event)"
+                  (click)="openSettleDialog(settle, $event)"
                 >
                   {{ 'planning.occurrence.settle' | transloco }}
                 </button>

@@ -309,6 +309,22 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
+    public async Task OneOffIncomeDeposit_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var deposit = await client.CreateOneOffIncomeDepositAsync(cancellationToken);
+        var update = new UpdateTransactionRequest { Type = TransactionType.Deposit, Quantity = 99m, UnitPrice = 1m, Date = SeptemberLastDay };
+
+        var response = await client.PutAsJsonAsync(TransactionUri(deposit.Account.MoneyAssetId, deposit.TransactionId), update, cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.IncomeDepositManagedErrorCode, cancellationToken);
+        var unchanged = Assert.Single((await client.ListTransactionsAsync(deposit.Account.MoneyAssetId, cancellationToken)).Items);
+        Assert.Equal(2_500m, unchanged.Quantity);
+    }
+
+    [Fact]
     public async Task Update_IncomeDeposit_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

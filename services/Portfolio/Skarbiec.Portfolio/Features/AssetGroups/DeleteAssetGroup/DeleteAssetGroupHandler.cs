@@ -1,10 +1,16 @@
+using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.AssetGroups.DeleteAssetGroup;
 
-public sealed class DeleteAssetGroupHandler(PortfolioDbContext dbContext, PositionEventPublisher positionEventPublisher)
+public sealed class DeleteAssetGroupHandler(
+    PortfolioDbContext dbContext,
+    PositionEventPublisher positionEventPublisher,
+    IPublishEndpoint publishEndpoint,
+    TimeProvider timeProvider)
 {
     public async Task<Result> HandleAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -34,6 +40,9 @@ public sealed class DeleteAssetGroupHandler(PortfolioDbContext dbContext, Positi
         }
 
         dbContext.AssetGroups.Remove(group);
+        await publishEndpoint.Publish(
+            new AssetGroupDeleted { UserId = group.UserId, GroupId = id, OccurredAtUtc = timeProvider.GetUtcNow() },
+            cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return Result.Success();

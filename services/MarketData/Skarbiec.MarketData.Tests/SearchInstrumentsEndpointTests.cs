@@ -36,6 +36,22 @@ public sealed class SearchInstrumentsEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
+    public async Task Metal_LastPriceIsPerGram()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var seedDb = CreateDbContext();
+        var instrumentId = await seedDb.SeedInstrumentAsync("GC=F", "Gold (1 g)", PriceSource.Yahoo, "USD", cancellationToken, AssetClass.PreciousMetal);
+        await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 4), 9331.04304m, cancellationToken);
+
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var response = await client.GetAsync(SearchInstrumentsUri("GC", assetClass: AssetClass.PreciousMetal), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var results = (await response.Content.ReadFromJsonAsync<InstrumentSearchResponse>(cancellationToken))!.Results;
+        Assert.Equal(300m, Assert.Single(results).LastPrice);
+    }
+
+    [Fact]
     public async Task Stock_MergesLocalAndProvider()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

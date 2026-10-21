@@ -34,6 +34,23 @@ public sealed class PlanningMonthCushionTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task OneOffExpense_RaisesCushionTarget()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await client.CreateCushionSetupAsync(cancellationToken);
+        await client.SaveAllocationPlanAsync("2026-10", cancellationToken, CushionPlan());
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Remont", 1_200m, new DateOnly(2026, 12, 5));
+
+        var november = await client.GetAllocationAsync("2026-11", cancellationToken);
+        var december = await client.GetAllocationAsync("2026-12", cancellationToken);
+
+        Assert.Equal(25_200m, november.Buckets[0].Cushion!.TargetPln);
+        Assert.Equal(32_400m, december.Buckets[0].Cushion!.TargetPln);
+    }
+
+    [Fact]
     public async Task ReachedTarget_TakesNothing()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

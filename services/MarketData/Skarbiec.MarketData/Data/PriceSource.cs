@@ -4,5 +4,4 @@ namespace Skarbiec.MarketData.Data;
 public enum PriceSource
 {
     Yahoo = 0,
-    GoldApi = 2,
 }

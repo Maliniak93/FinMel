@@ -102,7 +102,7 @@ public sealed class SearchInstrumentsHandler(MarketDataDbContext dbContext, IIns
                 {
                     latestQuotes.TryGetValue(i.Id, out var quote);
                     return new InstrumentSearchResult(
-                        i.Id, i.Ticker, i.Name, i.AssetClass, i.QuoteCurrency, i.Exchange, i.VerificationStatus, quote?.Close, quote?.Date);
+                        i.Id, i.Ticker, i.Name, i.AssetClass, i.QuoteCurrency, i.Exchange, i.VerificationStatus, MetalQuoteUnit.ToServedPrice(i.AssetClass, quote?.Close), quote?.Date);
                 }
 
                 var c = o.Candidate!;

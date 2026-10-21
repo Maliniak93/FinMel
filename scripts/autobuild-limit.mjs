@@ -48,12 +48,35 @@ export async function awaitReady({ check, now, sleep, timeoutMs = 15 * MIN, retr
   }
 }
 
+// the 2-minute unattended-sleep window starts at the wake, so the guard is confirmed before anything else runs; one retry, then the run goes on with a warning
+export async function rearmGuard({ start, log, line }) {
+  let guard = await start();
+  if (!guard.active) {
+    log(`blokada snu: ${guard.reason} - próbuję ponownie`);
+    guard = await start();
+  }
+  log(line(guard));
+  return guard;
+}
+
 // a rebuild after the wait is the same part again: ctx.builds is not touched
-export async function buildWithResume({ part, build, onLimit, awaitReady: ready }) {
+export async function buildWithResume({ part, build, onLimit, rearm, awaitReady: ready }) {
   while (true) {
     const result = await build(part);
     if (!result.limit) return result;
     await onLimit(result.limit);
+    await rearm?.();
+    await ready();
+  }
+}
+
+// a fix session cut by the usage limit runs again with the same prompt on the working tree as it is
+export async function fixWithResume({ prompt, run, onLimit, rearm, awaitReady: ready }) {
+  while (true) {
+    const result = await run(prompt);
+    if (!result.limitHit || result.timedOut || result.hung) return result;
+    await onLimit({ resetsAt: result.resetsAt });
+    await rearm?.();
     await ready();
   }
 }

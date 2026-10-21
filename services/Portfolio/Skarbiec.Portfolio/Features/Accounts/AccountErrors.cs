@@ -26,6 +26,9 @@ internal static class AccountErrors
     public static Error HasRecurringIncome(Guid id) =>
         new("Conflict.AccountHasRecurringIncome", $"Account '{id}' is the target of a recurring income — move or delete the income first.");
 
+    public static Error HasOneOffIncomes(Guid id) =>
+        new("Conflict.AccountHasOneOffIncomes", $"Account '{id}' is the target of a one-off income — move or delete the income first, or undo its settlement.");
+
     public static Error HasIncomeOccurrences(Guid id) =>
         new("Conflict.AccountHasIncomeOccurrences", $"Account '{id}' is planned or settled by a recurring income occurrence — undo it first.");
 

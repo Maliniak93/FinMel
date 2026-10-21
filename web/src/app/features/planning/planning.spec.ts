@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatMoney, formatPercent } from '../../shared/format';
+import { formatDate, formatMoney, formatPercent } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import {
@@ -151,7 +151,7 @@ function expenseNextChange(extra: Record<string, unknown> = {}): Record<string, 
 }
 
 function expenses(extra: Record<string, unknown> = {}): Record<string, unknown> {
-  return { payments: [], costPln: 0, definitions: [], ...extra };
+  return { payments: [], costPln: 0, definitions: [], oneOffs: [], ...extra };
 }
 
 function freeFunds(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -172,6 +172,7 @@ function month(
       balance: balance(),
       fxUnavailable: false,
       definitions: [],
+      oneOffs: [],
       ...incomes,
     },
     expenses: expenses(expensesPart),
@@ -760,6 +761,211 @@ describe('Planning', () => {
       RecurringExpenseFormDialog,
       expect.anything(),
     );
+  });
+
+  function oneOffIncome(
+    name: string,
+    date: string,
+    amount: number,
+    extra: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    return {
+      id: `one-off-${name}`,
+      name,
+      date,
+      accountId,
+      accountName: 'mBank ROR',
+      accountArchived: false,
+      amount,
+      currency: 'PLN',
+      amountPln: amount,
+      estimated: false,
+      inMonth: true,
+      status: 'Pending',
+      actualAmount: null,
+      actualDate: null,
+      actualAmountPln: null,
+      difference: null,
+      depositCreated: false,
+      overdue: false,
+      ...extra,
+    };
+  }
+
+  function oneOffExpense(
+    name: string,
+    date: string,
+    amount: number,
+    extra: Record<string, unknown> = {},
+  ): Record<string, unknown> {
+    return { id: `one-off-expense-${name}`, name, date, amount, inMonth: true, ...extra };
+  }
+
+  function deleteRequests(): Request[] {
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .filter((request: Request) => request.method === 'DELETE');
+  }
+
+  it('lists one-off entries with their date', async () => {
+    responses['2026-10'] = month(
+      { oneOffs: [oneOffIncome('Premia roczna', '2026-12-15', 8000, { inMonth: false })] },
+      { oneOffs: [oneOffExpense('Przegląd auta', '2027-02-10', 1200, { inMonth: false })] },
+    );
+    await setup();
+
+    const incomeRows = rows('one-off-income-row');
+    expect(incomeRows).toHaveLength(1);
+    expect(incomeRows[0].textContent).toContain('Premia roczna');
+    expect(incomeRows[0].textContent).toContain(formatMoney(8000, 'PLN'));
+    expect(incomeRows[0].querySelector('[data-testid="one-off-mark"]')).not.toBeNull();
+    expect(incomeRows[0].querySelector('[data-testid="one-off-date"]')!.textContent).toContain(
+      formatDate('2026-12-15'),
+    );
+    expect(incomeRows[0].querySelector('[data-testid="edit-one-off-income"]')).not.toBeNull();
+    expect(incomeRows[0].querySelector('[data-testid="delete-one-off-income"]')).not.toBeNull();
+
+    const expenseRows = rows('one-off-expense-row');
+    expect(expenseRows).toHaveLength(1);
+    expect(expenseRows[0].textContent).toContain('Przegląd auta');
+    expect(expenseRows[0].querySelector('[data-testid="one-off-mark"]')).not.toBeNull();
+    expect(expenseRows[0].querySelector('[data-testid="one-off-date"]')!.textContent).toContain(
+      formatDate('2027-02-10'),
+    );
+    expect(expenseRows[0].querySelector('[data-testid="edit-one-off-expense"]')).not.toBeNull();
+    expect(expenseRows[0].querySelector('[data-testid="delete-one-off-expense"]')).not.toBeNull();
+
+    expect(rows('occurrence-row')).toHaveLength(0);
+    expect(rows('expense-payment-row')).toHaveLength(0);
+  });
+
+  it('settles and undoes a one-off income', async () => {
+    responses['2026-10'] = month({
+      oneOffs: [
+        oneOffIncome('Zwrot podatku', '2026-10-25', 2500),
+        oneOffIncome('Premia', '2026-10-28', 800, {
+          status: 'Settled',
+          actualAmount: 800,
+          actualDate: '2026-10-28',
+          actualAmountPln: 800,
+          difference: 0,
+          depositCreated: true,
+        }),
+      ],
+    });
+    await setup();
+
+    const [pending, settled] = rows('occurrence-row');
+    expect(pending.textContent).toContain('Zwrot podatku');
+    expect(pending.querySelector('[data-testid="occurrence-status"]')!.textContent).toMatch(
+      /pending/i,
+    );
+    expect(pending.querySelector('[data-testid="settle-occurrence"]')).not.toBeNull();
+    expect(settled.querySelector('[data-testid="edit-settlement"]')).not.toBeNull();
+    expect(settled.querySelector('[data-testid="undo-occurrence"]')).not.toBeNull();
+
+    pending.querySelector<HTMLElement>('[data-testid="settle-occurrence"]')!.click();
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      SettleOccurrenceDialog,
+      expect.objectContaining({
+        data: { oneOffIncome: expect.objectContaining({ id: 'one-off-Zwrot podatku' }) },
+      }),
+    );
+
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+    settled.querySelector<HTMLElement>('[data-testid="undo-occurrence"]')!.click();
+
+    await vi.waitFor(() => {
+      expect(deleteRequests()).toHaveLength(1);
+      expect(deleteRequests()[0].url).toContain('/one-off-incomes/one-off-Premia/settlement');
+    });
+  });
+
+  it('one-off expense has no settlement', async () => {
+    responses['2026-10'] = month(
+      {},
+      {
+        oneOffs: [
+          oneOffExpense('Przegląd auta', '2026-10-10', 1200),
+          oneOffExpense('Za miesiąc', '2026-11-10', 300, { inMonth: false }),
+        ],
+      },
+    );
+    await setup();
+
+    const payments = rows('expense-payment-row');
+    expect(payments).toHaveLength(1);
+    expect(payments[0].textContent).toContain('Przegląd auta');
+    expect(payments[0].textContent).toContain(formatMoney(1200, 'PLN'));
+    expect(payments[0].querySelector('[data-testid="settle-occurrence"]')).toBeNull();
+    expect(payments[0].querySelector('[data-testid="occurrence-status"]')).toBeNull();
+    expect(rows('occurrence-row')).toHaveLength(0);
+  });
+
+  it('locks a settled one-off income', async () => {
+    responses['2026-10'] = month({
+      oneOffs: [
+        oneOffIncome('Premia', '2026-10-28', 800, {
+          status: 'Settled',
+          actualAmount: 800,
+          actualDate: '2026-10-28',
+          actualAmountPln: 800,
+        }),
+        oneOffIncome('Zwrot podatku', '2026-10-25', 2500),
+      ],
+    });
+    await setup();
+
+    const [settled, pending] = rows('one-off-income-row');
+    const edit = (row: HTMLElement): HTMLButtonElement =>
+      row.querySelector<HTMLButtonElement>('[data-testid="edit-one-off-income"]')!;
+    const remove = (row: HTMLElement): HTMLButtonElement =>
+      row.querySelector<HTMLButtonElement>('[data-testid="delete-one-off-income"]')!;
+
+    expect(edit(settled).disabled).toBe(true);
+    expect(remove(settled).disabled).toBe(true);
+    expect(settled.querySelector('[data-testid="one-off-locked-hint"]')).not.toBeNull();
+    expect(edit(pending).disabled).toBe(false);
+    expect(remove(pending).disabled).toBe(false);
+    expect(pending.querySelector('[data-testid="one-off-locked-hint"]')).toBeNull();
+  });
+
+  it('shows an overdue one-off income', async () => {
+    overdueItems = [
+      {
+        recurringIncomeId: null,
+        nominalMonth: null,
+        oneOffIncomeId: 'one-off-Zwrot podatku',
+        date: '2026-10-05',
+        name: 'Zwrot podatku',
+        accountId,
+        accountName: 'mBank ROR',
+        accountArchived: false,
+        amount: 2500,
+        currency: 'PLN',
+      },
+    ];
+    responses['2026-10'] = month({
+      oneOffs: [oneOffIncome('Zwrot podatku', '2026-10-05', 2500, { overdue: true })],
+    });
+    await setup();
+
+    expect(rows('overdue-section')).toHaveLength(1);
+    const overdueRows = rows('overdue-row');
+    expect(overdueRows).toHaveLength(1);
+    expect(overdueRows[0].textContent).toContain('Zwrot podatku');
+    expect(overdueRows[0].textContent).toContain(formatMoney(2500, 'PLN'));
+
+    overdueRows[0].querySelector<HTMLElement>('[data-testid="settle-overdue"]')!.click();
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      SettleOccurrenceDialog,
+      expect.objectContaining({
+        data: { oneOffIncome: expect.objectContaining({ id: 'one-off-Zwrot podatku' }) },
+      }),
+    );
+    expect(rows('occurrence-row')[0].classList.contains('planning-table__row--overdue')).toBe(true);
   });
 
   it('shows the free funds plan and forecast, a negative value as a deficit and the incomplete marker', async () => {

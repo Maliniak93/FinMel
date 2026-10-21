@@ -114,6 +114,88 @@
           }
         }
       }
+    },
+    "/api/reporting/target-allocation/groups/{groupId}": {
+      "get": {
+        "tags": [
+          "GetGroupTargetAllocationEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetAllocationResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "SaveGroupTargetAllocationEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveTargetAllocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeleteGroupTargetAllocationEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -594,6 +676,15 @@
     },
     {
       "name": "SaveTargetAllocationEndpoint"
+    },
+    {
+      "name": "GetGroupTargetAllocationEndpoint"
+    },
+    {
+      "name": "SaveGroupTargetAllocationEndpoint"
+    },
+    {
+      "name": "DeleteGroupTargetAllocationEndpoint"
     }
   ]
 }

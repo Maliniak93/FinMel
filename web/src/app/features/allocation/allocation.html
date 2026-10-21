@@ -10,6 +10,46 @@
     }
   </div>
 
+  @if (groups.hasValue() && groups.value().length > 0) {
+    <div
+      class="allocation-page__scope"
+      role="radiogroup"
+      data-testid="scope-switcher"
+      [attr.aria-label]="'allocation.scope.label' | transloco"
+    >
+      <button
+        type="button"
+        role="radio"
+        class="allocation-page__scope-chip"
+        data-testid="scope-chip"
+        [class.allocation-page__scope-chip--selected]="groupId() === null"
+        [attr.aria-checked]="groupId() === null"
+        (click)="selectScope(null)"
+      >
+        {{ 'allocation.scope.whole' | transloco }}
+      </button>
+      @for (entry of groups.value(); track entry.id) {
+        <button
+          type="button"
+          role="radio"
+          class="allocation-page__scope-chip"
+          data-testid="scope-chip"
+          [class.allocation-page__scope-chip--selected]="groupId() === entry.id"
+          [attr.aria-checked]="groupId() === entry.id"
+          (click)="selectScope(entry.id)"
+        >
+          <span
+            class="allocation-page__swatch"
+            data-testid="scope-swatch"
+            aria-hidden="true"
+            [style.background-color]="groupColor(entry.color)"
+          ></span>
+          {{ entry.name }}
+        </button>
+      }
+    </div>
+  }
+
   @if (allocation.error(); as loadError) {
     <div class="allocation-page__state" role="alert">
       <p>{{ loadError.message }}</p>
@@ -17,14 +57,18 @@
         {{ 'common.retry' | transloco }}
       </button>
     </div>
-  } @else if (allocation.isLoading() && !allocation.hasValue()) {
+  } @else if (!allocation.hasValue()) {
     <div class="allocation-page__state">
       <mat-spinner diameter="32" />
     </div>
   } @else if (allocation.hasValue()) {
     @let data = allocation.value();
 
-    @if (data.asOf === null) {
+    @if (groupNoValue()) {
+      <p class="allocation-page__note" data-testid="group-no-value">
+        {{ 'allocation.group.noValue' | transloco }}
+      </p>
+    } @else if (data.asOf === null) {
       <p class="allocation-page__note" data-testid="valuation-note">
         {{ 'allocation.noValuation' | transloco }}
       </p>
@@ -32,11 +76,17 @@
       <p class="allocation-page__note">
         {{ 'dashboard.asOf' | transloco: { date: formatDate(data.asOf) } }}
       </p>
-      @if (!showAmounts()) {
+      @if (!showAmounts() && !showEmptyState()) {
         <p class="allocation-page__note" data-testid="valuation-note">
           {{ 'allocation.noBase' | transloco }}
         </p>
       }
+    }
+
+    @if (isGroupScope()) {
+      <p class="allocation-page__note" data-testid="plan-note">
+        {{ 'allocation.group.planNote' | transloco }}
+      </p>
     }
 
     @if (showEditor()) {
@@ -46,7 +96,7 @@
         [formGroup]="form"
         (ngSubmit)="save()"
       >
-        @if (!data.isConfigured) {
+        @if (!data.isConfigured && !isGroupScope()) {
           <p class="allocation-page__note">{{ 'allocation.editor.proposalIntro' | transloco }}</p>
         }
 
@@ -141,7 +191,7 @@
             {{ 'allocation.editor.addGroup' | transloco }}
           </button>
           <span class="allocation-page__spacer"></span>
-          @if (data.isConfigured) {
+          @if (data.isConfigured || isGroupScope()) {
             <button mat-button type="button" data-testid="cancel" (click)="cancel()">
               {{ 'common.cancel' | transloco }}
             </button>
@@ -157,6 +207,31 @@
           </button>
         </div>
       </form>
+    } @else if (showEmptyState()) {
+      <div class="allocation-page__empty" data-testid="group-empty">
+        <p class="allocation-page__note">{{ 'allocation.group.empty' | transloco }}</p>
+        <div class="allocation-page__actions">
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            data-testid="create-allocation"
+            (click)="startEdit([])"
+          >
+            {{ 'allocation.group.create' | transloco }}
+          </button>
+          @if (canCopyFromWhole()) {
+            <button
+              mat-stroked-button
+              type="button"
+              data-testid="copy-from-whole"
+              (click)="copyFromWhole()"
+            >
+              {{ 'allocation.group.copy' | transloco }}
+            </button>
+          }
+        </div>
+      </div>
     } @else {
       <div class="allocation-page__view" data-testid="allocation-view">
         <table class="allocation-page__table">
@@ -245,7 +320,16 @@
           </p>
         }
 
+        @if (saveError(); as message) {
+          <p class="allocation-page__error" role="alert">{{ message }}</p>
+        }
+
         <div class="allocation-page__actions">
+          @if (isGroupScope()) {
+            <button mat-button type="button" data-testid="delete-allocation" (click)="remove()">
+              {{ 'allocation.group.delete' | transloco }}
+            </button>
+          }
           <span class="allocation-page__spacer"></span>
           <button
             mat-stroked-button

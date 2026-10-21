@@ -106,6 +106,36 @@ public sealed class AssetGroupOutboxTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
+    public async Task Delete_WritesAssetGroupDeleted()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var (first, second, withAssets) = await ArrangeAsync(scope.ServiceProvider, cancellationToken);
+        await scope.ServiceProvider.GetRequiredService<AssignAssetsToGroupHandler>().HandleAsync(
+            new AssignAssetsToGroupRequest { AssetIds = [first, second], GroupId = withAssets }, cancellationToken);
+        var empty = await CreateGroupAsync(scope.ServiceProvider, "Pusta", cancellationToken);
+        var handler = scope.ServiceProvider.GetRequiredService<DeleteAssetGroupHandler>();
+        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
+        SaveChanges.Reset();
+
+        Assert.True((await handler.HandleAsync(withAssets, cancellationToken)).IsSuccess);
+        Assert.Equal(1, SaveChanges.Count);
+        SaveChanges.Reset();
+        Assert.True((await handler.HandleAsync(empty, cancellationToken)).IsSuccess);
+        Assert.Equal(1, SaveChanges.Count);
+
+        var published = await dbContext.ReadPublishedAsync<AssetGroupDeleted>(cancellationToken);
+        Assert.Equal(2, published.Count);
+        Assert.All(published, e =>
+        {
+            Assert.Equal(UserId, e.UserId);
+            Assert.True(e.OccurredAtUtc >= before);
+        });
+        Assert.Equal(new[] { withAssets, empty }.Order().ToArray(), published.Select(e => e.GroupId).Order().ToArray());
+    }
+
+    [Fact]
     public async Task Update_PublishesNothing()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
