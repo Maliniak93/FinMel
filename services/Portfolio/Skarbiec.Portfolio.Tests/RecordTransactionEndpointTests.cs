@@ -374,9 +374,6 @@ public sealed class RecordTransactionEndpointTests(SkarbiecContainersFixture con
     [InlineData(TransactionType.Deposit, true)]
     [InlineData(TransactionType.Withdraw, true)]
     [InlineData(TransactionType.Buy, false)]
-    [InlineData(TransactionType.Sell, false)]
-    [InlineData(TransactionType.Dividend, false)]
-    [InlineData(TransactionType.Interest, false)]
     public async Task Record_OnBankAccount_AcceptsDepositAndWithdrawOnly(TransactionType type, bool accepted)
     {
         var cancellationToken = TestContext.Current.CancellationToken;

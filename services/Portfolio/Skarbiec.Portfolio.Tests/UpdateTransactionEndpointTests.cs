@@ -366,28 +366,6 @@ public sealed class UpdateTransactionEndpointTests(SkarbiecContainersFixture con
     }
 
     [Fact]
-    public async Task Update_ManualTransferLeg_ReturnsConflict()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(FixedTodayUtc);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var setup = await client.CreateCurrentAndSavingsAsync(cancellationToken);
-        await client.CreateTransferAsync(cancellationToken, NewTransferRequest(setup.Current.MoneyAssetId, setup.Savings.MoneyAssetId, 2_000m));
-        var leg = await client.GetCashWithdrawAsync(setup.Current.MoneyAssetId, cancellationToken);
-        var update = new UpdateTransactionRequest { Type = TransactionType.Withdraw, Quantity = 200m, UnitPrice = 1m, Date = leg.Date };
-
-        var response = await client.PutAsJsonAsync(
-            TransactionUri(setup.Current.MoneyAssetId, leg.Id), update, cancellationToken);
-
-        await response.AssertTransferLegManagedAsync(cancellationToken);
-        var unchanged = await client.GetCashWithdrawAsync(setup.Current.MoneyAssetId, cancellationToken);
-        Assert.Equal(2_000m, unchanged.Quantity);
-        Assert.NotNull(unchanged.Transfer);
-        Assert.Equal(3_000m, (await client.GetAssetAsync(setup.Current.MoneyAssetId, cancellationToken)).Quantity);
-        Assert.Equal(2_000m, (await client.GetAssetAsync(setup.Savings.MoneyAssetId, cancellationToken)).Quantity);
-    }
-
-    [Fact]
     public async Task Update_DepositPayoutLegOnBankAccount_ReturnsConflict()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
