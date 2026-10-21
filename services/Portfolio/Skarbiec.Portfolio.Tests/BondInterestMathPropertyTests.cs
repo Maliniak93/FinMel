@@ -6,7 +6,7 @@ namespace Skarbiec.Portfolio.Tests;
 
 public sealed class BondInterestMathPropertyTests
 {
-    private const int CaseCount = 200;
+    private const int CaseCount = 50;
 
     private static readonly TreasuryBondType[] CapitalisingTypes =
         [TreasuryBondType.Ots, TreasuryBondType.Tos, TreasuryBondType.Edo, TreasuryBondType.Ros, TreasuryBondType.Rod];

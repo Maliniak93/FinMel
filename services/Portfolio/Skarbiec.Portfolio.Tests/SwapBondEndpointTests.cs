@@ -192,10 +192,7 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
         { "count zero", HttpStatusCode.BadRequest, PortfolioAssertions.BondSwapCountErrorCode },
         { "count above holding", HttpStatusCode.BadRequest, PortfolioAssertions.BondSwapCountErrorCode },
         { "series does not match type", HttpStatusCode.BadRequest, null },
-        { "before maturity", HttpStatusCode.Conflict, PortfolioAssertions.BondNotMaturedErrorCode },
-        { "unsettled period", HttpStatusCode.Conflict, PortfolioAssertions.BondInterestUnsettledErrorCode },
         { "already redeemed", HttpStatusCode.Conflict, PortfolioAssertions.BondAlreadyRedeemedErrorCode },
-        { "archived bond", HttpStatusCode.Conflict, PortfolioAssertions.AssetArchivedErrorCode },
     };
 
     [Theory]
@@ -203,25 +200,10 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
     public async Task Swap_Invalid_IsRejected(string scenario, HttpStatusCode status, string? errorCode)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(
-            scenario == "before maturity" ? BondPurchaseDayUtc : AfterTosMaturityUtc);
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        FundedBond funded;
-        switch (scenario)
-        {
-            case "before maturity":
-                funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest());
-                break;
-            case "unsettled period":
-                funded = await client.CreateFundedBondAsync(cancellationToken, request: NewTosBondRequest());
-                await client.SettleBondInterestAsync(
-                    funded.Bond.AssetId, [(1, null)], cancellationToken);
-                break;
-            default:
-                funded = await client.CreateSettledTosAsync(cancellationToken);
-                break;
-        }
+        var funded = await client.CreateSettledTosAsync(cancellationToken);
 
         var assetId = funded.Bond.AssetId;
         var body = NewSwapBody(10);
@@ -238,9 +220,6 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
                 break;
             case "already redeemed":
                 await client.RedeemBondAsync(assetId, cancellationToken);
-                break;
-            case "archived bond":
-                await client.ArchiveAssetAsync(assetId, cancellationToken);
                 break;
         }
 

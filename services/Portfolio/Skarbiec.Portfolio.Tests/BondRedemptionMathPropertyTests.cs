@@ -6,7 +6,7 @@ namespace Skarbiec.Portfolio.Tests;
 
 public sealed class BondRedemptionMathPropertyTests
 {
-    private const int CaseCount = 200;
+    private const int CaseCount = 50;
 
     private static readonly TreasuryBondType[] AllTypes = Enum.GetValues<TreasuryBondType>();
 

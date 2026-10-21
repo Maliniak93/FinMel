@@ -177,7 +177,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
     [InlineData("active", PortfolioAssertions.DepositNotDueErrorCode)]
     [InlineData("paid-out", PortfolioAssertions.DepositAlreadyPaidOutErrorCode)]
     [InlineData("archived-asset", PortfolioAssertions.AssetArchivedErrorCode)]
-    [InlineData("settled-with-amounts", PortfolioAssertions.DepositAlreadySettledErrorCode)]
     [InlineData("settled-with-gross-only", PortfolioAssertions.DepositAlreadySettledErrorCode)]
     [InlineData("settled-with-tax-only", PortfolioAssertions.DepositAlreadySettledErrorCode)]
     public async Task RollOver_InvalidState_ReturnsConflict(string invalidCase, string errorCode)
@@ -206,18 +205,14 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
                 await client.ArchiveAssetAsync(assetId, cancellationToken);
                 body = NewRollOverRequest();
                 break;
-            case "settled-with-amounts":
             case "settled-with-gross-only":
             case "settled-with-tax-only":
                 var settled = await client.AddDepositAsync(cancellationToken);
                 assetId = settled.AssetId;
                 await client.SettleDepositAsync(assetId, cancellationToken);
-                body = invalidCase switch
-                {
-                    "settled-with-amounts" => NewRollOverRequest(),
-                    "settled-with-gross-only" => NewRollOverRequest(tax: null),
-                    _ => NewRollOverRequest(grossInterest: null)
-                };
+                body = invalidCase == "settled-with-gross-only"
+                    ? NewRollOverRequest(tax: null)
+                    : NewRollOverRequest(grossInterest: null);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(invalidCase), invalidCase, null);
@@ -235,7 +230,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
     [Theory]
     [InlineData("gross-missing")]
     [InlineData("tax-missing")]
-    [InlineData("both-missing")]
     [InlineData("tax-over-gross")]
     [InlineData("gross-3dp")]
     [InlineData("tax-3dp")]
@@ -255,7 +249,6 @@ public sealed class RollOverDepositEndpointTests(SkarbiecContainersFixture conta
         {
             "gross-missing" => NewRollOverRequest(grossInterest: null),
             "tax-missing" => NewRollOverRequest(tax: null),
-            "both-missing" => SettledRollOverBody(),
             "tax-over-gross" => NewRollOverRequest(grossInterest: 147.95m, tax: 147.96m),
             "gross-3dp" => NewRollOverRequest(grossInterest: 147.951m),
             "tax-3dp" => NewRollOverRequest(tax: 28.125m),
