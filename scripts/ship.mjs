@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Usage: node scripts/ship.mjs <issue> (--from-run | --branch <b> --title <t> --json '<run report>' [--blocked]) [--dry-run]
+// Usage: node scripts/ship.mjs <issue> (--from-run | --branch <b> --title <t> --json '<run report>' [--blocked] | --fix-pr --branch <b> --title <t> --json '<fix report>') [--dry-run]
 //   --from-run  branch, title, report and --blocked come from the newest build-feature workflow record of <issue>
 //   --blocked   only post the report, no git; --dry-run prints the commands and runs the read-only guards only
+//   --fix-pr    a CI fix on the open PR of <b>: same lane guard and verify gate (scope against master), commit `Fix CI: <t>`, plain push (never force), no `gh pr create`, then a PR comment with the hidden marker
+//               `<!-- skarbiec-ci-fix -->`: failing jobs, cause, what changed (--json {"jobs":[…],"cause":"…","changed":"…"}), **Poza obszarem:**, verify result; nothing to commit or no open PR fails (exit 2)
 //   a shipping run first needs the tree proven green: node scripts/verify.mjs --all --cache-check
 //   an e2e part ("e2e": true in --json) instead needs node scripts/verify.mjs --projects e2e --cache-check and a green node scripts/e2e.mjs check
 //   --blocked at stage e2e also saves the uncommitted diff to skarbiec-plan/issues/<issue>.e2e.patch, restores the tree and switches to master
@@ -13,11 +15,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { latestRunRecord } from "./build-replay.mjs";
+import { CI_FIX_MARKER } from "./autobuild-ci.mjs";
 import { GH_LIMIT_EXIT, GhLimitError, limitFromGhFailure, limitFromText, limitText, spawnGh } from "./gh.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
-const BOOLEAN_FLAGS = new Set(["blocked", "dry-run", "from-run"]);
+const BOOLEAN_FLAGS = new Set(["blocked", "dry-run", "from-run", "fix-pr"]);
 const VERIFY_ARGV = ["scripts/verify.mjs", "--cache-check"];
 const VERIFY_ALL_ARGV = ["scripts/verify.mjs", "--all", "--cache-check"];
 const E2E_VERIFY_ARGV = ["scripts/verify.mjs", "--projects", "e2e", "--cache-check"];
@@ -185,6 +188,77 @@ function postReport(report) {
   return res.ok ? { ok: true } : { ok: false, error: res.firstErr };
 }
 
+export function fixComment({ issue, title, report, outsideArea = [] }) {
+  const jobs = [report.jobs ?? []].flat().join(", ") || "-";
+  const lines = [
+    CI_FIX_MARKER,
+    `**CI fix** for #${issue} - ${title}`,
+    "",
+    `- **Failing job(s):** ${jobs}`,
+    `- **Cause:** ${report.cause ?? "-"}`,
+    `- **Changed:** ${report.changed ?? "-"}`,
+    "- **Verify:** green (`node scripts/verify.mjs --cache-check`)",
+  ];
+  if (outsideArea.length) lines.push("", `**Poza obszarem:** ${outsideArea.join(", ")}`);
+  lines.push("", "🤖 Generated with [Claude Code](https://claude.com/claude-code)");
+  return lines.join("\n");
+}
+
+function shipFixPr({ branch, title, report, dryRun }) {
+  const fail = (command, error, extra = {}) => {
+    result = { ok: false, branch, failedCommand: command, error, ...extra };
+    exitCode = 2;
+  };
+  const gate = { e2e: false, lastBuild: false };
+  const plainTitle = title.replace(/^Fix CI:\s*/i, "");
+  const current = run("git", ["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (!current.ok) return fail("git rev-parse --abbrev-ref HEAD", current.firstErr);
+  if (current.out !== branch) return fail("guard", `current branch is ${current.out}, expected ${branch}`);
+  if (!/^(feat|fix|chore)\//.test(branch) || ["master", "main"].includes(branch)) return fail("guard", `refusing to ship branch ${branch}`);
+
+  const outsideArea = outsideOf(readCard().area);
+  const pending = run("git", ["status", "--porcelain"]);
+  if (!pending.ok) return fail("git status --porcelain", pending.firstErr);
+  const ahead = run("git", ["rev-list", "--count", `origin/${branch}..HEAD`]);
+  if (!pending.out && !(ahead.ok && Number(ahead.out) > 0)) return fail("git commit", "nothing to commit");
+  const view = run("gh", ["pr", "view", branch, "--repo", REPO, "--json", "number,url,state"]);
+  const pr = view.ok ? JSON.parse(view.out) : null;
+  if (!pr || (pr.state ?? "OPEN") !== "OPEN") return fail("gh pr view", `no open PR for ${branch}${view.ok ? "" : `: ${view.firstErr}`}`);
+
+  const steps = [];
+  if (pending.out) {
+    steps.push({ label: "git add -A", cmd: "git", argv: ["add", "-A"] });
+    steps.push({ label: "git commit", cmd: "git", argv: ["commit", "-m", `Fix CI: ${plainTitle}`, "-m", `Spec: #${issue}`, "-m", "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"] });
+  }
+  steps.push({ label: "git push", cmd: "git", argv: ["push", "origin", branch] });
+  const body = fixComment({ issue, title: plainTitle, report, outsideArea });
+  const comment = { label: "gh pr comment", cmd: "gh", argv: ["pr", "comment", String(pr.number), "--repo", REPO, "--body", body] };
+
+  if (dryRun) {
+    console.log(`would run: ${gateCommand(gate)}`);
+    const verified = checkGate(gate);
+    console.log(verified.ok ? "verify cache: green" : `verify cache: ${verified.error}`);
+    for (const s of [...steps, comment]) console.log(`would run: ${s.cmd} ${s.argv.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ")}`);
+    if (!verified.ok) return fail(gateCommand(gate), verified.error, { dryRun: true });
+    result = { ok: true, dryRun: true, branch, prUrl: pr.url };
+    exitCode = 0;
+    return;
+  }
+
+  const verified = checkGate(gate);
+  if (!verified.ok) return fail(gateCommand(gate), verified.error);
+  for (const s of steps) {
+    const res = run(s.cmd, s.argv);
+    if (!res.ok) return fail(s.label, res.firstErr);
+  }
+  const sha = run("git", ["rev-parse", "--short", "HEAD"]);
+  const posted = run(comment.cmd, comment.argv);
+  const commit = sha.ok ? sha.out : null;
+  if (!posted.ok) return fail(comment.label, posted.firstErr, { commit, prUrl: pr.url, commentPosted: false });
+  result = { ok: true, branch, commit, prUrl: pr.url, commentPosted: true };
+  exitCode = 0;
+}
+
 function fromRun(issue) {
   const record = latestRunRecord({ issue });
   if (!record) throw new Error(`--from-run: no finished build-feature run of #${issue} with a ship report in the Claude Code history`);
@@ -202,6 +276,11 @@ try {
   const { branch, title } = flags;
   const report = JSON.parse(flags.json);
   result = { ok: false, branch };
+
+  if (flags["fix-pr"]) {
+    shipFixPr({ branch, title, report, dryRun: Boolean(flags["dry-run"]) });
+    finish();
+  }
 
   const e2e = Boolean(report.e2e);
   let gate = { e2e, lastBuild: false };

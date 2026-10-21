@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { E2E_APP_BLOCKED, E2E_DIAGNOSIS, appBlocks, e2eBlockLines, newestDiagnosis, parseFixResult, rebuildInputs, repairOutcome } from "./e2e-repair.mjs";
+import { E2E_APP_BLOCKED, E2E_DIAGNOSIS, appBlocks, ciFixOutcome, e2eBlockLines, newestDiagnosis, parseFixResult, rebuildInputs, repairOutcome } from "./e2e-repair.mjs";
 
 const SELF_CHECK = "rewrote the total with expectProjected (30 s): still 0 PLN after the re-fetch";
 
@@ -37,6 +40,17 @@ test("parses the last FIX_RESULT line", () => {
   assert.deepEqual(parseFixResult(text), { ok: true, kind: "test", summary: "waits wrongly" });
   assert.equal(parseFixResult("no result here"), null);
   assert.equal(parseFixResult("FIX_RESULT: {broken"), null);
+});
+
+test("parses and judges a ci fix result", () => {
+  const ok = parseFixResult('log\nFIX_RESULT: {"ok":true,"kind":"ci","summary":"fixed the build"}\n');
+  assert.deepEqual(ok, { ok: true, kind: "ci", summary: "fixed the build" });
+  assert.deepEqual(ciFixOutcome(ok), { ok: true, summary: "fixed the build" });
+  assert.equal(ciFixOutcome(parseFixResult('FIX_RESULT: {"ok":false,"kind":"stop","summary":"no reproduction"}')).ok, false);
+  assert.match(ciFixOutcome({ ok: false, kind: "stop", summary: "no reproduction" }).reason, /no reproduction/);
+  assert.match(ciFixOutcome(null).reason, /no FIX_RESULT/);
+  assert.match(ciFixOutcome({ ok: true, kind: "plan", summary: "x" }).reason, /not "ci"/);
+  assert.equal(repairOutcome(ok, { part: 332, nextOpen: 332 }).action, "stop");
 });
 
 test("test result rebuilds the e2e part", () => {
@@ -81,4 +95,13 @@ test("rebuild inputs only for a fresh e2e branch with a newest diagnosis", () =>
   assert.deepEqual(rebuildInputs({ ...base, freshBranch: false }), { diagnosis: null, applyPatch: false });
   assert.deepEqual(rebuildInputs({ ...base, e2e: false }), { diagnosis: null, applyPatch: false });
   assert.deepEqual(rebuildInputs({ ...base, comments: [c(DIAGNOSIS), c("later")] }), { diagnosis: null, applyPatch: false });
+});
+
+test("the fix skill documents the ci mode", () => {
+  const skill = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".claude", "skills", "fix", "SKILL.md"), "utf8");
+  const section = skill.slice(skill.indexOf("## Unattended CI fix (`ci:#<n>`)"), skill.indexOf("## Hard constraints"));
+  assert.ok(section.length > 200);
+  for (const word of ["ci-digest.mjs", "implementer → reviewer", "Skip =", "it.skip", "xit", "test.fixme", "weakened", "timeout-widened", "ship.mjs <n> --fix-pr", "FIX_RESULT", '"kind":"ci"', '"kind":"stop"', "areas.mjs profile", "build-feature", "gh-project.mjs prepare"]) {
+    assert.ok(section.includes(word), word);
+  }
 });

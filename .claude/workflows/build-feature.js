@@ -142,7 +142,7 @@ const REVIEW = {
 
 // ---------------------------------------------------------------- setup
 
-const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false, diagnosis = null, patchApplied = false, verifyAll = false, area = null, profile = null } = args || {}
+const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false, diagnosis = null, patchApplied = false, verifyAll = false, area = null, profile = null, ciFix = null } = args || {}
 
 if (!(spec && issue && branch && title)) {
   return {
@@ -164,9 +164,19 @@ const FULL_PATH = {
 const plan = profile || FULL_PATH
 const profileLabel = profile && profile.label ? profile.label : null
 // The Area has no test-writer and `skip-tests` is not set: the implementer proves the acceptance criteria with tests it writes itself.
-const writesOwnTests = !e2e && !noTests && plan.tests === false
-const runsTestWriter = !e2e && !noTests && plan.tests !== false
+// A /fix ci:#<n> session passes args.ciFix (the file holding the failed jobs and the cause): the red CI is the reproduction, so no test-writer runs.
+const writesOwnTests = !e2e && !noTests && (plan.tests === false || Boolean(ciFix))
+const runsTestWriter = !e2e && !noTests && !ciFix && plan.tests !== false
 const readFirst = (paths) => (paths && paths.length ? `Read first: ${paths.join(', ')}` : null)
+const CI_FIX_RULE = 'never silence the failure: a deleted, skipped (`Skip =`, `it.skip`, `xit`, `test.fixme`), weakened or timeout-widened test needs a stated cause in notes'
+const CI_FIX_LINES = ciFix
+  ? [
+      `This is a CI fix on the open PR branch \`${branch}\`, not a feature: the red CI is the reproduction. Read \`${ciFix}\` (failed jobs, failed step, log tail, the cause found) first, fix that cause, and run \`scripts/verify.mjs --fix --cache\` on the PR's scope. You may change tests, but ${CI_FIX_RULE}.`,
+    ]
+  : []
+const CI_FIX_REVIEW_LINE = ciFix
+  ? `This is a CI fix (\`${ciFix}\` holds the failure and the cause): blocking when the change silences the failure instead of fixing its cause - ${CI_FIX_RULE}.`
+  : null
 
 const OPUS = 'claude-opus-5-5'
 const startLevel =
@@ -406,7 +416,7 @@ if (e2e) {
 phase(e2e ? 'E2E' : 'Implement')
 if (broke()) return stop('implement', { reason: 'budget' })
 
-const implementLines = tests.tests.length
+const baseImplementLines = tests.tests.length
   ? [
       `Make these failing tests pass: ${JSON.stringify(tests)}`,
       "Start from the spec's Code map and the tests' contextFiles - read those instead of rediscovering the code. Then only the skarbiec-plan sections the spec names. Smallest correct change; do not widen scope beyond the spec.",
@@ -422,6 +432,7 @@ const implementLines = tests.tests.length
         "Start from the spec's Code map, then only the skarbiec-plan sections it names. Smallest correct change; do not widen scope beyond the spec.",
         'Run the command each acceptance criterion names as its proof, and report those commands in `commandsRun`.',
       ]
+const implementLines = [...CI_FIX_LINES, ...baseImplementLines]
 
 const initial = e2e
   ? await attempt('e2e: automate the epic plan and run the suite', [], e2eRun, e2eFailed)
@@ -456,6 +467,7 @@ if (skipped.has('review')) {
             `implementer response: ${JSON.stringify({ notes: previous.impl.notes || [], deviations: previous.impl.deviations || [], filesTouched: previous.impl.filesTouched })}`,
             'Check only that each finding is resolved (or rebutted with a sound reason in notes) and that the diff of the files touched in that round broke nothing. A full re-review is not your job.',
             e2e ? DIAGNOSIS_REVIEW_LINE : null,
+            CI_FIX_REVIEW_LINE,
             'blocking only for an unresolved finding or a regression in those files. Everything else is minor.',
           ]
         : [
@@ -465,6 +477,7 @@ if (skipped.has('review')) {
             `${e2e ? 'e2e agent' : 'implementer'} report: ${JSON.stringify(impl)}`,
             e2e ? 'This is an epic\'s e2e part (the `e2e` label): there is no test-writer and no implementer. Apply the "An e2e part" rules of your agent prompt; the epic body and the sibling parts are in `skarbiec-plan/issues/`, and `.git/e2e-result.json` holds the run.' : null,
             e2e ? DIAGNOSIS_REVIEW_LINE : null,
+            CI_FIX_REVIEW_LINE,
             deviations.length ? `deviations from the spec or the tests, all rounds: ${JSON.stringify(deviations)} - judge each on its why.` : null,
             e2e || tests.tests.length || writesOwnTests ? null : 'This spec carries the `skip-tests` label - no new tests were written. Judge each acceptance criterion by the command it names and confirm the existing suites still cover the behaviour it touches.',
             writesOwnTests ? 'No test-writer ran for this Area: the implementer wrote any tests the acceptance criteria need. Judge each acceptance criterion by the test or command it names.' : null,

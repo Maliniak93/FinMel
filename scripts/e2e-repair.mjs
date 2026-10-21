@@ -1,4 +1,4 @@
-// Usage: imported by autobuild.mjs (repair loop), gh-project.mjs (report, prepare) - e2e block lines, FIX_RESULT parsing, repair outcome, diagnosis and rebuild inputs
+// Usage: imported by autobuild.mjs (repair loop), autobuild-ci.mjs (CI fix), gh-project.mjs (report, prepare) - e2e block lines, FIX_RESULT parsing, repair and CI fix outcome, diagnosis and rebuild inputs
 
 export const E2E_BLOCKED = "**Blocked** at `e2e`";
 export const E2E_APP_BLOCKED = `${E2E_BLOCKED} (app)`;
@@ -26,6 +26,13 @@ export function parseFixResult(text) {
   } catch {
     return null;
   }
+}
+
+export function ciFixOutcome(result) {
+  if (!result) return { ok: false, reason: "the fix session gave no FIX_RESULT" };
+  if (!result.ok) return { ok: false, reason: `the fix session stopped: ${result.summary}` };
+  if (result.kind !== "ci") return { ok: false, reason: `the fix session returned kind "${result.kind}", not "ci"` };
+  return { ok: true, summary: result.summary };
 }
 
 export function repairOutcome(result, { part, nextOpen }) {
