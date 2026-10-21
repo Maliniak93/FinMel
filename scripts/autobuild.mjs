@@ -19,7 +19,7 @@
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
 //   a part without Branch is healed first (gh-project.mjs heal); a card with a missing or invalid Tier is skipped with the later open parts of its epic and the cards whose Depends on names it (a log line and one comment each, Status unchanged) and the run ends `done` listing them as `pominięte: …`
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
-//   a red CI with fewer than 5 failed tests (or only cancelled/timed-out jobs) reruns its failed jobs once per head SHA (GitHub's run_attempt is the counter), with a fresh 90 min wait; any other red stops `ci-failed`
+//   a red CI with fewer than 5 failed tests (or only cancelled/timed-out jobs) reruns its failed jobs once per head SHA (GitHub's run_attempt is the counter), with a fresh 90 min wait; any other red, or a red after the rerun, starts one fix session per PR (the PR comment marker `<!-- skarbiec-ci-fix -->` is the counter): `/fix ci:#<n>` on the PR branch (tree kept on a dirty PR branch, `dirty-tree` for any other dirty tree), `ship.mjs --fix-pr` pushes to the same PR, a fresh 90 min wait follows; never counted towards --max-tasks, no session after --until, with the stop file or in a dry run; red after the fix reruns once when < 5 tests failed, otherwise stops `ci-failed` with the job link and the resume line, a session that stops or moves no head `ci-failed` / `blocked`
 //   a GitHub rate limit (primary or secondary) is waited out with no upper bound, then the same call or step reruns (a child ending on the GITHUB_LIMIT marker or ship.mjs exit 4 included); the wait does not count towards the build or CI timeouts, and writes already done (merge, close, summary comment) are skipped
 //   the sleep guard is confirmed (`ready`) and re-armed after every wake; PC sleep gaps are logged (`PC spał …`) and do not count towards the 4 h build limit; a build with no progress for 45 awake minutes (no live dotnet/verify/e2e process) is killed and replayed once per part, a second hang stops the run with reason `hang`
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
@@ -32,9 +32,9 @@ import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
-import { CI_POLICY_LINE, driveCi, partLine, summaryPartLine } from "./autobuild-ci.mjs";
+import { CI_FIX_MARKER, CI_POLICY_LINE, driveCi, partLine, runCiFix, summaryPartLine } from "./autobuild-ci.mjs";
 import { postRunVerify } from "./autobuild-verify.mjs";
-import { awaitReady, buildWithResume, finishShutdown, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
+import { awaitReady, buildWithResume, finishShutdown, fixWithResume, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
 import { BUILD_LIMIT_MS, buildThroughHangs, createAwakeClock, createHangDetector, createHangPolicy, hangLabel, liveWork, summaryLines } from "./autobuild-watch.mjs";
 import { areaWarning, ensureBranch, mayStart, planFrom, planLines, postSkipOnce, runQueue, skipMarker, skippedLine, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
 import { UsageError, WizardCancelled, parseFlags, runWizard } from "./autobuild-wizard.mjs";
@@ -560,7 +560,73 @@ function rerunFailedJobs(runId) {
   return res.ok;
 }
 
-async function waitForCi(pr, entry) {
+function prHead(number) {
+  const res = retryTransient("pr head", () => gh(["api", `repos/${REPO}/pulls/${number}`, "--jq", ".head.sha"]));
+  return res.ok && res.out ? res.out : null;
+}
+
+function fixMarked(number) {
+  const jq = `[.[] | select(.body | contains("${CI_FIX_MARKER}"))] | length`;
+  const res = retryTransient("pr comments", () => gh(["api", "--paginate", `repos/${REPO}/issues/${number}/comments?per_page=100`, "--jq", jq]));
+  if (!res.ok) throw new Stop("github", `PR #${number}: could not read the comments (${short(res.firstErr, 120)})`);
+  return res.out.split(/\r?\n/).some((line) => Number(line) > 0);
+}
+
+// a dirty tree on the PR branch is an interrupted fix and is kept; any other dirty tree stops
+function enterPrBranch(part) {
+  const dirty = dirtyFiles();
+  if (currentBranch() === part.branch) {
+    if (dirty.length) say(`CI fix: continuing on ${part.branch} with ${dirty.length} uncommitted file(s) of an interrupted fix`);
+    return;
+  }
+  if (dirty.length) throw new Stop("dirty-tree", `the working tree is not clean on ${currentBranch()}, the CI fix of #${part.number} needs ${part.branch}:\n${dirty.slice(0, 10).join("\n")}`);
+  const step = git(["switch", part.branch]);
+  if (!step.ok) throw new Stop("sync-failed", `git switch ${part.branch}: ${step.firstErr}`);
+}
+
+function leavePrBranch() {
+  if (dirtyFiles().length) {
+    say("CI fix: the tree is not clean - staying on the PR branch");
+    return;
+  }
+  const step = git(["switch", "master"]);
+  if (!step.ok) throw new Stop("sync-failed", `git switch master: ${step.firstErr}`);
+}
+
+function fixSession(part) {
+  return fixWithResume({
+    prompt: `/fix ci:#${part.number}`,
+    run: async (prompt) => {
+      const fixed = await runClaude(ctx.claude, part.number, `${part.title} — CI fix`, prompt, FIX_MODEL);
+      if (fixed.timedOut) throw new Stop("timeout", `#${part.number}: the CI fix exceeded 4 h of awake time and was killed`);
+      if (fixed.hung) throw new Stop("hang", `#${part.number}: the CI fix made no progress for 45 min (${hangLabel(fixed.hung)}); resume with ${resumeCommand(ctx)}`);
+      return fixed;
+    },
+    onLimit: (limit) => onUsageLimit(limit, part.number),
+    rearm: armSleepGuard,
+    awaitReady: () => waitForReady(part.number),
+  });
+}
+
+function fixCi(part, pr, { failures, reason }) {
+  return runCiFix({
+    pr,
+    part: part.number,
+    failures,
+    reason,
+    resume: resumeCommand(ctx),
+    guards: { stopRequested: () => existsSync(stopFile()), windowClosed: () => Boolean(mayStart(ctx.until, new Date())), dryRun: ctx.dryRun },
+    headSha: () => prHead(pr.number),
+    markerPosted: () => fixMarked(pr.number),
+    prepare: () => enterPrBranch(part),
+    session: () => fixSession(part),
+    restore: leavePrBranch,
+    say,
+    stop: (kind, detail) => new Stop(kind, detail),
+  });
+}
+
+async function waitForCi(pr, entry, part) {
   const budgets = [];
   const track = (ms) => {
     const budget = createTimeoutBudget(ms);
@@ -575,6 +641,9 @@ async function waitForCi(pr, entry) {
       readJobs,
       readLog: readJobLog,
       rerun: rerunFailedJobs,
+      fix: (input) => fixCi(part, pr, input),
+      fixMarked: () => fixMarked(pr.number),
+      resume: resumeCommand(ctx),
       sleep,
       say,
       budget: track,
@@ -584,6 +653,9 @@ async function waitForCi(pr, entry) {
       stop: (reason, detail) => new Stop(reason, detail),
       onRerun: () => {
         entry.ciReruns = (entry.ciReruns ?? 0) + 1;
+      },
+      onFix: () => {
+        entry.ciFixes = (entry.ciFixes ?? 0) + 1;
       },
     });
   } finally {
@@ -739,7 +811,7 @@ function healBranch(number) {
 
 async function handlePart(sub, ctx) {
   const part = ensureBranch(getIssue(sub.number), healBranch);
-  const entry = { item: ctx.item, number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null, ciReruns: 0 };
+  const entry = { item: ctx.item, number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null, ciReruns: 0, ciFixes: 0 };
   let pr = openPr(part.branch);
 
   if (!pr) {
@@ -774,7 +846,7 @@ async function handlePart(sub, ctx) {
 
   entry.prUrl = pr.url;
   ctx.parts.push(entry);
-  const ci = await waitForCi(pr, entry);
+  const ci = await waitForCi(pr, entry, part);
   entry.ciMin = minutes(ci.ms);
   await mergeAndSync(pr, part.branch, part.number);
 }
@@ -840,7 +912,10 @@ function preChecks(first, flags) {
   if (dirty.length) {
     const next = partsOf(getIssue(first.number)).find((s) => s.state !== "CLOSED");
     const part = next ? getIssue(next.number) : null;
-    if (part?.branch && currentBranch() === part.branch && !openPr(part.branch)) {
+    const prOfBranch = part?.branch && currentBranch() === part.branch ? openPr(part.branch) : null;
+    if (prOfBranch) {
+      say(`${flags["dry-run"] ? "dry-run: would be resumed - " : ""}continuing the CI fix of #${part.number} on ${part.branch} with ${dirty.length} uncommitted file(s)`);
+    } else if (part?.branch && currentBranch() === part.branch) {
       const shipping = partPlan(part, dirty.length) === "ship";
       const verb = shipping ? "retrying the ship step of" : "resuming";
       const found = shipping ? null : findReplay({ issue: part.number, args: { tier: part.tier, skip: part.skipTests ? ["tests"] : [], e2e: Boolean(part.e2e) } });

@@ -253,6 +253,19 @@ if (args[0] === "pr" && args[1] === "list") {
   log({ kind: "prList", args });
   out(JSON.stringify(state.prs ?? []));
 }
+if (args[0] === "pr" && args[1] === "view") {
+  log({ kind: "prView", args });
+  const found = (state.prs ?? []).find((p) => p.headRefName === args[2]);
+  if (!found) {
+    fs.writeSync(2, "no pull requests found");
+    process.exit(1);
+  }
+  out(JSON.stringify({ number: found.number, state: found.state ?? "OPEN", url: found.url ?? `https://github.com/Maliniak93/FinMel/pull/${found.number}` }));
+}
+if (args[0] === "pr" && args[1] === "comment") {
+  log({ kind: "prComment", number: Number(args[2]), body: flag("--body") });
+  out("");
+}
 if (args[0] === "pr") out("[]");
 log({ kind: "other", args });
 out("");

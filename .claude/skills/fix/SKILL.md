@@ -18,6 +18,10 @@ names related issues. After `create` publishes, run `node scripts/idea.mjs mark 
 at `e2e` (app). Nobody is watching: never call `AskUserQuestion`, never build. Follow **Unattended e2e repair** below
 instead of steps 0 and 4.
 
+`$ARGUMENTS` = `ci:#<n>` → **unattended CI fix**, launched by `scripts/autobuild.mjs` after the CI of part `#<n>`'s open PR
+stayed red (not a rerun case, or red after the rerun). Nobody is watching: never call `AskUserQuestion`, publish no
+issue. Follow **Unattended CI fix** below instead of steps 0–4.
+
 ## 0. Is it already known?
 
 `node scripts/plan-status.mjs` lists every open spec issue. One that
@@ -149,10 +153,38 @@ previous one has merged. Build it exactly as `/build` steps 1–5 do and report 
    or `{"ok":true,"kind":"test","summary":"…"}`,
    or `{"ok":false,"kind":"stop","summary":"<what stops it and what the user must decide>"}`. `/fix e2e` changes no file.
 
+## Unattended CI fix (`ci:#<n>`)
+
+You start on `master` or on the part's PR branch; `autobuild.mjs` has already switched to the branch (a dirty tree on it is
+an interrupted fix: continue from it). One fix per PR, no second attempt.
+
+1. **The failure.** `node scripts/gh-project.mjs get <n> --out skarbiec-plan/issues/<n>.md` gives the part (title, tier, area,
+   branch) and its local spec copy: read its Goal, ACs and Code map. The PR is `gh pr list --head <branch> --state open`.
+   `node scripts/ci-digest.mjs <pr>` prints every failed job with its failed step, the last ~200 log lines of that step and
+   the failed test names (`unknown` for an unreadable log); the PR diff is `gh pr diff <pr>`. The red job is the reproduction: no new test-writer, no other reproduction.
+2. **The cause.** Follow the failure to its cause with a quoted log line as evidence. No cause you can show, or a cause
+   outside the PR (the runner, a GitHub outage, master) → stop (below); never guess at a fix.
+3. **Fix it with the pipeline.** Write the digest and the cause to `skarbiec-plan/issues/<n>.ci-fix.md`, then call the
+   `Workflow` tool with `{ name: "build-feature", args }`, `args` = `{ spec: "skarbiec-plan/issues/<n>.md", issue: <n>,
+   branch, title, tier, maxRounds: 2, skip: [], epic: null, e2e: false, verifyAll: false, area, profile, ciFix:
+   "skarbiec-plan/issues/<n>.ci-fix.md" }` with `profile` = the output of `node scripts/areas.mjs profile <Area> --no-tests`
+   (no Area → omit it). That is the profile *implementer → reviewer*: the implementer fixes the cause, may change tests and
+   runs `verify.mjs --fix --cache` on the PR's scope; the reviewer blocks a fix that silences the failure - a deleted,
+   skipped (`Skip =`, `it.skip`, `xit`, `test.fixme`), weakened or timeout-widened test without a stated cause. Do **not**
+   run `gh-project.mjs prepare` (it would move the card, recut or replay the part's earlier run). The workflow is run on the
+   existing branch with no replay.
+4. **Ship it.** Workflow `ready` → `node scripts/ship.mjs <n> --fix-pr --branch <branch> --title "<part title>" --json
+   '{"jobs":["<failed job>"],"cause":"<one line>","changed":"<one line>"}'` as ONE Bash call with `timeout: 3600000`. It guards the lane, checks the verify cache,
+   commits `Fix CI: <title>`, pushes to the same PR (never forced, no new PR) and comments the PR with the marker autobuild reads.
+   `SHIP_RESULT` not `ok` → stop with its `error`.
+5. The last line of your final message is exactly one line `FIX_RESULT: {"ok":true,"kind":"ci","summary":"<what was fixed>"}`, or
+   `{"ok":false,"kind":"stop","summary":"<why>"}` for a workflow `blocked` (review or verify), no commit (nothing to change), no
+   reproduction, or a cause outside the PR. Run no git command yourself: `ship.mjs` is the only writer.
+
 ## Hard constraints
 
 - Write no production code and no test yourself — the test-writer writes the reproduction test, the implementer
-  fixes it, the reviewer checks it. Your only artefact is the issue.
+  fixes it, the reviewer checks it. Your only artefact is the issue (`ci:#<n>`: the `<n>.ci-fix.md` note, the pipeline writes the fix).
 - Never run `git add`, `git commit`, `git push`, `git switch`, `git checkout`, `git stash` yourself — `ship.mjs`
   commits, pushes and opens the PR. Read-only git is fine. Never merge.
 - A flaky test is a bug in the test or the fixture, not a reason to retry until green — treat it like any other bug.

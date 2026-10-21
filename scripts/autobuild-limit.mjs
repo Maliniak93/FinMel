@@ -70,6 +70,17 @@ export async function buildWithResume({ part, build, onLimit, rearm, awaitReady:
   }
 }
 
+// a fix session cut by the usage limit runs again with the same prompt on the working tree as it is
+export async function fixWithResume({ prompt, run, onLimit, rearm, awaitReady: ready }) {
+  while (true) {
+    const result = await run(prompt);
+    if (!result.limitHit || result.timedOut || result.hung) return result;
+    await onLimit({ resetsAt: result.resetsAt });
+    await rearm?.();
+    await ready();
+  }
+}
+
 export async function finishShutdown({ confirm, run, noShutdown, dryRun, log = () => {} }) {
   if (noShutdown || dryRun) return "skipped";
   const answer = await confirm("shutdown");
