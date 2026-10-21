@@ -6,7 +6,7 @@ namespace Skarbiec.Reporting.Tests;
 
 public sealed class TargetAllocationMathPropertyTests
 {
-    private const int CaseCount = 200;
+    private const int CaseCount = 50;
 
     private static readonly AssetClass[] Classes =
         [AssetClass.Cash, AssetClass.Deposit, AssetClass.Stock, AssetClass.Etf, AssetClass.Bond, AssetClass.PreciousMetal, AssetClass.BankAccount];

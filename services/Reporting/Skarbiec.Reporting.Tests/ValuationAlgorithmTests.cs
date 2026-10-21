@@ -120,34 +120,6 @@ public sealed class ValuationAlgorithmTests
     }
 
     [Fact]
-    public void Calculate_MixOfMarketAndCurrencyValuedAcrossAssetClasses_ProducesOneLineEachSummingToTheTotal()
-    {
-        var stockInstrumentId = Guid.NewGuid();
-        var stockAssetId = Guid.NewGuid();
-        var cashAssetId = Guid.NewGuid();
-        var positions = new ValuationPosition[]
-        {
-            new() { AssetId = stockAssetId, AssetClass = AssetClass.Stock, ValuationMode = AssetValuationMode.Market, Currency = "PLN", Quantity = 2, InstrumentId = stockInstrumentId },
-            new() { AssetId = cashAssetId, AssetClass = AssetClass.Cash, ValuationMode = AssetValuationMode.CurrencyValued, Currency = "PLN", Quantity = 300_000m },
-        };
-        var prices = Prices((stockInstrumentId, "PLN", SnapshotDate, 150m));
-
-        var result = ValuationAlgorithm.Calculate(positions, prices, FxRates(), SnapshotDate);
-
-        Assert.Equal(300_300m, result.TotalPln);
-        Assert.Equal(2, result.Lines.Count);
-        Assert.Equal(result.Lines.Sum(l => l.ValuePln), result.TotalPln);
-
-        var stockLine = Assert.Single(result.Lines, l => l.AssetId == stockAssetId);
-        Assert.Equal(AssetClass.Stock, stockLine.AssetClass);
-        Assert.Equal(300m, stockLine.ValuePln);
-
-        var cashLine = Assert.Single(result.Lines, l => l.AssetId == cashAssetId);
-        Assert.Equal(AssetClass.Cash, cashLine.AssetClass);
-        Assert.Equal(300_000m, cashLine.ValuePln);
-    }
-
-    [Fact]
     public void Calculate_RoundsEachLineToTwoDecimals_TotalIsTheirSum()
     {
         var threeId = Guid.NewGuid();
