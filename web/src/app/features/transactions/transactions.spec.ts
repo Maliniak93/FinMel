@@ -902,6 +902,17 @@ describe('Transactions', () => {
     });
   });
 
+  it('shows the rounded quantity in the delete message', async () => {
+    const fractional = { ...transaction, quantity: 0.123456 };
+    await setup(jsonResponse(pagedResponse([fractional])));
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    await component['remove'](fractional);
+
+    const { message } = (dialog.open.mock.calls[0][1] as { data: { message: string } }).data;
+    expect(message).toContain('of 0.12 will be permanently deleted');
+  });
+
   describe('in Polish', () => {
     const outLeg = {
       ...transaction,

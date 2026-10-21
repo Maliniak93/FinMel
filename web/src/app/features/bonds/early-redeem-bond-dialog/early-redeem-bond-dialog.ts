@@ -28,7 +28,7 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
-import { formatDate, formatMoney, formatPercent } from '../../../shared/format';
+import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
 import { BOND_PERIOD_STATE, isCouponBond, loadSeriesRates, usesTermsRate } from '../bond-interest';
 
 export interface EarlyRedeemBondDialogData {
@@ -89,6 +89,7 @@ export class EarlyRedeemBondDialog {
 
   protected readonly currency = BOND_CURRENCY;
   protected readonly formatMoney = formatMoney;
+  protected readonly formatQuantity = formatQuantity;
   protected readonly formatDate = formatDate;
   protected readonly formatPercent = formatPercent;
   protected readonly maxCount = Number(this.bond.bondCount);

@@ -35,10 +35,6 @@ describe('locale-aware formatters', () => {
       expect(formatMoney('1234.56', 'USD')).toBe(
         new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(1234.56),
       );
-      expect(formatQuantity(12345.123456)).toBe(
-        new Intl.NumberFormat(locale, { maximumFractionDigits: 8 }).format(12345.123456),
-      );
-
       const percent = formatPercent(5.25);
       expect(percent).toContain(
         new Intl.NumberFormat(locale, { maximumFractionDigits: 4 }).format(5.25),
@@ -83,5 +79,36 @@ describe('locale-aware formatters', () => {
     expect(formatMoney(1234.56)).toBe(
       new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PLN' }).format(1234.56),
     );
+  });
+
+  it('formats a quantity with at most two decimals, rounded half-up, grouped, without trailing zeros', async () => {
+    const language = TestBed.inject(LanguageService);
+    const cases = [
+      [31.1034768, '31.1', '31,1'],
+      [10, '10', '10'],
+      [0.125, '0.13', '0,13'],
+      [1234.5, '1,234.5', '1 234,5'],
+      [1.005, '1.01', '1,01'],
+      [12345.123456, '12,345.12', '12 345,12'],
+    ] as const;
+
+    for (const lang of ['en', 'pl', 'en'] as const) {
+      await language.setLanguage(lang);
+      for (const [value, en, pl] of cases) {
+        expect(formatQuantity(value)).toBe(lang === 'en' ? en : pl);
+      }
+    }
+  });
+
+  it('formats a non-zero quantity that rounds to zero as a marker, and an exact zero as 0', async () => {
+    const language = TestBed.inject(LanguageService);
+
+    for (const lang of ['en', 'pl', 'en'] as const) {
+      await language.setLanguage(lang);
+
+      expect(formatQuantity(0.004)).toBe(lang === 'en' ? '< 0.01' : '< 0,01');
+      expect(formatQuantity(-0.004)).toBe(lang === 'en' ? '> -0.01' : '> -0,01');
+      expect(formatQuantity(0)).toBe('0');
+    }
   });
 });

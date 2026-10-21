@@ -108,7 +108,7 @@
     <ng-container matColumnDef="bondCount">
       <th mat-header-cell *matHeaderCellDef>{{ 'bonds.my.count' | transloco }}</th>
       <td mat-cell *matCellDef="let bond">
-        {{ bond.bondCount }}
+        {{ formatQuantity(bond.bondCount) }}
         @if (isPartiallyRedeemed(bond)) {
           <span class="my-bonds__muted" data-testid="partially-redeemed">
             {{ 'bonds.my.partiallyRedeemed' | transloco }}
@@ -267,7 +267,9 @@
                   @let rate = periodRate(bond, period);
                   {{ rate === null ? '—' : formatPercent(rate) }}
                 </td>
-                <td>{{ period.settlement?.bondCount ?? '—' }}</td>
+                <td>
+                  {{ period.settlement ? formatQuantity(period.settlement.bondCount) : '—' }}
+                </td>
                 <td>
                   {{
                     period.settlement ? formatMoney(period.settlement.grossInterest, 'PLN') : '—'

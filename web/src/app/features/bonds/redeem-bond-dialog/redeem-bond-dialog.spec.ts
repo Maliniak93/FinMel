@@ -34,13 +34,16 @@ describe('RedeemBondDialog', () => {
     await restoreEnglish();
   });
 
-  async function setup(bond: BondFixture = settledTosBond): Promise<void> {
+  async function setup(
+    bond: BondFixture = settledTosBond,
+    preview: typeof tosRedemptionPreview = tosRedemptionPreview,
+  ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
       if (requestMethod(input) === 'GET') {
         if (url.endsWith('/redemption-preview')) {
-          return jsonResponse(tosRedemptionPreview);
+          return jsonResponse(preview);
         }
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -80,6 +83,15 @@ describe('RedeemBondDialog', () => {
       expect(text).toContain(`To the cash of ${settledTosBond.accountName}`);
     });
     expect((fixture.nativeElement as HTMLElement).querySelector('mat-select')).toBeNull();
+  });
+
+  it('shows the redeemed bond count with the thousands separator', async () => {
+    await setup(settledTosBond, { ...tosRedemptionPreview, bondCount: 1234 });
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(renderedText(fixture)).toContain('1,234');
+    });
   });
 
   it('redeems with no destination and closes with true', async () => {

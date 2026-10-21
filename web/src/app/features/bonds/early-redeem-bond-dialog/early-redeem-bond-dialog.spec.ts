@@ -67,13 +67,14 @@ describe('EarlyRedeemBondDialog', () => {
   async function setup(
     bond: BondFixture = edoYearOneSettledBond,
     series: unknown = edoEarlySeries,
+    preview: unknown = edoEarlyRedemptionPreview,
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
       if (requestMethod(input) === 'GET') {
         if (url.includes('/early-redemption-preview')) {
-          return jsonResponse(edoEarlyRedemptionPreview);
+          return jsonResponse(preview);
         }
         if (url.includes('/api/marketdata/bond-series/')) {
           return jsonResponse(series);
@@ -128,6 +129,19 @@ describe('EarlyRedeemBondDialog', () => {
     const now = new Date();
     expect(form().date.value).toEqual(new Date(now.getFullYear(), now.getMonth(), now.getDate()));
     expect(form().bondCount.value).toBe(10);
+  });
+
+  it('shows the redeemed bond count with the thousands separator', async () => {
+    await setup(edoYearOneSettledBond, edoEarlySeries, {
+      ...edoEarlyRedemptionPreview,
+      bondCount: 1234,
+    });
+    await pick(new Date(2026, 4, 13));
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(renderedText(fixture)).toContain('1,234');
+    });
   });
 
   it('shows the account cash line instead of a cash select', async () => {

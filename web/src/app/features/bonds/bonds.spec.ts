@@ -185,6 +185,12 @@ describe('Bonds page, my bonds tab', () => {
     expect(text).toContain('2036');
   });
 
+  it('shows the bond count with the thousands separator', async () => {
+    await setup([{ ...activeBond, bondCount: 1234 }]);
+
+    expect(textOf(rowFor(activeBond.name))).toContain('1,234');
+  });
+
   it('shows the status chip per bond in Polish', async () => {
     await setup();
     await switchLanguage(fixture, 'pl');

@@ -45,13 +45,25 @@ export function formatRate(rate: number | string): string {
 }
 
 export function formatQuantity(quantity: number | string): string {
-  return new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 8 }).format(
-    Number(quantity),
-  );
+  const value = Number(quantity);
+  const options = {
+    maximumFractionDigits: 2,
+    useGrouping: 'always',
+    roundingMode: 'halfExpand',
+  } as unknown as Intl.NumberFormatOptions;
+  const format = new Intl.NumberFormat(activeLocale(), options);
+  if (value !== 0 && Math.abs(value) < 0.005) {
+    return value > 0 ? `< ${format.format(0.01)}` : `> ${format.format(-0.01)}`;
+  }
+  return format.format(value);
+}
+
+export function formatPercentNumber(value: number | string): string {
+  return new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 4 }).format(Number(value));
 }
 
 export function formatPercent(value: number | string): string {
-  return `${new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 4 }).format(Number(value))} %`;
+  return `${formatPercentNumber(value)} %`;
 }
 
 export function formatSignedMoney(amount: number | string, currency = 'PLN'): string {

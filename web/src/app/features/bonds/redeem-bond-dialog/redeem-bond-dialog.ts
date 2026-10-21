@@ -10,7 +10,7 @@ import {
   type BondResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
-import { formatDate, formatMoney } from '../../../shared/format';
+import { formatDate, formatMoney, formatQuantity } from '../../../shared/format';
 
 export interface RedeemBondDialogData {
   bond: BondResponse;
@@ -35,6 +35,7 @@ export class RedeemBondDialog {
   protected readonly unsettled = Number(this.bond.duePeriodCount) > 0;
   protected readonly currency = BOND_CURRENCY;
   protected readonly formatMoney = formatMoney;
+  protected readonly formatQuantity = formatQuantity;
   protected readonly formatDate = formatDate;
 
   protected readonly submitting = signal(false);

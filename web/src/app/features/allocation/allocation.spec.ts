@@ -92,6 +92,21 @@ describe('Allocation', () => {
     await fixture.whenStable();
   }
 
+  it('keeps the band label up to four decimals, not cut to two', async () => {
+    await render({
+      get: () =>
+        jsonResponse({
+          ...configuredAllocation,
+          groups: [
+            { ...configuredAllocation.groups[2], bandLowPercent: 2.125, bandHighPercent: 7.5 },
+          ],
+        }),
+    });
+
+    const rows = all('group-row').map((row) => plain(textOf(row)));
+    expect(rows[0]).toContain('2,125–7,5');
+  });
+
   it('renders deviations of a saved target', async () => {
     await render({ get: () => jsonResponse(configuredAllocation) });
 
