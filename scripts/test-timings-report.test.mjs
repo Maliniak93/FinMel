@@ -4,38 +4,40 @@ import { HIGHLIGHT_MS, HIGHLIGHT_PCT, classifyDelta, compareRows, escapeHtml, fi
 
 const counts = (passed, failed = 0, skipped = 0) => ({ passed, failed, skipped });
 
-const suite = (over = {}) => ({
-  kind: "web",
-  measuredAt: "2026-10-20T12:00:00",
-  commit: "abc",
+const day = (n) => `2026-10-${String(n).padStart(2, "0")}T12:00:00`;
+
+const entry = (n, testMs, over = {}) => ({
+  measuredAt: day(n),
+  commit: `abcdef${n}0123456`,
   dirty: false,
-  branch: "feat/x",
   status: "passed",
   setupMs: 1000,
-  testMs: 10_000,
+  testMs,
   counts: counts(3),
-  classes: { "N.A": { ms: 6000, count: 2 }, "N.B": { ms: 4000, count: 1 } },
-  tests: { "N.A.One": { ms: 2000, outcome: "passed" }, "N.A.Two": { ms: 6000, outcome: "passed" }, "N.B.Three": { ms: 4000, outcome: "passed" } },
-  previous: {
-    kind: "web",
-    measuredAt: "2026-10-13T12:00:00",
-    status: "passed",
-    setupMs: 1500,
-    testMs: 8000,
-    counts: counts(3),
-    classes: { "N.A": { ms: 3000, count: 2 }, "N.B": { ms: 5000, count: 1 } },
-    tests: { "N.A.One": { ms: 1000, outcome: "passed" }, "N.A.Two": { ms: 2000, outcome: "passed" }, "N.B.Three": { ms: 5000, outcome: "passed" } },
+  reliable: true,
+  reasons: [],
+  ...over,
+});
+
+const classEntry = (n, ms, count = 1) => ({ measuredAt: day(n), commit: `abcdef${n}0123456`, ms, count });
+
+const suite = (over = {}) => ({
+  history: [entry(10, 8000), entry(11, 8000), entry(12, 8000), entry(20, 10_000)],
+  classes: {
+    "N.A": [classEntry(10, 3000, 2), classEntry(11, 3000, 2), classEntry(12, 3000, 2), classEntry(20, 6000, 2)],
+    "N.B": [classEntry(10, 5000), classEntry(11, 5000), classEntry(12, 5000), classEntry(20, 4000)],
   },
+  tests: { "N.A.One": { ms: 2000, outcome: "passed" }, "N.A.Two": { ms: 6000, outcome: "passed" }, "N.B.Three": { ms: 4000, outcome: "passed" } },
   ...over,
 });
 
 const dataOf = (suites, over = {}) => ({
-  version: 1,
+  version: 2,
   run: { startedAt: "2026-10-20T12:00:00", commit: "abcdef123456", dirty: true, branch: "feat/x", suites: Object.fromEntries(Object.keys(suites).map((k) => [k, "measured"])), reasons: {}, ...over },
   suites,
 });
 
-const sections = (html) => html.split("<details").slice(1);
+const sections = (html) => html.split('<details class="section"').slice(1);
 
 test("report is self-contained", () => {
   const html = renderReport(dataOf({ web: suite() }));
@@ -54,11 +56,11 @@ test("header shows totals and comparison", () => {
   assert.match(html, /feat\/x/);
   assert.match(html, /setup 1\.0 s, testy 10\.0 s/);
   assert.match(html, /testów 3/);
-  assert.match(html, /z 2026-10-13: setup -500 ms, testy \+2\.0 s, liczba testów 0/);
-  assert.equal(html.includes("brak poprzedniego przebiegu"), false);
+  assert.match(html, /Względem mediany ostatnich wiarygodnych pomiarów: testy \+2\.0 s \(1 z 1 zestawów\)/);
+  assert.equal(html.includes("brak wiarygodnej historii"), false);
 
-  const first = renderReport(dataOf({ web: suite({ previous: null }) }, { dirty: false }));
-  assert.ok(first.includes("brak poprzedniego przebiegu"));
+  const first = renderReport(dataOf({ web: suite({ history: [entry(20, 10_000)] }) }, { dirty: false }));
+  assert.ok(first.includes("brak wiarygodnej historii do porównania"));
   assert.equal(first.includes("<strong>dirty</strong>"), false);
 });
 
@@ -66,20 +68,21 @@ test("suite table rows and badges", () => {
   const html = renderReport(
     dataOf(
       {
-        "dotnet:Skarbiec.Ok.Tests": suite({ kind: "dotnet" }),
-        "dotnet:Skarbiec.Red.Tests": suite({ kind: "dotnet", status: "failed", counts: counts(2, 1, 1) }),
-        e2e: suite({ kind: "e2e", measuredAt: "2026-10-01T08:00:00", previous: null }),
+        "dotnet:Skarbiec.Ok.Tests": suite(),
+        "dotnet:Skarbiec.Red.Tests": suite({ history: [entry(20, 10_000, { status: "failed", counts: counts(2, 1, 1), reliable: false, reasons: ["red-test"] })] }),
+        "dotnet:Skarbiec.Old.Tests": suite({ history: [entry(1, 10_000)] }),
       },
-      { suites: { "dotnet:Skarbiec.Ok.Tests": "measured", "dotnet:Skarbiec.Red.Tests": "measured", e2e: "unmeasured" }, reasons: { e2e: "Docker nie działa" } },
+      { suites: { "dotnet:Skarbiec.Ok.Tests": "measured", "dotnet:Skarbiec.Red.Tests": "measured", "dotnet:Skarbiec.Old.Tests": "unmeasured" }, reasons: { "dotnet:Skarbiec.Old.Tests": "Docker nie działa" } },
     ),
   );
-  const rows = html.match(/<tr data-name="(dotnet:[^"]*|e2e)">.*?<\/tr>/g);
+  const rows = html.match(/<tr data-name="dotnet:[^"]*">.*?<\/tr>/g);
   assert.equal(rows.length, 3);
   const [ok, red, untouched] = rows;
   assert.match(ok, /Skarbiec\.Ok\.Tests/);
   assert.match(ok, /badge passed">passed</);
   assert.match(ok, /\+2\.0 s \(\+25%\)/);
   assert.match(red, /badge failed">failed</);
+  assert.match(red, /badge unreliable" title="red-test">niewiarygodny</);
   assert.match(red, /<td data-v="1">1<\/td>/);
   assert.match(untouched, /badge unmeasured" title="Docker nie działa">nie zmierzony</);
   assert.match(untouched, /2026-10-01/);
@@ -101,41 +104,31 @@ const manyTests = (n, ms) => Object.fromEntries(Array.from({ length: n }, (_, i)
 
 test("top 20 slowest", () => {
   const tests = manyTests(30, (i) => 100 + i * 10);
-  const html = renderReport(dataOf({ web: suite({ tests, counts: counts(30), previous: suite().previous }) }));
+  const html = renderReport(dataOf({ web: suite({ tests }) }));
   const slowest = sections(html).find((s) => s.includes('id="slowest"'));
   const rows = slowest.match(/<tr data-name="[^"]*">/g);
   assert.equal(rows.length, 20);
   assert.ok(slowest.includes('data-name="N.T.Test29"'));
   assert.ok(slowest.includes('data-name="N.T.Test10"'));
   assert.equal(slowest.includes('data-name="N.T.Test09"'), false);
-
-  const withDelta = renderReport(dataOf({ web: suite() }));
-  assert.match(sections(withDelta).find((s) => s.includes('id="slowest"')), /data-name="N\.A\.Two".*?\+4\.0 s \(\+200%\)/);
 });
 
-test("new removed and slowdowns capped", () => {
-  const before = manyTests(25, () => 100);
-  const after = Object.fromEntries(Object.entries(manyTests(25, (i) => 100 + (i + 1) * 100)).map(([k, v]) => [k.replace("T.Test", "T.Slow"), v]));
-  const same = manyTests(25, (i) => 100 + (i + 1) * 100);
-  const html = renderReport(
-    dataOf({
-      web: suite({
-        tests: { ...same, ...after },
-        counts: counts(50),
-        previous: { ...suite().previous, counts: counts(25), tests: before, classes: {} },
-      }),
-    }),
+test("changes list suites and classes only", () => {
+  const classes = Object.fromEntries(
+    Array.from({ length: 25 }, (_, i) => [`N.Slow${String(i).padStart(2, "0")}`, [classEntry(10, 100), classEntry(11, 100), classEntry(12, 100), classEntry(20, 100 + (i + 1) * 100)]]),
   );
-  const changes = sections(html).find((s) => s.includes("Nowe testy"));
-  assert.match(changes, /Nowe testy \(25\)/);
-  assert.match(changes, /Usunięte testy \(0\)/);
-  assert.match(changes, /Największe spowolnienia \(25\)/);
-  assert.equal((changes.match(/<li>/g) ?? []).length, 20 + 20);
-  assert.equal((changes.match(/\+5 więcej/g) ?? []).length, 2);
-
-  const gone = renderReport(dataOf({ web: suite({ tests: {}, previous: { ...suite().previous, tests: manyTests(22, () => 5) } }) }));
-  assert.match(gone, /Usunięte testy \(22\)/);
-  assert.match(gone, /\+2 więcej/);
+  classes["N.Fast"] = [classEntry(10, 9000), classEntry(11, 9000), classEntry(12, 9000), classEntry(20, 1000)];
+  const html = renderReport(dataOf({ web: suite({ classes }) }));
+  const changes = sections(html).find((s) => s.includes("Klasy: największe spowolnienia"));
+  assert.match(changes, /Zmiany względem mediany ostatnich wiarygodnych pomiarów \(zestawy i klasy\)/);
+  assert.match(changes, /Zestawy \(1\)/);
+  assert.match(changes, /Klasy: największe spowolnienia \(25\)/);
+  assert.match(changes, /Klasy: największe przyspieszenia \(1\)/);
+  assert.equal((changes.match(/\+5 więcej/g) ?? []).length, 1);
+  assert.equal((changes.match(/<li>/g) ?? []).length, 1 + 20 + 1);
+  assert.match(changes, /N\.Slow24 .*?\+2\.5 s/);
+  assert.equal(/Nowe testy|Usunięte testy/.test(changes), false);
+  assert.ok(changes.indexOf("N.Slow24") < changes.indexOf("N.Slow23"));
 });
 
 test("classifyDelta applies both thresholds", () => {
@@ -148,30 +141,94 @@ test("classifyDelta applies both thresholds", () => {
   assert.equal(classifyDelta(0, 0), "plain");
 });
 
-test("uncertain comparison warns", () => {
+test("unreliable current entry is shown without a comparison", () => {
   const calm = renderReport(dataOf({ web: suite() }));
   assert.equal(calm.includes('class="warning"'), false);
-  const red = renderReport(dataOf({ "dotnet:Red.Tests": suite({ status: "failed", counts: counts(2, 1) }) }));
-  assert.match(red, /<div class="warning">Porównanie niepewne: czerwone testy w Red\.Tests/);
-  const prevRed = renderReport(dataOf({ web: suite({ previous: { ...suite().previous, status: "failed", counts: counts(2, 1) } }) }));
-  assert.ok(prevRed.includes('class="warning"'));
+
+  const history = [entry(10, 8000), entry(11, 8000), entry(12, 8000), entry(20, 30_000, { reliable: false, reasons: ["dirty-tree", "outlier"] })];
+  const html = renderReport(dataOf({ "dotnet:Dirty.Tests": suite({ history }) }));
+  assert.match(html, /<div class="warning">Pomiar niewiarygodny: Dirty\.Tests \(dirty-tree, outlier\)/);
+  const row = html.match(/<tr data-name="dotnet:Dirty\.Tests">.*?<\/tr>/)[0];
+  assert.match(row, /<td data-v="0">—<\/td>/);
+  assert.ok(html.includes("brak wiarygodnej historii do porównania"));
 });
 
-test("charts pair current and previous bars", () => {
-  const html = renderReport(dataOf({ web: suite(), "dotnet:New.Tests": suite({ previous: null }) }));
+test("only the suites section is open", () => {
+  const html = renderReport(dataOf({ web: suite() }));
+  const all = sections(html);
+  assert.equal(all.length, 4);
+  assert.deepEqual(
+    all.map((s) => s.startsWith(" open>")),
+    [true, false, false, false],
+  );
+  assert.ok(all[0].includes("<summary>Zestawy</summary>"));
+  assert.equal((html.match(/<details[^>]*\sopen/g) ?? []).length, 1);
+  assert.ok(all[3].includes("Zestawy (") && !all[3].includes("Nowe testy"));
+});
+
+test("charts pair current bars with the median", () => {
+  const html = renderReport(dataOf({ web: suite(), "dotnet:New.Tests": suite({ history: [entry(20, 10_000)], classes: { "N.Only": [classEntry(20, 50)] } }) }));
   const all = sections(html);
   const suiteChart = all.find((s) => s.includes("Zestawy: setup i testy"));
   assert.equal((suiteChart.match(/<g class="bar current">/g) ?? []).length, 2);
   assert.equal((suiteChart.match(/<g class="bar previous">/g) ?? []).length, 1);
-  assert.equal((suiteChart.match(/<svg/g) ?? []).length, 1);
+  assert.match(suiteChart, /mediana ostatnich wiarygodnych/);
   const widths = [...suiteChart.matchAll(/<rect class="[^"]*" x="[\d.]+" y="\d+" width="([\d.]+)"/g)].map((m) => Number(m[1]));
   assert.equal(Math.max(...widths) <= 520, true);
   assert.equal(widths.some((w) => w > 400), true);
   const classChart = all.find((s) => s.includes("Klasy i pliki: "));
-  assert.equal((classChart.match(/<g class="bar current">/g) ?? []).length, 4);
+  assert.equal((classChart.match(/<svg class="chart"/g) ?? []).length, 1);
+  assert.equal((classChart.match(/<g class="bar current">/g) ?? []).length, 3);
   assert.equal((classChart.match(/<g class="bar previous">/g) ?? []).length, 2);
-  assert.equal(all.length, 4);
-  for (const s of all) assert.ok(s.startsWith(" open>") || s.startsWith(">"));
+});
+
+test("history lists carry the commit", () => {
+  const html = renderReport(dataOf({ web: suite() }));
+  const suiteRow = html.match(/<tr data-name="web">.*?<\/tr>/)[0];
+  assert.match(suiteRow, /historia \(4\)/);
+  const items = [...suiteRow.matchAll(/<li[^>]*>(.*?)<\/li>/g)].map((m) => m[1]);
+  assert.equal(items.length, 4);
+  assert.match(items[0], /^2026-10-20 12:00 @ abcdef2 <span class="muted">10\.0 s<\/span>$/);
+  assert.match(items[3], /^2026-10-10 12:00 @ abcdef1 /);
+
+  const classes = sections(html).find((s) => s.includes('id="classes"'));
+  const classRow = classes.match(/<tr data-name="N\.A">.*?<\/tr>/)[0];
+  assert.match(classRow, /historia \(4\)/);
+  assert.match(classRow, /<li>2026-10-20 12:00 @ abcdef2 <span class="muted">6\.0 s<\/span><\/li>/);
+});
+
+test("unreliable history entries are greyed", () => {
+  const history = [entry(10, 8000), entry(11, 8000, { reliable: false, reasons: ["dirty-tree"] }), entry(12, 8000)];
+  const html = renderReport(
+    dataOf({
+      web: suite({
+        history,
+        classes: { "N.A": [classEntry(10, 5), classEntry(11, 6), classEntry(12, 7)] },
+      }),
+    }),
+  );
+  const suiteRow = html.match(/<tr data-name="web">.*?<\/tr>/)[0];
+  assert.equal((suiteRow.match(/<li class="unreliable" title="dirty-tree">/g) ?? []).length, 1);
+  assert.match(suiteRow, /<li class="unreliable" title="dirty-tree">2026-10-11 12:00 @ abcdef1/);
+  const classRow = html.match(/<tr data-name="N\.A">.*?<\/tr>/)[0];
+  assert.equal((classRow.match(/<li class="unreliable"/g) ?? []).length, 1);
+});
+
+test("suite trend chart greys unreliable points", () => {
+  const history = [entry(10, 8000), entry(11, 30_000, { reliable: false, reasons: ["outlier"] }), entry(12, 8000), entry(13, 9000, { reliable: false, reasons: ["dirty-tree"] })];
+  const html = renderReport(dataOf({ web: suite({ history }), "dotnet:Other.Tests": suite() }));
+  const trends = [...html.matchAll(/<figure class="trend">(.*?)<\/figure>/g)].map((m) => m[1]);
+  assert.equal(trends.length, 2);
+  const web = trends[0];
+  assert.match(web, /<figcaption>web<\/figcaption>/);
+  assert.equal((web.match(/class="pt ok"/g) ?? []).length, 2);
+  assert.equal((web.match(/class="pt unreliable"/g) ?? []).length, 2);
+  assert.equal((web.match(/<polyline/g) ?? []).length, 1);
+  assert.match(web, /<title>2026-10-11 12:00 @ abcdef1: 30\.0 s<\/title>/);
+  assert.equal((html.match(/<svg class="trend"/g) ?? []).length, 2);
+
+  const classes = sections(html).find((s) => s.includes('id="classes"'));
+  assert.equal(classes.includes('class="trend"'), false);
 });
 
 const rows = [
@@ -203,7 +260,15 @@ test("page embeds the helpers", () => {
 
 test("names are escaped", () => {
   const evil = '<img src=x onerror="a&b">';
-  const html = renderReport(dataOf({ "dotnet:Evil<Tests>": suite({ classes: { [evil]: { ms: 1, count: 1 } }, tests: { [evil]: { ms: 1, outcome: "passed" } } }) }));
+  const html = renderReport(
+    dataOf({
+      "dotnet:Evil<Tests>": suite({
+        classes: { [evil]: [classEntry(20, 1)] },
+        tests: { [evil]: { ms: 1, outcome: "passed" } },
+        history: [entry(20, 10_000, { commit: evil })],
+      }),
+    }),
+  );
   assert.equal(html.includes("<img"), false);
   assert.ok(html.includes("&lt;img src=x onerror=&quot;a&amp;b&quot;&gt;"));
   assert.ok(html.includes("Evil&lt;Tests&gt;"));

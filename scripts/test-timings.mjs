@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// Usage: node scripts/test-timings.mjs [--only dotnet,web,e2e] [--check] [--open] [--report-only]  measure the time of every test suite on a quiet machine, compare it with the previous run (skarbiec-plan/test-timings/last-run.json) and write report.html beside it
-//   --only <list>  measure only these suites (dotnet, web, e2e); the others keep their entries
+// Usage: node scripts/test-timings.mjs [--only dotnet,web] [--check] [--open] [--report-only]  measure the time of every test suite on a quiet machine, append it to the history (skarbiec-plan/test-timings/history.json, 30 entries per suite and class) and write report.html beside it
+//   --only <list>  measure only these suites (dotnet, web); the others keep their history
 //   --check        only check that the machine is quiet: exit 0 quiet, 3 busy (every source listed as "działa: ...")
 //   --open         open report.html in the browser when it is written
-//   --report-only  render report.html from the existing last-run.json without preflight or measuring (exit 3 when the file is missing)
+//   --report-only  render report.html from the existing history.json without preflight or measuring (exit 3 when the file is missing)
 // Exit codes: 0 measured and nothing red, 1 a red test, 3 environment (machine busy, Docker down, a suite unmeasured, another instance running)
 
 import { spawn, spawnSync } from "node:child_process";
@@ -18,16 +18,18 @@ import { renderReport } from "./test-timings-report.mjs";
 const IS_WIN = process.platform === "win32";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const WEB_DIR = path.join(REPO_ROOT, "web");
-const E2E_RESULTS_JSON = path.join(REPO_ROOT, "e2e", "test-results", "results.json");
 const DATA_DIR = path.join(REPO_ROOT, "skarbiec-plan", "test-timings");
-const DATA_FILE = path.join(DATA_DIR, "last-run.json");
+const DATA_FILE = path.join(DATA_DIR, "history.json");
 const REPORT_FILE = path.join(DATA_DIR, "report.html");
 const NPM = IS_WIN ? "npm.cmd" : "npm";
 const COMMAND_TIMEOUT_MS = 90 * 60 * 1000;
-const COMPOSE_PROJECTS = ["skarbiec-local", "skarbiec-e2e"];
-const GROUPS = ["dotnet", "web", "e2e"];
-const DATA_VERSION = 1;
-const SLOWDOWNS_KEPT = 10;
+const COMPOSE_PROJECTS = ["skarbiec-local"];
+const GROUPS = ["dotnet", "web"];
+const DATA_VERSION = 2;
+export const HISTORY_LIMIT = 30;
+export const BASELINE_SIZE = 5;
+export const MIN_BASELINE = 3;
+export const OUTLIER_RATIO = 0.25;
 
 const DOTNET_PROJECTS = [
   { name: "Skarbiec.Contracts.Tests", rel: "contracts/Skarbiec.Contracts.Tests/Skarbiec.Contracts.Tests.csproj" },
@@ -40,7 +42,7 @@ const DOTNET_PROJECTS = [
   { name: "Skarbiec.Testing.Tests", rel: "Skarbiec.Testing.Tests/Skarbiec.Testing.Tests.csproj" },
 ];
 
-export const ALL_KEYS = [...DOTNET_PROJECTS.map((p) => `dotnet:${p.name}`), "web", "e2e"];
+export const ALL_KEYS = [...DOTNET_PROJECTS.map((p) => `dotnet:${p.name}`), "web"];
 
 const round1 = (n) => Math.round(n * 10) / 10;
 const groupOf = (key) => key.split(":")[0];
@@ -73,7 +75,7 @@ export function selectSuites(only, available = ALL_KEYS) {
   return available.filter((key) => groups.includes(groupOf(key)));
 }
 
-export const dockerRequired = (keys) => keys.some((key) => groupOf(key) !== "web");
+export const dockerRequired = (keys) => keys.some((key) => groupOf(key) === "dotnet");
 
 const isAliveDefault = (pid) => {
   try {
@@ -103,7 +105,6 @@ export function detectBusy({ processes = [], pidFiles = {}, containers = {}, run
 
   const pidSources = [
     ["verify", "verify.mjs"],
-    ["e2e", "e2e.mjs"],
     ["timings", "inny test-timings.mjs"],
   ];
   for (const [field, label] of pidSources) {
@@ -129,7 +130,7 @@ export function detectBusy({ processes = [], pidFiles = {}, containers = {}, run
 export function evaluateSilence({ keys, dockerUp = true, ...busyInputs }) {
   const { busy, warnings } = detectBusy(busyInputs);
   const lines = [...busy];
-  if (!dockerUp && dockerRequired(keys)) lines.push("Docker nie jest uruchomiony (wymagany dla dotnet i e2e)");
+  if (!dockerUp && dockerRequired(keys)) lines.push("Docker nie jest uruchomiony (wymagany dla dotnet)");
   return { lines, warnings };
 }
 
@@ -207,36 +208,6 @@ export function parseVitestJson(source, { root = null } = {}) {
   return aggregate(rows);
 }
 
-const PLAYWRIGHT_OUTCOME = { expected: "passed", flaky: "passed", unexpected: "failed", skipped: "skipped" };
-
-function walkPlaywright(suite, chain, file, rows) {
-  for (const spec of suite.specs ?? []) {
-    const specFile = spec.file ?? file;
-    for (const test of spec.tests ?? []) {
-      const last = test.results?.at(-1);
-      rows.push({
-        id: [specFile, ...chain, spec.title].join(" › "),
-        cls: specFile,
-        ms: Number(last?.duration ?? 0),
-        outcome: PLAYWRIGHT_OUTCOME[test.status] ?? "failed",
-      });
-    }
-  }
-  for (const child of suite.suites ?? []) walkPlaywright(child, [...chain, child.title], file, rows);
-}
-
-export function parsePlaywrightJson(source, { commandStartedAt }) {
-  const report = typeof source === "string" ? JSON.parse(source) : source;
-  const rows = [];
-  for (const suite of report.suites ?? []) walkPlaywright(suite, [], suite.file ?? suite.title, rows);
-  const startedAt = Date.parse(report.stats?.startTime);
-  return {
-    ...aggregate(rows),
-    testMs: Math.round(Number(report.stats?.duration ?? 0)),
-    setupMs: Number.isFinite(startedAt) ? Math.max(0, Math.round(startedAt - commandStartedAt)) : 0,
-  };
-}
-
 export function dotnetCommands(csproj, { trxName, resultsDir }) {
   return {
     build: { bin: "dotnet", args: ["build", csproj] },
@@ -255,6 +226,7 @@ export function parseDataFile(text) {
   try {
     const data = JSON.parse(text);
     if (data?.version !== DATA_VERSION || typeof data.suites !== "object" || data.suites === null || Array.isArray(data.suites)) return null;
+    if (!Object.values(data.suites).every((s) => Array.isArray(s?.history) && s.history.length > 0 && s.classes && s.tests)) return null;
     return data;
   } catch {
     return null;
@@ -263,76 +235,64 @@ export function parseDataFile(text) {
 
 const totalTests = (counts) => counts.passed + counts.failed + counts.skipped;
 
+export function median(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+export const baselineOf = (entries) => entries.filter((e) => e.reliable).slice(-BASELINE_SIZE);
+
+export function assessReliability(history, { dirty, counts, testMs }) {
+  const reasons = [];
+  if (dirty) reasons.push("dirty-tree");
+  if (counts.failed > 0) reasons.push("red-test");
+  const baseline = baselineOf(history);
+  if (baseline.length >= MIN_BASELINE) {
+    const mid = median(baseline.map((e) => e.testMs));
+    if (mid > 0 && Math.abs(testMs - mid) > mid * OUTLIER_RATIO) reasons.push("outlier");
+  }
+  return { reliable: reasons.length === 0, reasons };
+}
+
+export function compareWithMedian(entries, field = "testMs") {
+  const current = entries.at(-1);
+  if (!current?.reliable) return null;
+  const baseline = baselineOf(entries.slice(0, -1));
+  if (!baseline.length) return null;
+  const mid = median(baseline.map((e) => e[field]));
+  return { ms: current[field], baselineMs: mid, deltaMs: round1(current[field] - mid), baselineSize: baseline.length };
+}
+
+export function classSeries(suite, name) {
+  const reliableAt = new Map(suite.history.map((e) => [e.measuredAt, e.reliable]));
+  return (suite.classes[name] ?? []).map((c) => ({ ...c, reliable: reliableAt.get(c.measuredAt) ?? false }));
+}
+
 export function mergeSuite(data, key, outcome, meta) {
   const base = data ?? { version: DATA_VERSION, run: null, suites: {} };
   if (!outcome.measured) return { data: base, status: "unmeasured", reason: outcome.reason };
   if (totalTests(outcome.counts) === 0) return { data: base, status: "unmeasured", reason: "0 testów" };
 
-  const old = base.suites[key] ?? null;
-  let previous = null;
-  if (old) {
-    const { previous: _dropped, ...rest } = old;
-    previous = rest;
-  }
+  const old = base.suites[key] ?? { history: [], classes: {}, tests: {} };
+  const testMs = Math.round(outcome.testMs);
   const entry = {
-    kind: outcome.kind,
     measuredAt: meta.measuredAt,
     commit: meta.commit,
     dirty: meta.dirty,
-    branch: meta.branch,
     status: outcome.counts.failed > 0 ? "failed" : "passed",
     setupMs: Math.round(outcome.setupMs),
-    testMs: Math.round(outcome.testMs),
+    testMs,
     counts: outcome.counts,
-    classes: outcome.classes,
-    tests: outcome.tests,
-    previous,
+    ...assessReliability(old.history, { dirty: meta.dirty, counts: outcome.counts, testMs }),
   };
-  return { data: { ...base, suites: { ...base.suites, [key]: entry } }, status: entry.status };
-}
-
-const isRed = (e) => e.status === "failed" || (e.counts?.failed ?? 0) > 0;
-
-function compareMaps(current, previous) {
-  const both = {};
-  for (const name of Object.keys(current)) {
-    const before = previous[name];
-    if (!before) continue;
-    both[name] = { ms: current[name].ms, previousMs: before.ms, deltaMs: round1(current[name].ms - before.ms) };
-    if ("count" in current[name]) {
-      both[name].count = current[name].count;
-      both[name].previousCount = before.count;
-    }
+  const classes = {};
+  for (const [name, c] of Object.entries(outcome.classes)) {
+    classes[name] = [...(old.classes[name] ?? []), { measuredAt: meta.measuredAt, commit: meta.commit, ms: c.ms, count: c.count }].slice(-HISTORY_LIMIT);
   }
-  return both;
-}
-
-const largest = (map) =>
-  Object.entries(map)
-    .filter(([, d]) => d.deltaMs > 0)
-    .sort((a, b) => b[1].deltaMs - a[1].deltaMs)
-    .slice(0, SLOWDOWNS_KEPT)
-    .map(([id, d]) => ({ id, deltaMs: d.deltaMs }));
-
-export function computeDeltas(entry) {
-  const prev = entry?.previous;
-  if (!prev) return null;
-  const classes = compareMaps(entry.classes, prev.classes);
-  const tests = compareMaps(entry.tests, prev.tests);
-  const count = totalTests(entry.counts);
-  const previousCount = totalTests(prev.counts);
-  return {
-    uncertain: isRed(entry) || isRed(prev),
-    setupMs: { ms: entry.setupMs, previousMs: prev.setupMs, deltaMs: entry.setupMs - prev.setupMs },
-    testMs: { ms: entry.testMs, previousMs: prev.testMs, deltaMs: entry.testMs - prev.testMs },
-    testCount: { count, previousCount, delta: count - previousCount },
-    classes,
-    tests,
-    newTests: Object.keys(entry.tests).filter((id) => !(id in prev.tests)),
-    removedTests: Object.keys(prev.tests).filter((id) => !(id in entry.tests)),
-    slowdowns: largest(tests),
-    classSlowdowns: largest(classes),
-  };
+  const suite = { history: [...old.history, entry].slice(-HISTORY_LIMIT), classes, tests: outcome.tests };
+  return { data: { ...base, suites: { ...base.suites, [key]: suite } }, status: entry.status };
 }
 
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -348,44 +308,36 @@ export function formatDuration(ms) {
 export const formatDelta = (ms) => `${ms < 0 ? "-" : "+"}${formatDuration(ms)}`;
 
 const formatCount = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-const formatCountDelta = (n) => `${n < 0 ? "-" : "+"}${formatCount(Math.abs(n))}`;
-
-function localDate(iso) {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
 
 export function progressLine(index, total, key, outcome) {
   const prefix = `[${index}/${total}] ${key.startsWith("dotnet:") ? `dotnet ${labelOf(key)}` : key}`;
   if (outcome.status === "unmeasured") return `${prefix} — niezmierzony: ${outcome.reason}`;
   const { entry } = outcome;
-  return `${prefix} — setup ${formatDuration(entry.setupMs)}, testy ${formatDuration(entry.testMs)}, ${formatCount(totalTests(entry.counts))} testów, ${entry.counts.failed} czerwonych`;
+  const flag = entry.reliable ? "" : `, niewiarygodny (${entry.reasons.join(", ")})`;
+  return `${prefix} — setup ${formatDuration(entry.setupMs)}, testy ${formatDuration(entry.testMs)}, ${formatCount(totalTests(entry.counts))} testów, ${entry.counts.failed} czerwonych${flag}`;
 }
 
 export function summarize(measured) {
   if (!measured.length) return "Nic nie zmierzono.";
-  const entries = measured.map(({ key, entry }) => ({ key, entry }));
-  const total = (e) => e.setupMs + e.testMs;
   const sum = (list, f) => list.reduce((acc, x) => acc + f(x), 0);
-  const nowMs = sum(entries, ({ entry }) => total(entry));
-  const tests = sum(entries, ({ entry }) => totalTests(entry.counts));
-  const red = sum(entries, ({ entry }) => entry.counts.failed);
-  const compared = entries.filter(({ entry }) => entry.previous);
+  const nowMs = sum(measured, ({ entry }) => entry.setupMs + entry.testMs);
+  const tests = sum(measured, ({ entry }) => totalTests(entry.counts));
+  const red = sum(measured, ({ entry }) => entry.counts.failed);
+  const compared = measured.filter(({ comparison }) => comparison);
+  const tail = `testów ${formatCount(tests)}, ${red} czerwonych.`;
 
-  if (!compared.length) return `Razem ${formatDuration(nowMs)} (brak poprzedniego przebiegu), testów ${formatCount(tests)}, ${red} czerwonych.`;
-
-  const timeDelta = sum(compared, ({ entry }) => total(entry) - total(entry.previous));
-  const testsDelta = sum(compared, ({ entry }) => totalTests(entry.counts) - totalTests(entry.previous.counts));
-  const since = compared.map(({ entry }) => entry.previous.measuredAt).sort()[0];
-  const grew = compared
-    .map(({ key, entry }) => ({ key, delta: total(entry) - total(entry.previous) }))
-    .filter((x) => x.delta > 0)
-    .sort((a, b) => b.delta - a.delta)[0];
-  const uncertain = compared.filter(({ entry }) => computeDeltas(entry).uncertain).map(({ key }) => labelOf(key));
-
-  let line = `Razem ${formatDuration(nowMs)} (${formatDelta(timeDelta)} vs ${localDate(since)}), testów ${formatCount(tests)} (${formatCountDelta(testsDelta)}), ${red} czerwonych.`;
-  if (grew) line += ` Najwięcej urosło: ${labelOf(grew.key)} ${formatDelta(grew.delta)}`;
-  if (uncertain.length) line += `${grew ? "." : ""} Porównanie niepewne (czerwone testy): ${uncertain.join(", ")}`;
+  let line;
+  if (!compared.length) line = `Razem ${formatDuration(nowMs)} (brak wiarygodnej historii do porównania), ${tail}`;
+  else {
+    const delta = sum(compared, ({ comparison }) => comparison.deltaMs);
+    line = `Razem ${formatDuration(nowMs)} (testy ${formatDelta(delta)} vs mediana), ${tail}`;
+    const grew = compared
+      .filter(({ comparison }) => comparison.deltaMs > 0)
+      .sort((a, b) => b.comparison.deltaMs - a.comparison.deltaMs)[0];
+    if (grew) line += ` Najwięcej urosło: ${labelOf(grew.key)} ${formatDelta(grew.comparison.deltaMs)}`;
+  }
+  const unreliable = measured.filter(({ entry }) => !entry.reliable).map(({ key, entry }) => `${labelOf(key)} (${entry.reasons.join(", ")})`);
+  if (unreliable.length) line += `${line.endsWith(".") ? "" : "."} Pomiar niewiarygodny: ${unreliable.join(", ")}`;
   return line;
 }
 
@@ -437,7 +389,8 @@ export async function runSuites({ keys, data, check, measure, write, git, now = 
     const outcome = await measure(key);
     const merged = mergeSuite(current, key, outcome, { measuredAt: now().toISOString(), ...git });
     current = merged.data;
-    const result = { key, status: merged.status, reason: merged.reason, entry: merged.status === "unmeasured" ? undefined : current.suites[key] };
+    const history = merged.status === "unmeasured" ? null : current.suites[key].history;
+    const result = { key, status: merged.status, reason: merged.reason, entry: history?.at(-1), comparison: history ? compareWithMedian(history) : null };
     results.push(result);
     record();
     onSuite(i + 1, keys.length, key, result);
@@ -502,7 +455,7 @@ async function measureDotnet(key) {
     const test = await exec(commands.test.bin, commands.test.args);
     const trx = readText(path.join(dir, "result.trx"));
     if (!trx || (test.status !== 0 && test.status !== 1)) return { measured: false, reason: failureReason("brak wyniku testów", test) };
-    return { measured: true, kind: "dotnet", setupMs: build.ms, testMs: test.ms, ...parseTrx(trx) };
+    return { measured: true, setupMs: build.ms, testMs: test.ms, ...parseTrx(trx) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -518,24 +471,14 @@ async function measureWeb() {
     const test = await exec(commands.test.bin, commands.test.args, { cwd: WEB_DIR });
     const json = readText(outputFile);
     if (!json || (test.status !== 0 && test.status !== 1)) return { measured: false, reason: failureReason("brak wyniku testów", test) };
-    return { measured: true, kind: "web", setupMs: install.ms, testMs: test.ms, ...parseVitestJson(json, { root: WEB_DIR }) };
+    return { measured: true, setupMs: install.ms, testMs: test.ms, ...parseVitestJson(json, { root: WEB_DIR }) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
-async function measureE2e() {
-  rmSync(E2E_RESULTS_JSON, { force: true });
-  const run = await exec(process.execPath, [path.join(REPO_ROOT, "scripts", "e2e.mjs"), "run"]);
-  const json = readText(E2E_RESULTS_JSON);
-  if (!json || (run.status !== 0 && run.status !== 1)) return { measured: false, reason: failureReason("e2e nie zostało uruchomione", run) };
-  return { measured: true, kind: "e2e", ...parsePlaywrightJson(json, { commandStartedAt: run.startedAt }) };
-}
-
 function measure(key) {
-  if (key === "web") return measureWeb();
-  if (key === "e2e") return measureE2e();
-  return measureDotnet(key);
+  return key === "web" ? measureWeb() : measureDotnet(key);
 }
 
 function git(argv) {
@@ -572,7 +515,7 @@ function gitInfo() {
   return {
     commit: git(["rev-parse", "HEAD"]),
     branch: git(["rev-parse", "--abbrev-ref", "HEAD"]),
-    dirty: Boolean(git(["status", "--porcelain"])),
+    dirty: Boolean(git(["status", "--porcelain", "--untracked-files=no"])),
   };
 }
 
@@ -600,7 +543,7 @@ function snapshot() {
   return {
     dockerUp,
     processes: listProcesses(),
-    pidFiles: { verify: readPidInfo("verify"), e2e: readPidInfo("e2e"), timings: readPidInfo("test-timings") },
+    pidFiles: { verify: readPidInfo("verify"), timings: readPidInfo("test-timings") },
     containers: dockerUp ? Object.fromEntries(COMPOSE_PROJECTS.map((p) => [p, runningContainers(p)])) : {},
     runners: fetchRunners(),
   };
@@ -641,7 +584,7 @@ async function main(argv) {
     return 2;
   }
   if (args.help) {
-    console.log("Usage: node scripts/test-timings.mjs [--only dotnet,web,e2e] [--check] [--open] [--report-only]");
+    console.log("Usage: node scripts/test-timings.mjs [--only dotnet,web] [--check] [--open] [--report-only]");
     return 0;
   }
   if (args.reportOnly) return reportOnly({ open: args.open });
@@ -670,10 +613,10 @@ async function main(argv) {
 
   claimPidFile();
   try {
-    const previous = parseDataFile(readText(DATA_FILE) ?? "");
+    const existing = parseDataFile(readText(DATA_FILE) ?? "");
     const outcome = await runSuites({
       keys,
-      data: previous,
+      data: existing,
       check,
       measure,
       write: (data) => writeAtomically(DATA_FILE, data),
@@ -685,7 +628,7 @@ async function main(argv) {
       console.log("Nic nie zmierzono, plik z wynikami bez zmian.");
       return 3;
     }
-    const measured = outcome.results.filter((r) => r.entry).map((r) => ({ key: r.key, entry: r.entry }));
+    const measured = outcome.results.filter((r) => r.entry).map((r) => ({ key: r.key, entry: r.entry, comparison: r.comparison }));
     console.log(summarize(measured));
     console.log(`Wyniki: ${path.relative(REPO_ROOT, DATA_FILE).replaceAll("\\", "/")}`);
     if (measured.length) emitReport(outcome.data, { open: args.open });
