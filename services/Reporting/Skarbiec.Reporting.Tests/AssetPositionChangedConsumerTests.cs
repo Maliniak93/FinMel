@@ -70,28 +70,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
     }
 
     [Fact]
-    public async Task Consume_EventWithQuoteUnitsPerQuantity_StoresAndUpdatesMultiplier()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var assetId = Guid.NewGuid();
-        var accountId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-
-        await RunConsumerAsync(async provider =>
-        {
-            var bus = provider.GetRequiredService<IBus>();
-
-            await bus.Publish(Event(assetId, accountId, userId, quantity: 3m, version: 0, quoteUnitsPerQuantity: 31.1034768m), cancellationToken);
-            var first = await WaitForPositionAsync(provider, assetId, cancellationToken);
-            Assert.Equal(31.1034768m, first.QuoteUnitsPerQuantity);
-
-            await bus.Publish(Event(assetId, accountId, userId, quantity: 3m, version: 1, quoteUnitsPerQuantity: 100m), cancellationToken);
-            var second = await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
-            Assert.Equal(100m, second.QuoteUnitsPerQuantity);
-        }, cancellationToken);
-    }
-
-    [Fact]
     public async Task Consume_SecondEventForSameAsset_UpsertsSingleRow()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -103,14 +81,16 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         {
             var bus = provider.GetRequiredService<IBus>();
 
-            await bus.Publish(Event(assetId, accountId, userId, quantity: 5m, version: 0), cancellationToken);
-            await WaitForPositionAsync(provider, assetId, cancellationToken);
+            await bus.Publish(Event(assetId, accountId, userId, quantity: 5m, version: 0, quoteUnitsPerQuantity: 31.1034768m), cancellationToken);
+            var first = await WaitForPositionAsync(provider, assetId, cancellationToken);
+            Assert.Equal(31.1034768m, first.QuoteUnitsPerQuantity);
 
-            await bus.Publish(Event(assetId, accountId, userId, quantity: 9m, version: 1), cancellationToken);
+            await bus.Publish(Event(assetId, accountId, userId, quantity: 9m, version: 1, quoteUnitsPerQuantity: 100m), cancellationToken);
             var position = await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
 
             Assert.Equal(9m, position.Quantity);
             Assert.Equal(1, position.Version);
+            Assert.Equal(100m, position.QuoteUnitsPerQuantity);
 
             await using var scope = provider.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
@@ -259,35 +239,6 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
     }
 
     [Fact]
-    public async Task Consume_PlnCash_WritesTodaysLineAndSnapshot()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var assetId = Guid.NewGuid();
-        var accountId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        var today = Today;
-
-        await RunConsumerAsync(async provider =>
-        {
-            var bus = provider.GetRequiredService<IBus>();
-            await bus.Publish(Event(assetId, accountId, userId, quantity: 1_000m, version: 0), cancellationToken);
-
-            var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken);
-
-            Assert.Equal(1_000m, snapshot.TotalPln);
-            Assert.Equal(userId, snapshot.UserId);
-            Assert.False(snapshot.IsStale);
-
-            var line = Assert.Single(await GetLinesAsync(containers, accountId, today, cancellationToken));
-            Assert.Equal(assetId, line.AssetId);
-            Assert.Equal(userId, line.UserId);
-            Assert.Equal(AssetClass.Cash, line.AssetClass);
-            Assert.Equal(1_000m, line.ValuePln);
-            Assert.False(line.IsStale);
-        }, cancellationToken);
-    }
-
-    [Fact]
     public async Task Consume_ForeignCash_ValuesWithLatestLocalFxRate()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -385,12 +336,19 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
 
             var snapshot = await WaitForSnapshotAsync(provider, userId, today, cancellationToken, s => s.TotalPln == 5_300m);
             Assert.Equal(userId, snapshot.UserId);
+            Assert.False(snapshot.IsStale);
 
             await using var db = OpenDbContext(containers);
             Assert.Equal(1, await db.ValuationSnapshots.IgnoreQueryFilters().CountAsync(s => s.UserId == userId && s.Date == today, cancellationToken));
 
             var lines = await GetUserLinesAsync(containers, userId, today, cancellationToken);
             Assert.Equal(2, lines.Count);
+            Assert.All(lines, l =>
+            {
+                Assert.Equal(userId, l.UserId);
+                Assert.Equal(AssetClass.Cash, l.AssetClass);
+                Assert.False(l.IsStale);
+            });
             Assert.Equal(5_300m, lines.Sum(l => l.ValuePln));
             Assert.Equal(300m, lines.Single(l => l.AssetId == assetAId).ValuePln);
             Assert.Equal(accountAId, lines.Single(l => l.AssetId == assetAId).AccountId);

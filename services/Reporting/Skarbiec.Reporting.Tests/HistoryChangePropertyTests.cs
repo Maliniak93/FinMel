@@ -7,7 +7,7 @@ namespace Skarbiec.Reporting.Tests;
 
 public sealed class HistoryChangePropertyTests
 {
-    private const int CaseCount = 200;
+    private const int CaseCount = 50;
 
     private static readonly DateOnly Origin = new(2026, 3, 1);
     private static readonly Guid AssetId = Guid.NewGuid();

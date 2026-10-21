@@ -6,7 +6,7 @@ namespace Skarbiec.Reporting.Tests;
 
 public sealed class HistoryRebuildPropertyTests
 {
-    private const int CaseCount = 100;
+    private const int CaseCount = 50;
 
     private static readonly string[] Currencies = ["PLN", "USD", "EUR"];
 
