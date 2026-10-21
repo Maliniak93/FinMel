@@ -8,6 +8,7 @@ import {
   detectBusy,
   dockerRequired,
   dotnetCommands,
+  emitReport,
   evaluateSilence,
   exitCodeFor,
   mergeSuite,
@@ -17,6 +18,7 @@ import {
   parseTrx,
   parseVitestJson,
   progressLine,
+  reportOnly,
   runSuites,
   selectSuites,
   summarize,
@@ -407,8 +409,10 @@ test("exitCodeFor", () => {
 });
 
 test("arguments select suites", () => {
-  assert.deepEqual(parseArgs([]), { only: null, check: false, help: false });
-  assert.deepEqual(parseArgs(["--only", "web,e2e", "--check"]), { only: ["web", "e2e"], check: true, help: false });
+  assert.deepEqual(parseArgs([]), { only: null, check: false, help: false, open: false, reportOnly: false });
+  assert.deepEqual(parseArgs(["--only", "web,e2e", "--check"]), { only: ["web", "e2e"], check: true, help: false, open: false, reportOnly: false });
+  assert.equal(parseArgs(["--open", "--report-only"]).open, true);
+  assert.equal(parseArgs(["--report-only"]).reportOnly, true);
   assert.ok(parseArgs(["--only", "nope"]).error);
   assert.ok(parseArgs(["--wat"]).error);
   assert.deepEqual(selectSuites(["web"]), ["web"]);
@@ -430,5 +434,52 @@ test("the script is documented once and its data directory is ignored", () => {
   assert.equal(claude.filter((l) => l.includes("scripts/test-timings.mjs")).length, 1);
   assert.ok(readFileSync(`${root}.gitignore`, "utf8").split("\n").includes("skarbiec-plan/test-timings/"));
   const header = readFileSync(fileURLToPath(import.meta.url).replace(".test.mjs", ".mjs"), "utf8").split("\n").slice(0, 6).join("\n");
-  for (const flag of ["--only", "--check"]) assert.ok(header.includes(flag));
+  for (const flag of ["--only", "--check", "--open", "--report-only"]) {
+    assert.ok(header.includes(flag));
+    assert.ok(claude.find((l) => l.includes("scripts/test-timings.mjs")).includes(flag));
+  }
+});
+
+const fixtureData = () => ({
+  version: 1,
+  run: { startedAt: "2026-10-20T12:00:00", commit: "abcdef123456", dirty: false, branch: "feat/x", suites: { web: "measured" }, reasons: {} },
+  suites: { web: { kind: "web", measuredAt: "2026-10-20T12:00:00", commit: "abc", dirty: false, branch: "feat/x", ...entryOf() } },
+});
+
+const sink = () => {
+  const calls = { written: [], opened: [], logs: [] };
+  return {
+    calls,
+    options: {
+      file: "/tmp/skarbiec/report.html",
+      write: (file, text) => calls.written.push({ file, text }),
+      opener: (file) => calls.opened.push(file),
+      log: (line) => calls.logs.push(line),
+    },
+  };
+};
+
+test("report is written after a run", () => {
+  const { calls, options } = sink();
+  emitReport(fixtureData(), options);
+  assert.equal(calls.written.length, 1);
+  assert.ok(calls.written[0].text.startsWith("<!doctype html>"));
+  assert.ok(calls.logs.some((l) => l.includes("report.html")));
+  assert.equal(calls.opened.length, 0);
+});
+
+test("report-only needs no measuring", () => {
+  const { calls, options } = sink();
+  assert.equal(reportOnly({ read: () => JSON.stringify(fixtureData()), ...options }), 0);
+  assert.equal(calls.written.length, 1);
+  const missing = sink();
+  assert.equal(reportOnly({ read: () => null, ...missing.options }), 3);
+  assert.equal(missing.calls.written.length, 0);
+  assert.ok(missing.calls.logs.length > 0);
+});
+
+test("open flag calls the opener", () => {
+  const { calls, options } = sink();
+  emitReport(fixtureData(), { ...options, open: true });
+  assert.deepEqual(calls.opened, ["/tmp/skarbiec/report.html"]);
 });
