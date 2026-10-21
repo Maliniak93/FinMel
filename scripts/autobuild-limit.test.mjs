@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { awaitReady, buildWithResume, decideOnLimit, finishShutdown, handleLimit } from "./autobuild-limit.mjs";
+import { awaitReady, buildWithResume, decideOnLimit, finishShutdown, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MIN = 60e3;
@@ -97,6 +97,41 @@ test("resume rebuilds the same part uncounted", async () => {
   assert.deepEqual(events, ["build", "limit", "ready", "build"]);
   assert.equal(ctx.builds, 1);
   assert.equal(result.limit, undefined);
+});
+
+test("wake rearms the guard before readiness", async () => {
+  const events = [];
+  const results = [{ limit: { resetsAt: after(40 * MIN) } }, {}];
+  await buildWithResume({
+    part: { number: 7 },
+    build: async () => (events.push("build"), results.shift()),
+    onLimit: async () => void events.push("limit"),
+    rearm: async () => void events.push("rearm"),
+    awaitReady: async () => (events.push("ready"), { ready: true }),
+  });
+  assert.deepEqual(events, ["build", "limit", "rearm", "ready", "build"]);
+
+  const lines = [];
+  const guard = await rearmGuard({ start: async () => (events.push("start"), { active: true }), log: (l) => lines.push(l), line: () => "blocked" });
+  assert.equal(guard.active, true);
+  assert.deepEqual(lines, ["blocked"]);
+});
+
+test("failed rearm retries once then warns", async () => {
+  const lines = [];
+  const line = (g) => (g.active ? "blocked" : `UWAGA: ${g.reason}`);
+  const answers = [{ active: false, reason: "first" }, { active: true }];
+  const recovered = await rearmGuard({ start: async () => answers.shift(), log: (l) => lines.push(l), line });
+  assert.equal(recovered.active, true);
+  assert.equal(answers.length, 0);
+  assert.equal(lines.at(-1), "blocked");
+
+  let starts = 0;
+  lines.length = 0;
+  const failed = await rearmGuard({ start: async () => (starts++, { active: false, reason: "no ready" }), log: (l) => lines.push(l), line });
+  assert.equal(starts, 2);
+  assert.equal(failed.active, false);
+  assert.equal(lines.at(-1), "UWAGA: no ready");
 });
 
 test("shutdown asks first", async () => {

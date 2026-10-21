@@ -1,4 +1,4 @@
-// Usage: imported by autobuild.mjs - wake-timer state, suspend/hibernate with a resume timer, the timed Tak/Nie popup; runs nothing on import
+// Usage: imported by autobuild.mjs - wake-timer state, the confirmed sleep guard, suspend/hibernate with a resume timer, the timed Tak/Nie popup; runs nothing on import
 import { spawn, spawnSync } from "node:child_process";
 
 const HINT = "run `powercfg /setacvalueindex SCHEME_CURRENT SUB_SLEEP RTCWAKE 1`, then `powercfg /setactive SCHEME_CURRENT`";
@@ -89,6 +89,66 @@ export function confirmScript(action, seconds = 600) {
 }
 
 const encoded = (script) => Buffer.from(script, "utf16le").toString("base64");
+
+const GUARD_READY_MS = 10e3;
+const GUARD_REASSERT_S = 30;
+
+// 0x80000003 = ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED - the display staying on also keeps the idle lock off
+export function guardScript(parentPid) {
+  return [
+    "$sig = '[DllImport(\"kernel32.dll\")] public static extern uint SetThreadExecutionState(uint esFlags);'",
+    "Add-Type -MemberDefinition $sig -Name Power -Namespace Skarbiec | Out-Null",
+    "$flags = [uint32]2147483651",
+    "if ([Skarbiec.Power]::SetThreadExecutionState($flags) -eq 0) { exit 1 }",
+    "[Console]::Out.WriteLine('ready')",
+    "[Console]::Out.Flush()",
+    `while (Get-Process -Id ${parentPid} -ErrorAction SilentlyContinue) { Start-Sleep -Seconds ${GUARD_REASSERT_S}; [void][Skarbiec.Power]::SetThreadExecutionState($flags) }`,
+  ].join("\n");
+}
+
+export function guardSpawn(parentPid) {
+  return {
+    command: "powershell.exe",
+    args: ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encoded(guardScript(parentPid))],
+    options: { windowsHide: true, stdio: ["ignore", "pipe", "ignore"] },
+  };
+}
+
+// resolves once the guard child printed `ready` (SetThreadExecutionState succeeded); the child stays up and re-asserts the state
+export function startGuard({ parentPid = process.pid, spawnFn = spawn, timeoutMs = GUARD_READY_MS } = {}) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let child = null;
+    const settle = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (!result.active) child?.kill();
+      resolve({ ...result, child });
+    };
+    const timer = setTimeout(() => settle({ active: false, reason: `no confirmation in ${Math.round(timeoutMs / 1000)} s` }), timeoutMs);
+    try {
+      const { command, args, options } = guardSpawn(parentPid);
+      child = spawnFn(command, args, options);
+    } catch (err) {
+      settle({ active: false, reason: err.message });
+      return;
+    }
+    let out = "";
+    child.stdout?.setEncoding?.("utf8");
+    child.stdout?.on("data", (chunk) => {
+      out += chunk;
+      if (/^ready\s*$/m.test(out)) settle({ active: true, reason: null });
+    });
+    child.on("error", (err) => settle({ active: false, reason: err.message }));
+    child.on("close", (code) => settle({ active: false, reason: `the guard exited with code ${code}` }));
+  });
+}
+
+export function guardLine(guard) {
+  if (guard.active) return "sleep, display-off and idle lock blocked while the run lasts (closing the lid still sleeps)";
+  return `UWAGA: blokada snu nie działa (${guard.reason}) — PC może zasnąć w trakcie buildu`;
+}
 
 export function suspendUntil(date, mode) {
   return new Promise((resolve) => {
