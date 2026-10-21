@@ -89,19 +89,13 @@ public sealed class DepositTenancyIsolationTests(SkarbiecContainersFixture conta
         var deposit = await owner.AddDepositAsync(cancellationToken);
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
 
-        var previewViaOwnersAccount = await stranger.GetAsync(
+        var preview = await stranger.GetAsync(
             DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
-        var previewViaStrangersAccount = await stranger.GetAsync(
-            DepositSettlementPreviewUri(deposit.AssetId), cancellationToken);
-        var settleViaOwnersAccount = await stranger.PostAsJsonAsync(
-            SettleDepositUri(deposit.AssetId), NewSettleRequest(), cancellationToken);
-        var settleViaStrangersAccount = await stranger.PostAsJsonAsync(
+        var settle = await stranger.PostAsJsonAsync(
             SettleDepositUri(deposit.AssetId), NewSettleRequest(), cancellationToken);
 
-        Assert.Equal(HttpStatusCode.NotFound, previewViaOwnersAccount.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, previewViaStrangersAccount.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, settleViaOwnersAccount.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, settleViaStrangersAccount.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, preview.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, settle.StatusCode);
         await owner.AssertDepositUnsettledAsync(deposit.AssetId, cancellationToken);
         await using var dbContext = CreateDbContext(ownerId);
         var terms = await dbContext.Set<TermDeposit>().SingleAsync(t => t.AssetId == deposit.AssetId, cancellationToken);

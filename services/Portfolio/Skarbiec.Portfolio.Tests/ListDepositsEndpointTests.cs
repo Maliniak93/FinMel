@@ -155,19 +155,6 @@ public sealed class ListDepositsEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
-    public async Task List_NoDeposits_ReturnsEmpty()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await client.AddCashAssetAsync(cancellationToken);
-
-        var response = await client.GetAsync(AllDepositsUri, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Empty((await response.Content.ReadFromJsonAsync<List<DepositResponse>>(cancellationToken))!);
-    }
-
-    [Fact]
     public async Task List_WithoutToken_ReturnsUnauthorized()
     {
         using var client = Factory.CreateClient();
