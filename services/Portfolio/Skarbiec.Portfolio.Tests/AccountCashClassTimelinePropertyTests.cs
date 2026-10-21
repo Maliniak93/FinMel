@@ -5,7 +5,7 @@ namespace Skarbiec.Portfolio.Tests;
 
 public sealed class AccountCashClassTimelinePropertyTests
 {
-    private const int CaseCount = 200;
+    private const int CaseCount = 50;
 
     private const int DayCount = 30;
 

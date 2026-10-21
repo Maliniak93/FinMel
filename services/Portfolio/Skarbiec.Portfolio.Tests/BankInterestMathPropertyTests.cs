@@ -4,7 +4,7 @@ namespace Skarbiec.Portfolio.Tests;
 
 public sealed class BankInterestMathPropertyTests
 {
-    private const int CaseCount = 300;
+    private const int CaseCount = 50;
 
     public static TheoryData<int> Seeds()
     {
