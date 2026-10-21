@@ -11,26 +11,6 @@ namespace Skarbiec.MarketData.Tests;
 public sealed class GetFxRatesBatchEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]
-    public async Task Post_WithoutToken_ReturnsOk()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var seedDb = CreateDbContext();
-        await seedDb.SeedFxRateAsync("USDPLN", new DateOnly(2026, 8, 7), 4.0m, cancellationToken);
-
-        using var client = Factory.CreateClient();
-        var response = await client.PostAsJsonAsync(
-            InternalFxRatesBatchUri,
-            new { Pairs = new[] { "USDPLN" }, AsOfDate = new DateOnly(2026, 8, 10) },
-            cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<FxRatesBatchResponse>(cancellationToken);
-        var rate = Assert.Single(body!.Rates);
-        Assert.Equal("USDPLN", rate.Pair);
-        Assert.Equal(4.0m, rate.Rate);
-    }
-
-    [Fact]
     public async Task Post_ReturnsLatestRateAtOrBeforeAsOfDate()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

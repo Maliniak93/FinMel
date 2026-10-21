@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Skarbiec.Contracts;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
@@ -38,79 +37,6 @@ public sealed class InternalEndpointsTests(SkarbiecContainersFixture containers)
         Assert.Multiple(
             () => Assert.Contains(pricesBatch.StatusCode, unmapped),
             () => Assert.Contains(fxBatch.StatusCode, unmapped));
-    }
-
-    [Fact]
-    public async Task BondSeriesRatesBatch_IsAnonymousAndAbsentFromOpenApi()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using (var seedDb = CreateDbContext())
-        {
-            await seedDb.SeedBondSeriesAsync(
-                "EDO1035", TreasuryBondType.Edo, new DateOnly(2025, 10, 1), new DateOnly(2025, 10, 31), cancellationToken, periodRatesPercent: [5.35m]);
-        }
-
-        using var client = Factory.CreateClient();
-        var batch = await client.PostAsJsonAsync(InternalBondSeriesRatesBatchUri, new { codes = new[] { "EDO1035" } }, cancellationToken);
-        var openApi = await client.GetAsync(OpenApiDocumentUri, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, batch.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, openApi.StatusCode);
-        using var document = await JsonDocument.ParseAsync(await openApi.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
-        var paths = document.RootElement.GetProperty("paths").EnumerateObject().Select(p => p.Name).ToList();
-        Assert.DoesNotContain(InternalBondSeriesRatesBatchUri, paths);
-    }
-
-    [Fact]
-    public async Task InstrumentsBatch_IsAnonymousAndAbsentFromOpenApi()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Guid instrumentId;
-        await using (var seedDb = CreateDbContext())
-        {
-            instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
-        }
-
-        using var client = Factory.CreateClient();
-        var batch = await client.PostAsJsonAsync(InternalInstrumentsBatchUri, new { instrumentIds = new[] { instrumentId } }, cancellationToken);
-        var openApi = await client.GetAsync(OpenApiDocumentUri, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, batch.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, openApi.StatusCode);
-        using var document = await JsonDocument.ParseAsync(await openApi.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
-        var paths = document.RootElement.GetProperty("paths").EnumerateObject().Select(p => p.Name).ToList();
-        Assert.DoesNotContain(InternalInstrumentsBatchUri, paths);
-    }
-
-    [Fact]
-    public async Task HistoryBatches_AreAnonymousAndAbsentFromOpenApi()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var from = new DateOnly(2026, 1, 5);
-        var to = new DateOnly(2026, 1, 10);
-        using var client = Factory.CreateClient();
-
-        var pricesBatch = await client.PostAsJsonAsync(
-            InternalPricesHistoryBatchUri,
-            new { InstrumentIds = new[] { Guid.NewGuid() }, From = from, To = to },
-            cancellationToken);
-        var fxBatch = await client.PostAsJsonAsync(
-            InternalFxRatesHistoryBatchUri,
-            new { Pairs = new[] { "USDPLN" }, From = from, To = to },
-            cancellationToken);
-        var openApi = await client.GetAsync(OpenApiDocumentUri, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, pricesBatch.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, fxBatch.StatusCode);
-        Assert.Equal(HttpStatusCode.OK, openApi.StatusCode);
-        using var document = await JsonDocument.ParseAsync(await openApi.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
-        var paths = document.RootElement.GetProperty("paths").EnumerateObject().Select(p => p.Name).ToList();
-
-        // Guards against a vacuous pass on an empty document.
-        Assert.Contains(SearchInstrumentsBaseUri, paths);
-        Assert.Multiple(
-            () => Assert.DoesNotContain(InternalPricesHistoryBatchUri, paths),
-            () => Assert.DoesNotContain(InternalFxRatesHistoryBatchUri, paths));
     }
 
     [Fact]

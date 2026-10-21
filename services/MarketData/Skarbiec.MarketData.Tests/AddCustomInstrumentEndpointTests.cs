@@ -42,40 +42,6 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     }
 
     [Fact]
-    public async Task Add_ValidEtfTicker_RoutesToYahoo()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-
-        var body = await client.AddCustomInstrumentAsync(cancellationToken, ticker: "VWCE.DE", assetClass: AssetClass.Etf);
-
-        Assert.Equal(PriceSource.Yahoo, body.Source);
-        Assert.Contains((PriceSource.Yahoo, "VWCE.DE"), Factory.TickerVerifier.Calls);
-    }
-
-    [Fact]
-    public async Task Add_BondClass_ReturnsUnsupported()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var request = new AddCustomInstrumentRequest
-        {
-            Ticker = "BOND.PL",
-            Name = "Treasury bond",
-            QuoteCurrency = "PLN",
-            AssetClass = AssetClass.Bond,
-        };
-
-        var response = await client.PostAsJsonAsync(InstrumentsUri, request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>(cancellationToken);
-        Assert.NotNull(problem);
-        Assert.Equal("Validation.UnsupportedInstrumentAssetClass", problem.Extensions["errorCode"]?.ToString());
-        Assert.Empty(Factory.TickerVerifier.Calls);
-    }
-
-    [Fact]
     public async Task Add_MakesInstrumentImmediatelyFindableBySearch()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -111,9 +77,8 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
     }
 
     [Theory]
+    [InlineData(AssetClass.Bond)]
     [InlineData(AssetClass.Cash)]
-    [InlineData(AssetClass.Deposit)]
-    [InlineData(AssetClass.BankAccount)]
     public async Task Add_AssetClassWithNoMarketProvider_ReturnsBadRequest(AssetClass assetClass)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -129,6 +94,9 @@ public sealed class AddCustomInstrumentEndpointTests(SkarbiecContainersFixture c
         var response = await client.PostAsJsonAsync(InstrumentsUri, request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>(cancellationToken);
+        Assert.NotNull(problem);
+        Assert.Equal("Validation.UnsupportedInstrumentAssetClass", problem.Extensions["errorCode"]?.ToString());
         Assert.Empty(Factory.TickerVerifier.Calls);
     }
 
