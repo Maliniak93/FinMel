@@ -22,6 +22,7 @@
 //   a red CI with fewer than 5 failed tests (or only cancelled/timed-out jobs) reruns its failed jobs once per head SHA (GitHub's run_attempt is the counter), with a fresh 90 min wait; any other red, or a red after the rerun, starts one fix session per PR (the PR comment marker `<!-- skarbiec-ci-fix -->` is the counter): `/fix ci:#<n>` on the PR branch (tree kept on a dirty PR branch, `dirty-tree` for any other dirty tree), `ship.mjs --fix-pr` pushes to the same PR, a fresh 90 min wait follows; never counted towards --max-tasks, no session after --until, with the stop file or in a dry run; red after the fix reruns once when < 5 tests failed, otherwise stops `ci-failed` with the job link and the resume line, a session that stops or moves no head `ci-failed` / `blocked`
 //   a GitHub rate limit (primary or secondary) is waited out with no upper bound, then the same call or step reruns (a child ending on the GITHUB_LIMIT marker or ship.mjs exit 4 included); the wait does not count towards the build or CI timeouts, and writes already done (merge, close, summary comment) are skipped
 //   the sleep guard is confirmed (`ready`) and re-armed after every wake; PC sleep gaps are logged (`PC spał …`) and do not count towards the 4 h build limit; a build with no progress for 45 awake minutes (no live dotnet/verify/e2e process) is killed and replayed once per part, a second hang stops the run with reason `hang`
+//   the `still:` heartbeat ends with the agent's current activity (`teraz: <label> (od N min)`), `czeka na proces w tle od <czas>` or `bez postępu od <czas>`; background commands log as `bg: <label>` and `bg done|failed|killed: <label> · <czas>`, never the raw command
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
 import { spawn, spawnSync } from "node:child_process";
@@ -33,6 +34,7 @@ import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
 import { CI_FIX_MARKER, CI_POLICY_LINE, driveCi, partLine, runCiFix, summaryPartLine } from "./autobuild-ci.mjs";
+import { activityLabel, createActivityTracker, short } from "./autobuild-activity.mjs";
 import { postRunVerify } from "./autobuild-verify.mjs";
 import { awaitReady, buildWithResume, finishShutdown, fixWithResume, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
 import { BUILD_LIMIT_MS, buildThroughHangs, createAwakeClock, createHangDetector, createHangPolicy, hangLabel, liveWork, summaryLines } from "./autobuild-watch.mjs";
@@ -324,10 +326,6 @@ const LIMIT_TEXT = /hit your (session|weekly) limit|usage limit/i;
 const ACTIVE_STATES = new Set(["start", "progress"]);
 const HEARTBEAT_MS = 10 * 60e3;
 
-const short = (text, max = 70) => {
-  const flat = String(text ?? "").replace(/\s+/g, " ").trim();
-  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
-};
 const modelName = (model) => String(model ?? "?").replace(/^claude-/, "");
 const kTokens = (n) => `${Math.round((n ?? 0) / 1000)}k`;
 const span = (ms) => {
@@ -342,7 +340,7 @@ function createReporter(number, watch) {
   const toolNames = new Map();
   const agents = new Map();
   const phases = new Set();
-  const bgTasks = new Set();
+  const activity = createActivityTracker({ now: Date.now });
   let limitAnnounced = false;
   let latest = null;
 
@@ -384,7 +382,7 @@ function createReporter(number, watch) {
       toolNames.set(block.id, block.name);
       if (obj.parent_tool_use_id) continue;
       const input = block.input ?? {};
-      if (block.name === "Bash") say(`run: ${short(input.description ?? input.command)}`);
+      if (block.name === "Bash") say(`run: ${activityLabel(block.name, input)}`);
       else if (block.name === "Workflow") say(`workflow: ${input.name ?? input.scriptPath ?? /name:\s*'([^']+)'/.exec(input.script ?? "")?.[1] ?? "script"}`);
       else if (block.name === "Skill") say(`skill: ${input.skill}`);
     }
@@ -395,12 +393,7 @@ function createReporter(number, watch) {
       if (rep.sessionId !== obj.session_id) say(`#${number} session ${obj.session_id} (full view later: claude --resume ${obj.session_id})`);
       rep.sessionId = obj.session_id;
     } else if (obj.subtype === "task_progress") onProgress(obj);
-    else if (obj.subtype === "task_started" && obj.task_type === "local_bash" && obj.is_backgrounded) {
-      bgTasks.add(obj.task_id);
-      say(`bg: ${short(obj.description)}`);
-    } else if (obj.subtype === "task_notification" && bgTasks.delete(obj.task_id)) {
-      say(`bg ${obj.status === "completed" ? "done" : "failed"}: ${short(obj.summary)}`);
-    } else if (obj.subtype === "permission_check_status" && !["checking", "done", "allowed"].includes(obj.status)) {
+    else if (obj.subtype === "permission_check_status" && !["checking", "done", "allowed"].includes(obj.status)) {
       say(`DENIED: ${toolNames.get(obj.tool_use_id) ?? obj.tool_use_id} (${obj.status})`);
     }
   };
@@ -412,6 +405,7 @@ function createReporter(number, watch) {
   };
 
   rep.handle = (obj) => {
+    for (const line of activity.observe(obj)) say(line);
     if (obj.type === "assistant") onAssistant(obj);
     else if (obj.type === "system") onSystem(obj);
     else if (obj.type === "rate_limit_event" && obj.rate_limit_info?.status === "rejected") markLimit(obj.rate_limit_info.resetsAt);
@@ -421,7 +415,8 @@ function createReporter(number, watch) {
 
   rep.heartbeat = () => {
     if (!latest || Date.now() - lastSayAt < HEARTBEAT_MS) return;
-    say(`   still: ${[latest.phase, latest.agent, `${kTokens(latest.tokens)} tokens`, `${latest.tools ?? 0} tools`].filter(Boolean).join(" · ")}`);
+    const tail = activity.heartbeatTail({ tokens: latest.tokens, tools: latest.tools });
+    say(`   still: ${[latest.phase, latest.agent, `${kTokens(latest.tokens)} tokens`, `${latest.tools ?? 0} tools`, tail].filter(Boolean).join(" · ")}`);
   };
 
   return rep;
