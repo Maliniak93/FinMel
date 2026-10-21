@@ -18,7 +18,7 @@
     <!-- Pinned above the transitive 2.0.0, which NU1903 flags for GHSA-v5pm-xwqc-g5wc. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="2.13.0" />
     <!-- Pinned above the transitive 2.5.302 that Aspire.Hosting 13.6 brings in, which NU1902 flags for GHSA-qhrr-8q5h-9q3h. -->
-    <PackageVersion Include="MessagePack" Version="2.5.307" />
+    <PackageVersion Include="MessagePack" Version="3.1.12" />
     <!-- Build-time OpenAPI generation, so gen:api needs no running stack. -->
     <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.13" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
