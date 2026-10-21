@@ -35,6 +35,9 @@ internal static class ReportingConsumers
 
         services.AddDbContext<ReportingDbContext>(options => options.UseNpgsql(containers.PostgresConnectionString));
 
+        // StartAsync then returns only once every queue is bound and consuming, so a publish right after it cannot be dropped.
+        services.Configure<MassTransitHostOptions>(options => options.WaitUntilStarted = true);
+
         services.AddMassTransit(x =>
         {
             x.SetKebabCaseEndpointNameFormatter();
@@ -91,9 +94,6 @@ internal static class ReportingConsumers
 
         try
         {
-            // StartAsync does not wait for RabbitMQ to apply the bindings, so a publish right after it could be dropped.
-            await Task.Delay(TimeSpan.FromMilliseconds(500), cancellationToken);
-
             await action(provider);
         }
         finally
