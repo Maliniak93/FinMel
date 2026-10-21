@@ -45,6 +45,8 @@ skarbiec-plan/przewodnik/
 skarbiec-plan/flows/
 # Logs of unattended autobuild runs (scripts/autobuild.mjs)
 skarbiec-plan/autobuild-runs/
+# Test timing measurements (scripts/test-timings.mjs)
+skarbiec-plan/test-timings/
 
 # e2e run output (scripts/e2e.mjs)
 e2e/test-results/

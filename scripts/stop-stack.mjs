@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const IS_WIN = process.platform === "win32";
 
-function listProcesses() {
+export function listProcesses() {
   if (IS_WIN) {
     const script =
       "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CommandLine | ConvertTo-Json -Compress";
@@ -51,8 +51,7 @@ function ancestorsOf(pid, byPid) {
   return seen;
 }
 
-function findStack() {
-  const all = listProcesses();
+export function findStack(all = listProcesses()) {
   const byPid = new Map(all.map((p) => [p.pid, p]));
   const own = ancestorsOf(process.pid, byPid);
   return all
