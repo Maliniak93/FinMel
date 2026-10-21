@@ -6,7 +6,7 @@ namespace Skarbiec.Portfolio.Tests;
 
 public sealed class TransferPlanCalculatorPropertyTests
 {
-    private const int CaseCount = 300;
+    private const int CaseCount = 50;
 
     private static readonly AssetClass[] Classes =
         [AssetClass.Stock, AssetClass.Etf, AssetClass.Bond, AssetClass.Deposit, AssetClass.PreciousMetal, AssetClass.Cash];

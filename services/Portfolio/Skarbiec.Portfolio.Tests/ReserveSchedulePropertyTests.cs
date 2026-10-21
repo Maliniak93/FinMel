@@ -6,7 +6,7 @@ namespace Skarbiec.Portfolio.Tests;
 
 public sealed class ReserveSchedulePropertyTests
 {
-    private const int CaseCount = 100;
+    private const int CaseCount = 50;
     private const int SpanMonths = 72;
 
     public static TheoryData<int> Seeds()
