@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Usage: node scripts/test-timings.mjs [--only dotnet,web,e2e] [--check]  measure the time of every test suite on a quiet machine and compare it with the previous run (skarbiec-plan/test-timings/last-run.json)
+// Usage: node scripts/test-timings.mjs [--only dotnet,web,e2e] [--check] [--open] [--report-only]  measure the time of every test suite on a quiet machine, compare it with the previous run (skarbiec-plan/test-timings/last-run.json) and write report.html beside it
 //   --only <list>  measure only these suites (dotnet, web, e2e); the others keep their entries
 //   --check        only check that the machine is quiet: exit 0 quiet, 3 busy (every source listed as "działa: ...")
+//   --open         open report.html in the browser when it is written
+//   --report-only  render report.html from the existing last-run.json without preflight or measuring (exit 3 when the file is missing)
 // Exit codes: 0 measured and nothing red, 1 a red test, 3 environment (machine busy, Docker down, a suite unmeasured, another instance running)
 
 import { spawn, spawnSync } from "node:child_process";
@@ -11,6 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { GhLimitError, REPO, exitOnGhLimit, gh } from "./gh.mjs";
 import { findStack, listProcesses } from "./stop-stack.mjs";
+import { renderReport } from "./test-timings-report.mjs";
 
 const IS_WIN = process.platform === "win32";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -18,6 +21,7 @@ const WEB_DIR = path.join(REPO_ROOT, "web");
 const E2E_RESULTS_JSON = path.join(REPO_ROOT, "e2e", "test-results", "results.json");
 const DATA_DIR = path.join(REPO_ROOT, "skarbiec-plan", "test-timings");
 const DATA_FILE = path.join(DATA_DIR, "last-run.json");
+const REPORT_FILE = path.join(DATA_DIR, "report.html");
 const NPM = IS_WIN ? "npm.cmd" : "npm";
 const COMMAND_TIMEOUT_MS = 90 * 60 * 1000;
 const COMPOSE_PROJECTS = ["skarbiec-local", "skarbiec-e2e"];
@@ -44,10 +48,12 @@ export const labelOf = (key) => (key.startsWith("dotnet:") ? key.slice("dotnet:"
 const projectOf = (key) => DOTNET_PROJECTS.find((p) => `dotnet:${p.name}` === key);
 
 export function parseArgs(argv) {
-  const args = { only: null, check: false, help: false };
+  const args = { only: null, check: false, help: false, open: false, reportOnly: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--check") args.check = true;
+    else if (a === "--open") args.open = true;
+    else if (a === "--report-only") args.reportOnly = true;
     else if (a === "--help" || a === "-h") args.help = true;
     else if (a === "--only") args.only = String(argv[++i] ?? "");
     else if (a.startsWith("--only=")) args.only = a.slice("--only=".length);
@@ -607,6 +613,27 @@ function writeAtomically(file, data) {
   renameSync(tmp, file);
 }
 
+function openFile(file) {
+  const [bin, args] = IS_WIN ? ["cmd", ["/c", "start", "", file]] : [process.platform === "darwin" ? "open" : "xdg-open", [file]];
+  spawn(bin, args, { detached: true, stdio: "ignore", windowsHide: true }).unref();
+}
+
+export function emitReport(data, { file = REPORT_FILE, open = false, write = (f, text) => (mkdirSync(path.dirname(f), { recursive: true }), writeFileSync(f, text)), opener = openFile, log = console.log } = {}) {
+  write(file, renderReport(data));
+  log(`Raport: ${path.relative(REPO_ROOT, file).replaceAll("\\", "/")}`);
+  if (open) opener(file);
+}
+
+export function reportOnly({ read = () => readText(DATA_FILE), log = console.log, ...options } = {}) {
+  const data = parseDataFile(read() ?? "");
+  if (!data) {
+    log(`Brak poprawnego pliku ${path.relative(REPO_ROOT, DATA_FILE).replaceAll("\\", "/")} — najpierw zmierz testy.`);
+    return 3;
+  }
+  emitReport(data, { log, ...options });
+  return 0;
+}
+
 async function main(argv) {
   const args = parseArgs(argv);
   if (args.error) {
@@ -614,9 +641,10 @@ async function main(argv) {
     return 2;
   }
   if (args.help) {
-    console.log("Usage: node scripts/test-timings.mjs [--only dotnet,web,e2e] [--check]");
+    console.log("Usage: node scripts/test-timings.mjs [--only dotnet,web,e2e] [--check] [--open] [--report-only]");
     return 0;
   }
+  if (args.reportOnly) return reportOnly({ open: args.open });
 
   const present = ALL_KEYS.filter((key) => !projectOf(key) || existsSync(path.join(REPO_ROOT, projectOf(key).rel)));
   const keys = selectSuites(args.only, present);
@@ -660,6 +688,7 @@ async function main(argv) {
     const measured = outcome.results.filter((r) => r.entry).map((r) => ({ key: r.key, entry: r.entry }));
     console.log(summarize(measured));
     console.log(`Wyniki: ${path.relative(REPO_ROOT, DATA_FILE).replaceAll("\\", "/")}`);
+    if (measured.length) emitReport(outcome.data, { open: args.open });
     for (const r of outcome.results.filter((x) => x.status === "unmeasured")) console.log(`Niezmierzony: ${labelOf(r.key)} — ${r.reason}`);
     return exitCodeFor(outcome.results);
   } finally {
