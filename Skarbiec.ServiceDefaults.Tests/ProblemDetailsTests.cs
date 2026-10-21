@@ -5,29 +5,17 @@ namespace Skarbiec.ServiceDefaults.Tests;
 
 public sealed class ProblemDetailsTests(SampleAppFactory factory) : IClassFixture<SampleAppFactory>
 {
-    [Fact]
-    public async Task UnhandledException_ReturnsProblemDetailsWithTraceId()
+    [Theory]
+    [InlineData("/boom", HttpStatusCode.InternalServerError)]
+    [InlineData("/sample-result/not-found", HttpStatusCode.NotFound)]
+    public async Task Error_ReturnsProblemDetailsWithTraceId(string path, HttpStatusCode expected)
     {
         using var client = factory.CreateClient();
 
-        var response = await client.GetAsync(new Uri("/boom", UriKind.Relative), TestContext.Current.CancellationToken);
+        var response = await client.GetAsync(new Uri(path, UriKind.Relative), TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        Assert.Equal(expected, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
-
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-        Assert.True(document.RootElement.TryGetProperty("traceId", out var traceId));
-        Assert.False(string.IsNullOrWhiteSpace(traceId.GetString()));
-    }
-
-    [Fact]
-    public async Task FailedResult_ReturnsProblemDetailsWithTraceId()
-    {
-        using var client = factory.CreateClient();
-
-        var response = await client.GetAsync(new Uri("/sample-result/not-found", UriKind.Relative), TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.True(document.RootElement.TryGetProperty("traceId", out var traceId));

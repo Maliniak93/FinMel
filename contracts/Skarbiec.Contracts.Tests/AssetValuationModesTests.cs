@@ -13,16 +13,12 @@ public sealed class AssetValuationModesTests
         }
     }
 
-    [Fact]
-    public void Default_BankAccount_IsCurrencyValued()
+    [Theory]
+    [InlineData(AssetClass.BankAccount)]
+    [InlineData(AssetClass.Bond)]
+    public void Default_CurrencyValuedClass_IsCurrencyValued(AssetClass assetClass)
     {
-        Assert.Equal(AssetValuationMode.CurrencyValued, AssetValuationModes.Default(AssetClass.BankAccount));
-    }
-
-    [Fact]
-    public void Default_Bond_IsCurrencyValued()
-    {
-        Assert.Equal(AssetValuationMode.CurrencyValued, AssetValuationModes.Default(AssetClass.Bond));
+        Assert.Equal(AssetValuationMode.CurrencyValued, AssetValuationModes.Default(assetClass));
     }
 
     [Fact]
