@@ -19,6 +19,7 @@
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
 //   a part without Branch is healed first (gh-project.mjs heal); a card with a missing or invalid Tier is skipped with the later open parts of its epic and the cards whose Depends on names it (a log line and one comment each, Status unchanged) and the run ends `done` listing them as `pominięte: …`
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
+//   a red CI with fewer than 5 failed tests (or only cancelled/timed-out jobs) reruns its failed jobs once per head SHA (GitHub's run_attempt is the counter), with a fresh 90 min wait; any other red stops `ci-failed`
 //   a GitHub rate limit (primary or secondary) is waited out with no upper bound, then the same call or step reruns (a child ending on the GITHUB_LIMIT marker or ship.mjs exit 4 included); the wait does not count towards the build or CI timeouts, and writes already done (merge, close, summary comment) are skipped
 //   the sleep guard is confirmed (`ready`) and re-armed after every wake; PC sleep gaps are logged (`PC spał …`) and do not count towards the 4 h build limit; a build with no progress for 45 awake minutes (no live dotnet/verify/e2e process) is killed and replayed once per part, a second hang stops the run with reason `hang`
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
@@ -31,6 +32,7 @@ import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
 import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
+import { CI_POLICY_LINE, driveCi, partLine, summaryPartLine } from "./autobuild-ci.mjs";
 import { postRunVerify } from "./autobuild-verify.mjs";
 import { awaitReady, buildWithResume, finishShutdown, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
 import { BUILD_LIMIT_MS, buildThroughHangs, createAwakeClock, createHangDetector, createHangPolicy, hangLabel, liveWork, summaryLines } from "./autobuild-watch.mjs";
@@ -536,8 +538,29 @@ function readChecks(pr) {
   }
 }
 
-async function waitForCi(pr) {
-  const startedAt = Date.now();
+function readJobs(runId) {
+  const res = retryTransient("run jobs", () => gh(["api", `repos/${REPO}/actions/runs/${runId}/jobs?per_page=100`, "--jq", ".jobs"]));
+  try {
+    if (!res.ok) throw new Error(res.firstErr);
+    return JSON.parse(res.out);
+  } catch (err) {
+    say(`CI: could not read the jobs of run ${runId} (${short(err.message, 120)})`);
+    return null;
+  }
+}
+
+function readJobLog(jobId) {
+  const res = retryTransient("job log", () => gh(["api", `repos/${REPO}/actions/jobs/${jobId}/logs`]));
+  return res.ok ? res.out : null;
+}
+
+function rerunFailedJobs(runId) {
+  const res = retryTransient("rerun failed jobs", () => gh(["api", "-X", "POST", `repos/${REPO}/actions/runs/${runId}/rerun-failed-jobs`]));
+  if (!res.ok) say(`CI: rerun of run ${runId} failed (${short(res.firstErr, 120)})`);
+  return res.ok;
+}
+
+async function waitForCi(pr, entry) {
   const budgets = [];
   const track = (ms) => {
     const budget = createTimeoutBudget(ms);
@@ -545,35 +568,24 @@ async function waitForCi(pr) {
     budgets.push(budget);
     return budget;
   };
-  const total = track(CI_TIMEOUT_MS);
-  let missing = track(CI_MISSING_MS);
-  let lastStatus = "";
-  let greenPolls = 0;
   try {
-    while (true) {
-      const checks = readChecks(pr.number);
-      if (!checks) {
-        greenPolls = 0;
-        if (total.expired()) throw new Stop("ci-timeout", `PR ${pr.url}: checks not readable or not green after 90 min`);
-        await sleep(CI_POLL_MS);
-        continue;
-      }
-      if (checks.length) missing = null;
-      else missing ??= track(CI_MISSING_MS);
-      const count = (...buckets) => checks.filter((c) => buckets.includes(c.bucket)).length;
-      const failed = checks.filter((c) => ["fail", "cancel"].includes(c.bucket));
-      const status = `pass ${count("pass")} · skipping ${count("skipping")} · pending ${count("pending")} · fail ${failed.length}`;
-      if (checks.length && status !== lastStatus) say(`CI PR #${pr.number}: ${status}`);
-      lastStatus = status;
-
-      if (failed.length) throw new Stop("ci-failed", `PR ${pr.url}: ${failed.map((c) => `${c.name} (${c.link})`).join(", ")}`);
-      if (missing?.expired()) throw new Stop("ci-missing", `PR ${pr.url}: no checks after 10 min - the runner did not pick up the job`);
-      greenPolls = checks.length && checks.every((c) => ["pass", "skipping"].includes(c.bucket)) ? greenPolls + 1 : 0;
-      // two green polls in a row: a late-registered check must not slip past the merge
-      if (greenPolls >= 2) return Date.now() - startedAt;
-      if (total.expired()) throw new Stop("ci-timeout", `PR ${pr.url}: checks not green after 90 min`);
-      await sleep(CI_POLL_MS);
-    }
+    return await driveCi({
+      pr,
+      readChecks: () => readChecks(pr.number),
+      readJobs,
+      readLog: readJobLog,
+      rerun: rerunFailedJobs,
+      sleep,
+      say,
+      budget: track,
+      pollMs: CI_POLL_MS,
+      missingMs: CI_MISSING_MS,
+      timeoutMs: CI_TIMEOUT_MS,
+      stop: (reason, detail) => new Stop(reason, detail),
+      onRerun: () => {
+        entry.ciReruns = (entry.ciReruns ?? 0) + 1;
+      },
+    });
   } finally {
     budgets.forEach((budget) => waitBudgets.delete(budget));
   }
@@ -727,7 +739,7 @@ function healBranch(number) {
 
 async function handlePart(sub, ctx) {
   const part = ensureBranch(getIssue(sub.number), healBranch);
-  const entry = { item: ctx.item, number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null };
+  const entry = { item: ctx.item, number: part.number, title: part.title, prUrl: null, buildMin: null, ciMin: null, ciReruns: 0 };
   let pr = openPr(part.branch);
 
   if (!pr) {
@@ -762,7 +774,8 @@ async function handlePart(sub, ctx) {
 
   entry.prUrl = pr.url;
   ctx.parts.push(entry);
-  entry.ciMin = minutes(await waitForCi(pr));
+  const ci = await waitForCi(pr, entry);
+  entry.ciMin = minutes(ci.ms);
   await mergeAndSync(pr, part.branch, part.number);
 }
 
@@ -870,7 +883,7 @@ function dryRunTable(issue) {
 function summary(reason, detail, parts, resume, costLine, verifyLine) {
   const lines = [`## Autobuild run: ${reason}`, ""];
   lines.push(parts.length ? "Parts handled in this run:" : "No part was merged in this run.");
-  for (const p of parts) lines.push(`- #${p.number} ${p.title} - ${p.prUrl ?? "no PR"} (${p.shipOnly ? "ship retried" : `build ${p.buildMin ?? "-"} min`}, CI ${p.ciMin ?? "-"} min)`);
+  for (const p of parts) lines.push(summaryPartLine(p));
   if (detail) lines.push("", "Detail:", "", "```", detail, "```");
   if (verifyLine) lines.push("", verifyLine);
   if (costLine) lines.push("", costLine);
@@ -918,9 +931,6 @@ async function postSummary(epic, body) {
   });
   return failure;
 }
-
-const prNumber = (url) => url?.split("/").pop();
-const partLine = (p) => `#${p.number} PR #${prNumber(p.prUrl)} (${p.shipOnly ? "ship retried" : `build ${Math.round(p.buildMin ?? 0)} min`}, CI ${Math.round(p.ciMin ?? 0)} min)`;
 
 async function finishRun(reason, detail, ctx) {
   const ok = reason === "done" || reason === "dry-run";
@@ -1136,6 +1146,7 @@ try {
   } else {
     ctx.power = wakeTimers();
     say(wakeLine(ctx.power));
+    say(CI_POLICY_LINE);
   }
   ctx.claude = resolveClaude();
   if (!ctx.dryRun) runPreflight();
