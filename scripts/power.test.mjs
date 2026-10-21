@@ -1,6 +1,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { confirmScript, confirmSpawn, parseWakeTimers, suspendScript } from "./power.mjs";
+import { EventEmitter } from "node:events";
+import { confirmScript, confirmSpawn, guardLine, guardScript, parseWakeTimers, startGuard, suspendScript } from "./power.mjs";
+
+function fakeGuard(behave) {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.killed = false;
+  child.kill = () => {
+    child.killed = true;
+  };
+  setImmediate(() => behave(child));
+  return child;
+}
+const guardWith = (behave, timeoutMs = 30) => startGuard({ parentPid: 1, timeoutMs, spawnFn: () => fakeGuard(behave) });
 
 const rtcwake = (ac, dc = 1) => `GUID podgrupy: 238c9fa8-0aad-41ed-83f4-97be242c8f20  (Uśpienie)
   GUID ustawienia zasilania: bd3b718a-0680-4d9d-8ab2-e1d2b4ac806d  (Zezwalaj na czasomierze wznawiania)
@@ -69,6 +82,49 @@ test("power scripts use a resume timer and a timed popup", () => {
   assert.match(popup, /Wyłączenie za/);
   assert.match(confirmScript("suspend", 600), /Uśpienie za/);
   assert.match(confirmScript("hibernate", 600), /Hibernacja za/);
+});
+
+test("guard reports active only after ready", async () => {
+  const ready = await guardWith((child) => child.stdout.emit("data", "ready\r\n"));
+  assert.equal(ready.active, true);
+  assert.match(guardLine(ready), /blocked while the run lasts/);
+
+  const split = await guardWith((child) => {
+    child.stdout.emit("data", "rea");
+    child.stdout.emit("data", "dy\n");
+  });
+  assert.equal(split.active, true);
+
+  const exited = await guardWith((child) => child.emit("close", 1));
+  assert.equal(exited.active, false);
+  assert.match(exited.reason, /code 1/);
+
+  const failed = await guardWith((child) => child.emit("error", new Error("spawn powershell.exe ENOENT")));
+  assert.equal(failed.active, false);
+  assert.match(failed.reason, /ENOENT/);
+
+  const noise = await guardWith((child) => child.stdout.emit("data", "not ready yet\n"));
+  assert.equal(noise.active, false);
+  assert.match(noise.reason, /no confirmation/);
+
+  const silent = await guardWith(() => {});
+  assert.equal(silent.active, false);
+  assert.match(silent.reason, /no confirmation/);
+  assert.equal(silent.child.killed, true);
+
+  const warning = guardLine(silent);
+  assert.match(warning, /^UWAGA: blokada snu nie działa \(.+\) — PC może zasnąć w trakcie buildu$/);
+  assert.doesNotMatch(warning, /blocked while the run lasts/);
+});
+
+test("the guard script re-asserts the state and prints ready after success", () => {
+  const script = guardScript(4242);
+  assert.match(script, /SetThreadExecutionState/);
+  assert.match(script, /2147483651/);
+  assert.ok(script.indexOf("WriteLine('ready')") > script.indexOf("-eq 0) { exit 1 }"));
+  assert.match(script, /Get-Process -Id 4242/);
+  assert.match(script, /Start-Sleep -Seconds 30/);
+  assert.doesNotMatch(script, /powercfg/i);
 });
 
 test("the popup is spawned visible, only its console hidden", () => {
