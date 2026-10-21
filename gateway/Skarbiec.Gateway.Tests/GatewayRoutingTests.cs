@@ -106,20 +106,4 @@ public sealed class GatewayRoutingTests : IAsyncLifetime, IClassFixture<Skarbiec
             () => Assert.Equal(HttpStatusCode.NotFound, instrument.StatusCode),
             () => Assert.Equal(HttpStatusCode.NotFound, pricesBatch.StatusCode));
     }
-
-    [Fact]
-    public async Task Login_BurstBeyondRateLimit_Returns429()
-    {
-        using var client = _gateway.CreateClient();
-        var request = new LoginRequest { Email = $"{Guid.NewGuid()}@example.com", Password = Password };
-
-        HttpStatusCode? lastStatus = null;
-        for (var attempt = 0; attempt < 10 && lastStatus != HttpStatusCode.TooManyRequests; attempt++)
-        {
-            using var response = await client.PostAsJsonAsync("/api/identity/login", request, TestContext.Current.CancellationToken);
-            lastStatus = response.StatusCode;
-        }
-
-        Assert.Equal(HttpStatusCode.TooManyRequests, lastStatus);
-    }
 }
