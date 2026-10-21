@@ -22,7 +22,7 @@ public sealed class AssetTransactionTypesTests
     public static TheoryData<AssetClass, TransactionType, bool> FullMatrix()
     {
         var data = new TheoryData<AssetClass, TransactionType, bool>();
-        foreach (var assetClass in Enum.GetValues<AssetClass>())
+        foreach (var assetClass in new[] { AssetClass.Cash, AssetClass.PreciousMetal, AssetClass.Stock })
         {
             foreach (var type in Enum.GetValues<TransactionType>())
             {

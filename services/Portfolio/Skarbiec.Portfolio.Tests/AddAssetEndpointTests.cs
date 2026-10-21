@@ -303,6 +303,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
         Assert.NotNull(body);
         Assert.Equal(instrumentId, body.InstrumentId);
+        Assert.Equal(AssetValuationMode.Market, body.ValuationMode);
     }
 
     [Fact]
@@ -380,27 +381,6 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Add_WithValidInstrument_ReturnsCreatedWithMarketValuationMode()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var accountId = await client.CreateAccountAsync(cancellationToken);
-        var request = new AddAssetRequest
-        {
-            AccountId = accountId,
-            AssetClass = AssetClass.Stock,
-            Name = "Apple",
-            Currency = "USD",
-            InstrumentId = Guid.NewGuid(),
-        };
-
-        var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
-
-        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        Assert.Equal(AssetValuationMode.Market, body!.ValuationMode);
     }
 
     [Fact]

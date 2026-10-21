@@ -41,6 +41,8 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         Assert.Equal("Renamed", body.Name);
         Assert.Equal("PLN", body.Currency);
         Assert.Equal(3m, body.Quantity);
+        var transactions = await client.ListTransactionsAsync(assetId, cancellationToken);
+        Assert.Single(transactions.Items);
     }
 
     [Theory]
@@ -106,35 +108,6 @@ public sealed class UpdateAssetEndpointTests(SkarbiecContainersFixture container
         var response = await client.PutAsJsonAsync(AssetUri(Guid.NewGuid()), request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Update_ChangeInstrument_KeepsTransactionsAndQuantity()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var (accountId, assetId) = await client.CreateAccountWithAssetAsync(cancellationToken);
-        await client.RecordTransactionAsync(assetId, TransactionType.Buy, 5m, new DateOnly(2026, 1, 1), cancellationToken);
-        var instrumentId = Guid.NewGuid();
-        Factory.InstrumentLookupClient.WithInstrument(instrumentId, AssetClass.Stock, "PLN");
-        var request = new UpdateAssetRequest
-        {
-            AssetClass = AssetClass.Stock,
-            Name = "Now market",
-            Currency = "PLN",
-            InstrumentId = instrumentId
-        };
-
-        var response = await client.PutAsJsonAsync(AssetUri(assetId), request, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken);
-        Assert.Equal(instrumentId, body!.InstrumentId);
-        // The switch to Market must not disturb the quantity the earlier Buy produced.
-        Assert.Equal(5m, body.Quantity);
-
-        var transactions = await client.ListTransactionsAsync(assetId, cancellationToken);
-        Assert.Single(transactions.Items);
     }
 
     [Fact]

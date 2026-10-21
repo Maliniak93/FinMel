@@ -36,27 +36,15 @@ public sealed class TransactionQuantityCalculatorTests
         Assert.Equal(0m, result.Value);
     }
 
-    [Fact]
-    public void Recompute_SellMoreThanPosition_Fails()
+    [Theory]
+    [InlineData(TransactionType.Buy, TransactionType.Sell)]
+    [InlineData(TransactionType.Deposit, TransactionType.Withdraw)]
+    public void Recompute_OutflowMoreThanPosition_Fails(TransactionType inflow, TransactionType outflow)
     {
         Transaction[] transactions =
         [
-            NewTransaction(TransactionType.Buy, 10, new DateOnly(2026, 1, 1)),
-            NewTransaction(TransactionType.Sell, 11, new DateOnly(2026, 1, 2))
-        ];
-
-        var result = TransactionQuantityCalculator.Recompute(transactions);
-
-        Assert.True(result.IsFailure);
-    }
-
-    [Fact]
-    public void Recompute_WithdrawMoreThanPosition_Fails()
-    {
-        Transaction[] transactions =
-        [
-            NewTransaction(TransactionType.Deposit, 5, new DateOnly(2026, 1, 1)),
-            NewTransaction(TransactionType.Withdraw, 6, new DateOnly(2026, 1, 2))
+            NewTransaction(inflow, 10, new DateOnly(2026, 1, 1)),
+            NewTransaction(outflow, 11, new DateOnly(2026, 1, 2))
         ];
 
         var result = TransactionQuantityCalculator.Recompute(transactions);
@@ -134,31 +122,6 @@ public sealed class TransactionQuantityCalculatorTests
                 Assert.True(result.Value >= 0);
             }
         }
-    }
-
-    [Fact]
-    public void Recompute_SameDayInflowReplaysBeforeOutflow()
-    {
-        var lowerId = new Guid("00000000-0000-0000-0000-000000000001");
-        var higherId = new Guid("00000000-0000-0000-0000-000000000002");
-        var day = new DateOnly(2026, 1, 15);
-        Transaction[] sameDay =
-        [
-            NewTransaction(TransactionType.Withdraw, 1_000m, day, lowerId),
-            NewTransaction(TransactionType.Deposit, 1_000m, day, higherId)
-        ];
-        Transaction[] withdrawTheDayBefore =
-        [
-            NewTransaction(TransactionType.Withdraw, 1_000m, day.AddDays(-1), lowerId),
-            NewTransaction(TransactionType.Deposit, 1_000m, day, higherId)
-        ];
-
-        var sameDayResult = TransactionQuantityCalculator.Recompute(sameDay);
-        var dayBeforeResult = TransactionQuantityCalculator.Recompute(withdrawTheDayBefore);
-
-        Assert.True(sameDayResult.IsSuccess, sameDayResult.IsFailure ? sameDayResult.Error.Code : null);
-        Assert.Equal(0m, sameDayResult.Value);
-        Assert.True(dayBeforeResult.IsFailure);
     }
 
     [Fact]

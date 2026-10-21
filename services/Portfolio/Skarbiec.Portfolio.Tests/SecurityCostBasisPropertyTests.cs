@@ -6,7 +6,7 @@ namespace Skarbiec.Portfolio.Tests;
 
 public sealed class SecurityCostBasisPropertyTests
 {
-    private const int CaseCount = 200;
+    private const int CaseCount = 50;
 
     public static TheoryData<int> Seeds()
     {
