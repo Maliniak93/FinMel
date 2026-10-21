@@ -1,9 +1,12 @@
 #!/usr/bin/env node
-// Usage: node scripts/test-timings.mjs [--only dotnet,web] [--check] [--open] [--report-only]  measure the time of every test suite on a quiet machine, append it to the history (skarbiec-plan/test-timings/history.json, 30 entries per suite and class) and write report.html beside it
+// Usage: node scripts/test-timings.mjs [--only dotnet,web] [--check] [--open] [--report-only] [--wait <min>] [--timeout <min>] [--from-autobuild]  measure the time of every test suite on a quiet machine, append it to the history (skarbiec-plan/test-timings/history.json, 30 entries per suite and class) and write report.html beside it
 //   --only <list>  measure only these suites (dotnet, web); the others keep their history
 //   --check        only check that the machine is quiet: exit 0 quiet, 3 busy (every source listed as "działa: ...")
 //   --open         open report.html in the browser when it is written
 //   --report-only  render report.html from the existing history.json without preflight or measuring (exit 3 when the file is missing)
+//   --wait <min>   poll the quiet check every 30 s until quiet, at most <min> minutes; still busy then: exit 3, nothing written
+//   --timeout <min>  deadline for the measuring (counted after the wait): the running command is killed, finished suites are kept, the rest stay unmeasured, exit 3
+//   --from-autobuild  the running autobuild.mjs is not counted busy (every other source still is)
 // Exit codes: 0 measured and nothing red, 1 a red test, 3 environment (machine busy, Docker down, a suite unmeasured, another instance running)
 
 import { spawn, spawnSync } from "node:child_process";
@@ -49,17 +52,26 @@ const groupOf = (key) => key.split(":")[0];
 export const labelOf = (key) => (key.startsWith("dotnet:") ? key.slice("dotnet:".length) : key);
 const projectOf = (key) => DOTNET_PROJECTS.find((p) => `dotnet:${p.name}` === key);
 
+const MINUTE_FLAGS = { "--wait": "wait", "--timeout": "timeout" };
+
 export function parseArgs(argv) {
-  const args = { only: null, check: false, help: false, open: false, reportOnly: false };
+  const args = { only: null, check: false, help: false, open: false, reportOnly: false, wait: null, timeout: null, fromAutobuild: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    const [flag, inline] = a.split(/=(.*)/s);
     if (a === "--check") args.check = true;
     else if (a === "--open") args.open = true;
     else if (a === "--report-only") args.reportOnly = true;
+    else if (a === "--from-autobuild") args.fromAutobuild = true;
     else if (a === "--help" || a === "-h") args.help = true;
     else if (a === "--only") args.only = String(argv[++i] ?? "");
     else if (a.startsWith("--only=")) args.only = a.slice("--only=".length);
-    else return { error: `unknown argument: ${a}` };
+    else if (MINUTE_FLAGS[flag]) {
+      const raw = inline ?? argv[++i];
+      const value = Number(raw);
+      if (raw === undefined || raw === "" || !(value > 0)) return { error: `${flag} takes a positive number of minutes` };
+      args[MINUTE_FLAGS[flag]] = value;
+    } else return { error: `unknown argument: ${a}` };
   }
   if (args.only !== null) {
     const groups = args.only.split(",").map((s) => s.trim()).filter(Boolean);
@@ -88,7 +100,7 @@ const isAliveDefault = (pid) => {
 
 const AUTOBUILD_RE = /scripts[\\/]autobuild\.mjs/;
 
-export function detectBusy({ processes = [], pidFiles = {}, containers = {}, runners = null, isAlive = isAliveDefault, ownPid = process.pid } = {}) {
+export function detectBusy({ processes = [], pidFiles = {}, containers = {}, runners = null, isAlive = isAliveDefault, ownPid = process.pid, ignoreAutobuild = false } = {}) {
   const busy = [];
   const warnings = [];
 
@@ -99,7 +111,7 @@ export function detectBusy({ processes = [], pidFiles = {}, containers = {}, run
     busy.push(`działa: lokalny stos (${[...kinds].map(([what, n]) => `${what} ×${n}`).join(", ")})`);
   }
 
-  for (const p of processes) {
+  for (const p of ignoreAutobuild ? [] : processes) {
     if (p.pid !== ownPid && /^node(\.exe)?$/i.test(p.name ?? "") && AUTOBUILD_RE.test(p.cmd ?? "")) busy.push(`działa: autobuild.mjs (pid ${p.pid})`);
   }
 
@@ -362,7 +374,30 @@ export function buildRun({ startedAt, git, keys, results, pendingReason }) {
   return { startedAt, commit: git.commit, dirty: git.dirty, branch: git.branch, suites, reasons };
 }
 
-export async function runSuites({ keys, data, check, measure, write, git, now = () => new Date(), onSuite = () => {} }) {
+export const POLL_INTERVAL_MS = 30_000;
+const TIMEOUT_REASON = "limit czasu przebiegu (--timeout)";
+
+export async function waitForQuiet({ check, waitMs, now = () => new Date(), sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), onBusy = () => {} }) {
+  const deadline = now().getTime() + waitMs;
+  for (;;) {
+    const lines = await check();
+    if (!lines.length) return [];
+    const left = deadline - now().getTime();
+    if (left <= 0) return lines;
+    onBusy(lines, left);
+    await sleep(Math.min(POLL_INTERVAL_MS, left));
+  }
+}
+
+export async function measureWhenQuiet({ waitMs = 0, check, measureRun, ...clock }) {
+  if (waitMs > 0) {
+    const lines = await waitForQuiet({ check, waitMs, ...clock });
+    if (lines.length) return { refused: lines };
+  }
+  return { refused: null, outcome: await measureRun() };
+}
+
+export async function runSuites({ keys, data, check, measure, write, git, now = () => new Date(), onSuite = () => {}, deadlineAt = null }) {
   const startedAt = now().toISOString();
   const results = [];
   let current = data;
@@ -371,18 +406,26 @@ export async function runSuites({ keys, data, check, measure, write, git, now = 
     write(current);
   };
 
+  const abandon = (from, reason) => {
+    if (from >= keys.length) return;
+    for (const rest of keys.slice(from)) {
+      const result = { key: rest, status: "unmeasured", reason };
+      results.push(result);
+      onSuite(results.length, keys.length, rest, result);
+    }
+    record();
+  };
+
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
+    if (deadlineAt !== null && now().getTime() >= deadlineAt) {
+      abandon(i, TIMEOUT_REASON);
+      return { data: current, results, refused: null, interrupted: null, timedOut: true };
+    }
     const lines = await check(keys.slice(i), i);
     if (lines.length) {
       if (i === 0) return { data, results, refused: lines, interrupted: null };
-      const reason = `maszyna zajęta: ${lines.join("; ")}`;
-      for (const rest of keys.slice(i)) {
-        const result = { key: rest, status: "unmeasured", reason };
-        results.push(result);
-        onSuite(i + 1 + (results.length - 1 - i), keys.length, rest, result);
-      }
-      record();
+      abandon(i, `maszyna zajęta: ${lines.join("; ")}`);
       return { data: current, results, refused: null, interrupted: lines };
     }
 
@@ -394,8 +437,12 @@ export async function runSuites({ keys, data, check, measure, write, git, now = 
     results.push(result);
     record();
     onSuite(i + 1, keys.length, key, result);
+    if (outcome.timedOut) {
+      abandon(i + 1, TIMEOUT_REASON);
+      return { data: current, results, refused: null, interrupted: null, timedOut: true };
+    }
   }
-  return { data: current, results, refused: null, interrupted: null };
+  return { data: current, results, refused: null, interrupted: null, timedOut: false };
 }
 
 function quoteArg(a) {
@@ -417,20 +464,28 @@ function killTree(pid) {
   }
 }
 
+let runDeadlineAt = null;
+
 function exec(bin, args, { cwd = REPO_ROOT } = {}) {
   const startedAt = Date.now();
+  const untilRunDeadline = runDeadlineAt === null ? Infinity : Math.max(0, runDeadlineAt - startedAt);
+  const limitMs = Math.min(COMMAND_TIMEOUT_MS, untilRunDeadline);
   return new Promise((resolve) => {
     let tail = "";
+    let cutByDeadline = false;
     const keepTail = (d) => {
       tail = (tail + d.toString("utf8")).slice(-4000);
     };
     const child = spawn([bin, ...args].map(quoteArg).join(" "), { cwd, shell: true, windowsHide: true, detached: !IS_WIN, stdio: ["ignore", "pipe", "pipe"] });
     child.stdout.on("data", keepTail);
     child.stderr.on("data", keepTail);
-    const timer = setTimeout(() => killTree(child.pid), COMMAND_TIMEOUT_MS);
+    const timer = setTimeout(() => {
+      cutByDeadline = untilRunDeadline <= COMMAND_TIMEOUT_MS;
+      killTree(child.pid);
+    }, limitMs);
     const done = (status, error) => {
       clearTimeout(timer);
-      resolve({ status, error, tail, ms: Date.now() - startedAt, startedAt });
+      resolve({ status, error, tail, ms: Date.now() - startedAt, startedAt, cutByDeadline });
     };
     child.on("error", (e) => done(null, e));
     child.on("close", (code) => done(code, null));
@@ -445,14 +500,18 @@ function failureReason(label, res) {
 
 const readText = (file) => (existsSync(file) ? readFileSync(file, "utf8") : null);
 
+const timedOut = () => ({ measured: false, timedOut: true, reason: TIMEOUT_REASON });
+
 async function measureDotnet(key) {
   const project = projectOf(key);
   const dir = mkdtempSync(path.join(tmpdir(), "test-timings-"));
   try {
     const commands = dotnetCommands(path.join(REPO_ROOT, project.rel), { trxName: "result.trx", resultsDir: dir });
     const build = await exec(commands.build.bin, commands.build.args);
+    if (build.cutByDeadline) return timedOut();
     if (build.status !== 0) return { measured: false, reason: failureReason("build nie przeszedł", build) };
     const test = await exec(commands.test.bin, commands.test.args);
+    if (test.cutByDeadline) return timedOut();
     const trx = readText(path.join(dir, "result.trx"));
     if (!trx || (test.status !== 0 && test.status !== 1)) return { measured: false, reason: failureReason("brak wyniku testów", test) };
     return { measured: true, setupMs: build.ms, testMs: test.ms, ...parseTrx(trx) };
@@ -467,8 +526,10 @@ async function measureWeb() {
     const outputFile = path.join(dir, "vitest.json");
     const commands = webCommands({ outputFile });
     const install = await exec(commands.install.bin, commands.install.args, { cwd: WEB_DIR });
+    if (install.cutByDeadline) return timedOut();
     if (install.status !== 0) return { measured: false, reason: failureReason("npm install nie przeszedł", install) };
     const test = await exec(commands.test.bin, commands.test.args, { cwd: WEB_DIR });
+    if (test.cutByDeadline) return timedOut();
     const json = readText(outputFile);
     if (!json || (test.status !== 0 && test.status !== 1)) return { measured: false, reason: failureReason("brak wyniku testów", test) };
     return { measured: true, setupMs: install.ms, testMs: test.ms, ...parseVitestJson(json, { root: WEB_DIR }) };
@@ -584,7 +645,7 @@ async function main(argv) {
     return 2;
   }
   if (args.help) {
-    console.log("Usage: node scripts/test-timings.mjs [--only dotnet,web] [--check] [--open] [--report-only]");
+    console.log("Usage: node scripts/test-timings.mjs [--only dotnet,web] [--check] [--open] [--report-only] [--wait <min>] [--timeout <min>] [--from-autobuild]");
     return 0;
   }
   if (args.reportOnly) return reportOnly({ open: args.open });
@@ -593,7 +654,7 @@ async function main(argv) {
   const keys = selectSuites(args.only, present);
   const warned = new Set();
   const check = async (remaining) => {
-    const { lines, warnings } = evaluateSilence({ keys: remaining, ...snapshot() });
+    const { lines, warnings } = evaluateSilence({ keys: remaining, ignoreAutobuild: args.fromAutobuild, ...snapshot() });
     for (const w of warnings) {
       if (!warned.has(w)) console.warn(`UWAGA: ${w}`);
       warned.add(w);
@@ -601,8 +662,11 @@ async function main(argv) {
     return lines;
   };
 
+  const waitMs = args.wait ? args.wait * 60_000 : 0;
+  const onBusy = (lines, left) => console.log(`czekam na ciszę (jeszcze ${Math.ceil(left / 60_000)} min): ${lines.join("; ")}`);
+
   if (args.check) {
-    const lines = await check(keys);
+    const lines = await waitForQuiet({ waitMs, check: () => check(keys), onBusy });
     if (!lines.length) {
       console.log("cisza: maszyna wolna, można mierzyć");
       return 0;
@@ -613,16 +677,29 @@ async function main(argv) {
 
   claimPidFile();
   try {
-    const existing = parseDataFile(readText(DATA_FILE) ?? "");
-    const outcome = await runSuites({
-      keys,
-      data: existing,
-      check,
-      measure,
-      write: (data) => writeAtomically(DATA_FILE, data),
-      git: gitInfo(),
-      onSuite: (index, total, key, result) => console.log(progressLine(index, total, key, result)),
+    const { refused, outcome } = await measureWhenQuiet({
+      waitMs,
+      check: () => check(keys),
+      onBusy,
+      measureRun: () => {
+        runDeadlineAt = args.timeout ? Date.now() + args.timeout * 60_000 : null;
+        return runSuites({
+          keys,
+          data: parseDataFile(readText(DATA_FILE) ?? ""),
+          check,
+          measure,
+          deadlineAt: runDeadlineAt,
+          write: (data) => writeAtomically(DATA_FILE, data),
+          git: gitInfo(),
+          onSuite: (index, total, key, result) => console.log(progressLine(index, total, key, result)),
+        });
+      },
     });
+    if (refused) {
+      for (const line of refused) console.log(line);
+      console.log("Nic nie zmierzono, plik z wynikami bez zmian.");
+      return 3;
+    }
     if (outcome.refused) {
       for (const line of outcome.refused) console.log(line);
       console.log("Nic nie zmierzono, plik z wynikami bez zmian.");

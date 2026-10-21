@@ -14,6 +14,7 @@ import {
   emitReport,
   evaluateSilence,
   exitCodeFor,
+  measureWhenQuiet,
   median,
   mergeSuite,
   parseArgs,
@@ -25,6 +26,7 @@ import {
   runSuites,
   selectSuites,
   summarize,
+  waitForQuiet,
   webCommands,
 } from "./test-timings.mjs";
 import { findStack, listProcesses } from "./stop-stack.mjs";
@@ -59,6 +61,151 @@ test("detectBusy names every busy source", () => {
   assert.ok(busy.some((l) => l.includes("verify.mjs (pid 30)")));
   assert.ok(busy.some((l) => l.includes("kontenery skarbiec-local (2)")));
   assert.ok(busy.some((l) => l.includes("runner wsl-1")));
+});
+
+test("detectBusy ignores autobuild only with from-autobuild", () => {
+  const autobuild = proc(22, "node.exe", "node scripts/autobuild.mjs --items all");
+  assert.equal(detectBusy({ ...quiet, processes: [autobuild] }).busy.length, 1);
+  assert.deepEqual(detectBusy({ ...quiet, processes: [autobuild], ignoreAutobuild: true }).busy, []);
+
+  const { busy } = detectBusy({
+    processes: [autobuild, proc(20, "dotnet.exe", "dotnet run --project Skarbiec.AppHost")],
+    pidFiles: { verify: { pid: 30 }, timings: { pid: 31 } },
+    containers: { "skarbiec-local": ["a"] },
+    runners: [{ name: "wsl-1", status: "online", busy: true }],
+    isAlive: alive(30, 31),
+    ignoreAutobuild: true,
+  });
+  assert.equal(busy.length, 5);
+  assert.ok(!busy.some((l) => l.includes("autobuild.mjs")));
+  assert.ok(busy.some((l) => l.includes("lokalny stos")));
+  assert.ok(busy.some((l) => l.includes("verify.mjs (pid 30)")));
+  assert.ok(busy.some((l) => l.includes("inny test-timings.mjs (pid 31)")));
+  assert.ok(busy.some((l) => l.includes("kontenery skarbiec-local")));
+  assert.ok(busy.some((l) => l.includes("runner wsl-1")));
+  assert.deepEqual(evaluateSilence({ keys: ["web"], ...quiet, processes: [autobuild], ignoreAutobuild: true }).lines, []);
+});
+
+const fakeClock = () => {
+  let t = Date.parse("2026-10-21T10:00:00Z");
+  const sleeps = [];
+  return {
+    now: () => new Date(t),
+    advance: (ms) => (t += ms),
+    sleeps,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+      t += ms;
+    },
+  };
+};
+
+test("wait polls until quiet", async () => {
+  const clock = fakeClock();
+  let checks = 0;
+  const ran = [];
+  const result = await measureWhenQuiet({
+    waitMs: 15 * 60_000,
+    check: async () => (++checks <= 3 ? ["działa: verify.mjs (pid 1)"] : []),
+    measureRun: async () => ran.push("measured"),
+    now: clock.now,
+    sleep: clock.sleep,
+  });
+  assert.equal(result.refused, null);
+  assert.deepEqual(ran, ["measured"]);
+  assert.equal(checks, 4);
+  assert.deepEqual(clock.sleeps, [30_000, 30_000, 30_000]);
+});
+
+test("wait gives up at the deadline", async () => {
+  const clock = fakeClock();
+  let checks = 0;
+  const result = await measureWhenQuiet({
+    waitMs: 15 * 60_000,
+    check: async () => (checks++, ["działa: runner wsl-1 (zajęty)"]),
+    measureRun: async () => assert.fail("must not measure"),
+    now: clock.now,
+    sleep: clock.sleep,
+  });
+  assert.deepEqual(result.refused, ["działa: runner wsl-1 (zajęty)"]);
+  assert.equal(result.outcome, undefined);
+  assert.equal(clock.sleeps.length, 30);
+  assert.ok(clock.sleeps.every((ms) => ms === 30_000));
+  assert.equal(checks, 31);
+  assert.equal(exitCodeFor([{ status: "unmeasured" }]), 3);
+});
+
+test("no wait checks once and measures", async () => {
+  let checks = 0;
+  const result = await measureWhenQuiet({ check: async () => (checks++, ["busy"]), measureRun: async () => "ran" });
+  assert.equal(checks, 0);
+  assert.equal(result.outcome, "ran");
+  assert.deepEqual(await waitForQuiet({ waitMs: 0, check: async () => (checks++, ["busy"]) }), ["busy"]);
+  assert.equal(checks, 1);
+});
+
+test("timeout keeps finished suites and stops the rest", async () => {
+  const clock = fakeClock();
+  const keys = ["dotnet:Skarbiec.Contracts.Tests", "dotnet:Skarbiec.Gateway.Tests", "dotnet:Skarbiec.Identity.Tests", "web"];
+  const writes = [];
+  const measured = [];
+  const result = await runSuites({
+    keys,
+    data: null,
+    git: meta,
+    check: async () => [],
+    now: clock.now,
+    deadlineAt: clock.now().getTime() + 45 * 60_000,
+    measure: async (key) => {
+      measured.push(key);
+      if (measured.length === 2) {
+        clock.advance(45 * 60_000);
+        return { measured: false, timedOut: true, reason: "limit czasu przebiegu (--timeout)" };
+      }
+      return outcome(2000);
+    },
+    write: (data) => writes.push(structuredClone(data)),
+  });
+
+  assert.equal(result.timedOut, true);
+  assert.deepEqual(measured, keys.slice(0, 2));
+  assert.deepEqual(result.results.map((r) => r.status), ["passed", "unmeasured", "unmeasured", "unmeasured"]);
+  for (const r of result.results.slice(1)) assert.match(r.reason, /limit czasu/);
+  assert.equal(exitCodeFor(result.results), 3);
+  const last = writes.at(-1);
+  assert.deepEqual(Object.keys(last.suites), [keys[0]]);
+  assert.equal(last.run.suites[keys[0]], "measured");
+  assert.equal(last.run.suites[keys[1]], "unmeasured");
+  assert.equal(last.run.suites[keys[3]], "unmeasured");
+});
+
+test("timeout passed between suites starts no further suite", async () => {
+  const clock = fakeClock();
+  const keys = ["dotnet:Skarbiec.Contracts.Tests", "dotnet:Skarbiec.Gateway.Tests", "web"];
+  const measured = [];
+  const result = await runSuites({
+    keys,
+    data: null,
+    git: meta,
+    check: async () => [],
+    now: clock.now,
+    deadlineAt: clock.now().getTime() + 10 * 60_000,
+    measure: async (key) => {
+      measured.push(key);
+      clock.advance(11 * 60_000);
+      return outcome(2000);
+    },
+    write: () => {},
+  });
+  assert.deepEqual(measured, [keys[0]]);
+  assert.equal(result.timedOut, true);
+  assert.deepEqual(result.results.map((r) => r.status), ["passed", "unmeasured", "unmeasured"]);
+  assert.equal(exitCodeFor(result.results), 3);
+});
+
+test("a run without a deadline is never timed out", async () => {
+  const result = await runSuites({ keys: ["web"], data: null, git: meta, check: async () => [], measure: async () => outcome(1000), write: () => {} });
+  assert.equal(result.timedOut, false);
 });
 
 test("detectBusy ignores a dead pid file and an autobuild-like script name", () => {
@@ -459,8 +606,11 @@ test("exitCodeFor", () => {
 });
 
 test("arguments select suites", () => {
-  assert.deepEqual(parseArgs([]), { only: null, check: false, help: false, open: false, reportOnly: false });
-  assert.deepEqual(parseArgs(["--only", "web,dotnet", "--check"]), { only: ["web", "dotnet"], check: true, help: false, open: false, reportOnly: false });
+  const defaults = { only: null, check: false, help: false, open: false, reportOnly: false, wait: null, timeout: null, fromAutobuild: false };
+  assert.deepEqual(parseArgs([]), defaults);
+  assert.deepEqual(parseArgs(["--only", "web,dotnet", "--check"]), { ...defaults, only: ["web", "dotnet"], check: true });
+  assert.deepEqual(parseArgs(["--from-autobuild", "--wait", "15", "--timeout=45"]), { ...defaults, fromAutobuild: true, wait: 15, timeout: 45 });
+  for (const bad of [["--wait"], ["--wait", "0"], ["--timeout", "abc"], ["--timeout=-3"], ["--wait="]]) assert.match(parseArgs(bad).error, /positive number of minutes/, bad.join(" "));
   assert.equal(parseArgs(["--open", "--report-only"]).open, true);
   assert.equal(parseArgs(["--report-only"]).reportOnly, true);
   assert.match(parseArgs(["--only", "web,nope"]).error, /--only takes dotnet,web \(unknown: nope\)/);
@@ -483,8 +633,9 @@ test("the script is documented once and its data directory is ignored", () => {
   const row = claude.find((l) => l.includes("scripts/test-timings.mjs"));
   assert.equal(claude.filter((l) => l.includes("scripts/test-timings.mjs")).length, 1);
   assert.ok(readFileSync(`${root}.gitignore`, "utf8").split("\n").includes("skarbiec-plan/test-timings/"));
-  const header = readFileSync(fileURLToPath(import.meta.url).replace(".test.mjs", ".mjs"), "utf8").split("\n").slice(0, 6).join("\n");
-  for (const text of ["--only dotnet,web", "--check", "--open", "--report-only", "history.json"]) {
+  const lines = readFileSync(fileURLToPath(import.meta.url).replace(".test.mjs", ".mjs"), "utf8").split("\n");
+  const header = lines.slice(0, lines.findIndex((l, i) => i > 0 && !l.startsWith("//"))).join("\n");
+  for (const text of ["--only dotnet,web", "--check", "--open", "--report-only", "history.json", "--wait <min>", "--timeout <min>", "--from-autobuild"]) {
     assert.ok(header.includes(text), `header names ${text}`);
     assert.ok(row.includes(text), `CLAUDE.md row names ${text}`);
   }
