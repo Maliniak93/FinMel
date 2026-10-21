@@ -23,7 +23,7 @@ import {
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
-import { formatDate, formatMoney, formatPercent } from '../../../shared/format';
+import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
 import { taxWrapperLabel } from '../../accounts/account-type';
 import {
   BondPurchaseDialog,
@@ -194,6 +194,7 @@ export class MyBonds {
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
   protected readonly formatPercent = formatPercent;
+  protected readonly formatQuantity = formatQuantity;
   protected readonly taxWrapperLabel = taxWrapperLabel;
   protected readonly canSettle = canSettle;
   protected readonly canEarlyRedeem = canEarlyRedeem;

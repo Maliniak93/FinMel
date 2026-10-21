@@ -146,7 +146,10 @@ describe('AccountDetail', () => {
     await restoreEnglish();
   });
 
-  async function setup(accountOverrides: Record<string, unknown> = {}): Promise<void> {
+  async function setup(
+    accountOverrides: Record<string, unknown> = {},
+    history: unknown = transactions,
+  ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const request = input as Request;
       const url = requestUrl(input);
@@ -154,7 +157,7 @@ describe('AccountDetail', () => {
         return new Response(null, { status: 204 });
       }
       if (url.includes(`/api/portfolio/assets/${cashAssetId}/transactions`)) {
-        return jsonResponse(transactions);
+        return jsonResponse(history);
       }
       if (url.includes('/api/portfolio/assets') && url.includes(`accountId=${accountId}`)) {
         return jsonResponse(holdings);
@@ -287,6 +290,17 @@ describe('AccountDetail', () => {
     expect(transferRow.textContent).toContain('Obligacje IKE');
     expect(rowButton(transferRow, /edit/i)).toBeUndefined();
     expect(rowButton(transferRow, /delete/i)).toBeDefined();
+  });
+
+  it('shows the rounded quantity in the delete confirmation of a cash row', async () => {
+    await setup({}, { items: [{ ...transactions.items[0], quantity: 0.123456 }] });
+    dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+    rowButton(historyRow(depositId), /delete/i)!.click();
+    await fixture.whenStable();
+
+    const { message } = (dialog.open.mock.calls[0][1] as { data: { message: string } }).data;
+    expect(message).toContain('of 0.12 will be permanently deleted');
   });
 
   it('labels a settlement deposit with the income name and offers no edit or delete', async () => {

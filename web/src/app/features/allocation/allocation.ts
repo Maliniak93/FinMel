@@ -47,7 +47,7 @@ import {
   formatDate,
   formatMoney,
   formatPercent,
-  formatQuantity,
+  formatPercentNumber,
   formatSignedMoney,
   formatSignedPoints,
 } from '../../shared/format';
@@ -337,7 +337,7 @@ export class Allocation {
   }
 
   protected bandLabel(group: TargetAllocationGroupResponse): string {
-    return `${formatQuantity(group.bandLowPercent)}–${formatPercent(group.bandHighPercent)}`;
+    return `${formatPercentNumber(group.bandLowPercent)}–${formatPercent(group.bandHighPercent)}`;
   }
 
   protected startEdit(groups: readonly TargetAllocationGroupResponse[]): void {
