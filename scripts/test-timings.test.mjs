@@ -4,17 +4,20 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   ALL_KEYS,
-  computeDeltas,
+  HISTORY_LIMIT,
+  assessReliability,
+  classSeries,
+  compareWithMedian,
   detectBusy,
   dockerRequired,
   dotnetCommands,
   emitReport,
   evaluateSilence,
   exitCodeFor,
+  median,
   mergeSuite,
   parseArgs,
   parseDataFile,
-  parsePlaywrightJson,
   parseTrx,
   parseVitestJson,
   progressLine,
@@ -39,24 +42,22 @@ test("detectBusy names every busy source", () => {
       proc(21, "Skarbiec.Portfolio.exe", "Skarbiec.Portfolio.exe"),
       proc(22, "node.exe", "node scripts/autobuild.mjs --items all"),
     ],
-    pidFiles: { verify: { pid: 30 }, e2e: { pid: 31 } },
-    containers: { "skarbiec-local": ["a", "b"], "skarbiec-e2e": ["c"] },
+    pidFiles: { verify: { pid: 30 } },
+    containers: { "skarbiec-local": ["a", "b"] },
     runners: [
       { name: "wsl-1", status: "online", busy: true },
       { name: "wsl-2", status: "online", busy: false },
       { name: "gone", status: "offline", busy: true },
     ],
-    isAlive: alive(30, 31),
+    isAlive: alive(30),
   });
 
-  assert.equal(busy.length, 7);
+  assert.equal(busy.length, 5);
   assert.ok(busy.every((l) => l.startsWith("działa: ")));
   assert.ok(busy.some((l) => l.includes("lokalny stos") && l.includes("dotnet run") && l.includes("service")));
   assert.ok(busy.some((l) => l.includes("autobuild.mjs (pid 22)")));
   assert.ok(busy.some((l) => l.includes("verify.mjs (pid 30)")));
-  assert.ok(busy.some((l) => l.includes("e2e.mjs (pid 31)")));
   assert.ok(busy.some((l) => l.includes("kontenery skarbiec-local (2)")));
-  assert.ok(busy.some((l) => l.includes("kontenery skarbiec-e2e (1)")));
   assert.ok(busy.some((l) => l.includes("runner wsl-1")));
 });
 
@@ -64,7 +65,7 @@ test("detectBusy ignores a dead pid file and an autobuild-like script name", () 
   const { busy } = detectBusy({
     ...quiet,
     processes: [proc(40, "node.exe", "node --test scripts/autobuild-watch.test.mjs")],
-    pidFiles: { verify: { pid: 30 }, e2e: { pid: 31 } },
+    pidFiles: { verify: { pid: 30 } },
     isAlive: alive(),
   });
   assert.deepEqual(busy, []);
@@ -85,13 +86,13 @@ test("second instance is refused", () => {
   assert.deepEqual(own.busy, []);
 });
 
-test("docker is required only for dotnet and e2e", () => {
+test("docker is required only for dotnet", () => {
   assert.equal(dockerRequired(["web"]), false);
   assert.equal(dockerRequired(["dotnet:Skarbiec.Contracts.Tests"]), true);
-  assert.equal(dockerRequired(["web", "e2e"]), true);
+  assert.equal(dockerRequired(["web", "dotnet:Skarbiec.Contracts.Tests"]), true);
 
   assert.deepEqual(evaluateSilence({ keys: ["web"], dockerUp: false, ...quiet }).lines, []);
-  for (const keys of [["dotnet:Skarbiec.Contracts.Tests"], ["e2e"], ALL_KEYS]) {
+  for (const keys of [["dotnet:Skarbiec.Contracts.Tests"], ALL_KEYS]) {
     const { lines } = evaluateSilence({ keys, dockerUp: false, ...quiet });
     assert.equal(lines.length, 1);
     assert.match(lines[0], /^Docker nie jest uruchomiony/);
@@ -102,7 +103,6 @@ test("docker is required only for dotnet and e2e", () => {
 const meta = { commit: "abc", dirty: false, branch: "feat/x" };
 const outcome = (ms, over = {}) => ({
   measured: true,
-  kind: "dotnet",
   setupMs: 1000,
   testMs: ms,
   counts: { passed: 2, failed: 0, skipped: 0 },
@@ -112,8 +112,8 @@ const outcome = (ms, over = {}) => ({
 });
 
 test("busy in the middle stops the run", async () => {
-  const keys = ALL_KEYS.slice(0, 10);
-  assert.equal(keys.length, 10);
+  const keys = ALL_KEYS;
+  assert.equal(keys.length, 9);
   const writes = [];
   const checked = [];
   const progress = [];
@@ -132,13 +132,13 @@ test("busy in the middle stops the run", async () => {
 
   assert.equal(result.refused, null);
   assert.deepEqual(result.interrupted, ["działa: runner wsl-1 (zajęty)"]);
-  assert.equal(result.results.length, 10);
+  assert.equal(result.results.length, 9);
   assert.deepEqual(result.results.slice(0, 3).map((r) => r.status), ["passed", "passed", "passed"]);
   for (const r of result.results.slice(3)) {
     assert.equal(r.status, "unmeasured");
     assert.match(r.reason, /działa: runner wsl-1/);
   }
-  assert.deepEqual(progress.map((p) => p[0]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.deepEqual(progress.map((p) => p[0]), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.equal(exitCodeFor(result.results), 3);
 
   assert.equal(writes.length, 4);
@@ -153,7 +153,7 @@ test("busy in the middle stops the run", async () => {
 test("a busy machine at the start refuses and writes nothing", async () => {
   const writes = [];
   const result = await runSuites({
-    keys: ["web", "e2e"],
+    keys: ["web", "dotnet:Skarbiec.Contracts.Tests"],
     data: null,
     git: meta,
     check: async () => ["działa: verify.mjs (pid 1)"],
@@ -224,57 +224,96 @@ test("parseVitestJson", () => {
   assert.deepEqual(parsed.classes["src/app/b.spec.ts"], { ms: 1, count: 1 });
 });
 
-test("parsePlaywrightJson", () => {
-  const started = Date.parse("2026-10-21T10:00:00.000Z");
-  const report = {
-    stats: { startTime: "2026-10-21T10:03:20.500Z", duration: 61234.5 },
-    suites: [
-      {
-        title: "specs/a.spec.ts",
-        file: "specs/a.spec.ts",
-        specs: [{ title: "top level", file: "specs/a.spec.ts", tests: [{ status: "expected", results: [{ duration: 1000 }] }] }],
-        suites: [
-          {
-            title: "Dashboard",
-            file: "specs/a.spec.ts",
-            specs: [
-              {
-                title: "flaky one",
-                file: "specs/a.spec.ts",
-                tests: [{ status: "flaky", results: [{ duration: 9000, status: "failed" }, { duration: 2500, status: "passed" }] }],
-              },
-              { title: "red", file: "specs/a.spec.ts", tests: [{ status: "unexpected", results: [{ duration: 700 }] }] },
-            ],
-            suites: [{ title: "nested", specs: [{ title: "deep", file: "specs/a.spec.ts", tests: [{ status: "skipped", results: [] }] }] }],
-          },
-        ],
-      },
-    ],
-  };
-  const parsed = parsePlaywrightJson(report, { commandStartedAt: started });
-  assert.equal(parsed.testMs, 61235);
-  assert.equal(parsed.setupMs, 200_500);
-  assert.deepEqual(parsed.counts, { passed: 2, failed: 1, skipped: 1 });
-  assert.deepEqual(parsed.tests["specs/a.spec.ts › top level"], { ms: 1000, outcome: "passed" });
-  assert.deepEqual(parsed.tests["specs/a.spec.ts › Dashboard › flaky one"], { ms: 2500, outcome: "passed" });
-  assert.deepEqual(parsed.tests["specs/a.spec.ts › Dashboard › red"], { ms: 700, outcome: "failed" });
-  assert.deepEqual(parsed.tests["specs/a.spec.ts › Dashboard › nested › deep"], { ms: 0, outcome: "skipped" });
-  assert.equal(parsed.classes["specs/a.spec.ts"].count, 4);
+const day = (n) => `2026-09-${String(n).padStart(2, "0")}T10:00:00Z`;
+const calm = { passed: 2, failed: 0, skipped: 0 };
+const entryAt = (n, testMs, over = {}) => ({
+  measuredAt: day(n),
+  commit: `commit${n}`,
+  dirty: false,
+  status: "passed",
+  setupMs: 1000,
+  testMs,
+  counts: calm,
+  reliable: true,
+  reasons: [],
+  ...over,
 });
+const withHistory = (history, classes = {}, tests = {}) => ({ history, classes, tests });
 
 test("mergeSuite keeps going on red", () => {
   const red = outcome(4000, { counts: { passed: 1, failed: 1, skipped: 0 } });
   const first = mergeSuite(null, "web", red, { measuredAt: "2026-10-13T10:00:00Z", ...meta });
   assert.equal(first.status, "failed");
-  assert.equal(first.data.suites.web.status, "failed");
-  assert.equal(first.data.suites.web.previous, null);
+  assert.equal(first.data.version, 2);
+  assert.equal(first.data.suites.web.history[0].status, "failed");
+  assert.equal(first.data.suites.web.history[0].reliable, false);
+  assert.deepEqual(first.data.suites.web.history[0].reasons, ["red-test"]);
 
   const second = mergeSuite(first.data, "web", outcome(3000), { measuredAt: "2026-10-14T10:00:00Z", ...meta });
   assert.equal(second.status, "passed");
-  assert.equal(second.data.suites.web.testMs, 3000);
-  assert.equal(second.data.suites.web.previous.testMs, 4000);
-  assert.equal(second.data.suites.web.previous.status, "failed");
-  assert.equal("previous" in second.data.suites.web.previous, false);
+  assert.deepEqual(second.data.suites.web.history.map((e) => e.testMs), [4000, 3000]);
+  assert.equal(second.data.suites.web.history[1].reliable, true);
+});
+
+test("a run appends one entry per suite", async () => {
+  const keys = ["web", "dotnet:Skarbiec.Contracts.Tests"];
+  const run = (data, at) =>
+    runSuites({ keys, data, git: { ...meta, dirty: true }, check: async () => [], measure: async () => outcome(2000), write: () => {}, now: () => new Date(at) });
+  const first = await run(null, "2026-10-13T10:00:00Z");
+  const second = await run(first.data, "2026-10-14T10:00:00Z");
+
+  for (const key of keys) {
+    const history = second.data.suites[key].history;
+    assert.equal(history.length, 2);
+    assert.deepEqual(Object.keys(history[1]).sort(), ["commit", "counts", "dirty", "measuredAt", "reasons", "reliable", "setupMs", "status", "testMs"]);
+    assert.deepEqual(history[1], {
+      measuredAt: "2026-10-14T10:00:00.000Z",
+      commit: "abc",
+      dirty: true,
+      status: "passed",
+      setupMs: 1000,
+      testMs: 2000,
+      counts: { passed: 2, failed: 0, skipped: 0 },
+      reliable: false,
+      reasons: ["dirty-tree"],
+    });
+  }
+  const source = readFileSync(fileURLToPath(import.meta.url).replace(".test.mjs", ".mjs"), "utf8");
+  assert.equal(source.includes("last-run.json"), false);
+});
+
+test("history keeps the last 30 entries", () => {
+  assert.equal(HISTORY_LIMIT, 30);
+  let data = null;
+  for (let i = 1; i <= 31; i++) data = mergeSuite(data, "web", outcome(2000), { measuredAt: `t${String(i).padStart(2, "0")}`, ...meta }).data;
+  const suite = data.suites.web;
+  assert.equal(suite.history.length, 30);
+  assert.equal(suite.history[0].measuredAt, "t02");
+  assert.equal(suite.history.at(-1).measuredAt, "t31");
+  assert.equal(suite.classes["N.A"].length, 30);
+  assert.equal(suite.classes["N.A"][0].measuredAt, "t02");
+});
+
+test("class history follows the classes of the latest measurement", () => {
+  const first = mergeSuite(null, "web", outcome(2000, { classes: { "N.A": { ms: 1500, count: 2 }, "N.B": { ms: 500, count: 1 } } }), { measuredAt: "t1", ...meta });
+  const second = mergeSuite(first.data, "web", outcome(2000, { classes: { "N.B": { ms: 600, count: 3 }, "N.C": { ms: 100, count: 1 } } }), { measuredAt: "t2", commit: "def", dirty: false, branch: "x" });
+  const classes = second.data.suites.web.classes;
+  assert.deepEqual(Object.keys(classes).sort(), ["N.B", "N.C"]);
+  assert.deepEqual(classes["N.B"], [
+    { measuredAt: "t1", commit: "abc", ms: 500, count: 1 },
+    { measuredAt: "t2", commit: "def", ms: 600, count: 3 },
+  ]);
+  assert.deepEqual(classes["N.C"], [{ measuredAt: "t2", commit: "def", ms: 100, count: 1 }]);
+});
+
+test("tests are kept for the latest measurement only", () => {
+  const first = mergeSuite(null, "web", outcome(2000, { tests: { "N.A.Old": { ms: 5, outcome: "passed" } } }), { measuredAt: "t1", ...meta });
+  const second = mergeSuite(first.data, "web", outcome(3000), { measuredAt: "t2", ...meta });
+  const suite = second.data.suites.web;
+  assert.deepEqual(suite.tests, outcome(3000).tests);
+  assert.deepEqual(Object.keys(suite).sort(), ["classes", "history", "tests"]);
+  assert.equal(JSON.stringify(second.data).includes("N.A.Old"), false);
+  assert.ok(suite.history.every((e) => !("tests" in e) && !("classes" in e)));
 });
 
 test("mergeSuite leaves an unmeasured suite alone", () => {
@@ -285,19 +324,17 @@ test("mergeSuite leaves an unmeasured suite alone", () => {
     assert.equal(result.status, "unmeasured");
     assert.ok(result.reason);
     assert.deepEqual(result.data.suites.web, again.suites.web);
-    assert.equal(result.data.suites.web.previous.testMs, 3000);
+    assert.equal(result.data.suites.web.history.length, 2);
   }
 });
 
 test("partial run merges per suite", () => {
   let data = mergeSuite(null, "web", outcome(3000), { measuredAt: "2026-10-13T10:00:00Z", ...meta }).data;
-  data = mergeSuite(data, "e2e", outcome(9000, { kind: "e2e" }), { measuredAt: "2026-10-13T10:05:00Z", ...meta }).data;
+  data = mergeSuite(data, "dotnet:Skarbiec.Contracts.Tests", outcome(9000), { measuredAt: "2026-10-13T10:05:00Z", ...meta }).data;
 
   const next = mergeSuite(data, "web", outcome(2500), { measuredAt: "2026-10-20T10:00:00Z", ...meta }).data;
-  assert.equal(next.suites.web.measuredAt, "2026-10-20T10:00:00Z");
-  assert.equal(next.suites.web.previous.measuredAt, "2026-10-13T10:00:00Z");
-  assert.deepEqual(next.suites.e2e, data.suites.e2e);
-  assert.equal(next.suites.e2e.measuredAt, "2026-10-13T10:05:00Z");
+  assert.deepEqual(next.suites.web.history.map((e) => e.measuredAt), ["2026-10-13T10:00:00Z", "2026-10-20T10:00:00Z"]);
+  assert.deepEqual(next.suites["dotnet:Skarbiec.Contracts.Tests"], data.suites["dotnet:Skarbiec.Contracts.Tests"]);
 });
 
 test("partial run records the other suites as not selected", async () => {
@@ -305,100 +342,113 @@ test("partial run records the other suites as not selected", async () => {
   await runSuites({ keys: ["web"], data: null, git: meta, check: async () => [], measure: async () => outcome(1000), write: (d) => writes.push(d) });
   const run = writes.at(-1).run;
   assert.equal(run.suites.web, "measured");
-  assert.equal(run.suites.e2e, "not-selected");
   assert.equal(run.suites["dotnet:Skarbiec.Portfolio.Tests"], "not-selected");
   assert.equal(run.branch, "feat/x");
+  assert.deepEqual(Object.keys(writes.at(-1).suites), ["web"]);
 });
 
-test("corrupt file means no previous", () => {
+test("corrupt file means no history", () => {
   assert.equal(parseDataFile("{ nope"), null);
   assert.equal(parseDataFile(""), null);
-  assert.equal(parseDataFile(JSON.stringify({ version: 2, suites: {} })), null);
-  assert.equal(parseDataFile(JSON.stringify({ version: 1, suites: [] })), null);
+  assert.equal(parseDataFile(JSON.stringify({ version: 1, suites: {} })), null);
+  assert.equal(parseDataFile(JSON.stringify({ version: 2, suites: [] })), null);
+  assert.equal(parseDataFile(JSON.stringify({ version: 2, suites: { web: { history: [], classes: {}, tests: {} } } })), null);
 
   const merged = mergeSuite(parseDataFile("{ nope"), "web", outcome(3000), { measuredAt: "t", ...meta });
-  assert.equal(merged.data.suites.web.previous, null);
-  assert.equal(computeDeltas(merged.data.suites.web), null);
-  assert.deepEqual(parseDataFile(JSON.stringify(merged.data)).suites.web.testMs, 3000);
+  assert.equal(merged.data.suites.web.history.length, 1);
+  assert.equal(parseDataFile(JSON.stringify(merged.data)).suites.web.history[0].testMs, 3000);
 });
 
-const entryOf = (over) => ({
-  status: "passed",
-  setupMs: 1000,
-  testMs: 10_000,
-  counts: { passed: 3, failed: 0, skipped: 0 },
-  classes: { "N.A": { ms: 6000, count: 2 }, "N.B": { ms: 4000, count: 1 }, "N.New": { ms: 100, count: 1 } },
-  tests: {
-    "N.A.One": { ms: 2000, outcome: "passed" },
-    "N.A.Two": { ms: 4000, outcome: "passed" },
-    "N.B.Three": { ms: 4000, outcome: "passed" },
-    "N.New.Fresh": { ms: 100, outcome: "passed" },
-  },
-  previous: {
-    status: "passed",
-    setupMs: 1500,
-    testMs: 8000,
-    counts: { passed: 3, failed: 0, skipped: 0 },
-    classes: { "N.A": { ms: 3000, count: 2 }, "N.B": { ms: 5000, count: 1 }, "N.Gone": { ms: 50, count: 1 } },
-    tests: {
-      "N.A.One": { ms: 1000, outcome: "passed" },
-      "N.A.Two": { ms: 2000, outcome: "passed" },
-      "N.B.Three": { ms: 5000, outcome: "passed" },
-      "N.Gone.Old": { ms: 50, outcome: "passed" },
-    },
-  },
-  ...over,
+test("median", () => {
+  assert.equal(median([]), null);
+  assert.equal(median([5]), 5);
+  assert.equal(median([9, 1, 5]), 5);
+  assert.equal(median([4, 1, 3, 2]), 2.5);
 });
 
-test("computeDeltas", () => {
-  const d = computeDeltas(entryOf());
-  assert.equal(d.uncertain, false);
-  assert.equal(d.setupMs.deltaMs, -500);
-  assert.equal(d.testMs.deltaMs, 2000);
-  assert.deepEqual(d.testCount, { count: 3, previousCount: 3, delta: 0 });
-  assert.equal(d.classes["N.A"].deltaMs, 3000);
-  assert.equal(d.classes["N.B"].deltaMs, -1000);
-  assert.equal("N.New" in d.classes, false);
-  assert.equal(d.tests["N.A.Two"].deltaMs, 2000);
-  assert.equal(d.tests["N.B.Three"].deltaMs, -1000);
-  assert.deepEqual(d.newTests, ["N.New.Fresh"]);
-  assert.deepEqual(d.removedTests, ["N.Gone.Old"]);
-  assert.deepEqual(d.slowdowns, [
-    { id: "N.A.Two", deltaMs: 2000 },
-    { id: "N.A.One", deltaMs: 1000 },
-  ]);
-  assert.deepEqual(d.classSlowdowns, [{ id: "N.A", deltaMs: 3000 }]);
-
-  assert.equal(computeDeltas(entryOf({ status: "failed" })).uncertain, true);
-  const prevRed = entryOf();
-  prevRed.previous.counts = { passed: 2, failed: 1, skipped: 0 };
-  assert.equal(computeDeltas(prevRed).uncertain, true);
-  assert.equal(computeDeltas(entryOf({ previous: null })), null);
+test("reliability flags", () => {
+  const steady = [entryAt(1, 10_000), entryAt(2, 10_000), entryAt(3, 10_000)];
+  const clean = { dirty: false, counts: calm, testMs: 10_000 };
+  const redCounts = { passed: 1, failed: 1, skipped: 0 };
+  const cases = [
+    ["a steady run is reliable", steady, clean, []],
+    ["a first measurement is reliable", [], clean, []],
+    ["a dirty tracked tree", steady, { ...clean, dirty: true }, ["dirty-tree"]],
+    ["a red test", steady, { ...clean, counts: redCounts }, ["red-test"]],
+    ["dirty and red give both reasons", steady, { ...clean, dirty: true, counts: redCounts }, ["dirty-tree", "red-test"]],
+    ["25 percent above is still fine", steady, { ...clean, testMs: 12_500 }, []],
+    ["just over 25 percent above", steady, { ...clean, testMs: 12_501 }, ["outlier"]],
+    ["25 percent below is still fine", steady, { ...clean, testMs: 7500 }, []],
+    ["just over 25 percent below", steady, { ...clean, testMs: 7499 }, ["outlier"]],
+    ["two reliable entries never flag an outlier", steady.slice(1), { ...clean, testMs: 30_000 }, []],
+    ["unreliable entries do not count towards the three", [entryAt(1, 10_000), entryAt(2, 50_000, { reliable: false }), entryAt(3, 10_000)], { ...clean, testMs: 30_000 }, []],
+    ["the median ignores unreliable entries", [...steady, entryAt(4, 90_000, { reliable: false })], { ...clean, testMs: 12_000 }, []],
+    ["only the last five reliable entries count", [entryAt(1, 100_000), ...[2, 3, 4, 5, 6].map((n) => entryAt(n, 10_000))], clean, []],
+    ["a slow outlier on a long history", [1, 2, 3, 4, 5, 6].map((n) => entryAt(n, 10_000)), { ...clean, testMs: 20_000 }, ["outlier"]],
+  ];
+  for (const [name, history, input, reasons] of cases) {
+    assert.deepEqual(assessReliability(history, input), { reliable: reasons.length === 0, reasons }, name);
+  }
 });
 
-const keyed = (key, entry) => ({ key, entry });
-const ago = (over = {}) => ({ ...entryOf().previous, measuredAt: "2026-10-13T12:00:00", ...over });
+test("comparison uses the median of reliable entries", () => {
+  const history = [
+    entryAt(1, 99_000),
+    entryAt(2, 10_000),
+    entryAt(3, 12_000),
+    entryAt(4, 50_000, { reliable: false }),
+    entryAt(5, 11_000),
+    entryAt(6, 13_000),
+    entryAt(7, 14_000),
+    entryAt(8, 16_000),
+  ];
+  assert.deepEqual(compareWithMedian(history), { ms: 16_000, baselineMs: 12_000, deltaMs: 4000, baselineSize: 5 });
+  assert.deepEqual(compareWithMedian(history, "setupMs"), { ms: 1000, baselineMs: 1000, deltaMs: 0, baselineSize: 5 });
+  assert.equal(compareWithMedian([entryAt(1, 10_000), entryAt(2, 12_000)]).baselineMs, 10_000);
+});
+
+test("unreliable current entry has no comparison", () => {
+  const steady = [entryAt(1, 10_000), entryAt(2, 10_000), entryAt(3, 10_000)];
+  assert.equal(compareWithMedian([...steady, entryAt(4, 30_000, { reliable: false, reasons: ["outlier"] })]), null);
+  assert.equal(compareWithMedian([entryAt(1, 10_000)]), null);
+  assert.equal(compareWithMedian([entryAt(1, 10_000, { reliable: false }), entryAt(2, 10_000)]), null);
+  assert.equal(compareWithMedian([]), null);
+});
+
+test("class history is as reliable as the suite entry of the same measurement", () => {
+  const suite = withHistory([entryAt(1, 10_000), entryAt(2, 10_000, { reliable: false })], {
+    "N.A": [
+      { measuredAt: day(1), commit: "c1", ms: 5, count: 1 },
+      { measuredAt: day(2), commit: "c2", ms: 6, count: 1 },
+    ],
+  });
+  assert.deepEqual(classSeries(suite, "N.A").map((c) => c.reliable), [true, false]);
+  assert.deepEqual(classSeries(suite, "N.Gone"), []);
+});
+
+const keyed = (key, entry, comparison = null) => ({ key, entry, comparison });
+const cmp = (deltaMs) => ({ ms: 0, baselineMs: 0, deltaMs, baselineSize: 3 });
 
 test("summarize", () => {
-  const a = entryOf({ setupMs: 21_000, testMs: 72_000, counts: { passed: 1000, failed: 0, skipped: 0 }, previous: ago({ setupMs: 21_000, testMs: 44_000, counts: { passed: 990, failed: 0, skipped: 0 } }) });
-  const b = entryOf({ setupMs: 30_000, testMs: 750_000, counts: { passed: 284, failed: 0, skipped: 0 }, previous: ago({ setupMs: 30_000, testMs: 746_000, counts: { passed: 282, failed: 0, skipped: 0 } }) });
-  const line = summarize([keyed("dotnet:Skarbiec.Portfolio.Tests", a), keyed("web", b)]);
-  assert.equal(line, "Razem 14:33 (+0:32 vs 2026-10-13), testów 1 284 (+12), 0 czerwonych. Najwięcej urosło: Skarbiec.Portfolio.Tests +0:28");
-  assert.match(line, /^Razem \d+:\d\d \([+-]\d+:\d\d vs \d{4}-\d\d-\d\d\), testów [\d ]+ \([+-][\d ]+\), \d+ czerwonych\. Najwięcej urosło: \S+ \+\d+:\d\d$/);
+  const a = entryAt(2, 72_000, { setupMs: 21_000, counts: { passed: 1000, failed: 0, skipped: 0 } });
+  const b = entryAt(2, 750_000, { setupMs: 30_000, counts: { passed: 284, failed: 0, skipped: 0 } });
+  const line = summarize([keyed("dotnet:Skarbiec.Portfolio.Tests", a, cmp(28_000)), keyed("web", b, cmp(4000))]);
+  assert.equal(line, "Razem 14:33 (testy +0:32 vs mediana), testów 1 284, 0 czerwonych. Najwięcej urosło: Skarbiec.Portfolio.Tests +0:28");
 
-  const first = summarize([keyed("web", entryOf({ previous: null, setupMs: 1000, testMs: 71_000, counts: { passed: 1500, failed: 2, skipped: 0 } }))]);
-  assert.equal(first, "Razem 1:12 (brak poprzedniego przebiegu), testów 1 502, 2 czerwonych.");
+  const first = summarize([keyed("web", entryAt(1, 71_000, { counts: { passed: 1500, failed: 2, skipped: 0 } }))]);
+  assert.equal(first, "Razem 1:12 (brak wiarygodnej historii do porównania), testów 1 502, 2 czerwonych.");
   assert.equal(summarize([]), "Nic nie zmierzono.");
 
-  const red = summarize([keyed("web", entryOf({ status: "failed", counts: { passed: 2, failed: 1, skipped: 0 } }))]);
-  assert.match(red, /Porównanie niepewne \(czerwone testy\): web$/);
-  assert.match(red, /1 czerwonych/);
+  const unreliable = summarize([keyed("web", entryAt(1, 71_000, { reliable: false, reasons: ["dirty-tree", "red-test"], counts: { passed: 2, failed: 1, skipped: 0 } }))]);
+  assert.match(unreliable, /1 czerwonych\. Pomiar niewiarygodny: web \(dirty-tree, red-test\)$/);
 });
 
 test("progressLine", () => {
-  const entry = entryOf({ setupMs: 21_000, testMs: 72_000, counts: { passed: 312, failed: 0, skipped: 0 } });
-  assert.equal(progressLine(3, 10, "dotnet:Skarbiec.Portfolio.Tests", { status: "passed", entry }), "[3/10] dotnet Skarbiec.Portfolio.Tests — setup 0:21, testy 1:12, 312 testów, 0 czerwonych");
-  assert.equal(progressLine(9, 10, "web", { status: "unmeasured", reason: "0 testów" }), "[9/10] web — niezmierzony: 0 testów");
+  const entry = entryAt(1, 72_000, { setupMs: 21_000, counts: { passed: 312, failed: 0, skipped: 0 } });
+  assert.equal(progressLine(3, 9, "dotnet:Skarbiec.Portfolio.Tests", { status: "passed", entry }), "[3/9] dotnet Skarbiec.Portfolio.Tests — setup 0:21, testy 1:12, 312 testów, 0 czerwonych");
+  assert.equal(progressLine(9, 9, "web", { status: "unmeasured", reason: "0 testów" }), "[9/9] web — niezmierzony: 0 testów");
+  const flagged = entryAt(1, 72_000, { reliable: false, reasons: ["outlier"] });
+  assert.match(progressLine(1, 9, "web", { status: "passed", entry: flagged }), /, niewiarygodny \(outlier\)$/);
 });
 
 test("exitCodeFor", () => {
@@ -410,16 +460,15 @@ test("exitCodeFor", () => {
 
 test("arguments select suites", () => {
   assert.deepEqual(parseArgs([]), { only: null, check: false, help: false, open: false, reportOnly: false });
-  assert.deepEqual(parseArgs(["--only", "web,e2e", "--check"]), { only: ["web", "e2e"], check: true, help: false, open: false, reportOnly: false });
+  assert.deepEqual(parseArgs(["--only", "web,dotnet", "--check"]), { only: ["web", "dotnet"], check: true, help: false, open: false, reportOnly: false });
   assert.equal(parseArgs(["--open", "--report-only"]).open, true);
   assert.equal(parseArgs(["--report-only"]).reportOnly, true);
-  assert.ok(parseArgs(["--only", "nope"]).error);
+  assert.match(parseArgs(["--only", "web,nope"]).error, /--only takes dotnet,web \(unknown: nope\)/);
   assert.ok(parseArgs(["--wat"]).error);
   assert.deepEqual(selectSuites(["web"]), ["web"]);
   assert.deepEqual(selectSuites(null), ALL_KEYS);
-  assert.equal(selectSuites(["dotnet"]).length, ALL_KEYS.length - 2);
-  assert.equal(ALL_KEYS.at(-2), "web");
-  assert.equal(ALL_KEYS.at(-1), "e2e");
+  assert.equal(selectSuites(["dotnet"]).length, ALL_KEYS.length - 1);
+  assert.equal(ALL_KEYS.at(-1), "web");
 });
 
 test("stop-stack exports the process detection", () => {
@@ -431,19 +480,26 @@ test("stop-stack exports the process detection", () => {
 test("the script is documented once and its data directory is ignored", () => {
   const root = fileURLToPath(new URL("..", import.meta.url));
   const claude = readFileSync(`${root}CLAUDE.md`, "utf8").split("\n");
+  const row = claude.find((l) => l.includes("scripts/test-timings.mjs"));
   assert.equal(claude.filter((l) => l.includes("scripts/test-timings.mjs")).length, 1);
   assert.ok(readFileSync(`${root}.gitignore`, "utf8").split("\n").includes("skarbiec-plan/test-timings/"));
   const header = readFileSync(fileURLToPath(import.meta.url).replace(".test.mjs", ".mjs"), "utf8").split("\n").slice(0, 6).join("\n");
-  for (const flag of ["--only", "--check", "--open", "--report-only"]) {
-    assert.ok(header.includes(flag));
-    assert.ok(claude.find((l) => l.includes("scripts/test-timings.mjs")).includes(flag));
+  for (const text of ["--only dotnet,web", "--check", "--open", "--report-only", "history.json"]) {
+    assert.ok(header.includes(text), `header names ${text}`);
+    assert.ok(row.includes(text), `CLAUDE.md row names ${text}`);
   }
 });
 
 const fixtureData = () => ({
-  version: 1,
+  version: 2,
   run: { startedAt: "2026-10-20T12:00:00", commit: "abcdef123456", dirty: false, branch: "feat/x", suites: { web: "measured" }, reasons: {} },
-  suites: { web: { kind: "web", measuredAt: "2026-10-20T12:00:00", commit: "abc", dirty: false, branch: "feat/x", ...entryOf() } },
+  suites: {
+    web: withHistory(
+      [entryAt(1, 10_000), entryAt(2, 10_000), entryAt(3, 12_000)],
+      { "N.A": [{ measuredAt: day(3), commit: "c3", ms: 100, count: 1 }] },
+      { "N.A.One": { ms: 100, outcome: "passed" } },
+    ),
+  },
 });
 
 const sink = () => {
