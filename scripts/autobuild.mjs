@@ -23,6 +23,7 @@
 //   a GitHub rate limit (primary or secondary) is waited out with no upper bound, then the same call or step reruns (a child ending on the GITHUB_LIMIT marker or ship.mjs exit 4 included); the wait does not count towards the build or CI timeouts, and writes already done (merge, close, summary comment) are skipped
 //   the sleep guard is confirmed (`ready`) and re-armed after every wake; PC sleep gaps are logged (`PC spał …`) and do not count towards the 4 h build limit; a build with no progress for 45 awake minutes (no live dotnet/verify/e2e process) is killed and replayed once per part, a second hang stops the run with reason `hang`
 //   the `still:` heartbeat ends with the agent's current activity (`teraz: <label> (od N min)`), `czeka na proces w tle od <czas>` or `bez postępu od <czas>`; background commands log as `bg: <label>` and `bg done|failed|killed: <label> · <czas>`, never the raw command
+//   after the last part of an epic merges and the epic closes, on a clean master, an epic whose merged PRs touched tests or app logic (services/, contracts/, gateway/, web/, Skarbiec.ServiceDefaults/, Skarbiec.Testing/, *.Tests, *.spec.ts) is measured by `test-timings.mjs --from-autobuild --wait 15 --timeout 45` (history.json, one log line); outside the awake clock and the 4 h limit, ignores --until, a failure is only logged and never changes the exit code; --dry-run prints the line only
 //   exit 0 when done (or a dry run is fine), 2 otherwise, 130 on Ctrl+C
 
 import { spawn, spawnSync } from "node:child_process";
@@ -36,6 +37,7 @@ import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnle
 import { CI_FIX_MARKER, CI_POLICY_LINE, driveCi, partLine, runCiFix, summaryPartLine } from "./autobuild-ci.mjs";
 import { activityLabel, createActivityTracker, short } from "./autobuild-activity.mjs";
 import { postRunVerify } from "./autobuild-verify.mjs";
+import { collectEpicFiles, measureAfterEpic } from "./autobuild-timings.mjs";
 import { awaitReady, buildWithResume, finishShutdown, fixWithResume, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
 import { BUILD_LIMIT_MS, buildThroughHangs, createAwakeClock, createHangDetector, createHangPolicy, hangLabel, liveWork, summaryLines } from "./autobuild-watch.mjs";
 import { areaWarning, ensureBranch, mayStart, planFrom, planLines, postSkipOnce, runQueue, skipMarker, skippedLine, startAt, startWork, windowEnd } from "./autobuild-queue.mjs";
@@ -97,7 +99,7 @@ function openLog() {
 
 function outcome(res) {
   const err = res.error?.message ?? (res.stderr ?? "").trim();
-  return { ok: !res.error && res.status === 0, out: (res.stdout ?? "").trim(), err, firstErr: err.split(/\r?\n/).find(Boolean) ?? "", all: `${res.stdout ?? ""}\n${res.stderr ?? ""}` };
+  return { ok: !res.error && res.status === 0, code: res.status ?? null, error: res.error ?? null, out: (res.stdout ?? "").trim(), err, firstErr: err.split(/\r?\n/).find(Boolean) ?? "", all: `${res.stdout ?? ""}\n${res.stderr ?? ""}` };
 }
 
 function run(cmd, argv, options = {}) {
@@ -1031,7 +1033,21 @@ async function finishRun(reason, detail, ctx) {
   process.exit(ok ? 0 : 2);
 }
 
-async function finishEpic(item) {
+function epicMeasurement(item, cards, dryRun) {
+  const parts = (item.subIssues ?? []).map((s) => (typeof s === "object" ? s.number : s));
+  return measureAfterEpic({
+    number: item.number,
+    epic: Boolean(item.epic),
+    dryRun,
+    branch: dryRun ? "master" : currentBranch(),
+    dirty: dryRun ? 0 : dirtyFiles().length,
+    files: () => collectEpicFiles({ parts, branchOf: (n) => cards.find((c) => c.number === n)?.branch, gh: (argv) => retryTransient(`gh ${argv[0]}`, () => gh(argv)), repo: REPO }),
+    run,
+    log: say,
+  });
+}
+
+async function finishEpic(item, cards = []) {
   const number = item.number;
   ctx.touched.add(number);
   const issue = getIssue(number);
@@ -1040,6 +1056,7 @@ async function finishEpic(item) {
     await closeIssue(number);
     const moved = retryTransient(`set ${number} Done`, () => project(["set", String(number), "Status", "Done"]));
     if (!moved.ok) say(`could not move the epic card to Done: ${moved.firstErr}`);
+    await epicMeasurement(item, cards, false);
   }
   ctx.itemsDone.push(number);
 }
@@ -1234,6 +1251,7 @@ try {
     for (const item of plan) {
       say(`── item #${item.number} ${item.title} [${itemTag(item)}]`);
       dryRunTable(getIssue(item.number));
+      if (item.epic) await epicMeasurement(item, cards, true);
     }
     await finishRun("dry-run", null, ctx);
   }
