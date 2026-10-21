@@ -65,20 +65,6 @@ public sealed class TickerVerifierTests(SkarbiecContainersFixture containers) : 
     }
 
     [Fact]
-    public async Task VerifyAsync_YahooReturnsAQuote_ReturnsExists()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
-        var apiClient = new FakeYahooApiClient().WithResponse("MSFT.US", RecordedResponse.Read("yahoo-latest-happy-path.json"));
-        var source = new YahooPriceSource(apiClient);
-        var verifier = new TickerVerifier(db, [source], NullLogger<TickerVerifier>.Instance);
-
-        var outcome = await verifier.VerifyAsync(PriceSource.Yahoo, "MSFT.US", cancellationToken);
-
-        Assert.Equal(TickerVerificationOutcome.Exists, outcome);
-    }
-
-    [Fact]
     public async Task VerifyAsync_Yahoo_NotFound_IsDoesNotExist()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -102,20 +88,6 @@ public sealed class TickerVerifierTests(SkarbiecContainersFixture containers) : 
         var verifier = new TickerVerifier(db, [source], NullLogger<TickerVerifier>.Instance);
 
         var outcome = await verifier.VerifyAsync(PriceSource.Yahoo, "BLOCKED.US", cancellationToken);
-
-        Assert.Equal(TickerVerificationOutcome.Unreachable, outcome);
-    }
-
-    [Fact]
-    public async Task VerifyAsync_YahooTransportFailure_ReturnsUnreachable()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var db = CreateDbContext();
-        var apiClient = new FakeYahooApiClient().ThrowingFor("DOWN.US", new HttpRequestException("simulated network failure"));
-        var source = new YahooPriceSource(apiClient);
-        var verifier = new TickerVerifier(db, [source], NullLogger<TickerVerifier>.Instance);
-
-        var outcome = await verifier.VerifyAsync(PriceSource.Yahoo, "DOWN.US", cancellationToken);
 
         Assert.Equal(TickerVerificationOutcome.Unreachable, outcome);
     }

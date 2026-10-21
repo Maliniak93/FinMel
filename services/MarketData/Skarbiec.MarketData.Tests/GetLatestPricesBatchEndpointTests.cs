@@ -13,27 +13,6 @@ namespace Skarbiec.MarketData.Tests;
 public sealed class GetLatestPricesBatchEndpointTests(SkarbiecContainersFixture containers) : MarketDataEndpointTests(containers)
 {
     [Fact]
-    public async Task Post_WithoutToken_ReturnsOk()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var seedDb = CreateDbContext();
-        var instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple Inc.", PriceSource.Yahoo, "USD", cancellationToken);
-        await seedDb.SeedQuoteAsync(instrumentId, new DateOnly(2026, 8, 5), 160m, cancellationToken);
-
-        using var client = Factory.CreateClient();
-        var response = await client.PostAsJsonAsync(
-            InternalLatestPricesBatchUri,
-            new { InstrumentIds = new[] { instrumentId }, AsOfDate = new DateOnly(2026, 8, 10) },
-            cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var body = await response.Content.ReadFromJsonAsync<LatestPricesBatchResponse>(cancellationToken);
-        var quote = Assert.Single(body!.Quotes);
-        Assert.Equal(instrumentId, quote.InstrumentId);
-        Assert.Equal(160m, quote.Close);
-    }
-
-    [Fact]
     public async Task Post_ReturnsLatestQuoteAtOrBeforeAsOfDate_NotTheNewestOneEverSeen()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

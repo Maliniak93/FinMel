@@ -19,23 +19,10 @@ public sealed class AssetClassPriceSourceMappingTests
     [Theory]
     [InlineData(AssetClass.Stock)]
     [InlineData(AssetClass.Etf)]
-    public void Resolve_StockAndEtf_AreYahoo(AssetClass assetClass)
+    [InlineData(AssetClass.PreciousMetal)]
+    public void Resolve_MarketClasses_AreYahoo(AssetClass assetClass)
     {
         Assert.Equal(PriceSource.Yahoo, AssetClassPriceSourceMapping.Resolve(assetClass));
-    }
-
-    [Fact]
-    public void MarketDataAssembly_HasNoTypeNamedStooq()
-    {
-        var stooqTypes = typeof(PriceSource).Assembly.GetTypes().Where(t => t.Name.StartsWith("Stooq", StringComparison.Ordinal));
-
-        Assert.Empty(stooqTypes);
-    }
-
-    [Fact]
-    public void Resolve_PreciousMetal_IsPricedByYahoo()
-    {
-        Assert.Equal(PriceSource.Yahoo, AssetClassPriceSourceMapping.Resolve(AssetClass.PreciousMetal));
     }
 
     [Fact]

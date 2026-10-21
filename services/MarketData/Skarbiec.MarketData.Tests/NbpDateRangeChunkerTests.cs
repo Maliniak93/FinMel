@@ -4,14 +4,18 @@ namespace Skarbiec.MarketData.Tests;
 
 public sealed class NbpDateRangeChunkerTests
 {
-    [Fact]
-    public void Chunk_RangeWithinLimit_ReturnsSingleChunk()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(93)]
+    public void Chunk_RangeAtOrBelowLimit_ReturnsSingleChunk(int days)
     {
-        var chunks = NbpDateRangeChunker.Chunk(new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), maxDaysPerChunk: 93).ToList();
+        var from = new DateOnly(2026, 1, 1);
+        var to = from.AddDays(days - 1);
 
-        var chunk = Assert.Single(chunks);
-        Assert.Equal(new DateOnly(2026, 1, 1), chunk.From);
-        Assert.Equal(new DateOnly(2026, 1, 31), chunk.To);
+        var chunk = Assert.Single(NbpDateRangeChunker.Chunk(from, to, maxDaysPerChunk: 93));
+
+        Assert.Equal(from, chunk.From);
+        Assert.Equal(to, chunk.To);
     }
 
     [Fact]
@@ -31,28 +35,5 @@ public sealed class NbpDateRangeChunkerTests
         }
 
         Assert.All(chunks, c => Assert.True(c.To.DayNumber - c.From.DayNumber + 1 <= 93));
-    }
-
-    [Fact]
-    public void Chunk_SingleDayRange_ReturnsOneChunkOfOneDay()
-    {
-        var date = new DateOnly(2026, 8, 3);
-
-        var chunk = Assert.Single(NbpDateRangeChunker.Chunk(date, date, maxDaysPerChunk: 93));
-
-        Assert.Equal(date, chunk.From);
-        Assert.Equal(date, chunk.To);
-    }
-
-    [Fact]
-    public void Chunk_RangeExactlyAtLimit_ReturnsSingleChunk()
-    {
-        var from = new DateOnly(2026, 1, 1);
-        var to = from.AddDays(92);
-
-        var chunk = Assert.Single(NbpDateRangeChunker.Chunk(from, to, maxDaysPerChunk: 93));
-
-        Assert.Equal(from, chunk.From);
-        Assert.Equal(to, chunk.To);
     }
 }
