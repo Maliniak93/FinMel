@@ -298,6 +298,11 @@ test("delay is an unknown flag", () => {
   assert.doesNotMatch(out, /runner online/);
 });
 
+test("dry-run prints the CI policy", () => {
+  const res = spawnSync(process.execPath, ["scripts/autobuild.mjs", "423", "--dry-run"], { cwd: root, encoding: "utf8", env: { ...process.env, SKARBIEC_GH_BIN: process.execPath }, timeout: 60e3 });
+  assert.match(`${res.stdout}${res.stderr}`, /CI: rerun failed jobs once when < 5 tests failed/);
+});
+
 test("docs no longer mention delay and describe the window", () => {
   const read = (f) => readFileSync(path.join(root, f), "utf8");
   for (const f of ["CLAUDE.md", "skarbiec-plan/workflow.md", "scripts/autobuild.mjs"]) assert.doesNotMatch(read(f), /--delay/, f);
