@@ -225,7 +225,6 @@ describe('Shell', () => {
     expect(sidebarSequence()).toEqual([
       'Overview',
       'Dashboard',
-      'Allocation',
       'Planning',
       'Wealth',
       'Investment accounts',
@@ -245,7 +244,6 @@ describe('Shell', () => {
     expect(sidebarSequence()).toEqual([
       'Przegląd',
       'Pulpit',
-      'Alokacja',
       'Planowanie',
       'Majątek',
       'Rachunki inwestycyjne',
@@ -325,7 +323,6 @@ describe('Shell', () => {
     const englishLabels = navLabels();
     expect(englishLabels).toEqual([
       'Dashboard',
-      'Allocation',
       'Planning',
       'Investment accounts',
       'Bank accounts',

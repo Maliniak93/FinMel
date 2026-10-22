@@ -1,5 +1,3 @@
-using Skarbiec.Portfolio.Features.TransferPlan;
-
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningYear;
 
 public sealed record PlanningYearResponse
@@ -35,11 +33,6 @@ public sealed record PlanningYearMonthResponse
     public required decimal? FreeFundsPlanPln { get; init; }
     public required decimal? FreeFundsForecastPln { get; init; }
 
-    /// <summary>Null when no allocation plan version is in force.</summary>
-    public required decimal? ToInvestPln { get; init; }
-
-    public required TransferPlanStatus? TransferPlanStatus { get; init; }
-
     /// <summary>True when any occurrence of the month is overdue.</summary>
     public required bool HasOverdue { get; init; }
 
@@ -55,5 +48,4 @@ public sealed record PlanningYearTotalsResponse
     public required decimal CostPln { get; init; }
     public required decimal FreeFundsPlanPln { get; init; }
     public required decimal FreeFundsForecastPln { get; init; }
-    public required decimal ToInvestPln { get; init; }
 }

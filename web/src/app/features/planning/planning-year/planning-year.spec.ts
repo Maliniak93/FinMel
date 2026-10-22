@@ -15,7 +15,6 @@ const VALUE_KEYS = [
   'costPln',
   'freeFundsPlanPln',
   'freeFundsForecastPln',
-  'toInvestPln',
 ] as const;
 
 const EMPTY_MONTH = {
@@ -26,8 +25,6 @@ const EMPTY_MONTH = {
   costPln: null,
   freeFundsPlanPln: null,
   freeFundsForecastPln: null,
-  toInvestPln: null,
-  transferPlanStatus: null,
   hasOverdue: false,
   incomplete: false,
 };
@@ -40,8 +37,6 @@ const FULL_MONTH = {
   costPln: 4200,
   freeFundsPlanPln: 12300,
   freeFundsForecastPln: 12243.27,
-  toInvestPln: 5000,
-  transferPlanStatus: 'Preview',
   hasOverdue: false,
   incomplete: false,
 };
@@ -143,27 +138,25 @@ describe('PlanningYear', () => {
     return element().querySelector('[data-testid="year-label"]')?.textContent ?? '';
   }
 
-  it('renders the eight value columns of a month with the formatted values', async () => {
+  it('renders the six value columns of a month with the formatted values', async () => {
     await setup();
 
     expect(rows()).toHaveLength(12);
-    expect(cellsOf(rows()[9]).slice(0, 7)).toEqual([
+    expect(cellsOf(rows()[9])).toEqual([
       formatMoney(16500, 'PLN'),
       formatMoney(16443.27, 'PLN'),
       formatMoney(-56.73, 'PLN'),
       formatMoney(4200, 'PLN'),
       formatMoney(12300, 'PLN'),
       formatMoney(12243.27, 'PLN'),
-      formatMoney(5000, 'PLN'),
     ]);
-    expect(cellsOf(rows()[9])[7]).not.toBe('');
   });
 
   it('shows an em dash in every value of a month without definitions', async () => {
     await setup();
 
-    expect(cellsOf(rows()[0])).toEqual(Array(8).fill('—'));
-    expect(cellsOf(rows()[1])).toEqual(Array(8).fill('—'));
+    expect(cellsOf(rows()[0])).toEqual(Array(6).fill('—'));
+    expect(cellsOf(rows()[1])).toEqual(Array(6).fill('—'));
   });
 
   it('leaves the actual empty for future months', async () => {
@@ -182,16 +175,13 @@ describe('PlanningYear', () => {
     expect(rows().filter((row) => row.getAttribute('aria-current') !== null)).toHaveLength(1);
   });
 
-  it('shows the total row with the column sums and no status total', async () => {
+  it('shows the total row with the column sums', async () => {
     await setup();
 
     const totals = yearPage(2026)['totals'] as Record<(typeof VALUE_KEYS)[number], number>;
     const total = element().querySelector<HTMLElement>('[data-testid="year-total"]')!;
 
-    expect(cellsOf(total)).toEqual([
-      ...VALUE_KEYS.map((key) => formatMoney(totals[key], 'PLN')),
-      '',
-    ]);
+    expect(cellsOf(total)).toEqual(VALUE_KEYS.map((key) => formatMoney(totals[key], 'PLN')));
   });
 
   it('disables the arrows at the bounds and opens the next year with an empty actual', async () => {

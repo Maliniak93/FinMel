@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
-using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.MarketData;
 
@@ -38,23 +37,10 @@ public sealed class PlanningMonthLoader(
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
-        var versions = await dbContext.AllocationPlanVersions
-            .AsNoTracking()
-            .Include(v => v.Entries)
-            .ToListAsync(cancellationToken);
-
-        var overrides = await dbContext.AllocationBalanceOverrides
-            .AsNoTracking()
-            .ToListAsync(cancellationToken);
-
-        var kinds = await dbContext.AllocationBuckets
-            .AsNoTracking()
-            .ToDictionaryAsync(b => b.Id, b => b.Kind, cancellationToken);
-
         var forecast = new PlanningForecast(incomes, accounts, stored, expenseRows, oneOffIncomes, oneOffExpenses);
 
         var foreign = new List<string>();
-        for (var walked = AllocationLedger.WalkStart(first, versions, kinds); walked <= last; walked = walked.AddMonths(1))
+        for (var walked = first; walked <= last; walked = walked.AddMonths(1))
         {
             foreign.AddRange(forecast.ForeignIn(walked));
         }
@@ -75,33 +61,14 @@ public sealed class PlanningMonthLoader(
             }
         }
 
-        var targetReplica = await dbContext.TargetAllocationReplicas.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
-        var valuationReplica = await dbContext.ValuationReplicas.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
         var settings = await dbContext.PlanningSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
-        var transferPlans = await dbContext.TransferPlans
-            .AsNoTracking()
-            .Include(p => p.Batches)
-            .ThenInclude(b => b.Rows)
-            .ToListAsync(cancellationToken);
-
-        YearMonth? planStart = versions.Count == 0
-            ? null
-            : YearMonth.From(WarsawCalendar.DateOf(versions.Min(v => v.CreatedAt)));
 
         return new PlanningMonthData(
             today,
             incomes,
             accounts,
             forecast,
-            versions,
-            overrides,
-            kinds,
             rates,
-            targetReplica,
-            valuationReplica,
-            settings?.MinimumTransferPln ?? PlanningSettings.DefaultMinimumTransferPln,
-            settings?.PaymentLeadDays ?? PlanningSettings.DefaultPaymentLeadDays,
-            planStart,
-            transferPlans);
+            settings?.PaymentLeadDays ?? PlanningSettings.DefaultPaymentLeadDays);
     }
 }

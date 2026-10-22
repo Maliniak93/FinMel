@@ -36,8 +36,6 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
             Assert.Equal(month.Expenses.CostPln, row.CostPln);
             Assert.Equal(month.FreeFunds.PlanPln, row.FreeFundsPlanPln);
             Assert.Equal(month.FreeFunds.ForecastPln, row.FreeFundsForecastPln);
-            Assert.Equal(month.Allocation.EffectiveFrom is null ? (decimal?)null : month.Allocation.ToInvestPln, row.ToInvestPln);
-            Assert.Equal(month.TransferPlan!.Status.GetRawText(), row.TransferPlanStatus?.GetRawText());
         }
     }
 
@@ -89,10 +87,9 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
                 new[]
                 {
                     empty.IncomePlanPln, empty.IncomeActualPln, empty.DifferencePln, empty.CostPln,
-                    empty.FreeFundsPlanPln, empty.FreeFundsForecastPln, empty.ToInvestPln
+                    empty.FreeFundsPlanPln, empty.FreeFundsForecastPln
                 },
                 value => Assert.Null(value));
-            Assert.Null(empty.TransferPlanStatus);
         }
 
         var march = year.Months.Single(m => m.Month == "2026-03");
@@ -124,7 +121,6 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(ColumnSum(year, m => m.CostPln), year.Totals.CostPln);
         Assert.Equal(ColumnSum(year, m => m.FreeFundsPlanPln), year.Totals.FreeFundsPlanPln);
         Assert.Equal(ColumnSum(year, m => m.FreeFundsForecastPln), year.Totals.FreeFundsForecastPln);
-        Assert.Equal(ColumnSum(year, m => m.ToInvestPln), year.Totals.ToInvestPln);
     }
 
     [Fact]
@@ -178,7 +174,6 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
         await client.SettleOccurrenceAsync(
             incomes.Zona, "2026-10", incomes.Account.AccountId, 6_400m, new DateOnly(2026, 10, 9), cancellationToken);
         await client.SkipOccurrenceAsync(incomes.Plus800, "2026-10", cancellationToken);
-        await client.SaveAllocationPlanAsync("2026-10", cancellationToken, FirstAllocationPlan());
     }
 
     private static decimal ColumnSum(PlanningYearView year, Func<PlanningYearMonthView, decimal?> column) =>

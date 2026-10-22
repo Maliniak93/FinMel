@@ -7,21 +7,9 @@ import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatDate, formatMoney, formatPercent } from '../../shared/format';
+import { formatDate, formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
-import {
-  allocation,
-  allocationBucket,
-  cushionBucket,
-  firstPlanBuckets,
-  limitedBucket,
-  transferGroup,
-  transferPlan,
-  transferRow,
-} from '../../../testing/allocation-fixtures';
-import { AllocationPlanDialog } from './allocation-plan-dialog/allocation-plan-dialog';
-import { BucketBalanceDialog } from './bucket-balance-dialog/bucket-balance-dialog';
 import { Planning } from './planning';
 import { RecurringExpenseFormDialog } from './recurring-expense-form-dialog/recurring-expense-form-dialog';
 import { RecurringIncomeFormDialog } from './recurring-income-form-dialog/recurring-income-form-dialog';
@@ -162,11 +150,8 @@ function month(
   incomes: Record<string, unknown>,
   expensesPart: Record<string, unknown> = {},
   freeFundsPart: Record<string, unknown> = {},
-  allocationPart: Record<string, unknown> = {},
-  transferPlanPart: Record<string, unknown> | null = null,
 ): Record<string, unknown> {
   return {
-    ...(transferPlanPart ? { transferPlan: transferPlan(transferPlanPart) } : {}),
     incomes: {
       occurrences: [],
       balance: balance(),
@@ -177,7 +162,6 @@ function month(
     },
     expenses: expenses(expensesPart),
     freeFunds: freeFunds(freeFundsPart),
-    allocation: allocation(allocationPart),
     nonBusinessDays: [],
   };
 }
@@ -192,8 +176,6 @@ function yearPage(year: number): Record<string, unknown> {
     costPln: 4200,
     freeFundsPlanPln: 12300,
     freeFundsForecastPln: 12300,
-    toInvestPln: null,
-    transferPlanStatus: 'None',
     hasOverdue: false,
     incomplete: false,
   }));
@@ -210,7 +192,6 @@ function yearPage(year: number): Record<string, unknown> {
       costPln: 50400,
       freeFundsPlanPln: 147600,
       freeFundsForecastPln: 147600,
-      toInvestPln: 0,
     },
   };
 }
@@ -988,474 +969,6 @@ describe('Planning', () => {
     expect(rows('free-funds-incomplete')).toHaveLength(1);
   });
 
-  it('renders the allocation groups with the underfunded and remainder markers, the deficit message, the amount to invest and the next change', async () => {
-    const buckets = [
-      ...firstPlanBuckets(),
-      allocationBucket('Remont', {
-        kind: 1,
-        shareType: 0,
-        share: 15000,
-        position: 1,
-        allocatedPln: 11743,
-        underfunded: true,
-      }),
-    ];
-    responses['2026-10'] = month(
-      {},
-      {},
-      { planPln: 12243.27, forecastPln: 12243.27 },
-      {
-        effectiveFrom: '2026-10',
-        nextChange: '2027-01',
-        forecastPln: 12243.27,
-        incomplete: true,
-        toInvestPln: 9395.27,
-        buckets,
-      },
-    );
-    await setup();
-
-    expect(rows('allocation-section')).toHaveLength(1);
-    const fixedRows = rows('allocation-group-fixed')[0].querySelectorAll(
-      '[data-testid="allocation-bucket-row"]',
-    );
-    const percentRows = rows('allocation-group-percent')[0].querySelectorAll(
-      '[data-testid="allocation-bucket-row"]',
-    );
-    expect(Array.from(fixedRows).map((row) => row.textContent)).toEqual([
-      expect.stringContaining('Wakacje'),
-      expect.stringContaining('Remont'),
-    ]);
-    expect(Array.from(percentRows).map((row) => row.textContent)).toEqual([
-      expect.stringContaining('Akcje'),
-      expect.stringContaining('Lokata'),
-      expect.stringContaining('ETF'),
-    ]);
-    expect(fixedRows[0].textContent).toContain(formatMoney(500, 'PLN'));
-    expect(percentRows[2].textContent).toContain(formatMoney(3524.27, 'PLN'));
-    expect(rows('allocation-underfunded')).toHaveLength(1);
-    expect(fixedRows[1].querySelector('[data-testid="allocation-underfunded"]')).not.toBeNull();
-    expect(rows('allocation-remainder')).toHaveLength(1);
-    expect(percentRows[2].querySelector('[data-testid="allocation-remainder"]')).not.toBeNull();
-    expect(rows('allocation-to-invest')[0].textContent).toContain(formatMoney(9395.27, 'PLN'));
-    expect(rows('allocation-incomplete')).toHaveLength(1);
-    expect(rows('allocation-deficit')).toHaveLength(0);
-    expect(rows('allocation-next-change')[0].textContent).toContain('01.2027');
-    expect(rows('delete-allocation-change')).toHaveLength(1);
-
-    responses['2026-11'] = month(
-      {},
-      {},
-      {},
-      {
-        effectiveFrom: '2026-10',
-        forecastPln: -756.73,
-        deficitPln: 756.73,
-        buckets: firstPlanBuckets().map((bucket) => ({ ...bucket, allocatedPln: 0 })),
-      },
-    );
-    click('next-month');
-    await settle();
-
-    expect(rows('allocation-deficit')[0].textContent).toContain(formatMoney(756.73, 'PLN'));
-    expect(rows('allocation-incomplete')).toHaveLength(0);
-    expect(rows('allocation-next-change')).toHaveLength(0);
-  });
-
-  it('shows the read-only reserve row above the buckets with the month amount, the balance and the account and no actions', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      { planPln: 12243.27, forecastPln: 12243.27 },
-      {
-        effectiveFrom: '2026-10',
-        forecastPln: 12243.27,
-        toInvestPln: 9395.27,
-        buckets: firstPlanBuckets(),
-        reserve: {
-          monthPln: 200,
-          balancePln: 600,
-          accountId,
-          accountName: 'Konto oszczędnościowe',
-        },
-      },
-    );
-    await setup();
-
-    const reserve = rows('reserve-row');
-    expect(reserve).toHaveLength(1);
-    expect(reserve[0].textContent).toContain(formatMoney(200, 'PLN'));
-    expect(reserve[0].textContent).toContain(formatMoney(600, 'PLN'));
-    expect(reserve[0].textContent).toContain('Konto oszczędnościowe');
-    expect(reserve[0].querySelectorAll('button')).toHaveLength(0);
-    const firstGroup = rows('allocation-group-fixed')[0];
-    expect(
-      reserve[0].compareDocumentPosition(firstGroup) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-  });
-
-  it('hides the reserve row when the month has no reserve', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      { buckets: firstPlanBuckets(), forecastPln: 0, toInvestPln: 0 },
-    );
-    await setup();
-
-    expect(rows('allocation-section')).toHaveLength(1);
-    expect(rows('reserve-row')).toHaveLength(0);
-  });
-
-  it('renders the cushion first without a share, with its balance against the target and the reached marker', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {
-        effectiveFrom: '2026-10',
-        buckets: [cushionBucket(), ...firstPlanBuckets()],
-      },
-    );
-    await setup();
-
-    const cushionRows = rows('allocation-group-cushion');
-    expect(cushionRows).toHaveLength(1);
-    const allRows = rows('allocation-bucket-row');
-    expect(allRows[0].textContent).toContain('Poduszka');
-    expect(cushionRows[0].contains(allRows[0])).toBe(true);
-    expect(allRows[0].textContent).toContain(formatMoney(5200, 'PLN'));
-    const balance = rows('allocation-cushion-balance');
-    expect(balance).toHaveLength(1);
-    expect(balance[0].textContent).toContain(formatMoney(20000, 'PLN'));
-    expect(balance[0].textContent).toContain(formatMoney(25200, 'PLN'));
-    expect(rows('allocation-cushion-reached')).toHaveLength(0);
-    expect(rows('allocation-remainder')).toHaveLength(1);
-
-    responses['2026-11'] = month(
-      {},
-      {},
-      {},
-      {
-        effectiveFrom: '2026-10',
-        buckets: [
-          cushionBucket({
-            allocatedPln: 0,
-            cushion: {
-              balanceStartPln: 25200,
-              targetPln: 25200,
-              targetMonths: 6,
-              balanceEndPln: 25200,
-              reached: true,
-            },
-          }),
-          ...firstPlanBuckets(),
-        ],
-      },
-    );
-    click('next-month');
-    await settle();
-
-    expect(rows('allocation-cushion-reached')).toHaveLength(1);
-  });
-
-  it('shows a limited bucket with its contributed against the limit, the reached marker and the estimated warning', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {
-        effectiveFrom: '2026-10',
-        buckets: [limitedBucket('IKE', { position: 0, share: 50 }), ...firstPlanBuckets()],
-      },
-    );
-    await setup();
-
-    const limit = rows('allocation-limit');
-    expect(limit).toHaveLength(1);
-    expect(limit[0].textContent).toContain(formatMoney(28260, 'PLN'));
-    expect(limit[0].textContent).toContain('2026');
-    expect(rows('allocation-limit-reached')).toHaveLength(1);
-    expect(rows('allocation-limit-estimated')).toHaveLength(0);
-
-    responses['2026-11'] = month(
-      {},
-      {},
-      {},
-      {
-        effectiveFrom: '2026-10',
-        buckets: [
-          limitedBucket('IKE', {
-            allocatedPln: 5871,
-            limitReached: false,
-            limit: {
-              year: 2027,
-              limitPln: 28260,
-              contributedStartPln: 0,
-              contributedEndPln: 5871,
-              reached: false,
-              estimated: true,
-            },
-          }),
-          ...firstPlanBuckets(),
-        ],
-      },
-    );
-    click('next-month');
-    await settle();
-
-    expect(rows('allocation-limit')[0].textContent).toContain(formatMoney(5871, 'PLN'));
-    expect(rows('allocation-limit-reached')).toHaveLength(0);
-    expect(rows('allocation-limit-estimated')).toHaveLength(1);
-    expect(rows('allocation-limit-estimated')[0].textContent).toContain('2027');
-  });
-
-  it('shows no buckets and an edit action when no plan is in force, and opens the plan dialog for the viewed month', async () => {
-    responses['2026-10'] = month({}, {}, {}, allocation());
-    await setup();
-
-    expect(rows('allocation-section')).toHaveLength(1);
-    expect(rows('allocation-bucket-row')).toHaveLength(0);
-
-    click('edit-allocation');
-
-    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
-      AllocationPlanDialog,
-      expect.objectContaining({
-        data: expect.objectContaining({ month: '2026-10' }),
-      }),
-    );
-  });
-
-  it('openAllocationDialog_WideDialog_LiftsMaterialMaxWidth', async () => {
-    responses['2026-10'] = month({}, {}, {}, allocation());
-    await setup();
-
-    click('edit-allocation');
-
-    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
-      AllocationPlanDialog,
-      expect.objectContaining({
-        width: '960px',
-        maxWidth: expect.anything(),
-      }),
-    );
-  });
-
-  it('deletes the scheduled allocation change after confirmation and reloads the month', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      { effectiveFrom: '2026-10', nextChange: '2027-01', buckets: firstPlanBuckets() },
-    );
-    await setup();
-    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
-      afterClosed: () => of(true),
-    } as never);
-
-    click('delete-allocation-change');
-
-    await vi.waitFor(() => {
-      const deletes = fetchSpy.mock.calls
-        .map((call: unknown[]) => call[0] as Request)
-        .filter((request: Request) => request.method === 'DELETE');
-      expect(deletes).toHaveLength(1);
-      expect(deletes[0].url).toContain('/allocation-plan/versions/2027-01');
-    });
-    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
-  });
-
-  it('renders the transfer plan rows with the three markers, the groups table, the fallback link, the nothing-to-invest message and saves the minimum', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {},
-      {
-        toInvestPln: 6543.27,
-        rows: [
-          transferRow('IKE', 2260, {
-            accountName: 'IKE mBank',
-            groupName: 'Akcje/ETF',
-            marker: 'AboveTarget',
-          }),
-          transferRow('Kasa', 300, { marker: 'OutsideAllocation' }),
-          transferRow('Inwestycje', 1979.27, { groupName: 'Obligacje', marker: 'BelowMinimum' }),
-        ],
-        groups: [
-          transferGroup('Akcje/ETF', 60.4, 59.5, 50),
-          transferGroup('Obligacje', 33, 33.7, 40),
-        ],
-      },
-    );
-    await setup();
-
-    const planRows = rows('transfer-plan-row');
-    expect(rows('transfer-plan-section')).toHaveLength(1);
-    expect(planRows).toHaveLength(3);
-    expect(planRows[0].textContent).toContain('IKE mBank');
-    expect(planRows[0].textContent).toContain('Akcje/ETF');
-    expect(planRows[0].textContent).toContain(formatMoney(2260, 'PLN'));
-    expect(
-      planRows[0].querySelector('[data-testid="transfer-marker-above-target"]'),
-    ).not.toBeNull();
-    expect(
-      planRows[1].querySelector('[data-testid="transfer-marker-outside-allocation"]'),
-    ).not.toBeNull();
-    expect(
-      planRows[2].querySelector('[data-testid="transfer-marker-below-minimum"]'),
-    ).not.toBeNull();
-    expect(rows('transfer-group-row')).toHaveLength(2);
-    expect(rows('transfer-group-row')[0].textContent).toContain(formatPercent(59.5));
-    expect(rows('transfer-plan-fallback')).toHaveLength(0);
-
-    const input = rows('transfer-minimum-input')[0] as HTMLInputElement;
-    input.value = '250';
-    input.dispatchEvent(new Event('change'));
-
-    await vi.waitFor(async () => {
-      const puts = fetchSpy.mock.calls
-        .map((call: unknown[]) => call[0] as Request)
-        .filter((request: Request) => request.method === 'PUT');
-      expect(puts).toHaveLength(1);
-      expect(puts[0].url).toContain('/planning/settings');
-      expect(await puts[0].clone().json()).toEqual({ minimumTransferPln: 250, paymentLeadDays: 7 });
-    });
-    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
-  });
-
-  it('renders the nothing-to-invest message instead of rows', async () => {
-    responses['2026-10'] = month({}, {}, {}, {}, { status: 'None', noneReason: 'NothingToInvest' });
-    await setup();
-
-    expect(rows('transfer-plan-section')).toHaveLength(1);
-    expect(rows('transfer-plan-nothing-to-invest')).toHaveLength(1);
-    expect(rows('transfer-plan-row')).toHaveLength(0);
-  });
-
-  it('shows the fallback with a link to the target allocation', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {},
-      {
-        fallbackReason: 'NoTargetAllocation',
-        rows: [
-          transferRow('IKE', 2260, { accountName: 'IKE mBank' }),
-          transferRow('Inwestycje', 1979.27),
-        ],
-      },
-    );
-    await setup();
-
-    expect(rows('transfer-plan-row')).toHaveLength(2);
-    expect(rows('transfer-plan-fallback')).toHaveLength(1);
-    expect(rows('transfer-plan-set-target-link')[0].getAttribute('href')).toBe('/allocation');
-    expect(rows('transfer-group-row')).toHaveLength(0);
-  });
-
-  it('offers the balance action on cushion and limited buckets only, lists their adjustments and deletes one after confirmation', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {
-        effectiveFrom: '2026-10',
-        buckets: [
-          cushionBucket({
-            adjustments: [
-              { month: '2026-10', amountPln: 20000 },
-              { month: '2026-12', amountPln: 20000 },
-            ],
-          }),
-          limitedBucket('IKE', { position: 0, share: 50 }),
-          ...firstPlanBuckets(),
-        ],
-      },
-    );
-    await setup();
-
-    const bucketRow = (name: string): HTMLElement =>
-      rows('allocation-bucket-row').find((row) => row.textContent!.includes(name))!;
-    expect(
-      bucketRow('Poduszka').querySelector('[data-testid="set-bucket-balance"]'),
-    ).not.toBeNull();
-    expect(bucketRow('IKE').querySelector('[data-testid="set-bucket-balance"]')).not.toBeNull();
-    for (const name of ['Wakacje', 'Akcje', 'Lokata', 'ETF']) {
-      expect(bucketRow(name).querySelector('[data-testid="set-bucket-balance"]')).toBeNull();
-    }
-    const adjustments = rows('bucket-adjustment');
-    expect(adjustments).toHaveLength(2);
-    expect(adjustments[1].textContent).toContain('2026');
-    expect(adjustments[1].textContent).toContain(formatMoney(20000, 'PLN'));
-
-    (bucketRow('IKE').querySelector('[data-testid="set-bucket-balance"]') as HTMLElement).click();
-    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
-      BucketBalanceDialog,
-      expect.objectContaining({
-        data: expect.objectContaining({
-          month: '2026-10',
-          bucket: expect.objectContaining({ name: 'IKE' }),
-        }),
-      }),
-    );
-
-    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
-      afterClosed: () => of(true),
-    } as never);
-    (
-      adjustments[1].querySelector('[data-testid="delete-bucket-adjustment"]') as HTMLElement
-    ).click();
-
-    await vi.waitFor(() => {
-      const deletes = fetchSpy.mock.calls
-        .map((call: unknown[]) => call[0] as Request)
-        .filter((request: Request) => request.method === 'DELETE');
-      expect(deletes).toHaveLength(1);
-      expect(deletes[0].url).toContain('/allocation-buckets/bucket-Poduszka/balances/2026-12');
-    });
-  });
-
-  function transferRequests(method: string): Request[] {
-    return fetchSpy.mock.calls
-      .map((call: unknown[]) => call[0] as Request)
-      .filter(
-        (request: Request) => request.method === method && /transfer-plans/.test(request.url),
-      );
-  }
-
-  function frozenRow(name: string, id: string, isChecked: boolean): Record<string, unknown> {
-    return transferRow(name, 1000, { id, batchNumber: 1, checked: isChecked });
-  }
-
-  it('accepts or skips a preview and reloads the month', async () => {
-    responses['2026-10'] = month({}, {}, {}, {}, { rows: [transferRow('IKE', 2260)] });
-    await setup();
-
-    expect(rows('transfer-plan-status')[0].textContent).toContain('Preview');
-    expect(rows('transfer-undo')).toHaveLength(0);
-    expect(rows('transfer-unskip')).toHaveLength(0);
-    expect(rows('transfer-row-check')).toHaveLength(0);
-
-    click('transfer-accept');
-    await vi.waitFor(() => {
-      const posts = transferRequests('POST');
-      expect(posts).toHaveLength(1);
-      expect(posts[0].url).toContain('/transfer-plans/2026-10/accept');
-    });
-    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
-
-    click('transfer-skip');
-    await vi.waitFor(() => {
-      const posts = transferRequests('POST');
-      expect(posts).toHaveLength(2);
-      expect(posts[1].url).toContain('/transfer-plans/2026-10/skip');
-    });
-    await vi.waitFor(() => expect(requestedMonths()).toHaveLength(3));
-  });
-
   function todoRequests(): number {
     return fetchSpy.mock.calls.filter(
       (call: unknown[]) =>
@@ -1463,27 +976,10 @@ describe('Planning', () => {
     ).length;
   }
 
-  it('reloads the planning state after a row is checked and after the lead days are saved', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {},
-      {
-        status: 'Accepted',
-        canUndo: true,
-        rows: [frozenRow('IKE', 'row-1', false), frozenRow('IKZE', 'row-2', true)],
-      },
-    );
+  it('reloads the planning state after the lead days are saved', async () => {
     await setup();
     const loaded = todoRequests();
     expect(loaded).toBeGreaterThan(0);
-
-    const boxes = rows('transfer-row-check') as HTMLInputElement[];
-    boxes[0].checked = true;
-    boxes[0].dispatchEvent(new Event('change'));
-    await vi.waitFor(() => expect(todoRequests()).toBeGreaterThan(loaded));
-    const afterCheck = todoRequests();
 
     const input = rows('payment-lead-days-input')[0] as HTMLInputElement;
     expect(input.value).toBe('7');
@@ -1497,12 +993,9 @@ describe('Planning', () => {
             request.method === 'PUT' && request.url.includes('/planning/settings'),
         );
       expect(puts).toHaveLength(1);
-      expect(await puts[0].clone().json()).toEqual({
-        minimumTransferPln: 100,
-        paymentLeadDays: 14,
-      });
+      expect(await puts[0].clone().json()).toEqual({ paymentLeadDays: 14 });
     });
-    await vi.waitFor(() => expect(todoRequests()).toBeGreaterThan(afterCheck));
+    await vi.waitFor(() => expect(todoRequests()).toBeGreaterThan(loaded));
   });
 
   it('scrolls to the section named in the URL fragment after the month loads', async () => {
@@ -1515,216 +1008,11 @@ describe('Planning', () => {
       writable: true,
       value: scrollIntoView,
     });
-    responses['2026-10'] = month({}, {}, {}, {}, { rows: [transferRow('IKE', 2260)] });
 
-    await setup('/planning?month=2026-10#plan-przelewow');
-    await vi.waitFor(() => expect(scrolled).toContain('plan-przelewow'));
+    await setup('/planning?month=2026-10#wydatki');
+    await vi.waitFor(() => expect(scrolled).toContain('wydatki'));
 
-    expect(element().querySelector('#plan-przelewow')).not.toBeNull();
-  });
-
-  it('shows an accepted plan with a checkbox per row, checks a row and undoes the acceptance after confirmation', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {},
-      {
-        status: 'Accepted',
-        canUndo: true,
-        rows: [frozenRow('IKE', 'row-1', false), frozenRow('IKZE', 'row-2', true)],
-      },
-    );
-    await setup();
-
-    const boxes = rows('transfer-row-check') as HTMLInputElement[];
-    expect(rows('transfer-plan-status')[0].textContent).toContain('Accepted');
-    expect(rows('transfer-plan-row')).toHaveLength(2);
-    expect(boxes.map((box) => box.checked)).toEqual([false, true]);
-    expect(rows('transfer-accept')).toHaveLength(0);
-    expect(rows('transfer-minimum-input')).toHaveLength(0);
-    expect((rows('transfer-undo')[0] as HTMLButtonElement).disabled).toBe(false);
-    expect(rows('transfer-undo-hint')).toHaveLength(0);
-
-    boxes[0].checked = true;
-    boxes[0].dispatchEvent(new Event('change'));
-    await vi.waitFor(async () => {
-      const puts = transferRequests('PUT');
-      expect(puts).toHaveLength(1);
-      expect(puts[0].url).toContain('/transfer-plans/rows/row-1/checked');
-      expect(await puts[0].clone().json()).toEqual({ checked: true });
-    });
-    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
-
-    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
-      afterClosed: () => of(true),
-    } as never);
-    click('transfer-undo');
-    await vi.waitFor(() => {
-      const posts = transferRequests('POST');
-      expect(posts).toHaveLength(1);
-      expect(posts[0].url).toContain('/transfer-plans/2026-10/undo');
-    });
-    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
-      ConfirmDialog,
-      expect.objectContaining({ data: expect.objectContaining({ destructive: true }) }),
-    );
-  });
-
-  it('does not undo the acceptance when the confirmation is declined and disables undo while a row is checked', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {},
-      {
-        status: 'Accepted',
-        canUndo: false,
-        rows: [frozenRow('IKE', 'row-1', true), frozenRow('IKZE', 'row-2', false)],
-      },
-    );
-    await setup();
-
-    expect((rows('transfer-undo')[0] as HTMLButtonElement).disabled).toBe(true);
-    expect(rows('transfer-undo-hint')).toHaveLength(1);
-
-    component['undoTransferPlan']();
-    await settle();
-
-    expect(transferRequests('POST')).toHaveLength(0);
-  });
-
-  it('shows a completed plan as completed', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {},
-      {
-        status: 'Completed',
-        canUndo: false,
-        rows: [frozenRow('IKE', 'row-1', true)],
-      },
-    );
-    await setup();
-
-    expect(rows('transfer-plan-status')[0].textContent).toContain('Completed');
-    expect((rows('transfer-row-check')[0] as HTMLInputElement).checked).toBe(true);
-  });
-
-  it('shows the differences, the top-up preview and the batches as separate groups, and accepts the top-up', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {},
-      {
-        status: 'Accepted',
-        canUndo: true,
-        rows: [
-          frozenRow('IKE', 'row-1', true),
-          transferRow('IKZE', 300, { id: 'row-2', batchNumber: 1, checked: false }),
-          transferRow('Obligacje', 200, { id: 'row-3', batchNumber: 2, checked: false }),
-        ],
-        differences: [
-          {
-            bucketId: 'bucket-IKE',
-            bucketName: 'IKE',
-            acceptedPln: 1000,
-            currentPln: 1200,
-            differencePln: 200,
-          },
-          {
-            bucketId: 'bucket-IKZE',
-            bucketName: 'IKZE',
-            acceptedPln: 300,
-            currentPln: 250,
-            differencePln: -50,
-          },
-        ],
-        topUp: {
-          minimumTransferPln: 100,
-          valuationDate: '2026-10-14',
-          fallbackReason: null,
-          rows: [transferRow('IKE', 200, { marker: 'BelowMinimum' })],
-          groups: [transferGroup('Akcje', 40, 45, 50)],
-        },
-      },
-    );
-    await setup();
-
-    const titles = rows('transfer-batch-title').map((title) => title.textContent!.trim());
-    expect(titles).toEqual(['Plan', 'Top-up 1']);
-    expect(rows('transfer-batch').map((batch) => batch.querySelectorAll('li').length)).toEqual([
-      2, 1,
-    ]);
-
-    const differences = rows('transfer-difference');
-    expect(differences).toHaveLength(2);
-    expect(differences[0].textContent).toContain(formatMoney(200, 'PLN'));
-    expect(differences[0].querySelector('[data-testid="transfer-difference-info"]')).toBeNull();
-    expect(differences[1].textContent).toContain(formatMoney(-50, 'PLN'));
-    expect(differences[1].querySelector('[data-testid="transfer-difference-info"]')).not.toBeNull();
-
-    const topUp = rows('transfer-top-up')[0];
-    expect(topUp.querySelectorAll('[data-testid="transfer-plan-row"]')).toHaveLength(1);
-    expect(topUp.querySelectorAll('[data-testid="transfer-row-check"]')).toHaveLength(0);
-    expect(topUp.querySelector('[data-testid="transfer-marker-below-minimum"]')).not.toBeNull();
-    expect(topUp.querySelectorAll('[data-testid="transfer-group-row"]')).toHaveLength(1);
-
-    click('transfer-top-up-accept');
-    await vi.waitFor(() => {
-      const posts = transferRequests('POST');
-      expect(posts).toHaveLength(1);
-      expect(posts[0].url).toContain('/transfer-plans/2026-10/top-up/accept');
-    });
-    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
-  });
-
-  it('shows no top-up block when the response has none', async () => {
-    responses['2026-10'] = month(
-      {},
-      {},
-      {},
-      {},
-      {
-        status: 'Completed',
-        rows: [frozenRow('IKE', 'row-1', true)],
-        differences: [
-          {
-            bucketId: 'bucket-IKE',
-            bucketName: 'IKE',
-            acceptedPln: 1000,
-            currentPln: 800,
-            differencePln: -200,
-          },
-        ],
-      },
-    );
-    await setup();
-
-    expect(rows('transfer-top-up')).toHaveLength(0);
-    expect(rows('transfer-difference')).toHaveLength(1);
-    expect(rows('transfer-difference-info')).toHaveLength(1);
-  });
-
-  it('shows a skipped month without rows and unskips it', async () => {
-    responses['2026-10'] = month({}, {}, {}, {}, { status: 'Skipped' });
-    await setup();
-
-    expect(rows('transfer-plan-status')[0].textContent).toContain('Skipped');
-    expect(rows('transfer-plan-skipped')).toHaveLength(1);
-    expect(rows('transfer-plan-row')).toHaveLength(0);
-    expect(rows('transfer-accept')).toHaveLength(0);
-    expect(rows('transfer-skip')).toHaveLength(0);
-
-    click('transfer-unskip');
-    await vi.waitFor(() => {
-      const deletes = transferRequests('DELETE');
-      expect(deletes).toHaveLength(1);
-      expect(deletes[0].url).toContain('/transfer-plans/2026-10/skip');
-    });
-    await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
+    expect(element().querySelector('#wydatki')).not.toBeNull();
   });
 
   it('opens the Rok tab from the query params and loads the requested year', async () => {

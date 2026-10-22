@@ -22,7 +22,6 @@ import { assetClassLabel } from '../assets/asset-class';
 import { UNGROUPED_COLOR, groupColor } from '../groups/group-color';
 import { GROUP_KIND } from '../groups/group-kind';
 import { assetClassColor } from './asset-class-color';
-import { AllocationCard } from './allocation-card/allocation-card';
 import { CashCard } from './cash-card/cash-card';
 import { AccountsCard } from './accounts-card/accounts-card';
 import { MonthCard } from './month-card/month-card';
@@ -82,7 +81,6 @@ function toGrosze(amount: number | string): number {
     PieChart,
     AccountsCard,
     CashCard,
-    AllocationCard,
     MonthCard,
     UpcomingCard,
   ],

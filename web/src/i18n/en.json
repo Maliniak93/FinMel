@@ -33,7 +33,6 @@
   "shell": {
     "nav": {
       "dashboard": "Dashboard",
-      "allocation": "Allocation",
       "cash": "Cash",
       "planning": "Planning",
       "securities": "Stocks & ETFs",
@@ -389,62 +388,6 @@
       }
     }
   },
-  "allocation": {
-    "title": "Target allocation",
-    "loadFailed": "Could not load the target allocation.",
-    "noValuation": "Current value: no valuation yet.",
-    "noBase": "Deviations: no assets in the allocation.",
-    "disclaimer": "Information only, not investment advice.",
-    "outOfBand": "Out of band",
-    "outside": "Outside the allocation",
-    "summary": "base {{ base }} of {{ total }}",
-    "scope": {
-      "label": "Allocation scope",
-      "whole": "Whole portfolio"
-    },
-    "group": {
-      "empty": "This asset group has no target allocation yet.",
-      "create": "Create allocation",
-      "copy": "Copy from the whole",
-      "delete": "Delete allocation",
-      "planNote": "The transfer plan is computed from the allocation of \"Whole portfolio\", not from this asset group.",
-      "noValue": "This asset group has no value yet, so only the targets and bands are shown."
-    },
-    "delete": {
-      "title": "Delete the group allocation?",
-      "message": "The target allocation of the asset group \"{{ name }}\" will be deleted. The allocation of the whole portfolio stays as it is."
-    },
-    "columns": {
-      "group": "Class group",
-      "value": "Value",
-      "current": "Current share",
-      "target": "Target",
-      "band": "Band",
-      "deviationPp": "Deviation",
-      "deviationPln": "Versus target"
-    },
-    "proposal": {
-      "equities": "Stocks/ETFs",
-      "bonds": "Bonds",
-      "metals": "Metals"
-    },
-    "editor": {
-      "proposalIntro": "A proposed split of your assets. Set a target for each class group and save.",
-      "name": "Class group name",
-      "classes": "Asset classes",
-      "target": "Target (%)",
-      "band": "Band ± (pp)",
-      "addGroup": "Add class group",
-      "removeGroup": "Remove class group",
-      "sum": "Sum of targets: {{ sum }}"
-    },
-    "errors": {
-      "nameRequired": "Enter a class group name.",
-      "classesRequired": "Pick at least one asset class.",
-      "percent": "Enter 0–100 with at most one decimal.",
-      "duplicateNames": "Class group names must differ."
-    }
-  },
   "dashboard": {
     "title": "Dashboard",
     "netWorth": "Net worth",
@@ -487,15 +430,6 @@
         "bankInterestDue": "Bank interest due, months: {{ count }}"
       }
     },
-    "allocationCard": {
-      "title": "Target allocation",
-      "notConfigured": "Set a target allocation",
-      "outside": "{{ outside }} of {{ total }} groups outside the band",
-      "allInBand": "All groups within the band",
-      "noValuation": "no valuation yet",
-      "noAssets": "no assets in the allocation",
-      "loadFailed": "Failed to load the target allocation."
-    },
     "goToAccounts": "Go to accounts",
     "accounts": {
       "title": "Accounts",
@@ -510,22 +444,11 @@
       "forecast": "Forecast",
       "deficit": "deficit",
       "settled": "Incomes settled: {{ done }} of {{ total }}",
-      "planStatus": "Transfer plan",
-      "status": {
-        "None": "none",
-        "Preview": "Preview",
-        "Accepted": "Accepted",
-        "Completed": "Completed",
-        "Skipped": "Skipped"
-      },
       "empty": "All done",
       "showAll": "show all",
       "loadFailed": "Failed to load the month.",
       "todo": {
         "overdueIncome": "{{ name }} — {{ date }}, overdue by {{ days }} d, {{ amount }}",
-        "toAccept": "Transfer plan waits for acceptance — {{ amount }}",
-        "topUp": "Top-up waits for acceptance — {{ amount }}",
-        "unchecked": "Transfers not checked off: {{ unchecked }} of {{ total }}",
         "payment": "{{ name }} — {{ date }} (in {{ days }} d), {{ amount }}"
       }
     }
@@ -828,9 +751,7 @@
         "difference": "Difference",
         "cost": "Expenses",
         "freeFundsPlan": "Free funds plan",
-        "freeFundsForecast": "Free funds forecast",
-        "toInvest": "To invest",
-        "status": "Transfer plan"
+        "freeFundsForecast": "Free funds forecast"
       }
     },
     "add": "Add income",
@@ -957,155 +878,6 @@
         "amount": "Amount (PLN)"
       }
     },
-    "allocation": {
-      "title": "Allocation",
-      "edit": "Edit allocation",
-      "forecast": "Forecast to split",
-      "effectiveFrom": "Plan from",
-      "empty": "No allocation plan in force this month.",
-      "deficit": "Deficit {{ amount }} — nothing to allocate.",
-      "reserve": {
-        "title": "Expense reserve",
-        "monthly": "You set aside {{ amount }}",
-        "balance": "balance {{ amount }}",
-        "account": "on {{ name }}"
-      },
-      "groups": {
-        "cushion": "Emergency cushion",
-        "fixed": "Fixed amounts",
-        "percent": "Percent"
-      },
-      "kind": {
-        "investments": "Investments",
-        "savings": "Savings",
-        "cushion": "Cushion",
-        "ike": "IKE",
-        "ikze": "IKZE",
-        "ikzeJdg": "IKZE JDG"
-      },
-      "cushionBalance": "Balance {{ start }} → {{ end }} / target {{ target }} ({{ months }} mo.)",
-      "cushionReached": "target reached",
-      "limitContributed": "Contributed in {{ year }}: {{ contributed }} / {{ limit }}",
-      "limitReached": "limit reached",
-      "limitEstimated": "The {{ year }} limit is estimated from the last known year.",
-      "shareType": {
-        "fixed": "Fixed amount",
-        "percent": "Percent"
-      },
-      "underfunded": "underfunded",
-      "remainder": "remainder",
-      "toInvest": "To invest",
-      "nextChange": "scheduled change from {{ month }}",
-      "deleteTitle": "Delete scheduled change",
-      "deleteMessage": "Delete the allocation change scheduled from {{ month }}? Earlier months stay as they are.",
-      "deleteFailed": "Failed to delete the change.",
-      "balance": {
-        "action": "Set balance from month",
-        "adjustment": "from {{ month }}: {{ amount }}",
-        "delete": "Delete adjustment",
-        "deleteTitle": "Delete balance adjustment",
-        "deleteMessage": "Delete the balance of “{{ name }}” set from {{ month }}? Earlier months stay as they are.",
-        "deleteFailed": "Failed to delete the adjustment.",
-        "dialogTitle": "Set balance of “{{ name }}”",
-        "month": "From month",
-        "amountCushion": "Balance at the start of the month",
-        "amountCounter": "Paid in during the year before this month",
-        "amountInvalid": "Enter an amount from 0 to 10,000,000."
-      },
-      "dialog": {
-        "title": "Edit allocation",
-        "effectiveFrom": "Applies from",
-        "effectiveFromHint": "The whole plan applies from this month on; later scheduled changes are kept.",
-        "name": "Bucket name",
-        "kind": "Kind",
-        "shareType": "Share type",
-        "fixedShare": "Amount (PLN)",
-        "percentShare": "Percent",
-        "account": "Account",
-        "noAccount": "No account",
-        "reserveAccount": "Reserve account",
-        "remainder": "Remainder",
-        "moveUp": "Move up",
-        "moveDown": "Move down",
-        "removeRow": "Remove bucket",
-        "addRow": "Add bucket",
-        "addCushion": "Add emergency cushion",
-        "targetMonths": "Target (months of costs)",
-        "targetMonthsInvalid": "Enter a whole number of months from 1 to 24.",
-        "startingBalance": "Balance at the start of the month (PLN)",
-        "startingBalanceInvalid": "Enter an amount of 0 or more.",
-        "contributed": "Contributed in {{ year }} before {{ month }} (PLN)",
-        "empty": "No buckets — nothing will be split from this month.",
-        "percentSum": "Percent total: {{ sum }}",
-        "percentOver": "The percent shares add up to more than 100.",
-        "remainderRequired": "Choose the bucket that takes the remainder.",
-        "nameRequired": "A name is required.",
-        "nameDuplicate": "Bucket names must be unique.",
-        "shareInvalid": "Enter a valid share."
-      }
-    },
-    "transferPlan": {
-      "title": "Transfer plan",
-      "minimum": "Minimum transfer (PLN)",
-      "minimumFailed": "Could not save the minimum transfer.",
-      "valuationDate": "Valuation of {{ date }}",
-      "valuationStale": "valuation is stale",
-      "noAccount": "no account",
-      "markers": {
-        "aboveTarget": "above target",
-        "outsideAllocation": "outside allocation",
-        "belowMinimum": "below minimum"
-      },
-      "groups": {
-        "name": "Group",
-        "current": "Current %",
-        "after": "After plan %",
-        "target": "Target %"
-      },
-      "fallback": {
-        "NoTargetAllocation": "No target allocation is set, so the amounts are not split into groups.",
-        "NoValuation": "There is no valuation yet, so the amounts are not split into groups.",
-        "EmptyBase": "The allocation groups are worth zero, so the amounts are not split into groups.",
-        "setTarget": "Set the target allocation"
-      },
-      "nothingToInvest": "Nothing to invest.",
-      "status": {
-        "preview": "Preview",
-        "accepted": "Accepted",
-        "completed": "Completed",
-        "skipped": "Skipped"
-      },
-      "accept": "Accept plan",
-      "acceptFailed": "Could not accept the plan.",
-      "skip": "Skip",
-      "skipFailed": "Could not skip the month.",
-      "skipped": "Transfers are skipped for this month.",
-      "unskip": "Undo skip",
-      "unskipFailed": "Could not undo the skip.",
-      "undo": "Undo acceptance",
-      "undoBlocked": "Uncheck every row to undo the acceptance.",
-      "undoTitle": "Undo the acceptance?",
-      "undoMessage": "The accepted rows are discarded and the plan goes back to a preview.",
-      "undoFailed": "Could not undo the acceptance.",
-      "checkRow": "Mark as transferred",
-      "checkFailed": "Could not update the row.",
-      "batch": {
-        "plan": "Plan",
-        "topUp": "Top-up {{ number }}"
-      },
-      "differences": {
-        "title": "Changes since the plan was accepted",
-        "change": "Accepted {{ accepted }}, now {{ current }}",
-        "decrease": "Information only, accepted rows stay as they are."
-      },
-      "topUp": {
-        "title": "Top-up",
-        "accept": "Accept top-up",
-        "acceptFailed": "Could not accept the top-up."
-      },
-      "paymentLeadDays": "Remind about payments (days ahead)",
-      "paymentLeadDaysFailed": "Could not save the reminder lead time."
-    },
     "freeFunds": {
       "title": "Free funds",
       "plan": "Plan",
@@ -1150,7 +922,9 @@
     },
     "todo": {
       "badge": "Things to do"
-    }
+    },
+    "paymentLeadDays": "Remind about payments (days ahead)",
+    "paymentLeadDaysFailed": "Could not save the reminder lead time."
   },
   "securities": {
     "title": "Stocks & ETFs",

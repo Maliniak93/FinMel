@@ -1,10 +1,8 @@
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.Features.Planning.Reserves;
 using Skarbiec.Portfolio.Features.RecurringExpenses;
 using Skarbiec.Portfolio.Features.RecurringIncomes;
-using Skarbiec.Portfolio.Features.TransferPlan;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
 
@@ -76,27 +74,6 @@ internal static class PlanningMonthBuilder
 
         var expenses = BuildExpenses(viewed, forecast);
         var viewedFigures = new MonthFigures(balance.ActualPln + balance.PendingPln - expenses.CostPln, expenses.CostPln);
-        var allocation = BuildAllocation(
-            viewed,
-            viewedFigures,
-            fxUnavailable,
-            accounts,
-            data.Versions,
-            data.Overrides,
-            data.Kinds,
-            forecast.Plans,
-            walked => walked == viewed ? viewedFigures : forecast.FiguresIn(walked, rates, today));
-
-        var transferPlan = TransferPlanPreview.Build(
-            viewed,
-            YearMonth.From(today),
-            data.PlanStart,
-            allocation,
-            accounts,
-            data.TargetReplica,
-            data.ValuationReplica,
-            data.MinimumTransfer,
-            data.TransferPlans);
 
         return new PlanningMonthResponse
         {
@@ -115,121 +92,10 @@ internal static class PlanningMonthBuilder
                 ForecastPln = viewedFigures.Forecast,
                 Incomplete = fxUnavailable
             },
-            Allocation = allocation,
-            TransferPlan = transferPlan,
             NonBusinessDays = Enumerable.Range(0, viewed.LastDay.Day)
                 .Select(offset => viewed.FirstDay.AddDays(offset))
                 .Where(day => !PolishHolidayCalendar.IsBusinessDay(day))
                 .ToList()
-        };
-    }
-
-    private static AllocationResponse BuildAllocation(
-        YearMonth viewed,
-        MonthFigures figures,
-        bool incomplete,
-        Dictionary<Guid, Account> accounts,
-        List<AllocationPlanVersion> versions,
-        List<AllocationBalanceOverride> overrides,
-        IReadOnlyDictionary<Guid, BucketKind> kinds,
-        IReadOnlyList<(RecurringExpense Expense, ReservePlan Plan)> plans,
-        Func<YearMonth, MonthFigures> figuresFor)
-    {
-        var ledger = AllocationLedger.Compute(viewed, versions, overrides, kinds, figuresFor);
-        var next = versions
-            .Where(v => v.EffectiveFrom > viewed.FirstDay)
-            .OrderBy(v => v.EffectiveFrom)
-            .FirstOrDefault();
-
-        var buckets = ledger.Buckets
-            .Select(b => new AllocationBucketResponse
-            {
-                BucketId = b.Entry.BucketId,
-                Name = b.Entry.Name,
-                Kind = kinds[b.Entry.BucketId],
-                ShareType = b.Entry.ShareType,
-                Share = b.Entry.Share,
-                Position = b.Entry.Position,
-                IsRemainder = b.Entry.IsRemainder,
-                AccountId = b.Entry.AccountId,
-                AccountName = b.Entry.AccountId is { } accountId && accounts.TryGetValue(accountId, out var account) ? account.Name : null,
-                AllocatedPln = b.Allocation.Allocated,
-                Underfunded = b.Allocation.Underfunded,
-                LimitReached = b.Allocation.LimitReached,
-                Limit = b.Limit is null
-                    ? null
-                    : new LimitResponse
-                    {
-                        Year = b.Limit.Year,
-                        LimitPln = b.Limit.Limit,
-                        ContributedStartPln = b.Limit.ContributedStart,
-                        ContributedEndPln = b.Limit.ContributedEnd,
-                        Reached = b.Limit.Reached,
-                        Estimated = b.Limit.Estimated
-                    },
-                Adjustments = kinds[b.Entry.BucketId] is BucketKind.Cushion || kinds[b.Entry.BucketId].IsLimited()
-                    ? overrides
-                        .Where(o => o.BucketId == b.Entry.BucketId)
-                        .OrderBy(o => o.Month)
-                        .Select(o => new BalanceAdjustmentResponse { Month = YearMonth.From(o.Month).ToString(), AmountPln = o.Amount })
-                        .ToList()
-                    : null,
-                Cushion = b.Cushion is null
-                    ? null
-                    : new CushionResponse
-                    {
-                        BalanceStartPln = b.Cushion.BalanceStart,
-                        TargetPln = b.Cushion.Target,
-                        TargetMonths = b.Cushion.TargetMonths,
-                        BalanceEndPln = b.Cushion.BalanceEnd,
-                        Reached = b.Cushion.Reached
-                    }
-            })
-            .ToList();
-
-        return new AllocationResponse
-        {
-            EffectiveFrom = ledger.InForce is null ? null : YearMonth.From(ledger.InForce.EffectiveFrom).ToString(),
-            NextChange = next is null ? null : YearMonth.From(next.EffectiveFrom).ToString(),
-            ForecastPln = figures.Forecast,
-            Incomplete = incomplete,
-            DeficitPln = ledger.Deficit,
-            Buckets = buckets,
-            ToInvestPln = buckets.Where(b => b.Kind == BucketKind.Investments || b.Kind.IsLimited()).Sum(b => b.AllocatedPln),
-            Reserve = BuildReserve(viewed, plans, ledger.InForce?.ReserveAccountId, accounts)
-        };
-    }
-
-    private static ReserveResponse? BuildReserve(
-        YearMonth viewed,
-        IReadOnlyList<(RecurringExpense Expense, ReservePlan Plan)> plans,
-        Guid? reserveAccountId,
-        Dictionary<Guid, Account> accounts)
-    {
-        var monthPln = plans
-            .Where(p => p.Expense.InForce(viewed).IntervalMonths > 1)
-            .Sum(p => ReserveSchedule.ReservesIn(viewed, p.Plan).Sum(r => r.Amount));
-
-        var balancePln = 0m;
-        foreach (var (_, plan) in plans)
-        {
-            for (var month = plan.CreatedMonth; month <= viewed; month = month.AddMonths(1))
-            {
-                balancePln += ReserveSchedule.CostIn(month, plan) - ReserveSchedule.PaymentsIn(month, plan).Sum(p => p.Amount);
-            }
-        }
-
-        if (monthPln == 0m && balancePln == 0m && reserveAccountId is null)
-        {
-            return null;
-        }
-
-        return new ReserveResponse
-        {
-            MonthPln = monthPln,
-            BalancePln = balancePln,
-            AccountId = reserveAccountId,
-            AccountName = reserveAccountId is { } id && accounts.TryGetValue(id, out var account) ? account.Name : null
         };
     }
 

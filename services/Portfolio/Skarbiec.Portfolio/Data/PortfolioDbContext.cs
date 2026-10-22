@@ -32,16 +32,8 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<RecurringExpenseVersion> RecurringExpenseVersions => Set<RecurringExpenseVersion>();
     public DbSet<OneOffIncome> OneOffIncomes => Set<OneOffIncome>();
     public DbSet<OneOffExpense> OneOffExpenses => Set<OneOffExpense>();
-    public DbSet<AllocationBucket> AllocationBuckets => Set<AllocationBucket>();
-    public DbSet<AllocationPlanVersion> AllocationPlanVersions => Set<AllocationPlanVersion>();
-    public DbSet<AllocationPlanEntry> AllocationPlanEntries => Set<AllocationPlanEntry>();
-    public DbSet<AllocationBalanceOverride> AllocationBalanceOverrides => Set<AllocationBalanceOverride>();
-    public DbSet<TargetAllocationReplica> TargetAllocationReplicas => Set<TargetAllocationReplica>();
     public DbSet<ValuationReplica> ValuationReplicas => Set<ValuationReplica>();
     public DbSet<PlanningSettings> PlanningSettings => Set<PlanningSettings>();
-    public DbSet<TransferPlan> TransferPlans => Set<TransferPlan>();
-    public DbSet<TransferPlanBatch> TransferPlanBatches => Set<TransferPlanBatch>();
-    public DbSet<TransferPlanRow> TransferPlanRows => Set<TransferPlanRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.AddInterceptors(new UserOwnedSaveInterceptor(currentUser));
@@ -359,53 +351,6 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             expense.Property(e => e.Amount).HasPrecision(18, 2);
         });
 
-        modelBuilder.Entity<AllocationBucket>(bucket =>
-        {
-            bucket.Property(b => b.Kind).HasConversion<string>().HasMaxLength(20);
-        });
-
-        modelBuilder.Entity<AllocationPlanVersion>(version =>
-        {
-            version.HasIndex(v => new { v.UserId, v.EffectiveFrom }).IsUnique();
-
-            version.HasMany(v => v.Entries)
-                .WithOne()
-                .HasForeignKey(e => e.VersionId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<AllocationPlanEntry>(entry =>
-        {
-            entry.Property(e => e.Name).HasMaxLength(100);
-            entry.Property(e => e.ShareType).HasConversion<string>().HasMaxLength(20);
-            entry.Property(e => e.Share).HasPrecision(18, 2);
-
-            // Restrict: the save and delete handlers remove a bucket only after no version references it.
-            entry.HasOne<AllocationBucket>()
-                .WithMany()
-                .HasForeignKey(e => e.BucketId)
-                .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<AllocationBalanceOverride>(balance =>
-        {
-            balance.Property(o => o.Amount).HasPrecision(18, 2);
-            balance.HasIndex(o => new { o.BucketId, o.Month }).IsUnique();
-
-            balance.HasOne<AllocationBucket>()
-                .WithMany()
-                .HasForeignKey(o => o.BucketId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<TargetAllocationReplica>(replica =>
-        {
-            replica.HasKey(r => r.UserId);
-            replica.Property(r => r.UserId).ValueGeneratedNever();
-
-            replica.ComplexCollection(r => r.Groups, groups => groups.ToJson());
-        });
-
         modelBuilder.Entity<ValuationReplica>(replica =>
         {
             replica.HasKey(r => r.UserId);
@@ -419,35 +364,6 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
         {
             settings.HasKey(s => s.UserId);
             settings.Property(s => s.UserId).ValueGeneratedNever();
-        });
-
-        modelBuilder.Entity<TransferPlan>(plan =>
-        {
-            plan.HasIndex(p => new { p.UserId, p.Month }).IsUnique();
-
-            plan.HasMany(p => p.Batches)
-                .WithOne()
-                .HasForeignKey(b => b.PlanId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<TransferPlanBatch>(batch =>
-        {
-            batch.HasIndex(b => new { b.PlanId, b.Number }).IsUnique();
-
-            batch.HasMany(b => b.Rows)
-                .WithOne()
-                .HasForeignKey(r => r.BatchId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        modelBuilder.Entity<TransferPlanRow>(row =>
-        {
-            row.Property(r => r.BucketName).HasMaxLength(100);
-            row.Property(r => r.AccountName).HasMaxLength(200);
-            row.Property(r => r.GroupName).HasMaxLength(100);
-            row.Property(r => r.AmountPln).HasPrecision(18, 2);
-            row.Property(r => r.Marker).HasConversion<string>().HasMaxLength(20);
         });
 
         // Covers every IUserOwned entity added from here on without touching this method again.

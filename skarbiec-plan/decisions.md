@@ -259,6 +259,8 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-038 🕐 Transfer plan in Portfolio; Reporting shares the target allocation and the latest valuation as events
 
+**Superseded in part (transfer plan) by ADR-042.**
+
 **Context:** the transfer plan needs the to-invest amounts per bucket, account and account type (Portfolio, computed live and changing backwards) and the target groups and per-class values (Reporting); `/internal` may not serve user data (ADR-027).
 **Decision:** the plan lives in Portfolio; Reporting publishes `TargetAllocationSaved` and `LatestValuationChanged` with full state through its outbox, and Portfolio replicates them with idempotent consumers, ignoring older messages (`SavedAtUtc`; `Date` then `OccurredAtUtc`). The loser — the plan in Reporting fed by a Portfolio event — needed a publish on every planning write plus a month-rollover job.
 **Consequences:** Reporting becomes a publisher and Portfolio a consumer; events flow both ways but no consumer calls a publisher back; the replica lags by one delivery. Amends ADR-020, ADR-021.
@@ -278,6 +280,14 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-041 🕐 A group's target allocation lives in Reporting and is cleaned up by `AssetGroupDeleted`
 
+**Superseded by ADR-042.**
+
 **Context:** each asset group can have its own target allocation compared with that group's assets (epic idea `alokacja-grupy`); Reporting holds no group replica (ADR-040) and the transfer plan reads only the global allocation (ADR-038).
 **Decision:** `GroupTargetAllocation (UserId, GroupId)` in `reporting_db` holds the class groups; the comparison joins the latest valuation lines to `Position.GroupId`; saving it publishes nothing; Portfolio publishes `AssetGroupDeleted` through its outbox on deleting a group and Reporting's idempotent consumer deletes the allocation. The loser, cleaning at read time, needs a group list Reporting does not have.
 **Consequences:** an allocation saved for an id Portfolio does not know is unreachable from the app; a late `AssetGroupDeleted` is harmless. Amends ADR-021.
+
+## ADR-042 🕐 Allocation lives on asset groups; the target allocation, transfer plan and buckets are removed
+
+**Context:** the user plans investing per asset group (kind, class allocation, monthly contribution — epic `group-allocation-planning`). The global and per-group target allocation (Reporting), the transfer plan with allocation buckets, plan versions, balances and IKE/IKZE limits (Portfolio) and the events that kept them in sync (ADR-038, ADR-041) describe the same intent in a second, heavier model.
+**Decision:** the group is the only carrier of allocation. `TargetAllocation`, `GroupTargetAllocation`, `TargetAllocationReplica`, the transfer plan, `AllocationBucket`/`AllocationPlanVersion`/`AllocationPlanEntry`/`AllocationBalanceOverride`, the allocation-plan reserve row, `PlanningSettings.MinimumTransferPln`, `TargetAllocationSaved` and `AssetGroupDeleted` are deleted with their endpoints, pages and tables (destructive migrations, ADR-019). Deleting a group still clears the assets', accounts' and cash places' group, publishing only the assets' `AssetPositionChanged`. `ValuationReplica` and `LatestValuationChanged` stay for the group planning of the next part. The planning month keeps income, expenses and free funds; the expense reserve of rare expenses stays.
+**Consequences:** Reporting publishes only `LatestValuationChanged` and consumes no group event; a user's former targets, plans and balances are gone. Supersedes ADR-041 and the transfer-plan half of ADR-038; ADR-039 and ADR-040 stand.

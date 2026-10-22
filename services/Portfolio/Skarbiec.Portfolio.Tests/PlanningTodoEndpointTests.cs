@@ -1,5 +1,4 @@
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.TransferPlan;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
@@ -63,107 +62,6 @@ public sealed class PlanningTodoEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
-    public async Task TransferPlans()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 8, 15, 10, 0, 0, TimeSpan.Zero));
-        var ike = await client.CreateAccountAsync(cancellationToken, "IKE mBank", AccountType.Brokerage, TaxWrapper.Ike);
-        var ikze = await client.CreateAccountAsync(cancellationToken, "IKZE Obligacje", AccountType.Bonds, TaxWrapper.Ikze);
-        await client.SaveAllocationPlanAsync(
-            "2026-08",
-            cancellationToken,
-            AllocationRow("IKE", IkeKind, FixedShare, 2_260m, accountId: ike),
-            AllocationRow("IKZE", IkzeKind, FixedShare, 2_304m, accountId: ikze),
-            AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 100m, isRemainder: true));
-        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero));
-        await client.CreateAllocationSetupAsync(cancellationToken, 6_543.27m);
-        await SeedReplicasAsync(userId, cancellationToken, TransferTargets, TransferValues, TransferValuationDate);
-        var august = await client.GetTransferPlanAsync("2026-08", cancellationToken);
-        Assert.True(august.Status.Is(TransferPlanStatus.Preview));
-        Assert.True(august.ToInvestPln > 0m);
-        Factory.Clock.SetUtcNow(CreationDayUtc);
-        await client.AcceptTransferPlanAsync("2026-09", cancellationToken);
-        var september = await client.GetTransferPlanAsync("2026-09", cancellationToken);
-        Assert.Equal(4, september.Rows.Count);
-        foreach (var row in september.Rows.Take(2))
-        {
-            await client.CheckTransferPlanRowAsync(row.Id!.Value, true, cancellationToken);
-        }
-
-        var todo = await client.GetTodoAsync(cancellationToken);
-
-        Assert.Equal(
-            [
-                (TransferPlanUncheckedKind, "2026-09", (decimal?)null, 2, 4),
-                (TransferPlanToAcceptKind, "2026-10", 6_543.27m, null, null)
-            ],
-            todo.Items
-                .Where(i => i.Kind != OverdueIncomeKind)
-                .Select(i => (i.Kind, i.Month, i.Amount, i.UncheckedRows, i.TotalRows)));
-    }
-
-    [Fact]
-    public async Task TransferPlans_CompletedSkippedAndNone_AddNothing()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 7, 15, 10, 0, 0, TimeSpan.Zero));
-        await client.CreateTransferPlanSetupAsync(cancellationToken, "2026-08");
-        await SeedReplicasAsync(userId, cancellationToken, TransferTargets, TransferValues, TransferValuationDate);
-        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 9, 15, 10, 0, 0, TimeSpan.Zero));
-        await client.AcceptTransferPlanAsync("2026-08", cancellationToken);
-        foreach (var row in (await client.GetTransferPlanAsync("2026-08", cancellationToken)).Rows)
-        {
-            await client.CheckTransferPlanRowAsync(row.Id!.Value, true, cancellationToken);
-        }
-
-        await client.SkipTransferPlanAsync("2026-09", cancellationToken);
-
-        var todo = await client.GetTodoAsync(cancellationToken);
-
-        Assert.DoesNotContain(todo.Items, i => i.Kind is TransferPlanToAcceptKind or TransferPlanUncheckedKind);
-    }
-
-    [Fact]
-    public async Task TopUp()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(CreationDayUtc);
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        var setup = await client.CreateTransferPlanBenefitSetupAsync(cancellationToken);
-        await SeedReplicasAsync(userId, cancellationToken, TransferTargets, TransferValues, TransferValuationDate);
-        await client.AcceptTransferPlanAsync("2026-10", cancellationToken);
-        var rows = (await client.GetTransferPlanAsync("2026-10", cancellationToken)).Rows;
-        foreach (var row in rows.Take(rows.Count - 1))
-        {
-            await client.CheckTransferPlanRowAsync(row.Id!.Value, true, cancellationToken);
-        }
-
-        await client.SettleBenefitAsync(setup, 1_000m, cancellationToken);
-
-        var todo = await client.GetTodoAsync(cancellationToken);
-
-        Assert.Equal(
-            [
-                (TransferPlanToAcceptKind, "2026-10", (decimal?)200m, (bool?)true, (int?)null, (int?)null),
-                (TransferPlanUncheckedKind, "2026-10", null, null, 1, 4)
-            ],
-            todo.Items.Select(i => (i.Kind, i.Month, i.Amount, i.IsTopUp, i.UncheckedRows, i.TotalRows)));
-
-        await client.AcceptTransferPlanTopUpAsync("2026-10", cancellationToken);
-        foreach (var row in (await client.GetTransferPlanAsync("2026-10", cancellationToken)).Rows.Where(r => r.Checked == false))
-        {
-            await client.CheckTransferPlanRowAsync(row.Id!.Value, true, cancellationToken);
-        }
-
-        Assert.Empty((await client.GetTodoAsync(cancellationToken)).Items);
-    }
-
-    [Fact]
     public async Task UpcomingPayments()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -202,10 +100,7 @@ public sealed class PlanningTodoEndpointTests(SkarbiecContainersFixture containe
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(CreationDayUtc);
-        var userId = Guid.NewGuid();
-        using var client = Factory.CreateAuthenticatedClient(userId);
-        await client.CreateTransferPlanSetupAsync(cancellationToken);
-        await SeedReplicasAsync(userId, cancellationToken, TransferTargets, TransferValues, TransferValuationDate);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var premiaAccount = await client.CreateBankAccountAsync(cancellationToken, "Konto premii");
         await client.CreateRecurringIncomeAsync(premiaAccount.AccountId, cancellationToken, "Premia", 500m, dayOfMonth: 18);
         await client.CreateRecurringExpenseAsync(
@@ -215,7 +110,7 @@ public sealed class PlanningTodoEndpointTests(SkarbiecContainersFixture containe
         var todo = await client.GetTodoAsync(cancellationToken);
 
         Assert.Equal(
-            [OverdueIncomeKind, TransferPlanToAcceptKind, UpcomingPaymentKind],
+            [OverdueIncomeKind, UpcomingPaymentKind],
             todo.Items.Select(i => i.Kind));
     }
 }

@@ -56,98 +56,10 @@
   color: var(--mat-sys-on-error-container);
 }
 
-.planning-allocation__reserve {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  margin: 8px 0;
-}
-
-.planning-allocation__row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1.5fr 1fr 1.5fr;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
-}
-
-.planning-transfer__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  margin: 8px 0;
-}
-
-.planning-transfer__minimum {
+.planning-settings__lead-days {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-inline-start: auto;
-}
-
-.planning-transfer__row {
-  display: grid;
-  grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1.5fr;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--mat-sys-outline-variant);
-}
-
-.planning-transfer__row--frozen {
-  grid-template-columns: auto 2fr 1.5fr 1.5fr 1fr 1.5fr;
-}
-
-.planning-transfer__actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-inline-start: auto;
-}
-
-.planning-transfer__groups {
-  margin-top: 16px;
-  border-collapse: collapse;
-
-  th,
-  td {
-    padding: 4px 16px 4px 0;
-    text-align: start;
-  }
-}
-
-.planning-allocation__cushion {
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.875rem;
-}
-
-.planning-allocation__limit {
-  grid-column: 1 / -1;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.875rem;
-}
-
-.planning-allocation__balance-action {
-  grid-column: 1 / -1;
-}
-
-.planning-allocation__adjustment {
-  grid-column: 1 / -1;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.875rem;
-}
-
-.planning-allocation__amount {
-  font-weight: 500;
-  text-align: end;
-}
-
-.planning-allocation__markers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 
 .planning-section__header {

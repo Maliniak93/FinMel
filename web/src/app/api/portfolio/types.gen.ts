@@ -77,47 +77,6 @@ export type AddWatchlistItemRequest = {
     targetPrice?: null | number | string;
 };
 
-export type AllocationBucketResponse = {
-    bucketId: string;
-    name: string;
-    kind: BucketKind;
-    shareType: null | BucketShareType;
-    share: null | number | string;
-    position: number | string;
-    isRemainder: boolean;
-    accountId: null | string;
-    accountName: null | string;
-    allocatedPln: number | string;
-    underfunded: boolean;
-    cushion: null | CushionResponse;
-    limitReached: boolean;
-    limit: null | LimitResponse;
-    adjustments: null | Array<BalanceAdjustmentResponse>;
-};
-
-export type AllocationPlanRowRequest = {
-    bucketId?: null | string;
-    name: string;
-    kind: BucketKind;
-    shareType?: null | BucketShareType;
-    share?: null | number | string;
-    isRemainder: boolean;
-    accountId?: null | string;
-    targetMonths?: null | number | string;
-    startingBalance?: null | number | string;
-};
-
-export type AllocationResponse = {
-    effectiveFrom: null | string;
-    nextChange: null | string;
-    forecastPln: number | string;
-    incomplete: boolean;
-    deficitPln: number | string;
-    buckets: Array<AllocationBucketResponse>;
-    toInvestPln: number | string;
-    reserve: null | ReserveResponse;
-};
-
 export type AssetClass = number;
 
 export type AssetGroupClassShare = {
@@ -172,11 +131,6 @@ export type AssignableAssetResponse = {
     cashPlaceName: null | string;
     groupId: null | string;
     isArchived: boolean;
-};
-
-export type BalanceAdjustmentResponse = {
-    month: string;
-    amountPln: number | string;
 };
 
 export type BankInterestPreviewResponse = {
@@ -329,10 +283,6 @@ export type BondSwapSourceResponse = {
     name: string;
 };
 
-export type BucketKind = number;
-
-export type BucketShareType = number;
-
 export type BusinessDayShift = number;
 
 export type CashBalanceResponse = {
@@ -361,10 +311,6 @@ export type CashPlacesResponse = {
 export type CashTotalResponse = {
     currency: string;
     balance: number | string;
-};
-
-export type CheckTransferPlanRowRequest = {
-    checked: boolean;
 };
 
 export type ContributionResponse = {
@@ -460,14 +406,6 @@ export type CreateTransferRequest = {
 
 export type CreateTransferResponse = {
     transferId: string;
-};
-
-export type CushionResponse = {
-    balanceStartPln: number | string;
-    targetPln: number | string;
-    targetMonths: number | string;
-    balanceEndPln: number | string;
-    reached: boolean;
 };
 
 export type DepositCapitalization = number;
@@ -634,15 +572,6 @@ export type IncomeOccurrenceResponse = {
     overdue: boolean;
 };
 
-export type LimitResponse = {
-    year: number | string;
-    limitPln: number | string;
-    contributedStartPln: number | string;
-    contributedEndPln: number | string;
-    reached: boolean;
-    estimated: boolean;
-};
-
 export type Metal = number;
 
 export type MetalResponse = {
@@ -734,13 +663,10 @@ export type PlanningMonthResponse = {
     incomes: PlanningIncomesResponse;
     expenses: PlanningExpensesResponse;
     freeFunds: FreeFundsResponse;
-    allocation: AllocationResponse;
-    transferPlan: TransferPlanResponse;
     nonBusinessDays: Array<string>;
 };
 
 export type PlanningSettingsResponse = {
-    minimumTransferPln: number | string;
     paymentLeadDays: number | string;
 };
 
@@ -758,8 +684,6 @@ export type PlanningYearMonthResponse = {
     costPln: null | number | string;
     freeFundsPlanPln: null | number | string;
     freeFundsForecastPln: null | number | string;
-    toInvestPln: null | number | string;
-    transferPlanStatus: null | TransferPlanStatus;
     hasOverdue: boolean;
     incomplete: boolean;
 };
@@ -779,7 +703,6 @@ export type PlanningYearTotalsResponse = {
     costPln: number | string;
     freeFundsPlanPln: number | string;
     freeFundsForecastPln: number | string;
-    toInvestPln: number | string;
 };
 
 export type RecordTransactionRequest = {
@@ -807,26 +730,13 @@ export type RedeemBondRequest = {
     [key: string]: unknown;
 };
 
-export type ReserveResponse = {
-    monthPln: number | string;
-    balancePln: number | string;
-    accountId: null | string;
-    accountName: null | string;
-};
-
 export type RollOverDepositRequest = {
     annualInterestRatePercent: number | string;
     grossInterest?: null | number | string;
     tax?: null | number | string;
 };
 
-export type SaveAllocationPlanVersionRequest = {
-    buckets: Array<AllocationPlanRowRequest>;
-    reserveAccountId?: null | string;
-};
-
 export type SavePlanningSettingsRequest = {
-    minimumTransferPln: number | string;
     paymentLeadDays: number | string;
 };
 
@@ -864,10 +774,6 @@ export type SecurityHoldingResponse = {
 };
 
 export type SecurityPriceUnavailableReason = number;
-
-export type SetBucketBalanceRequest = {
-    amount: number | string;
-};
 
 export type SetContributionLimitRequest = {
     amount: number | string;
@@ -926,20 +832,16 @@ export type SwapNewBondRequest = {
 
 export type TaxWrapper = number;
 
-export type TodoItemKind = 'OverdueIncome' | 'TransferPlanToAccept' | 'TransferPlanUnchecked' | 'UpcomingPayment';
+export type TodoItemKind = 'OverdueIncome' | 'UpcomingPayment';
 
 export type TodoItemResponse = {
     kind: TodoItemKind;
-    name: null | string;
-    date: null | string;
-    month: null | string;
-    amount: null | number | string;
-    currency: null | string;
+    name: string;
+    date: string;
+    amount: number | string;
+    currency: string;
     daysOverdue: null | number | string;
     daysUntil: null | number | string;
-    isTopUp: null | boolean;
-    uncheckedRows: null | number | string;
-    totalRows: null | number | string;
 };
 
 export type TransactionResponse = {
@@ -977,66 +879,7 @@ export type TransferCandidateResponse = {
     balance: number | string;
 };
 
-export type TransferDifferenceResponse = {
-    bucketId: string;
-    bucketName: string;
-    acceptedPln: number | string;
-    currentPln: number | string;
-    differencePln: number | string;
-};
-
 export type TransferDirection = number;
-
-export type TransferGroupShare = {
-    name: string;
-    currentPercent: number | string;
-    afterPercent: number | string;
-    targetPercent: number | string;
-};
-
-export type TransferMarker = 'None' | 'AboveTarget' | 'OutsideAllocation' | 'BelowMinimum';
-
-export type TransferPlanFallbackReason = 'NoTargetAllocation' | 'NoValuation' | 'EmptyBase';
-
-export type TransferPlanNoneReason = 'NothingToInvest' | 'FutureMonth' | 'BeforeStart';
-
-export type TransferPlanResponse = {
-    status: TransferPlanStatus;
-    noneReason: null | TransferPlanNoneReason;
-    minimumTransferPln: number | string;
-    valuationDate: null | string;
-    valuationStale: boolean;
-    fallbackReason: null | TransferPlanFallbackReason;
-    rows: Array<TransferRowResponse>;
-    groups: Array<TransferGroupShare>;
-    toInvestPln: number | string;
-    canUndo: boolean;
-    differences: Array<TransferDifferenceResponse>;
-    topUp: null | TransferTopUpResponse;
-};
-
-export type TransferPlanStatus = 'None' | 'Preview' | 'Accepted' | 'Completed' | 'Skipped';
-
-export type TransferRowResponse = {
-    id: null | string;
-    batchNumber: null | number | string;
-    checked: null | boolean;
-    bucketId: string;
-    bucketName: string;
-    accountId: null | string;
-    accountName: null | string;
-    groupName: null | string;
-    amountPln: number | string;
-    marker: TransferMarker;
-};
-
-export type TransferTopUpResponse = {
-    minimumTransferPln: number | string;
-    valuationDate: null | string;
-    fallbackReason: null | TransferPlanFallbackReason;
-    rows: Array<TransferRowResponse>;
-    groups: Array<TransferGroupShare>;
-};
 
 export type TreasuryBondType = number;
 
@@ -2555,80 +2398,6 @@ export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses = {
 
 export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponse = DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses[keyof DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses];
 
-export type DeleteApiPortfolioAllocationPlanVersionsByMonthData = {
-    body?: never;
-    path: {
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/allocation-plan/versions/{month}';
-};
-
-export type DeleteApiPortfolioAllocationPlanVersionsByMonthResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type DeleteApiPortfolioAllocationPlanVersionsByMonthResponse = DeleteApiPortfolioAllocationPlanVersionsByMonthResponses[keyof DeleteApiPortfolioAllocationPlanVersionsByMonthResponses];
-
-export type PutApiPortfolioAllocationPlanVersionsByMonthData = {
-    body: SaveAllocationPlanVersionRequest;
-    path: {
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/allocation-plan/versions/{month}';
-};
-
-export type PutApiPortfolioAllocationPlanVersionsByMonthResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type PutApiPortfolioAllocationPlanVersionsByMonthResponse = PutApiPortfolioAllocationPlanVersionsByMonthResponses[keyof PutApiPortfolioAllocationPlanVersionsByMonthResponses];
-
-export type DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthData = {
-    body?: never;
-    path: {
-        bucketId: string;
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/allocation-buckets/{bucketId}/balances/{month}';
-};
-
-export type DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponse = DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses[keyof DeleteApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses];
-
-export type PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthData = {
-    body: SetBucketBalanceRequest;
-    path: {
-        bucketId: string;
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/allocation-buckets/{bucketId}/balances/{month}';
-};
-
-export type PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponse = PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses[keyof PutApiPortfolioAllocationBucketsByBucketIdBalancesByMonthResponses];
-
 export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementData = {
     body: SettleOccurrenceRequest;
     path: {
@@ -2769,114 +2538,6 @@ export type GetApiPortfolioPlanningTodoResponses = {
 };
 
 export type GetApiPortfolioPlanningTodoResponse = GetApiPortfolioPlanningTodoResponses[keyof GetApiPortfolioPlanningTodoResponses];
-
-export type PostApiPortfolioTransferPlansByMonthAcceptData = {
-    body?: never;
-    path: {
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/transfer-plans/{month}/accept';
-};
-
-export type PostApiPortfolioTransferPlansByMonthAcceptResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type PostApiPortfolioTransferPlansByMonthAcceptResponse = PostApiPortfolioTransferPlansByMonthAcceptResponses[keyof PostApiPortfolioTransferPlansByMonthAcceptResponses];
-
-export type PostApiPortfolioTransferPlansByMonthTopUpAcceptData = {
-    body?: never;
-    path: {
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/transfer-plans/{month}/top-up/accept';
-};
-
-export type PostApiPortfolioTransferPlansByMonthTopUpAcceptResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type PostApiPortfolioTransferPlansByMonthTopUpAcceptResponse = PostApiPortfolioTransferPlansByMonthTopUpAcceptResponses[keyof PostApiPortfolioTransferPlansByMonthTopUpAcceptResponses];
-
-export type PostApiPortfolioTransferPlansByMonthUndoData = {
-    body?: never;
-    path: {
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/transfer-plans/{month}/undo';
-};
-
-export type PostApiPortfolioTransferPlansByMonthUndoResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type PostApiPortfolioTransferPlansByMonthUndoResponse = PostApiPortfolioTransferPlansByMonthUndoResponses[keyof PostApiPortfolioTransferPlansByMonthUndoResponses];
-
-export type PutApiPortfolioTransferPlansRowsByRowIdCheckedData = {
-    body: CheckTransferPlanRowRequest;
-    path: {
-        rowId: string;
-    };
-    query?: never;
-    url: '/api/portfolio/transfer-plans/rows/{rowId}/checked';
-};
-
-export type PutApiPortfolioTransferPlansRowsByRowIdCheckedResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type PutApiPortfolioTransferPlansRowsByRowIdCheckedResponse = PutApiPortfolioTransferPlansRowsByRowIdCheckedResponses[keyof PutApiPortfolioTransferPlansRowsByRowIdCheckedResponses];
-
-export type DeleteApiPortfolioTransferPlansByMonthSkipData = {
-    body?: never;
-    path: {
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/transfer-plans/{month}/skip';
-};
-
-export type DeleteApiPortfolioTransferPlansByMonthSkipResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type DeleteApiPortfolioTransferPlansByMonthSkipResponse = DeleteApiPortfolioTransferPlansByMonthSkipResponses[keyof DeleteApiPortfolioTransferPlansByMonthSkipResponses];
-
-export type PostApiPortfolioTransferPlansByMonthSkipData = {
-    body?: never;
-    path: {
-        month: string;
-    };
-    query?: never;
-    url: '/api/portfolio/transfer-plans/{month}/skip';
-};
-
-export type PostApiPortfolioTransferPlansByMonthSkipResponses = {
-    /**
-     * No Content
-     */
-    204: void;
-};
-
-export type PostApiPortfolioTransferPlansByMonthSkipResponse = PostApiPortfolioTransferPlansByMonthSkipResponses[keyof PostApiPortfolioTransferPlansByMonthSkipResponses];
 
 export type GetApiPortfolioPlanningOverdueData = {
     body?: never;

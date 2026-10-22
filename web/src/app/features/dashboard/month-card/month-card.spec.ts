@@ -1,5 +1,4 @@
 import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
-import { transferPlan } from '../../../../testing/allocation-fixtures';
 import { formatMoney } from '../../../shared/format';
 import { jsonResponse, planningMonthResponse, renderCard } from '../testing/dashboard-fixtures';
 import { MonthCard } from './month-card';
@@ -21,15 +20,12 @@ function incomeMonth(extra: Record<string, unknown> = {}): Record<string, unknow
       definitions: [{ id: 'income-1', name: 'Wypłata Dominik' }],
     },
     freeFunds: { planPln: 12300, forecastPln: 12243.27, incomplete: false },
-    transferPlan: transferPlan({ status: 'Preview', toInvestPln: 12243.27 }),
     ...extra,
   });
 }
 
 const todoItems = [
   { kind: 'OverdueIncome', name: '800+', date: '2026-11-10', amount: 800, currency: 'PLN' },
-  { kind: 'TransferPlanToAccept', month: '2026-10', amount: 12243.27 },
-  { kind: 'TransferPlanUnchecked', month: '2026-10', uncheckedRows: 1, totalRows: 2 },
   { kind: 'UpcomingPayment', name: 'Przegląd', date: '2026-11-02', amount: 400, currency: 'PLN' },
   { kind: 'UpcomingPayment', name: 'OC Toyota', date: '2026-11-05', amount: 1200, currency: 'PLN' },
   {
@@ -40,6 +36,8 @@ const todoItems = [
     currency: 'PLN',
   },
   { kind: 'UpcomingPayment', name: 'Podatek', date: '2026-12-02', amount: 300, currency: 'PLN' },
+  { kind: 'UpcomingPayment', name: 'Szkoła', date: '2026-12-03', amount: 500, currency: 'PLN' },
+  { kind: 'UpcomingPayment', name: 'Czynsz', date: '2026-12-04', amount: 700, currency: 'PLN' },
 ];
 
 describe('MonthCard', () => {
@@ -73,7 +71,7 @@ describe('MonthCard', () => {
     return Array.from(element.querySelectorAll<HTMLElement>(`[data-testid="${testId}"]`));
   }
 
-  it('shows the free funds, the settled incomes, the plan status and five todo items, then reveals the rest', async () => {
+  it('shows the free funds, the settled incomes and five todo items, then reveals the rest', async () => {
     const element = await render(incomeMonth(), todoItems);
 
     expect(all(element, 'month-card-plan')[0].textContent).toContain(formatMoney(12300, 'PLN'));
@@ -81,7 +79,6 @@ describe('MonthCard', () => {
       formatMoney(12243.27, 'PLN'),
     );
     expect(all(element, 'month-card-settled')[0].textContent).toMatch(/2\D+3/);
-    expect(all(element, 'month-card-plan-status')[0].textContent).toContain('Preview');
     expect(all(element, 'month-card-todo-item')).toHaveLength(5);
     expect(all(element, 'month-card-empty')).toHaveLength(0);
 
@@ -90,10 +87,10 @@ describe('MonthCard', () => {
 
     expect(all(element, 'month-card-todo-item').map((item) => item.getAttribute('href'))).toEqual([
       '/planning?month=2026-11#do-rozliczenia',
-      '/planning?month=2026-10#plan-przelewow',
-      '/planning?month=2026-10#plan-przelewow',
       '/planning?month=2026-11#wydatki',
       '/planning?month=2026-11#wydatki',
+      '/planning?month=2026-12#wydatki',
+      '/planning?month=2026-12#wydatki',
       '/planning?month=2026-12#wydatki',
       '/planning?month=2026-12#wydatki',
     ]);
@@ -130,7 +127,7 @@ describe('MonthCard', () => {
 
   it('renders in Polish', async () => {
     const { fixture } = await renderCard(MonthCard, {
-      planningMonth: jsonResponse(incomeMonth({ transferPlan: transferPlan({ status: 'None' }) })),
+      planningMonth: jsonResponse(incomeMonth()),
       todo: jsonResponse({ items: [], paymentLeadDays: 7 }),
     });
     await fixture.whenStable();
@@ -139,7 +136,6 @@ describe('MonthCard', () => {
 
     await switchLanguage(fixture, 'pl');
 
-    expect(all(element, 'month-card-plan-status')[0].textContent).toContain('brak');
     expect(all(element, 'month-card-empty')[0].textContent).toContain('Wszystko załatwione');
   });
 });

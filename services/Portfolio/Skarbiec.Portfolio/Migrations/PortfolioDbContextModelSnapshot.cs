@@ -263,127 +263,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("AccountContributionLimits");
                 });
 
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationBalanceOverride", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid>("BucketId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateOnly>("Month")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BucketId", "Month")
-                        .IsUnique();
-
-                    b.ToTable("AllocationBalanceOverrides");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationBucket", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Kind")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AllocationBuckets");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanEntry", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("BucketId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsRemainder")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<int>("Position")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("Share")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<string>("ShareType")
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int?>("TargetMonths")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("VersionId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BucketId");
-
-                    b.HasIndex("VersionId");
-
-                    b.ToTable("AllocationPlanEntries");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanVersion", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateOnly>("EffectiveFrom")
-                        .HasColumnType("date");
-
-                    b.Property<Guid?>("ReserveAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "EffectiveFrom")
-                        .IsUnique();
-
-                    b.ToTable("AllocationPlanVersions");
-                });
-
             modelBuilder.Entity("Skarbiec.Portfolio.Data.Asset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -821,9 +700,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
-                    b.Property<int>("MinimumTransferPln")
-                        .HasColumnType("integer");
-
                     b.Property<int>("PaymentLeadDays")
                         .HasColumnType("integer");
 
@@ -1044,38 +920,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("RecurringIncomeVersions");
                 });
 
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TargetAllocationReplica", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("SavedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Groups", "Skarbiec.Portfolio.Data.TargetAllocationReplica.Groups#TargetAllocationReplicaGroup", b1 =>
-                        {
-                            b1.IsRequired();
-
-                            b1.PrimitiveCollection<string>("AssetClasses")
-                                .IsRequired();
-
-                            b1.Property<decimal>("BandPp");
-
-                            b1.Property<string>("Name")
-                                .IsRequired();
-
-                            b1.Property<decimal>("TargetPercent");
-
-                            b1
-                                .ToJson("Groups")
-                                .HasColumnType("jsonb");
-                        });
-
-                    b.HasKey("UserId");
-
-                    b.ToTable("TargetAllocationReplicas");
-                });
-
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TermDeposit", b =>
                 {
                     b.Property<Guid>("AssetId")
@@ -1199,118 +1043,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.HasIndex("TransferId");
 
                     b.ToTable("Transactions");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlan", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsSkipped")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateOnly>("Month")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "Month")
-                        .IsUnique();
-
-                    b.ToTable("TransferPlans");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlanBatch", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("AcceptedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("MinimumTransferPln")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("Number")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("PlanId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateOnly?>("ValuationDate")
-                        .HasColumnType("date");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PlanId", "Number")
-                        .IsUnique();
-
-                    b.ToTable("TransferPlanBatches");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlanRow", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("AccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AccountName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<decimal>("AmountPln")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.PrimitiveCollection<int[]>("AssetClasses")
-                        .IsRequired()
-                        .HasColumnType("integer[]");
-
-                    b.Property<Guid>("BatchId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("BucketId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("BucketName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<DateTimeOffset?>("CheckedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("GroupName")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Marker")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
-                    b.Property<int>("Position")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("BatchId");
-
-                    b.ToTable("TransferPlanRows");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TreasuryBond", b =>
@@ -1463,30 +1195,6 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasPrincipalKey("MessageId", "ConsumerId");
                 });
 
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationBalanceOverride", b =>
-                {
-                    b.HasOne("Skarbiec.Portfolio.Data.AllocationBucket", null)
-                        .WithMany()
-                        .HasForeignKey("BucketId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanEntry", b =>
-                {
-                    b.HasOne("Skarbiec.Portfolio.Data.AllocationBucket", null)
-                        .WithMany()
-                        .HasForeignKey("BucketId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Skarbiec.Portfolio.Data.AllocationPlanVersion", null)
-                        .WithMany("Entries")
-                        .HasForeignKey("VersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Skarbiec.Portfolio.Data.BankAccountTerms", b =>
                 {
                     b.HasOne("Skarbiec.Portfolio.Data.Account", null)
@@ -1582,24 +1290,6 @@ namespace Skarbiec.Portfolio.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlanBatch", b =>
-                {
-                    b.HasOne("Skarbiec.Portfolio.Data.TransferPlan", null)
-                        .WithMany("Batches")
-                        .HasForeignKey("PlanId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlanRow", b =>
-                {
-                    b.HasOne("Skarbiec.Portfolio.Data.TransferPlanBatch", null)
-                        .WithMany("Rows")
-                        .HasForeignKey("BatchId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Skarbiec.Portfolio.Data.TreasuryBond", b =>
                 {
                     b.HasOne("Skarbiec.Portfolio.Data.Asset", null)
@@ -1607,11 +1297,6 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasForeignKey("Skarbiec.Portfolio.Data.TreasuryBond", "AssetId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.AllocationPlanVersion", b =>
-                {
-                    b.Navigation("Entries");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpense", b =>
@@ -1622,16 +1307,6 @@ namespace Skarbiec.Portfolio.Migrations
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringIncome", b =>
                 {
                     b.Navigation("Versions");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlan", b =>
-                {
-                    b.Navigation("Batches");
-                });
-
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.TransferPlanBatch", b =>
-                {
-                    b.Navigation("Rows");
                 });
 #pragma warning restore 612, 618
         }

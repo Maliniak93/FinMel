@@ -2454,128 +2454,6 @@
         }
       }
     },
-    "/api/portfolio/allocation-plan/versions/{month}": {
-      "put": {
-        "tags": [
-          "SaveAllocationPlanVersionEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SaveAllocationPlanVersionRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "DeleteAllocationPlanVersionEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      }
-    },
-    "/api/portfolio/allocation-buckets/{bucketId}/balances/{month}": {
-      "put": {
-        "tags": [
-          "SetBucketBalanceEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "bucketId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SetBucketBalanceRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "DeleteBucketBalanceEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "bucketId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      }
-    },
     "/api/portfolio/recurring-incomes/{id}/occurrences/{month}/settlement": {
       "put": {
         "tags": [
@@ -2793,147 +2671,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/api/portfolio/transfer-plans/{month}/accept": {
-      "post": {
-        "tags": [
-          "AcceptTransferPlanEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      }
-    },
-    "/api/portfolio/transfer-plans/{month}/top-up/accept": {
-      "post": {
-        "tags": [
-          "AcceptTransferPlanTopUpEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      }
-    },
-    "/api/portfolio/transfer-plans/{month}/undo": {
-      "post": {
-        "tags": [
-          "UndoTransferPlanAcceptanceEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      }
-    },
-    "/api/portfolio/transfer-plans/rows/{rowId}/checked": {
-      "put": {
-        "tags": [
-          "CheckTransferPlanRowEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "rowId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CheckTransferPlanRowRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      }
-    },
-    "/api/portfolio/transfer-plans/{month}/skip": {
-      "post": {
-        "tags": [
-          "SkipTransferPlanEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "UnskipTransferPlanEndpoint"
-        ],
-        "parameters": [
-          {
-            "name": "month",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "No Content"
           }
         }
       }
@@ -3739,264 +3476,6 @@
           }
         }
       },
-      "AllocationBucketResponse": {
-        "required": [
-          "bucketId",
-          "name",
-          "kind",
-          "shareType",
-          "share",
-          "position",
-          "isRemainder",
-          "accountId",
-          "accountName",
-          "allocatedPln",
-          "underfunded",
-          "cushion",
-          "limitReached",
-          "limit",
-          "adjustments"
-        ],
-        "type": "object",
-        "properties": {
-          "bucketId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/BucketKind"
-          },
-          "shareType": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/BucketShareType"
-              }
-            ]
-          },
-          "share": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "position": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "isRemainder": {
-            "type": "boolean"
-          },
-          "accountId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "accountName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "allocatedPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "underfunded": {
-            "type": "boolean"
-          },
-          "cushion": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/CushionResponse"
-              }
-            ]
-          },
-          "limitReached": {
-            "type": "boolean"
-          },
-          "limit": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/LimitResponse"
-              }
-            ]
-          },
-          "adjustments": {
-            "type": [
-              "null",
-              "array"
-            ],
-            "items": {
-              "$ref": "#/components/schemas/BalanceAdjustmentResponse"
-            }
-          }
-        }
-      },
-      "AllocationPlanRowRequest": {
-        "required": [
-          "name",
-          "kind",
-          "isRemainder"
-        ],
-        "type": "object",
-        "properties": {
-          "bucketId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/BucketKind"
-          },
-          "shareType": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/BucketShareType"
-              }
-            ]
-          },
-          "share": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "isRemainder": {
-            "type": "boolean"
-          },
-          "accountId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "targetMonths": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "startingBalance": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
-      },
-      "AllocationResponse": {
-        "required": [
-          "effectiveFrom",
-          "nextChange",
-          "forecastPln",
-          "incomplete",
-          "deficitPln",
-          "buckets",
-          "toInvestPln",
-          "reserve"
-        ],
-        "type": "object",
-        "properties": {
-          "effectiveFrom": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "nextChange": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "forecastPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "incomplete": {
-            "type": "boolean"
-          },
-          "deficitPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "buckets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AllocationBucketResponse"
-            }
-          },
-          "toInvestPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "reserve": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/ReserveResponse"
-              }
-            ]
-          }
-        }
-      },
       "AssetClass": {
         "type": "integer"
       },
@@ -4255,26 +3734,6 @@
           },
           "isArchived": {
             "type": "boolean"
-          }
-        }
-      },
-      "BalanceAdjustmentResponse": {
-        "required": [
-          "month",
-          "amountPln"
-        ],
-        "type": "object",
-        "properties": {
-          "month": {
-            "type": "string"
-          },
-          "amountPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
           }
         }
       },
@@ -5128,12 +4587,6 @@
           }
         }
       },
-      "BucketKind": {
-        "type": "integer"
-      },
-      "BucketShareType": {
-        "type": "integer"
-      },
       "BusinessDayShift": {
         "type": "integer"
       },
@@ -5265,17 +4718,6 @@
               "string"
             ],
             "format": "double"
-          }
-        }
-      },
-      "CheckTransferPlanRowRequest": {
-        "required": [
-          "checked"
-        ],
-        "type": "object",
-        "properties": {
-          "checked": {
-            "type": "boolean"
           }
         }
       },
@@ -5725,53 +5167,6 @@
           "transferId": {
             "type": "string",
             "format": "uuid"
-          }
-        }
-      },
-      "CushionResponse": {
-        "required": [
-          "balanceStartPln",
-          "targetPln",
-          "targetMonths",
-          "balanceEndPln",
-          "reached"
-        ],
-        "type": "object",
-        "properties": {
-          "balanceStartPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "targetPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "targetMonths": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "balanceEndPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "reached": {
-            "type": "boolean"
           }
         }
       },
@@ -6630,57 +6025,6 @@
           }
         }
       },
-      "LimitResponse": {
-        "required": [
-          "year",
-          "limitPln",
-          "contributedStartPln",
-          "contributedEndPln",
-          "reached",
-          "estimated"
-        ],
-        "type": "object",
-        "properties": {
-          "year": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "limitPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "contributedStartPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "contributedEndPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "reached": {
-            "type": "boolean"
-          },
-          "estimated": {
-            "type": "boolean"
-          }
-        }
-      },
       "Metal": {
         "type": "integer"
       },
@@ -7108,8 +6452,6 @@
           "incomes",
           "expenses",
           "freeFunds",
-          "allocation",
-          "transferPlan",
           "nonBusinessDays"
         ],
         "type": "object",
@@ -7123,12 +6465,6 @@
           "freeFunds": {
             "$ref": "#/components/schemas/FreeFundsResponse"
           },
-          "allocation": {
-            "$ref": "#/components/schemas/AllocationResponse"
-          },
-          "transferPlan": {
-            "$ref": "#/components/schemas/TransferPlanResponse"
-          },
           "nonBusinessDays": {
             "type": "array",
             "items": {
@@ -7140,19 +6476,10 @@
       },
       "PlanningSettingsResponse": {
         "required": [
-          "minimumTransferPln",
           "paymentLeadDays"
         ],
         "type": "object",
         "properties": {
-          "minimumTransferPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
           "paymentLeadDays": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
@@ -7196,8 +6523,6 @@
           "costPln",
           "freeFundsPlanPln",
           "freeFundsForecastPln",
-          "toInvestPln",
-          "transferPlanStatus",
           "hasOverdue",
           "incomplete"
         ],
@@ -7263,25 +6588,6 @@
             ],
             "format": "double"
           },
-          "toInvestPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "null",
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "transferPlanStatus": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/TransferPlanStatus"
-              }
-            ]
-          },
           "hasOverdue": {
             "type": "boolean"
           },
@@ -7342,8 +6648,7 @@
           "differencePln",
           "costPln",
           "freeFundsPlanPln",
-          "freeFundsForecastPln",
-          "toInvestPln"
+          "freeFundsForecastPln"
         ],
         "type": "object",
         "properties": {
@@ -7388,14 +6693,6 @@
             "format": "double"
           },
           "freeFundsForecastPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "toInvestPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -7517,46 +6814,6 @@
       "RedeemBondRequest": {
         "type": "object"
       },
-      "ReserveResponse": {
-        "required": [
-          "monthPln",
-          "balancePln",
-          "accountId",
-          "accountName"
-        ],
-        "type": "object",
-        "properties": {
-          "monthPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "balancePln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "accountId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "accountName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
       "RollOverDepositRequest": {
         "required": [
           "annualInterestRatePercent"
@@ -7597,42 +6854,12 @@
           }
         }
       },
-      "SaveAllocationPlanVersionRequest": {
-        "required": [
-          "buckets"
-        ],
-        "type": "object",
-        "properties": {
-          "buckets": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/AllocationPlanRowRequest"
-            }
-          },
-          "reserveAccountId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          }
-        }
-      },
       "SavePlanningSettingsRequest": {
         "required": [
-          "minimumTransferPln",
           "paymentLeadDays"
         ],
         "type": "object",
         "properties": {
-          "minimumTransferPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
           "paymentLeadDays": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
@@ -7853,24 +7080,6 @@
       },
       "SecurityPriceUnavailableReason": {
         "type": "integer"
-      },
-      "SetBucketBalanceRequest": {
-        "required": [
-          "amount"
-        ],
-        "type": "object",
-        "properties": {
-          "amount": {
-            "maximum": 10000000,
-            "minimum": 0,
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
       },
       "SetContributionLimitRequest": {
         "required": [
@@ -8151,8 +7360,6 @@
       "TodoItemKind": {
         "enum": [
           "OverdueIncome",
-          "TransferPlanToAccept",
-          "TransferPlanUnchecked",
           "UpcomingPayment"
         ]
       },
@@ -8161,14 +7368,10 @@
           "kind",
           "name",
           "date",
-          "month",
           "amount",
           "currency",
           "daysOverdue",
-          "daysUntil",
-          "isTopUp",
-          "uncheckedRows",
-          "totalRows"
+          "daysUntil"
         ],
         "type": "object",
         "properties": {
@@ -8176,38 +7379,22 @@
             "$ref": "#/components/schemas/TodoItemKind"
           },
           "name": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "date": {
-            "type": [
-              "null",
-              "string"
-            ],
+            "type": "string",
             "format": "date"
-          },
-          "month": {
-            "type": [
-              "null",
-              "string"
-            ]
           },
           "amount": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
-              "null",
               "number",
               "string"
             ],
             "format": "double"
           },
           "currency": {
-            "type": [
-              "null",
-              "string"
-            ]
+            "type": "string"
           },
           "daysOverdue": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -8219,30 +7406,6 @@
             "format": "int32"
           },
           "daysUntil": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "isTopUp": {
-            "type": [
-              "null",
-              "boolean"
-            ]
-          },
-          "uncheckedRows": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "totalRows": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
               "null",
@@ -8432,346 +7595,8 @@
           }
         }
       },
-      "TransferDifferenceResponse": {
-        "required": [
-          "bucketId",
-          "bucketName",
-          "acceptedPln",
-          "currentPln",
-          "differencePln"
-        ],
-        "type": "object",
-        "properties": {
-          "bucketId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "bucketName": {
-            "type": "string"
-          },
-          "acceptedPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "currentPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "differencePln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
-      },
       "TransferDirection": {
         "type": "integer"
-      },
-      "TransferGroupShare": {
-        "required": [
-          "name",
-          "currentPercent",
-          "afterPercent",
-          "targetPercent"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "currentPercent": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "afterPercent": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "targetPercent": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          }
-        }
-      },
-      "TransferMarker": {
-        "enum": [
-          "None",
-          "AboveTarget",
-          "OutsideAllocation",
-          "BelowMinimum"
-        ]
-      },
-      "TransferPlanFallbackReason": {
-        "enum": [
-          "NoTargetAllocation",
-          "NoValuation",
-          "EmptyBase",
-          null
-        ]
-      },
-      "TransferPlanNoneReason": {
-        "enum": [
-          "NothingToInvest",
-          "FutureMonth",
-          "BeforeStart",
-          null
-        ]
-      },
-      "TransferPlanResponse": {
-        "required": [
-          "status",
-          "noneReason",
-          "minimumTransferPln",
-          "valuationDate",
-          "valuationStale",
-          "fallbackReason",
-          "rows",
-          "groups",
-          "toInvestPln",
-          "canUndo",
-          "differences",
-          "topUp"
-        ],
-        "type": "object",
-        "properties": {
-          "status": {
-            "$ref": "#/components/schemas/TransferPlanStatus"
-          },
-          "noneReason": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/TransferPlanNoneReason"
-              }
-            ]
-          },
-          "minimumTransferPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "valuationDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "valuationStale": {
-            "type": "boolean"
-          },
-          "fallbackReason": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/TransferPlanFallbackReason"
-              }
-            ]
-          },
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TransferRowResponse"
-            }
-          },
-          "groups": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TransferGroupShare"
-            }
-          },
-          "toInvestPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "canUndo": {
-            "type": "boolean"
-          },
-          "differences": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TransferDifferenceResponse"
-            }
-          },
-          "topUp": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/TransferTopUpResponse"
-              }
-            ]
-          }
-        }
-      },
-      "TransferPlanStatus": {
-        "enum": [
-          "None",
-          "Preview",
-          "Accepted",
-          "Completed",
-          "Skipped"
-        ]
-      },
-      "TransferRowResponse": {
-        "required": [
-          "id",
-          "batchNumber",
-          "checked",
-          "bucketId",
-          "bucketName",
-          "accountId",
-          "accountName",
-          "groupName",
-          "amountPln",
-          "marker"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "batchNumber": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "checked": {
-            "type": [
-              "null",
-              "boolean"
-            ]
-          },
-          "bucketId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "bucketName": {
-            "type": "string"
-          },
-          "accountId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "accountName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "groupName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "amountPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double"
-          },
-          "marker": {
-            "$ref": "#/components/schemas/TransferMarker"
-          }
-        }
-      },
-      "TransferTopUpResponse": {
-        "required": [
-          "minimumTransferPln",
-          "valuationDate",
-          "fallbackReason",
-          "rows",
-          "groups"
-        ],
-        "type": "object",
-        "properties": {
-          "minimumTransferPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "valuationDate": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date"
-          },
-          "fallbackReason": {
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/TransferPlanFallbackReason"
-              }
-            ]
-          },
-          "rows": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TransferRowResponse"
-            }
-          },
-          "groups": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TransferGroupShare"
-            }
-          }
-        }
       },
       "TreasuryBondType": {
         "type": "integer"
@@ -9830,18 +8655,6 @@
       "name": "DeleteRecurringExpenseChangeEndpoint"
     },
     {
-      "name": "SaveAllocationPlanVersionEndpoint"
-    },
-    {
-      "name": "DeleteAllocationPlanVersionEndpoint"
-    },
-    {
-      "name": "SetBucketBalanceEndpoint"
-    },
-    {
-      "name": "DeleteBucketBalanceEndpoint"
-    },
-    {
       "name": "SettleOccurrenceEndpoint"
     },
     {
@@ -9864,24 +8677,6 @@
     },
     {
       "name": "GetPlanningTodoEndpoint"
-    },
-    {
-      "name": "AcceptTransferPlanEndpoint"
-    },
-    {
-      "name": "AcceptTransferPlanTopUpEndpoint"
-    },
-    {
-      "name": "UndoTransferPlanAcceptanceEndpoint"
-    },
-    {
-      "name": "CheckTransferPlanRowEndpoint"
-    },
-    {
-      "name": "SkipTransferPlanEndpoint"
-    },
-    {
-      "name": "UnskipTransferPlanEndpoint"
     },
     {
       "name": "GetOverdueOccurrencesEndpoint"

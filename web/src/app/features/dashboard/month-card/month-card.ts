@@ -23,50 +23,32 @@ interface MonthCardItem {
   fragment: string;
 }
 
-function monthOf(date: string | null): string {
-  return (date ?? '').slice(0, 7);
+function monthOf(date: string): string {
+  return date.slice(0, 7);
 }
 
 function itemOf(item: TodoItemResponse): MonthCardItem {
-  const currency = item.currency ?? 'PLN';
-  const amount = formatMoney(Number(item.amount ?? 0), currency);
+  const amount = formatMoney(Number(item.amount), item.currency);
 
   switch (item.kind) {
     case 'OverdueIncome':
       return {
         key: 'dashboard.monthCard.todo.overdueIncome',
         params: {
-          name: item.name ?? '',
-          date: formatDate(item.date ?? ''),
+          name: item.name,
+          date: formatDate(item.date),
           days: Number(item.daysOverdue ?? 0),
           amount,
         },
         month: monthOf(item.date),
         fragment: 'do-rozliczenia',
       };
-    case 'TransferPlanToAccept':
-      return {
-        key: item.isTopUp ? 'dashboard.monthCard.todo.topUp' : 'dashboard.monthCard.todo.toAccept',
-        params: { amount },
-        month: item.month ?? '',
-        fragment: 'plan-przelewow',
-      };
-    case 'TransferPlanUnchecked':
-      return {
-        key: 'dashboard.monthCard.todo.unchecked',
-        params: {
-          unchecked: Number(item.uncheckedRows ?? 0),
-          total: Number(item.totalRows ?? 0),
-        },
-        month: item.month ?? '',
-        fragment: 'plan-przelewow',
-      };
     case 'UpcomingPayment':
       return {
         key: 'dashboard.monthCard.todo.payment',
         params: {
-          name: item.name ?? '',
-          date: formatDate(item.date ?? ''),
+          name: item.name,
+          date: formatDate(item.date),
           days: Number(item.daysUntil ?? 0),
           amount,
         },
@@ -123,8 +105,6 @@ export class MonthCard {
       total: occurrences.length,
     };
   });
-
-  protected readonly planStatus = computed(() => this.month()?.transferPlan?.status ?? 'None');
 
   private readonly items = computed(() => this.planningState.todo().map(itemOf));
 

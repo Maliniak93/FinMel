@@ -12,7 +12,7 @@ public sealed class ReplicaTenancyIsolationTests(SkarbiecContainersFixture conta
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     [Fact]
-    public async Task Query_AsUserB_ReturnsOnlyBsReplicas()
+    public async Task Query_AsUserB_ReturnsOnlyBsReplica()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userA = Guid.NewGuid();
@@ -23,7 +23,6 @@ public sealed class ReplicaTenancyIsolationTests(SkarbiecContainersFixture conta
         {
             foreach (var userId in new[] { userA, userB })
             {
-                seed.Set<TargetAllocationReplica>().Add(new TargetAllocationReplica { UserId = userId, Groups = [], SavedAtUtc = savedAt });
                 seed.Set<ValuationReplica>().Add(new ValuationReplica
                 {
                     UserId = userId,
@@ -40,10 +39,8 @@ public sealed class ReplicaTenancyIsolationTests(SkarbiecContainersFixture conta
 
         await using var asUserB = OpenDbContext(containers, userB);
 
-        var targets = await asUserB.Set<TargetAllocationReplica>().ToListAsync(cancellationToken);
         var valuations = await asUserB.Set<ValuationReplica>().ToListAsync(cancellationToken);
 
-        Assert.Equal(userB, Assert.Single(targets).UserId);
         Assert.Equal(userB, Assert.Single(valuations).UserId);
     }
 }
