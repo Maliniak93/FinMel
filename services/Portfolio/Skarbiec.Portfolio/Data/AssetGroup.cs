@@ -12,6 +12,9 @@ public sealed class AssetGroup : IUserOwned
     public decimal? TargetPln { get; set; }
     public AssetGroupKind Kind { get; set; }
     public decimal MonthlyContributionPln { get; set; }
+
+    // Share of the free funds the Regular groups split between them (one decimal); null for a Cushion.
+    public decimal? SharePercent { get; set; }
     public List<AssetGroupClassShare> ClassAllocation { get; set; } = [];
 }
 

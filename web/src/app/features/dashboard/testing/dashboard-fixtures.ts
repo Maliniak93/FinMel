@@ -59,6 +59,7 @@ export const groups: AssetGroupResponse[] = [
     assetCount: 2,
     kind: 0,
     monthlyContributionPln: 0,
+    sharePercent: 0,
     classAllocation: [],
   },
   {
@@ -69,6 +70,7 @@ export const groups: AssetGroupResponse[] = [
     assetCount: 1,
     kind: 0,
     monthlyContributionPln: 0,
+    sharePercent: 0,
     classAllocation: [],
   },
   {
@@ -79,6 +81,7 @@ export const groups: AssetGroupResponse[] = [
     assetCount: 1,
     kind: 1,
     monthlyContributionPln: 0,
+    sharePercent: null,
     classAllocation: [],
   },
 ];

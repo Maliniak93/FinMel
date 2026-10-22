@@ -1,5 +1,6 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 
@@ -33,14 +34,29 @@ public static class LatestValuation
             .AsNoTracking()
             .IgnoreQueryFilters()
             .Where(l => l.UserId == userId && l.Date == snapshot.Date)
-            .Select(l => new { l.AssetClass, l.ValuePln })
+            .Select(l => new { l.AssetId, l.AssetClass, l.ValuePln })
             .ToListAsync(cancellationToken);
 
-        var byAssetClass = lines
-            .GroupBy(l => l.AssetClass)
-            .Select(g => new AssetClassValue { AssetClass = g.Key, ValuePln = g.Sum(l => l.ValuePln) })
-            .Where(v => v.ValuePln != 0m)
-            .OrderBy(v => v.AssetClass)
+        // IgnoreQueryFilters: same reason as the lines above.
+        var groupByAsset = await db.Positions
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(p => p.UserId == userId)
+            .Select(p => new { p.AssetId, p.GroupId })
+            .ToDictionaryAsync(p => p.AssetId, p => p.GroupId, cancellationToken);
+
+        var byAssetClass = SumPerClass(lines.Select(l => (l.AssetClass, l.ValuePln)));
+
+        // A line with no position counts as ungrouped, so the groups still sum to the snapshot total.
+        var byGroup = lines
+            .GroupBy(l => groupByAsset.GetValueOrDefault(l.AssetId))
+            .Select(g => new GroupClassValues
+            {
+                GroupId = g.Key,
+                ByAssetClass = SumPerClass(g.Select(l => (l.AssetClass, l.ValuePln))),
+            })
+            .Where(g => g.ByAssetClass.Count > 0)
+            .OrderBy(g => g.GroupId)
             .ToList();
 
         await context.Publish(
@@ -51,8 +67,16 @@ public static class LatestValuation
                 IsStale = snapshot.IsStale,
                 TotalPln = snapshot.TotalPln,
                 ByAssetClass = byAssetClass,
+                ByGroup = byGroup,
                 OccurredAtUtc = timeProvider.GetUtcNow(),
             },
             cancellationToken);
     }
+
+    private static List<AssetClassValue> SumPerClass(IEnumerable<(AssetClass AssetClass, decimal ValuePln)> lines) =>
+        [.. lines
+            .GroupBy(l => l.AssetClass)
+            .Select(g => new AssetClassValue { AssetClass = g.Key, ValuePln = g.Sum(l => l.ValuePln) })
+            .Where(v => v.ValuePln != 0m)
+            .OrderBy(v => v.AssetClass)];
 }

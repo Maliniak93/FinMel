@@ -52,7 +52,7 @@ to its seeded MarketData instrument id, so changing an id orphans every stored r
 `WatchlistItemAdded` and `WatchlistItemRemoved` (`WatchlistItemId, UserId, InstrumentId, OccurredAtUtc`) are
 Portfolio's facts about a user's watchlist; MarketData counts watchers from them (watchlist part 2).
 
-`LatestValuationChanged` (`UserId, Date, IsStale, TotalPln, ByAssetClass, OccurredAtUtc`) is Reporting's fact;
+`LatestValuationChanged` (`UserId, Date, IsStale, TotalPln, ByAssetClass, ByGroup, OccurredAtUtc`) is Reporting's fact;
 Portfolio replicates it per user and ignores a message older than the stored one (`Date` then `OccurredAtUtc`).
 
 When ADR-019 is revoked (real data in production), the classic discipline comes back: additive

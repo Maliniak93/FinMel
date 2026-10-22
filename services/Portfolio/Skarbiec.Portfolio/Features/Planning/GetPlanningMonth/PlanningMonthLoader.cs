@@ -37,17 +37,27 @@ public sealed class PlanningMonthLoader(
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
-        var forecast = new PlanningForecast(incomes, accounts, stored, expenseRows, oneOffIncomes, oneOffExpenses);
+        var groups = await dbContext.AssetGroups
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
 
+        var today = WarsawCalendar.Today(timeProvider);
+        var currentMonth = YearMonth.From(today);
+
+        var forecast = new PlanningForecast(
+            incomes, accounts, stored, expenseRows, oneOffIncomes, oneOffExpenses, groups, currentMonth);
+
+        // A later month's cushion level depends on the free funds of every month from the current one.
         var foreign = new List<string>();
-        for (var walked = first; walked <= last; walked = walked.AddMonths(1))
+        for (var walked = last > currentMonth && currentMonth < first ? currentMonth : first; walked <= last; walked = walked.AddMonths(1))
         {
             foreign.AddRange(forecast.ForeignIn(walked));
         }
 
         foreign = foreign.Distinct().ToList();
 
-        var today = WarsawCalendar.Today(timeProvider);
+        var replica = await dbContext.ValuationReplicas.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+
         var rates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         if (foreign.Count > 0)
         {
@@ -69,6 +79,7 @@ public sealed class PlanningMonthLoader(
             accounts,
             forecast,
             rates,
+            replica,
             settings?.PaymentLeadDays ?? PlanningSettings.DefaultPaymentLeadDays);
     }
 }

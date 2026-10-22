@@ -11,6 +11,7 @@ public sealed class ArchitectureTests
     [
         typeof(AssetGroupClassShare),
         typeof(ValuationReplicaClassValue),
+        typeof(ValuationReplicaGroupValue),
     ];
 
     [Fact]

@@ -857,6 +857,7 @@
       "add": "Dodaj wydatek",
       "empty": "W tym miesiącu nie planujesz żadnych wydatków.",
       "cost": "Koszt miesiąca (z rezerwami)",
+      "contribution": "Wpłata do grupy",
       "reserve": "{{ amount }}/mies.",
       "nextPayment": "najbliższa płatność {{ date }}",
       "definitions": {
@@ -883,6 +884,22 @@
       "plan": "Plan",
       "forecast": "Prognoza",
       "deficit": "deficyt"
+    },
+    "split": {
+      "title": "Podział wolnych środków",
+      "info": "Tylko propozycja, niepowiązana z kontem, aktywem ani przelewem. To nie jest porada inwestycyjna.",
+      "valuationMissing": "Wycena jeszcze nie dotarła: poduszka liczy się jako pusta, a wpłaty idą wg procentów klas.",
+      "deficit": "Deficyt, nie ma co dzielić",
+      "level": "Stan",
+      "missing": "Brakuje",
+      "allocation": "Przydział",
+      "contribution": "Wpłata",
+      "breakdown": "Rozbicie na klasy",
+      "unassigned": "Nieprzypisane do grupy",
+      "shares": "Procenty wolnych środków",
+      "sum": "Suma",
+      "saveShares": "Zapisz procenty",
+      "sharesFailed": "Nie udało się zapisać procentów."
     },
     "form": {
       "title": "Dodaj wpływ cykliczny",

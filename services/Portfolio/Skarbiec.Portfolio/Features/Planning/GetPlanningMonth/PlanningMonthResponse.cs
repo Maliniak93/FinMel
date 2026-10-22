@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 
@@ -12,6 +13,9 @@ public sealed record PlanningMonthResponse
 
     public required FreeFundsResponse FreeFunds { get; init; }
 
+    /// <summary>Null for a past month and for a user without a group.</summary>
+    public required PlanningSplitResponse? Split { get; init; }
+
     /// <summary>The weekends and Polish holidays of the viewed month, each date once.</summary>
     public required IReadOnlyList<DateOnly> NonBusinessDays { get; init; }
 }
@@ -20,8 +24,11 @@ public sealed record PlanningExpensesResponse
 {
     public required IReadOnlyList<ExpensePaymentResponse> Payments { get; init; }
 
-    /// <summary>PLN sum of every expense's cost for the month: payments plus the reserve set aside for later ones.</summary>
+    /// <summary>PLN sum of every expense's cost for the month: payments plus the reserve set aside for later ones, one-offs and the group contributions.</summary>
     public required decimal CostPln { get; init; }
+
+    /// <summary>Each group's monthly contribution, from the current month on; empty for a past month.</summary>
+    public required IReadOnlyList<GroupContributionResponse> GroupContributions { get; init; }
 
     public required IReadOnlyList<ExpenseDefinitionResponse> Definitions { get; init; }
 
@@ -262,4 +269,62 @@ public enum RecurringIncomeStatus
     Upcoming,
     Active,
     Ended,
+}
+
+public sealed record GroupContributionResponse
+{
+    public required Guid GroupId { get; init; }
+    public required string Name { get; init; }
+    public required decimal AmountPln { get; init; }
+}
+
+/// <summary>How the viewed month's free funds would be divided between the groups; information only.</summary>
+public sealed record PlanningSplitResponse
+{
+    public required decimal FreeFundsPln { get; init; }
+
+    /// <summary>The missing amount when the free funds are 0 or less, in which case no amounts are given; null otherwise.</summary>
+    public required decimal? DeficitPln { get; init; }
+
+    /// <summary>Null when the user has no cushion group.</summary>
+    public required SplitCushionResponse? Cushion { get; init; }
+
+    public required IReadOnlyList<SplitGroupResponse> Groups { get; init; }
+
+    /// <summary>What no regular group takes: the free funds the cushion leaves when there is no regular group.</summary>
+    public required decimal UnassignedPln { get; init; }
+
+    /// <summary>True when Reporting's valuation has not arrived yet: the cushion level counts as 0 and breakdowns follow percentages.</summary>
+    public required bool ValuationMissing { get; init; }
+}
+
+public sealed record SplitCushionResponse
+{
+    public required Guid GroupId { get; init; }
+    public required string Name { get; init; }
+
+    /// <summary>The cushion's value now plus its contributions and allocations of the months before the viewed one.</summary>
+    public required decimal LevelPln { get; init; }
+
+    public required decimal TargetPln { get; init; }
+    public required decimal MissingPln { get; init; }
+    public required decimal AllocationPln { get; init; }
+}
+
+public sealed record SplitGroupResponse
+{
+    public required Guid GroupId { get; init; }
+    public required string Name { get; init; }
+    public required decimal SharePercent { get; init; }
+    public required decimal ContributionPln { get; init; }
+    public required decimal AllocationPln { get; init; }
+
+    /// <summary>The contribution per asset class by today's values; null without a contribution or a class allocation.</summary>
+    public required IReadOnlyList<SplitClassAmountResponse>? Breakdown { get; init; }
+}
+
+public sealed record SplitClassAmountResponse
+{
+    public required AssetClass AssetClass { get; init; }
+    public required decimal AmountPln { get; init; }
 }

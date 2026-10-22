@@ -10,6 +10,14 @@ namespace Skarbiec.Portfolio.Tests.Fixtures;
 
 internal static class PortfolioAssertions
 {
+    public static T Present<T>(T? value)
+        where T : class
+    {
+        Assert.NotNull(value);
+
+        return value;
+    }
+
     public const string AccountArchivedErrorCode = "Conflict.AccountArchived";
 
     public const string AccountNotEmptyErrorCode = "Conflict.AccountNotEmpty";

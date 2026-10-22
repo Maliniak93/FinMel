@@ -139,7 +139,14 @@ function expenseNextChange(extra: Record<string, unknown> = {}): Record<string, 
 }
 
 function expenses(extra: Record<string, unknown> = {}): Record<string, unknown> {
-  return { payments: [], costPln: 0, definitions: [], oneOffs: [], ...extra };
+  return {
+    payments: [],
+    costPln: 0,
+    definitions: [],
+    oneOffs: [],
+    groupContributions: [],
+    ...extra,
+  };
 }
 
 function freeFunds(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -150,6 +157,7 @@ function month(
   incomes: Record<string, unknown>,
   expensesPart: Record<string, unknown> = {},
   freeFundsPart: Record<string, unknown> = {},
+  split: Record<string, unknown> | null = null,
 ): Record<string, unknown> {
   return {
     incomes: {
@@ -163,8 +171,60 @@ function month(
     expenses: expenses(expensesPart),
     freeFunds: freeFunds(freeFundsPart),
     nonBusinessDays: [],
+    split,
   };
 }
+
+const cushionId = 'c0000000-0000-0000-0000-000000000001';
+const retirementId = 'c0000000-0000-0000-0000-000000000002';
+const investingId = 'c0000000-0000-0000-0000-000000000003';
+
+function splitView(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    freeFundsPln: 4000,
+    deficitPln: null,
+    cushion: {
+      groupId: cushionId,
+      name: 'Poduszka',
+      levelPln: 10500,
+      targetPln: 12000,
+      missingPln: 1500,
+      allocationPln: 1500,
+    },
+    groups: [
+      {
+        groupId: retirementId,
+        name: 'Emerytura',
+        sharePercent: 50,
+        contributionPln: 2000,
+        allocationPln: 1250,
+        breakdown: [
+          { assetClass: 1, amountPln: 0 },
+          { assetClass: 9, amountPln: 2000 },
+        ],
+      },
+      {
+        groupId: investingId,
+        name: 'Inwestycje',
+        sharePercent: 50,
+        contributionPln: 1000,
+        allocationPln: 1250,
+        breakdown: [
+          { assetClass: 1, amountPln: 500 },
+          { assetClass: 9, amountPln: 500 },
+        ],
+      },
+    ],
+    unassignedPln: 0,
+    valuationMissing: false,
+    ...extra,
+  };
+}
+
+const contributions = [
+  { groupId: retirementId, name: 'Emerytura', amountPln: 2000 },
+  { groupId: investingId, name: 'Inwestycje', amountPln: 1000 },
+];
 
 function yearPage(year: number): Record<string, unknown> {
   const months = Array.from({ length: 12 }, (_, index) => ({
@@ -1060,6 +1120,133 @@ describe('Planning', () => {
       await settle();
       expect(tabs()[0].getAttribute('aria-selected')).toBe('true');
       expect(TestBed.inject(Router).url).not.toContain('tab=year');
+    });
+  });
+
+  it('shows the contribution lines, the cushion state, the per-group amounts and expandable class breakdowns', async () => {
+    responses['2026-10'] = month(
+      {},
+      { groupContributions: contributions, costPln: 4000 },
+      { planPln: 4000, forecastPln: 4000 },
+      splitView(),
+    );
+    await setup();
+
+    const lines = rows('group-contribution');
+    expect(lines).toHaveLength(2);
+    expect(lines[0].textContent).toContain('Emerytura');
+    expect(lines[0].textContent).toContain(formatMoney(2000, 'PLN'));
+    expect(lines[1].textContent).toContain('Inwestycje');
+
+    expect(rows('split-section')).toHaveLength(1);
+    const cushion = rows('split-cushion')[0].textContent!;
+    expect(cushion).toContain('Poduszka');
+    expect(cushion).toContain(formatMoney(1500, 'PLN'));
+    expect(cushion).toContain(formatMoney(12000, 'PLN'));
+
+    const groups = rows('split-group');
+    expect(groups).toHaveLength(2);
+    expect(groups[0].textContent).toContain('Emerytura');
+    expect(groups[0].textContent).toContain(formatMoney(1250, 'PLN'));
+    expect(rows('split-deficit')).toHaveLength(0);
+    expect(rows('split-valuation-missing')).toHaveLength(0);
+    expect(rows('split-breakdown')).toHaveLength(0);
+
+    rows('split-breakdown-toggle')[0].click();
+    await settle();
+
+    const parts = rows('split-breakdown');
+    expect(parts).toHaveLength(2);
+    expect(parts[1].textContent).toContain(formatMoney(2000, 'PLN'));
+  });
+
+  it('shows neither contribution lines nor a split in a past month', async () => {
+    responses['2026-10'] = month(
+      {},
+      { groupContributions: contributions, costPln: 4000 },
+      { planPln: 4000, forecastPln: 4000 },
+      splitView(),
+    );
+    responses['2026-09'] = month({}, {}, { planPln: 7000, forecastPln: 7000 }, null);
+    await setup();
+
+    expect(rows('group-contribution')).toHaveLength(2);
+    expect(rows('split-section')).toHaveLength(1);
+
+    click('previous-month');
+    await settle();
+
+    expect(requestedMonths().at(-1)).toBe('2026-09');
+    expect(rows('group-contribution')).toHaveLength(0);
+    expect(rows('split-section')).toHaveLength(0);
+    expect(rows('split-cushion')).toHaveLength(0);
+  });
+
+  it('shows the deficit instead of amounts and a notice when the valuation is missing', async () => {
+    responses['2026-10'] = month(
+      {},
+      { groupContributions: contributions },
+      { planPln: -500, forecastPln: -500 },
+      splitView({
+        freeFundsPln: -500,
+        deficitPln: 500,
+        valuationMissing: true,
+        cushion: null,
+      }),
+    );
+    await setup();
+
+    const deficit = rows('split-deficit');
+    expect(deficit).toHaveLength(1);
+    expect(deficit[0].textContent).toContain(formatMoney(500, 'PLN'));
+    expect(rows('split-valuation-missing')).toHaveLength(1);
+    expect(rows('split-cushion')).toHaveLength(0);
+  });
+
+  it('blocks saving the shares unless they sum to 100 and saves the whole list', async () => {
+    responses['2026-10'] = month(
+      {},
+      { groupContributions: contributions },
+      { planPln: 4000, forecastPln: 4000 },
+      splitView(),
+    );
+    await setup();
+
+    const inputs = () => rows('share-input') as HTMLInputElement[];
+    const save = () => element().querySelector<HTMLButtonElement>('[data-testid="shares-save"]')!;
+    expect(inputs()).toHaveLength(2);
+    expect(rows('share-sum')[0].textContent).toContain('100');
+    expect(save().disabled).toBe(true);
+
+    inputs()[0].value = '30';
+    inputs()[0].dispatchEvent(new Event('input'));
+    await settle();
+
+    expect(rows('share-sum')[0].textContent).toContain('80');
+    expect(save().disabled).toBe(true);
+
+    inputs()[1].value = '70';
+    inputs()[1].dispatchEvent(new Event('input'));
+    await settle();
+
+    expect(rows('share-sum')[0].textContent).toContain('100');
+    expect(save().disabled).toBe(false);
+
+    save().click();
+    await settle();
+
+    const put = fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .find(
+        (request: Request) =>
+          request.method === 'PUT' && request.url.includes('/asset-groups/shares'),
+      )!;
+    expect(put).toBeDefined();
+    expect(await put.clone().json()).toEqual({
+      shares: [
+        { groupId: retirementId, sharePercent: 30 },
+        { groupId: investingId, sharePercent: 70 },
+      ],
     });
   });
 });

@@ -76,6 +76,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             group.Property(g => g.TargetPln).HasPrecision(18, 2);
             group.Property(g => g.Kind).HasConversion<string>().HasMaxLength(20).HasDefaultValue(AssetGroupKind.Regular);
             group.Property(g => g.MonthlyContributionPln).HasPrecision(18, 2);
+            group.Property(g => g.SharePercent).HasPrecision(4, 1);
             group.ComplexCollection(g => g.ClassAllocation, allocation => allocation.ToJson());
 
             group.HasIndex(g => new { g.UserId, g.Color }).IsUnique();
@@ -358,6 +359,11 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             replica.Property(r => r.TotalPln).HasPrecision(18, 2);
 
             replica.ComplexCollection(r => r.ByAssetClass, byClass => byClass.ToJson());
+            replica.ComplexCollection(r => r.ByGroup, byGroup =>
+            {
+                byGroup.ToJson();
+                byGroup.ComplexCollection(g => g.ByAssetClass);
+            });
         });
 
         modelBuilder.Entity<PlanningSettings>(settings =>

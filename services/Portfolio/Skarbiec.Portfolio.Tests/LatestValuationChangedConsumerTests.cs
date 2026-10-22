@@ -27,6 +27,7 @@ public sealed class LatestValuationChangedConsumerTests(SkarbiecContainersFixtur
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
 
         await RunConsumerAsync(async provider =>
         {
@@ -42,6 +43,20 @@ public sealed class LatestValuationChangedConsumerTests(SkarbiecContainersFixtur
                         new() { AssetClass = AssetClass.Stock, ValuePln = 80_000m },
                         new() { AssetClass = AssetClass.Etf, ValuePln = 30_000m },
                         new() { AssetClass = AssetClass.PreciousMetal, ValuePln = 12_000m },
+                    ],
+                    ByGroup =
+                    [
+                        new()
+                        {
+                            GroupId = groupId,
+                            ByAssetClass =
+                            [
+                                new() { AssetClass = AssetClass.Stock, ValuePln = 50_000m },
+                                new() { AssetClass = AssetClass.Etf, ValuePln = 30_000m },
+                            ],
+                        },
+                        new() { GroupId = null, ByAssetClass = [new() { AssetClass = AssetClass.Stock, ValuePln = 30_000m }] },
+                        new() { GroupId = Guid.NewGuid(), ByAssetClass = [new() { AssetClass = AssetClass.PreciousMetal, ValuePln = 12_000m }] },
                     ],
                     OccurredAtUtc = BaselineAt,
                 },
@@ -62,6 +77,11 @@ public sealed class LatestValuationChangedConsumerTests(SkarbiecContainersFixtur
                     [AssetClass.PreciousMetal] = 12_000m,
                 },
                 replica.ByAssetClass.ToDictionary(c => c.AssetClass, c => c.ValuePln));
+            Assert.Equal(3, replica.ByGroup.Count);
+            Assert.Equal(
+                new Dictionary<AssetClass, decimal> { [AssetClass.Stock] = 50_000m, [AssetClass.Etf] = 30_000m },
+                replica.ByGroup.Single(g => g.GroupId == groupId).ByAssetClass.ToDictionary(c => c.AssetClass, c => c.ValuePln));
+            Assert.Equal(30_000m, replica.ByGroup.Single(g => g.GroupId is null).ByAssetClass.Single().ValuePln);
         }, cancellationToken);
     }
 
@@ -89,6 +109,9 @@ public sealed class LatestValuationChangedConsumerTests(SkarbiecContainersFixtur
             Assert.Equal(BaselineAt, replica.OccurredAtUtc);
             Assert.Equal(1_000m, replica.TotalPln);
             Assert.False(replica.IsStale);
+            var group = Assert.Single(replica.ByGroup);
+            Assert.Null(group.GroupId);
+            Assert.Equal(1_000m, group.ByAssetClass.Single().ValuePln);
         }, cancellationToken);
     }
 
@@ -115,6 +138,7 @@ public sealed class LatestValuationChangedConsumerTests(SkarbiecContainersFixtur
             var replica = await WaitForValuationReplicaAsync(provider, userId, cancellationToken, r => r.TotalPln == 3_000m);
             Assert.Equal(nextDay, replica.Date);
             Assert.False(replica.IsStale);
+            Assert.Equal(3_000m, Assert.Single(replica.ByGroup).ByAssetClass.Single().ValuePln);
         }, cancellationToken);
     }
 
@@ -152,6 +176,7 @@ public sealed class LatestValuationChangedConsumerTests(SkarbiecContainersFixtur
             IsStale = isStale,
             TotalPln = totalPln,
             ByAssetClass = [new() { AssetClass = AssetClass.Stock, ValuePln = totalPln }],
+            ByGroup = [new() { GroupId = null, ByAssetClass = [new() { AssetClass = AssetClass.Stock, ValuePln = totalPln }] }],
             OccurredAtUtc = occurredAtUtc,
         };
 

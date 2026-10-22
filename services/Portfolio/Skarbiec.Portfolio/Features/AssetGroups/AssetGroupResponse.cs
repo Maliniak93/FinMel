@@ -10,4 +10,5 @@ public sealed record AssetGroupResponse(
     int AssetCount,
     AssetGroupKind Kind,
     decimal MonthlyContributionPln,
-    List<AssetGroupClassShare> ClassAllocation);
+    List<AssetGroupClassShare> ClassAllocation,
+    decimal? SharePercent);

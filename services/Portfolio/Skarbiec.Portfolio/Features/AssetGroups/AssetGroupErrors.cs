@@ -48,6 +48,15 @@ internal static class AssetGroupErrors
     public static Error ClassAllocationSum { get; } =
         new("Validation.ClassAllocationSum", "The class allocation must sum to exactly 100.");
 
+    public static Error InvalidShare { get; } =
+        new("Validation.InvalidShare", "Each share must be 0 to 100 with at most 1 decimal.");
+
+    public static Error SharesSum { get; } =
+        new("Validation.SharesSum", "The shares must sum to exactly 100.");
+
+    public static Error SharesGroupMismatch { get; } =
+        new("Validation.SharesGroupMismatch", "The shares must list each regular group exactly once and nothing else.");
+
     public static Error AssetIdsRequired { get; } =
         new("Validation.AssetIdsRequired", "Pick at least one asset.");
 }
