@@ -2,7 +2,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
@@ -146,82 +145,10 @@ internal static class PlanningApi
 
     public sealed record FreeFundsView(decimal PlanPln, decimal ForecastPln, bool Incomplete);
 
-    public sealed record AllocationBucketView(
-        Guid BucketId,
-        string Name,
-        int Kind,
-        int? ShareType,
-        decimal? Share,
-        int Position,
-        bool IsRemainder,
-        Guid? AccountId,
-        string? AccountName,
-        decimal AllocatedPln,
-        bool Underfunded,
-        CushionView? Cushion = null,
-        bool LimitReached = false,
-        LimitView? Limit = null,
-        List<BalanceAdjustmentView>? Adjustments = null);
-
-    public sealed record BalanceAdjustmentView(string Month, decimal AmountPln);
-
-    public sealed record LimitView(
-        int Year, decimal LimitPln, decimal ContributedStartPln, decimal ContributedEndPln, bool Reached, bool Estimated);
-
-    public sealed record CushionView(
-        decimal BalanceStartPln, decimal TargetPln, int TargetMonths, decimal BalanceEndPln, bool Reached);
-
-    public sealed record ReserveView(decimal MonthPln, decimal BalancePln, Guid? AccountId, string? AccountName);
-
-    public sealed record AllocationView(
-        string? EffectiveFrom,
-        string? NextChange,
-        decimal ForecastPln,
-        bool Incomplete,
-        decimal DeficitPln,
-        List<AllocationBucketView> Buckets,
-        decimal ToInvestPln,
-        ReserveView? Reserve = null);
-
-    public sealed record TransferRowView(
-        Guid BucketId,
-        string BucketName,
-        Guid? AccountId,
-        string? AccountName,
-        string? GroupName,
-        decimal AmountPln,
-        JsonElement Marker,
-        Guid? Id = null,
-        int? BatchNumber = null,
-        bool? Checked = null);
-
-    public sealed record TransferGroupView(string Name, decimal CurrentPercent, decimal AfterPercent, decimal TargetPercent);
-
-    public sealed record TransferDifferenceView(
-        Guid BucketId, string BucketName, decimal AcceptedPln, decimal CurrentPln, decimal DifferencePln);
-
-    public sealed record TransferTopUpView(List<TransferRowView> Rows, List<TransferGroupView> Groups);
-
-    public sealed record TransferPlanView(
-        JsonElement Status,
-        JsonElement? NoneReason,
-        int MinimumTransferPln,
-        DateOnly? ValuationDate,
-        bool ValuationStale,
-        JsonElement? FallbackReason,
-        List<TransferRowView> Rows,
-        List<TransferGroupView> Groups,
-        decimal ToInvestPln,
-        bool CanUndo = false,
-        List<TransferDifferenceView>? Differences = null,
-        TransferTopUpView? TopUp = null);
-
     public sealed record PlanningMonthView(
         IncomesView Incomes,
         ExpensesView Expenses,
         FreeFundsView FreeFunds,
-        AllocationView Allocation,
-        TransferPlanView? TransferPlan = null,
         List<DateOnly>? NonBusinessDays = null);
 
     public sealed record PlanningYearView(
@@ -240,8 +167,6 @@ internal static class PlanningApi
         decimal? CostPln,
         decimal? FreeFundsPlanPln,
         decimal? FreeFundsForecastPln,
-        decimal? ToInvestPln,
-        JsonElement? TransferPlanStatus,
         bool HasOverdue,
         bool Incomplete);
 
@@ -251,84 +176,7 @@ internal static class PlanningApi
         decimal DifferencePln,
         decimal CostPln,
         decimal FreeFundsPlanPln,
-        decimal FreeFundsForecastPln,
-        decimal ToInvestPln);
-
-    public const int InvestmentsKind = (int)BucketKind.Investments;
-
-    public const int SavingsKind = (int)BucketKind.Savings;
-
-    public const int CushionKind = (int)BucketKind.Cushion;
-
-    public const int IkeKind = (int)BucketKind.Ike;
-
-    public const int IkzeKind = (int)BucketKind.Ikze;
-
-    public const int IkzeJdgKind = (int)BucketKind.IkzeJdg;
-
-    public const string BucketAccountWrapperErrorCode = "Validation.BucketAccountWrapper";
-
-    public const int FixedShare = (int)BucketShareType.Fixed;
-
-    public const int PercentShare = (int)BucketShareType.Percent;
-
-    public const string AllocationBucketNotFoundErrorCode = "NotFound.AllocationBucket";
-
-    public const string AllocationPlanVersionNotFoundErrorCode = "NotFound.AllocationPlanVersion";
-
-    public const string PercentSumOver100ErrorCode = "Validation.PercentSumOver100";
-
-    public const string BalanceAdjustmentNotFoundErrorCode = "NotFound.BalanceAdjustment";
-
-    public const string BucketHasNoBalanceErrorCode = "Validation.BucketHasNoBalance";
-
-    public static string AllocationPlanVersionUri(string month) => $"/api/portfolio/allocation-plan/versions/{month}";
-
-    public static string BucketBalanceUri(Guid bucketId, string month) =>
-        $"/api/portfolio/allocation-buckets/{bucketId}/balances/{month}";
-
-    public static async Task SetBucketBalanceAsync(
-        this HttpClient client, Guid bucketId, string month, decimal amount, CancellationToken cancellationToken)
-    {
-        var response = await client.PutAsJsonAsync(BucketBalanceUri(bucketId, month), new { amount }, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task DeleteBucketBalanceAsync(
-        this HttpClient client, Guid bucketId, string month, CancellationToken cancellationToken)
-    {
-        var response = await client.DeleteAsync(BucketBalanceUri(bucketId, month), cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static object AllocationRow(
-        string name,
-        int kind,
-        int shareType,
-        decimal share,
-        bool isRemainder = false,
-        Guid? bucketId = null,
-        Guid? accountId = null,
-        int? targetMonths = null,
-        decimal? startingBalance = null) =>
-        new { bucketId, name, kind, shareType, share, isRemainder, accountId, targetMonths, startingBalance };
-
-    public static object CushionRow(
-        int? targetMonths = 6,
-        decimal? startingBalance = null,
-        Guid? bucketId = null,
-        string name = "Poduszka",
-        int? shareType = null,
-        decimal? share = null,
-        bool isRemainder = false) =>
-        new { bucketId, name, kind = CushionKind, shareType, share, isRemainder, targetMonths, startingBalance };
-
-    public static object[] CushionPlan(decimal startingBalance = 20_000m, int targetMonths = 6) =>
-    [
-        CushionRow(targetMonths, startingBalance),
-        AllocationRow("Wakacje", SavingsKind, FixedShare, 500m),
-        AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 100m, isRemainder: true)
-    ];
+        decimal FreeFundsForecastPln);
 
     // Forecast 12 243.27 and cost 4 200 every month; returns the "Życie" expense id.
     public static async Task<Guid> CreateCushionSetupAsync(this HttpClient client, CancellationToken cancellationToken)
@@ -339,49 +187,7 @@ internal static class PlanningApi
         return await client.CreateRecurringExpenseAsync(cancellationToken, "Życie", 4_200m, dayOfMonth: 1);
     }
 
-    // IKE 50% (contributed 26 000), IKZE 20% (contributed 9 000), Inwestycje 30% remainder; Wakacje fixed 500 and a 6-month cushion from 20 000.
-    public static object[] TaxLimitPlan(Guid? ikeAccountId = null, Guid? ikzeAccountId = null) =>
-    [
-        CushionRow(6, 20_000m),
-        AllocationRow("Wakacje", SavingsKind, FixedShare, 500m),
-        AllocationRow("IKE", IkeKind, PercentShare, 50m, accountId: ikeAccountId, startingBalance: 26_000m),
-        AllocationRow("IKZE", IkzeKind, PercentShare, 20m, accountId: ikzeAccountId, startingBalance: 9_000m),
-        AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 30m, isRemainder: true)
-    ];
-
-    public static async Task<(Guid IkeAccountId, Guid IkzeAccountId)> CreateTaxLimitSetupAsync(
-        this HttpClient client, CancellationToken cancellationToken)
-    {
-        await client.CreateCushionSetupAsync(cancellationToken);
-        var ike = await client.CreateAccountAsync(cancellationToken, "IKE Dominik", AccountType.Brokerage, TaxWrapper.Ike);
-        var ikze = await client.CreateAccountAsync(cancellationToken, "IKZE Dominik", AccountType.Brokerage, TaxWrapper.Ikze);
-
-        return (ike, ikze);
-    }
-
-    public static object NewAllocationPlanBody(params object[] buckets) => new { buckets };
-
-    public static object[] FirstAllocationPlan(Guid? accountId = null) =>
-    [
-        AllocationRow("Wakacje", SavingsKind, FixedShare, 500m, accountId: accountId),
-        AllocationRow("Akcje", InvestmentsKind, PercentShare, 50m),
-        AllocationRow("Lokata", SavingsKind, PercentShare, 20m),
-        AllocationRow("ETF", InvestmentsKind, PercentShare, 30m, isRemainder: true)
-    ];
-
-    // A PLN account with the "Pensja" income: the forecast is 12 243.27 every month.
-    public static async Task<BankAccountsApi.BankAccount> CreateAllocationSetupAsync(
-        this HttpClient client, CancellationToken cancellationToken, decimal income = 12_243.27m)
-    {
-        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
-        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", income, dayOfMonth: 10);
-
-        return account;
-    }
-
     public const string PlanningSettingsUri = "/api/portfolio/planning/settings";
-
-    public const string InvalidMinimumTransferErrorCode = "Validation.InvalidMinimumTransfer";
 
     public const string InvalidPaymentLeadDaysErrorCode = "Validation.InvalidPaymentLeadDays";
 
@@ -389,28 +195,14 @@ internal static class PlanningApi
 
     public const string OverdueIncomeKind = "OverdueIncome";
 
-    public const string TransferPlanToAcceptKind = "TransferPlanToAccept";
-
-    public const string TransferPlanUncheckedKind = "TransferPlanUnchecked";
-
     public const string UpcomingPaymentKind = "UpcomingPayment";
 
     public sealed record TodoItemView(
-        string Kind,
-        string? Name,
-        DateOnly? Date,
-        string? Month,
-        decimal? Amount,
-        string? Currency,
-        int? DaysOverdue,
-        int? DaysUntil,
-        bool? IsTopUp,
-        int? UncheckedRows,
-        int? TotalRows);
+        string Kind, string Name, DateOnly Date, decimal Amount, string Currency, int? DaysOverdue, int? DaysUntil);
 
     public sealed record TodoView(List<TodoItemView> Items, int PaymentLeadDays);
 
-    public sealed record PlanningSettingsView(int MinimumTransferPln, int PaymentLeadDays);
+    public sealed record PlanningSettingsView(int PaymentLeadDays);
 
     public static async Task<TodoView> GetTodoAsync(this HttpClient client, CancellationToken cancellationToken)
     {
@@ -432,167 +224,12 @@ internal static class PlanningApi
     public static async Task SavePlanningSettingsAsync(
         this HttpClient client,
         CancellationToken cancellationToken,
-        int minimumTransferPln = 100,
         int paymentLeadDays = 7)
     {
         var response = await client.PutAsJsonAsync(
-            PlanningSettingsUri, new { minimumTransferPln, paymentLeadDays }, cancellationToken);
+            PlanningSettingsUri, new { paymentLeadDays }, cancellationToken);
         response.EnsureSuccessStatusCode();
     }
-
-    public static readonly DateOnly TransferValuationDate = new(2026, 10, 14);
-
-    public static readonly TargetAllocationReplicaGroup[] TransferTargets =
-    [
-        new("Akcje/ETF", [AssetClass.Stock, AssetClass.Etf], 50m, 5m),
-        new("Obligacje", [AssetClass.Bond, AssetClass.Deposit], 40m, 5m),
-        new("Kruszce", [AssetClass.PreciousMetal], 10m, 5m)
-    ];
-
-    // Akcje/ETF 110 000, Obligacje 60 000, Kruszce 12 000, plus 5 000 of Cash outside every group.
-    public static readonly ValuationReplicaClassValue[] TransferValues =
-    [
-        new(AssetClass.Stock, 70_000m),
-        new(AssetClass.Etf, 40_000m),
-        new(AssetClass.Bond, 40_000m),
-        new(AssetClass.Deposit, 20_000m),
-        new(AssetClass.PreciousMetal, 12_000m),
-        new(AssetClass.Cash, 5_000m)
-    ];
-
-    // Forecast 6 543.27 from firstMonth on: IKE 2 260 (Brokerage), IKZE 2 304 (Bonds), Inwestycje 1 979.27 (no account).
-    public static async Task<(Guid IkeAccountId, Guid IkzeAccountId)> CreateTransferPlanSetupAsync(
-        this HttpClient client, CancellationToken cancellationToken, string firstMonth = "2026-10")
-    {
-        var setup = await client.CreateTransferPlanBenefitSetupAsync(cancellationToken, firstMonth, benefit: 0m);
-
-        return (setup.IkeAccountId, setup.IkzeAccountId);
-    }
-
-    public sealed record TransferPlanBenefitSetup(Guid IkeAccountId, Guid IkzeAccountId, Guid BankAccountId, Guid BenefitId);
-
-    // The same forecast 6 543.27 with "800+" (day 10, from 2026-01-01) as 800 of it; BenefitId is Guid.Empty when benefit is 0.
-    public static async Task<TransferPlanBenefitSetup> CreateTransferPlanBenefitSetupAsync(
-        this HttpClient client, CancellationToken cancellationToken, string firstMonth = "2026-10", decimal benefit = 800m)
-    {
-        var bank = await client.CreateAllocationSetupAsync(cancellationToken, 6_543.27m - benefit);
-        var benefitId = benefit > 0m
-            ? await client.CreateRecurringIncomeAsync(
-                bank.AccountId, cancellationToken, "800+", benefit, new DateOnly(2026, 1, 1), dayOfMonth: 10)
-            : Guid.Empty;
-        var ike = await client.CreateAccountAsync(cancellationToken, "IKE mBank", AccountType.Brokerage, TaxWrapper.Ike);
-        var ikze = await client.CreateAccountAsync(cancellationToken, "IKZE Obligacje", AccountType.Bonds, TaxWrapper.Ikze);
-        await client.SaveAllocationPlanAsync(
-            firstMonth,
-            cancellationToken,
-            AllocationRow("IKE", IkeKind, FixedShare, 2_260m, accountId: ike),
-            AllocationRow("IKZE", IkzeKind, FixedShare, 2_304m, accountId: ikze),
-            AllocationRow("Inwestycje", InvestmentsKind, PercentShare, 100m, isRemainder: true));
-
-        return new TransferPlanBenefitSetup(ike, ikze, bank.AccountId, benefitId);
-    }
-
-    public static Task SettleBenefitAsync(
-        this HttpClient client, TransferPlanBenefitSetup setup, decimal actualAmount, CancellationToken cancellationToken) =>
-        client.SettleOccurrenceAsync(
-            setup.BenefitId, "2026-10", setup.BankAccountId, actualAmount, new DateOnly(2026, 10, 10), cancellationToken);
-
-    public static Task UndoBenefitSettlementAsync(
-        this HttpClient client, TransferPlanBenefitSetup setup, CancellationToken cancellationToken) =>
-        client.UndoOccurrenceAsync(setup.BenefitId, "2026-10", cancellationToken);
-
-    public const string TransferPlansUri = "/api/portfolio/transfer-plans";
-
-    public const string TransferPlanNotPreviewErrorCode = "Conflict.TransferPlanNotPreview";
-
-    public const string TransferPlanRowCheckedErrorCode = "Conflict.TransferPlanRowChecked";
-
-    public const string TransferPlanNotFoundErrorCode = "NotFound.TransferPlan";
-
-    public const string TransferPlanRowNotFoundErrorCode = "NotFound.TransferPlanRow";
-
-    public const string InvalidMonthErrorCode = "Validation.InvalidMonth";
-
-    public static string TransferPlanActionUri(string month, string action) => $"{TransferPlansUri}/{month}/{action}";
-
-    public static string TransferPlanRowCheckedUri(Guid rowId) => $"{TransferPlansUri}/rows/{rowId}/checked";
-
-    public static async Task AcceptTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
-    {
-        var response = await client.PostAsync(TransferPlanActionUri(month, "accept"), content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public const string TransferPlanNoTopUpErrorCode = "Conflict.TransferPlanNoTopUp";
-
-    public static string TransferPlanTopUpAcceptUri(string month) => $"{TransferPlansUri}/{month}/top-up/accept";
-
-    public static async Task AcceptTransferPlanTopUpAsync(this HttpClient client, string month, CancellationToken cancellationToken)
-    {
-        var response = await client.PostAsync(TransferPlanTopUpAcceptUri(month), content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task UndoTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
-    {
-        var response = await client.PostAsync(TransferPlanActionUri(month, "undo"), content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task CheckTransferPlanRowAsync(
-        this HttpClient client, Guid rowId, bool isChecked, CancellationToken cancellationToken)
-    {
-        var response = await client.PutAsJsonAsync(TransferPlanRowCheckedUri(rowId), new { @checked = isChecked }, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task SkipTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
-    {
-        var response = await client.PostAsync(TransferPlanActionUri(month, "skip"), content: null, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task UnskipTransferPlanAsync(this HttpClient client, string month, CancellationToken cancellationToken)
-    {
-        var response = await client.DeleteAsync(TransferPlanActionUri(month, "skip"), cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static TransferRowView RowOf(this TransferPlanView plan, string bucketName, string groupName) =>
-        plan.Rows.Single(r => r.BucketName == bucketName && r.GroupName == groupName);
-
-    public static async Task<TransferPlanView> GetTransferPlanAsync(
-        this HttpClient client, string month, CancellationToken cancellationToken) =>
-        (await client.GetPlanningMonthAsync(month, cancellationToken)).TransferPlan!;
-
-    public static bool Is<TEnum>(this JsonElement? element, TEnum expected) where TEnum : struct, Enum =>
-        element is { } value && value.Is(expected);
-
-    public static async Task SaveAllocationPlanAsync(
-        this HttpClient client, string month, CancellationToken cancellationToken, params object[] buckets)
-    {
-        var response = await client.PutAsJsonAsync(AllocationPlanVersionUri(month), NewAllocationPlanBody(buckets), cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task SaveAllocationPlanWithReserveAsync(
-        this HttpClient client, string month, Guid? reserveAccountId, CancellationToken cancellationToken, params object[] buckets)
-    {
-        var response = await client.PutAsJsonAsync(
-            AllocationPlanVersionUri(month), new { buckets, reserveAccountId }, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task DeleteAllocationPlanVersionAsync(
-        this HttpClient client, string month, CancellationToken cancellationToken)
-    {
-        var response = await client.DeleteAsync(AllocationPlanVersionUri(month), cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task<AllocationView> GetAllocationAsync(
-        this HttpClient client, string month, CancellationToken cancellationToken) =>
-        (await client.GetPlanningMonthAsync(month, cancellationToken)).Allocation;
 
     public const string RecurringExpensesUri = "/api/portfolio/recurring-expenses";
 

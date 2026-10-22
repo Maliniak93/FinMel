@@ -39,7 +39,6 @@
           @for (column of columns; track column.key) {
             <th scope="col" class="planning-year__amount">{{ column.label | transloco }}</th>
           }
-          <th scope="col">{{ 'planning.year.columns.status' | transloco }}</th>
         </tr>
       </thead>
       <tbody>
@@ -67,7 +66,6 @@
             @for (cell of row.cells; track $index) {
               <td class="planning-year__amount">{{ cell }}</td>
             }
-            <td>{{ row.status ? (row.status | transloco) : '—' }}</td>
           </tr>
         }
       </tbody>
@@ -77,7 +75,6 @@
           @for (total of totals(); track $index) {
             <td class="planning-year__amount">{{ total }}</td>
           }
-          <td></td>
         </tr>
       </tfoot>
     </table>

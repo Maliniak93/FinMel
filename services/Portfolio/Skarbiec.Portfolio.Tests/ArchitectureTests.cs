@@ -10,7 +10,6 @@ public sealed class ArchitectureTests
     private static readonly HashSet<Type> StoredValues =
     [
         typeof(AssetGroupClassShare),
-        typeof(TargetAllocationReplicaGroup),
         typeof(ValuationReplicaClassValue),
     ];
 

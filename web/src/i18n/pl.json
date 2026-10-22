@@ -33,7 +33,6 @@
   "shell": {
     "nav": {
       "dashboard": "Pulpit",
-      "allocation": "Alokacja",
       "cash": "Gotówka",
       "planning": "Planowanie",
       "securities": "Akcje i ETF",
@@ -389,62 +388,6 @@
       }
     }
   },
-  "allocation": {
-    "title": "Alokacja docelowa",
-    "loadFailed": "Nie udało się wczytać alokacji docelowej.",
-    "noValuation": "Aktualna wartość: brak wyceny.",
-    "noBase": "Odchylenia: brak aktywów w alokacji.",
-    "disclaimer": "Informacja, nie porada inwestycyjna.",
-    "outOfBand": "Poza pasmem",
-    "outside": "Poza alokacją",
-    "summary": "baza {{ base }} z {{ total }}",
-    "scope": {
-      "label": "Zakres alokacji",
-      "whole": "Całość"
-    },
-    "group": {
-      "empty": "Ta grupa aktywów nie ma jeszcze alokacji docelowej.",
-      "create": "Utwórz alokację",
-      "copy": "Skopiuj z całości",
-      "delete": "Usuń alokację",
-      "planNote": "Plan przelewów jest liczony z alokacji „Całość”, nie z tej grupy aktywów.",
-      "noValue": "Ta grupa aktywów nie ma jeszcze wartości, więc widać tylko cele i pasma."
-    },
-    "delete": {
-      "title": "Usunąć alokację grupy?",
-      "message": "Alokacja docelowa grupy aktywów „{{ name }}” zostanie usunięta. Alokacja całości się nie zmieni."
-    },
-    "columns": {
-      "group": "Grupa klas",
-      "value": "Wartość",
-      "current": "Udział obecny",
-      "target": "Cel",
-      "band": "Pasmo",
-      "deviationPp": "Odchylenie",
-      "deviationPln": "Względem celu"
-    },
-    "proposal": {
-      "equities": "Akcje/ETF",
-      "bonds": "Obligacje",
-      "metals": "Kruszce"
-    },
-    "editor": {
-      "proposalIntro": "Propozycja podziału majątku. Ustaw cel dla każdej grupy klas i zapisz.",
-      "name": "Nazwa grupy klas",
-      "classes": "Klasy aktywów",
-      "target": "Cel (%)",
-      "band": "Pasmo ± (pp)",
-      "addGroup": "Dodaj grupę klas",
-      "removeGroup": "Usuń grupę klas",
-      "sum": "Suma celów: {{ sum }}"
-    },
-    "errors": {
-      "nameRequired": "Podaj nazwę grupy klas.",
-      "classesRequired": "Wybierz co najmniej jedną klasę aktywów.",
-      "percent": "Podaj wartość 0–100 z najwyżej jednym miejscem po przecinku.",
-      "duplicateNames": "Nazwy grup klas muszą się różnić."
-    }
-  },
   "dashboard": {
     "title": "Pulpit",
     "netWorth": "Wartość majątku",
@@ -487,15 +430,6 @@
         "bankInterestDue": "Odsetki na koncie bankowym do rozliczenia, miesiące: {{ count }}"
       }
     },
-    "allocationCard": {
-      "title": "Alokacja",
-      "notConfigured": "Ustaw alokację docelową",
-      "outside": "{{ outside }} z {{ total }} grup poza pasmem",
-      "allInBand": "Wszystkie grupy w paśmie",
-      "noValuation": "brak wyceny",
-      "noAssets": "brak aktywów w alokacji",
-      "loadFailed": "Nie udało się wczytać alokacji docelowej."
-    },
     "goToAccounts": "Przejdź do rachunków",
     "accounts": {
       "title": "Rachunki",
@@ -510,22 +444,11 @@
       "forecast": "Prognoza",
       "deficit": "deficyt",
       "settled": "Wpływy załatwione: {{ done }} z {{ total }}",
-      "planStatus": "Plan przelewów",
-      "status": {
-        "None": "brak",
-        "Preview": "Podgląd",
-        "Accepted": "Przyjęty",
-        "Completed": "Zakończony",
-        "Skipped": "Pominięty"
-      },
       "empty": "Wszystko załatwione",
       "showAll": "pokaż wszystkie",
       "loadFailed": "Nie udało się wczytać miesiąca.",
       "todo": {
         "overdueIncome": "{{ name }} — {{ date }}, zaległe: {{ days }} dni, {{ amount }}",
-        "toAccept": "Plan czeka na przyjęcie — {{ amount }}",
-        "topUp": "Dopłata czeka na przyjęcie — {{ amount }}",
-        "unchecked": "{{ unchecked }} z {{ total }} przelewów nieodhaczone",
         "payment": "{{ name }} — {{ date }} (za {{ days }} dni), {{ amount }}"
       }
     }
@@ -828,9 +751,7 @@
         "difference": "Różnica",
         "cost": "Wydatki",
         "freeFundsPlan": "Wolne środki plan",
-        "freeFundsForecast": "Wolne środki prognoza",
-        "toInvest": "Do zainwestowania",
-        "status": "Plan przelewów"
+        "freeFundsForecast": "Wolne środki prognoza"
       }
     },
     "add": "Dodaj wpływ",
@@ -957,155 +878,6 @@
         "amount": "Kwota (PLN)"
       }
     },
-    "allocation": {
-      "title": "Podział",
-      "edit": "Edytuj podział",
-      "forecast": "Prognoza do podziału",
-      "effectiveFrom": "Obowiązuje od",
-      "empty": "Brak podziału obowiązującego w tym miesiącu.",
-      "deficit": "Deficyt {{ amount }} — nie ma czego dzielić.",
-      "reserve": {
-        "title": "Rezerwa na wydatki",
-        "monthly": "odkładasz {{ amount }}",
-        "balance": "saldo {{ amount }}",
-        "account": "na koncie {{ name }}"
-      },
-      "groups": {
-        "cushion": "Poduszka bezpieczeństwa",
-        "fixed": "Kwoty stałe",
-        "percent": "Procentowe"
-      },
-      "kind": {
-        "investments": "Inwestycje",
-        "savings": "Oszczędności",
-        "cushion": "Poduszka",
-        "ike": "IKE",
-        "ikze": "IKZE",
-        "ikzeJdg": "IKZE JDG"
-      },
-      "cushionBalance": "Saldo {{ start }} → {{ end }} / cel {{ target }} ({{ months }} mies.)",
-      "cushionReached": "cel osiągnięty",
-      "limitContributed": "Wpłacono w {{ year }}: {{ contributed }} / {{ limit }}",
-      "limitReached": "limit osiągnięty",
-      "limitEstimated": "Limit na {{ year }} jest szacowany na podstawie ostatniego znanego roku.",
-      "shareType": {
-        "fixed": "Kwota stała",
-        "percent": "Procent"
-      },
-      "underfunded": "niedofinansowany",
-      "remainder": "reszta",
-      "toInvest": "Do zainwestowania",
-      "nextChange": "zaplanowana zmiana od {{ month }}",
-      "deleteTitle": "Usuń zaplanowaną zmianę",
-      "deleteMessage": "Usunąć zmianę podziału zaplanowaną od {{ month }}? Wcześniejsze miesiące zostają bez zmian.",
-      "deleteFailed": "Nie udało się usunąć zmiany.",
-      "balance": {
-        "action": "Ustaw saldo od miesiąca",
-        "adjustment": "od {{ month }}: {{ amount }}",
-        "delete": "Usuń korektę",
-        "deleteTitle": "Usuń korektę salda",
-        "deleteMessage": "Usunąć saldo „{{ name }}” ustawione od {{ month }}? Wcześniejsze miesiące zostają bez zmian.",
-        "deleteFailed": "Nie udało się usunąć korekty.",
-        "dialogTitle": "Ustaw saldo „{{ name }}”",
-        "month": "Od miesiąca",
-        "amountCushion": "saldo na początek miesiąca",
-        "amountCounter": "wpłacono w roku przed tym miesiącem",
-        "amountInvalid": "Podaj kwotę od 0 do 10 000 000."
-      },
-      "dialog": {
-        "title": "Edytuj podział",
-        "effectiveFrom": "Obowiązuje od",
-        "effectiveFromHint": "Cały podział obowiązuje od tego miesiąca; późniejsze zaplanowane zmiany zostają.",
-        "name": "Nazwa koszyka",
-        "kind": "Rodzaj",
-        "shareType": "Typ udziału",
-        "fixedShare": "Kwota (PLN)",
-        "percentShare": "Procent",
-        "account": "Konto",
-        "noAccount": "Bez konta",
-        "reserveAccount": "Konto rezerwy",
-        "remainder": "Reszta",
-        "moveUp": "Przesuń w górę",
-        "moveDown": "Przesuń w dół",
-        "removeRow": "Usuń koszyk",
-        "addRow": "Dodaj koszyk",
-        "addCushion": "Dodaj poduszkę bezpieczeństwa",
-        "targetMonths": "Cel (miesiące kosztów)",
-        "targetMonthsInvalid": "Podaj liczbę całkowitą miesięcy od 1 do 24.",
-        "startingBalance": "Saldo na początek miesiąca (PLN)",
-        "startingBalanceInvalid": "Podaj kwotę 0 lub większą.",
-        "contributed": "Wpłacono w {{ year }} przed {{ month }} (PLN)",
-        "empty": "Brak koszyków — od tego miesiąca nic nie będzie dzielone.",
-        "percentSum": "Suma procentów: {{ sum }}",
-        "percentOver": "Suma procentów przekracza 100.",
-        "remainderRequired": "Wybierz koszyk, który przejmuje resztę.",
-        "nameRequired": "Nazwa jest wymagana.",
-        "nameDuplicate": "Nazwy koszyków muszą być unikalne.",
-        "shareInvalid": "Podaj poprawny udział."
-      }
-    },
-    "transferPlan": {
-      "title": "Plan przelewów",
-      "minimum": "Minimalny przelew (zł)",
-      "minimumFailed": "Nie udało się zapisać minimalnego przelewu.",
-      "valuationDate": "Wycena z dnia {{ date }}",
-      "valuationStale": "wycena nieaktualna",
-      "noAccount": "bez konta",
-      "markers": {
-        "aboveTarget": "powyżej celu",
-        "outsideAllocation": "poza alokacją",
-        "belowMinimum": "poniżej minimum"
-      },
-      "groups": {
-        "name": "Grupa",
-        "current": "Bieżący %",
-        "after": "Po planie %",
-        "target": "Cel %"
-      },
-      "fallback": {
-        "NoTargetAllocation": "Nie ustawiono alokacji docelowej, więc kwoty nie są rozdzielone na grupy.",
-        "NoValuation": "Brak wyceny majątku, więc kwoty nie są rozdzielone na grupy.",
-        "EmptyBase": "Wycena grup alokacji wynosi zero, więc kwoty nie są rozdzielone na grupy.",
-        "setTarget": "Ustaw alokację docelową"
-      },
-      "nothingToInvest": "Brak kwoty do zainwestowania.",
-      "status": {
-        "preview": "Podgląd",
-        "accepted": "Przyjęty",
-        "completed": "Zrealizowany",
-        "skipped": "Pominięty"
-      },
-      "accept": "Przyjmij plan",
-      "acceptFailed": "Nie udało się przyjąć planu.",
-      "skip": "Pomiń",
-      "skipFailed": "Nie udało się pominąć miesiąca.",
-      "skipped": "Przelewy w tym miesiącu są pominięte.",
-      "unskip": "Cofnij pominięcie",
-      "unskipFailed": "Nie udało się cofnąć pominięcia.",
-      "undo": "Cofnij przyjęcie",
-      "undoBlocked": "Odznacz wszystkie wiersze, aby cofnąć przyjęcie.",
-      "undoTitle": "Cofnąć przyjęcie?",
-      "undoMessage": "Przyjęte wiersze zostaną odrzucone, a plan wróci do podglądu.",
-      "undoFailed": "Nie udało się cofnąć przyjęcia.",
-      "checkRow": "Oznacz jako przelane",
-      "checkFailed": "Nie udało się zaktualizować wiersza.",
-      "batch": {
-        "plan": "Plan",
-        "topUp": "Dopłata {{ number }}"
-      },
-      "differences": {
-        "title": "Zmiany od przyjęcia planu",
-        "change": "Przyjęto {{ accepted }}, teraz {{ current }}",
-        "decrease": "Tylko informacja, przyjęte wiersze zostają bez zmian."
-      },
-      "topUp": {
-        "title": "Dopłata",
-        "accept": "Przyjmij dopłatę",
-        "acceptFailed": "Nie udało się przyjąć dopłaty."
-      },
-      "paymentLeadDays": "Przypominaj o płatnościach (dni wcześniej)",
-      "paymentLeadDaysFailed": "Nie udało się zapisać wyprzedzenia przypomnień."
-    },
     "freeFunds": {
       "title": "Wolne środki",
       "plan": "Plan",
@@ -1150,7 +922,9 @@
     },
     "todo": {
       "badge": "Do zrobienia"
-    }
+    },
+    "paymentLeadDays": "Przypominaj o płatnościach (dni wcześniej)",
+    "paymentLeadDaysFailed": "Nie udało się zapisać wyprzedzenia przypomnień."
   },
   "securities": {
     "title": "Akcje i ETF",

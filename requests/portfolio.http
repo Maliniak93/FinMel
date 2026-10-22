@@ -1466,85 +1466,21 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/portfolio/one-off-expenses/{{createOneOffExpense.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### --- Allocation plan ---
+### --- Planning settings and todo ---
 
-### Save the whole plan from a month (204; month yyyy-MM, 2011-01 to 2099-12; kind 0 = Investments, 1 = Savings, 2 = Cushion (at most one; no shareType, share or remainder; targetMonths 1-24 required; startingBalance >= 0 only on a new cushion, default 0), 3 = Ike, 4 = Ikze, 5 = IkzeJdg (yearly-limited, never the remainder; startingBalance >= 0 = contributed in the month's year before it, only on a new bucket, default 0; an account must have wrapper Ike for Ike, Ikze for Ikze and IkzeJdg, else 400 Validation.BucketAccountWrapper); shareType 0 = Fixed (PLN), 1 = Percent; exactly one remainder in a non-empty plan, an empty buckets list means no split from that month; omit bucketId to create a bucket, send it to keep one; later versions are kept; 400 Validation.PercentSumOver100, 400 Validation.BucketKindMismatch; 404 NotFound.AllocationBucket / NotFound.Account; 409 Conflict.AccountArchived when the account changes to an archived one; optional reserveAccountId = the account the expense reserve is kept on, same account rules, a version may hold it with no buckets)
-PUT {{baseUrl}}/api/portfolio/allocation-plan/versions/2026-10
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "reserveAccountId": "00000000-0000-0000-0000-000000000000",
-  "buckets": [
-    { "name": "Poduszka", "kind": 2, "targetMonths": 6, "startingBalance": 20000, "isRemainder": false },
-    { "name": "Wakacje", "kind": 1, "shareType": 0, "share": 500, "isRemainder": false },
-    { "name": "IKE", "kind": 3, "shareType": 1, "share": 30, "isRemainder": false, "startingBalance": 26000 },
-    { "name": "Akcje", "kind": 0, "shareType": 1, "share": 20, "isRemainder": false },
-    { "name": "Lokata", "kind": 1, "shareType": 1, "share": 20, "isRemainder": false },
-    { "name": "ETF", "kind": 0, "shareType": 1, "share": 30, "isRemainder": true }
-  ]
-}
-
-### Delete the plan version starting in a month (204; 404 NotFound.AllocationPlanVersion when none starts there; buckets no version references are removed)
-DELETE {{baseUrl}}/api/portfolio/allocation-plan/versions/2026-10
-Authorization: Bearer {{authToken}}
-
-### Set a cushion balance or an IKE/IKZE counter from a month (204; 400 Validation.BucketHasNoBalance for an Investments or Savings bucket; 404 NotFound.AllocationBucket); take the bucket id from GET planning/months
-PUT {{baseUrl}}/api/portfolio/allocation-buckets/00000000-0000-0000-0000-000000000000/balances/2026-12
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{ "amount": 20000 }
-
-### Delete a balance adjustment (204; 404 NotFound.BalanceAdjustment when none is set at that month)
-DELETE {{baseUrl}}/api/portfolio/allocation-buckets/00000000-0000-0000-0000-000000000000/balances/2026-12
-Authorization: Bearer {{authToken}}
-
-### --- Transfer plan ---
-
-### Read the planning settings (200; minimumTransferPln defaults to 100, paymentLeadDays to 7)
+### Read the planning settings (200; paymentLeadDays defaults to 7)
 GET {{baseUrl}}/api/portfolio/planning/settings
 Authorization: Bearer {{authToken}}
 
-### Save the planning settings (204; minimumTransferPln whole PLN, 0 = no minimum, 400 Validation.InvalidMinimumTransfer unless an integer from 0 to 1000000; paymentLeadDays whole days, 0 = no payment reminders, 400 Validation.InvalidPaymentLeadDays unless an integer from 0 to 90); the minimum drives the transferPlan of GET planning/months, the lead the todo
+### Save the planning settings (204; paymentLeadDays whole days, 0 = no payment reminders, 400 Validation.InvalidPaymentLeadDays unless an integer from 0 to 90)
 PUT {{baseUrl}}/api/portfolio/planning/settings
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "minimumTransferPln": 250,
   "paymentLeadDays": 7
 }
 
-### The todo list (200; items in the order overdue incomes, transfer plans to accept or check off, payments of rare expenses due within paymentLeadDays; the planning menu counter is its length)
+### The todo list (200; items in the order overdue incomes, payments of rare expenses due within paymentLeadDays; the planning menu counter is its length)
 GET {{baseUrl}}/api/portfolio/planning/todo
-Authorization: Bearer {{authToken}}
-
-### Accept the month's preview, freezing its rows as batch 1 (204; 409 Conflict.TransferPlanNotPreview unless the month's transferPlan.status is Preview; 400 Validation.InvalidMonth)
-POST {{baseUrl}}/api/portfolio/transfer-plans/2026-10/accept
-Authorization: Bearer {{authToken}}
-
-### Accept the month's top-up, the rows of transferPlan.topUp, as the next batch (204; 409 Conflict.TransferPlanNoTopUp when transferPlan.topUp is null or the month is not accepted; 400 Validation.InvalidMonth)
-POST {{baseUrl}}/api/portfolio/transfer-plans/2026-10/top-up/accept
-Authorization: Bearer {{authToken}}
-
-### Undo the acceptance of the month (204; 409 Conflict.TransferPlanRowChecked while a row of the latest batch is checked; 404 NotFound.TransferPlan when nothing is accepted)
-POST {{baseUrl}}/api/portfolio/transfer-plans/2026-10/undo
-Authorization: Bearer {{authToken}}
-
-### Check or uncheck a frozen row; take the row id from transferPlan.rows of GET planning/months (204; 404 NotFound.TransferPlanRow)
-PUT {{baseUrl}}/api/portfolio/transfer-plans/rows/00000000-0000-0000-0000-000000000000/checked
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "checked": true
-}
-
-### Skip the month (204; 409 Conflict.TransferPlanNotPreview unless the status is Preview)
-POST {{baseUrl}}/api/portfolio/transfer-plans/2026-10/skip
-Authorization: Bearer {{authToken}}
-
-### Undo the skip (204; 404 NotFound.TransferPlan when the month is not skipped)
-DELETE {{baseUrl}}/api/portfolio/transfer-plans/2026-10/skip
 Authorization: Bearer {{authToken}}

@@ -16,16 +16,8 @@ import {
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
-import type {
-  DashboardResponse,
-  NetWorthHistoryResponse,
-  TargetAllocationResponse,
-} from '../../api/reporting';
+import type { DashboardResponse, NetWorthHistoryResponse } from '../../api/reporting';
 import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
-import {
-  configuredAllocation,
-  notConfiguredAllocation,
-} from '../allocation/testing/target-allocation-fixtures';
 import { Dashboard } from './dashboard';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney, formatPercent } from '../../shared/format';
@@ -163,36 +155,6 @@ describe('Dashboard', () => {
     );
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain("You haven't entered any wealth yet.");
-  });
-
-  it('shows the allocation card in the empty state', async () => {
-    await setup(
-      jsonResponse({
-        netWorthPln: 0,
-        asOf: null,
-        isStale: false,
-        byAssetClass: [],
-        byAccount: [],
-        byGroup: [],
-      } satisfies DashboardResponse),
-      undefined,
-      {
-        allocation: jsonResponse({
-          ...notConfiguredAllocation,
-          asOf: null,
-          totalPln: 0,
-          byAssetClass: [],
-        } satisfies TargetAllocationResponse),
-      },
-    );
-    await switchLanguage(fixture, 'pl');
-    const element = fixture.nativeElement as HTMLElement;
-    const card = element.querySelector('app-allocation-card');
-
-    expect(textOf(element)).toContain('Nie wprowadzono jeszcze żadnego majątku.');
-    expect(card).not.toBeNull();
-    expect(textOf(card)).toContain('Ustaw alokację docelową');
-    expect(card?.querySelector('a[href="/allocation"]')).not.toBeNull();
   });
 
   it('surfaces a load failure through the resource error', async () => {
@@ -592,20 +554,14 @@ describe('Dashboard', () => {
     expect(element.querySelector('app-cash-card')?.textContent).toContain(formatMoney(1000, 'PLN'));
   });
 
-  it('the summary grid holds the allocation card beside the accounts and cash cards', async () => {
-    await setup(jsonResponse(dashboard), historyWithChange(250, 25), {
-      allocation: jsonResponse(configuredAllocation),
-    });
-    await switchLanguage(fixture, 'pl');
+  it('the summary grid holds the accounts and cash cards', async () => {
+    await setup(jsonResponse(dashboard), historyWithChange(250, 25));
     const summary = (fixture.nativeElement as HTMLElement).querySelector(
       '.dashboard-page__summary',
     ) as HTMLElement;
 
     expect(summary.querySelector('app-accounts-card')).not.toBeNull();
     expect(summary.querySelector('app-cash-card')).not.toBeNull();
-    expect(summary.querySelector('app-allocation-card')?.textContent).toContain(
-      '2 z 3 grup poza pasmem',
-    );
   });
 
   describe('groups', () => {

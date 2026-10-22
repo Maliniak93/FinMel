@@ -9,7 +9,6 @@ import {
   getApiPortfolioPlanningYearsByYear,
   type PlanningYearMonthResponse,
   type PlanningYearTotalsResponse,
-  type TransferPlanStatus,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { fromDateOnly } from '../../../shared/date-only';
@@ -17,14 +16,6 @@ import { formatMoney, formatMonth } from '../../../shared/format';
 import { currentWarsawMonth } from '../recurrence';
 
 const YEAR_PATTERN = /^\d{4}$/;
-
-const STATUS_KEYS: Record<TransferPlanStatus, string | null> = {
-  None: null,
-  Preview: 'planning.transferPlan.status.preview',
-  Accepted: 'planning.transferPlan.status.accepted',
-  Completed: 'planning.transferPlan.status.completed',
-  Skipped: 'planning.transferPlan.status.skipped',
-};
 
 type ValueColumn = Exclude<keyof PlanningYearTotalsResponse, never>;
 
@@ -35,7 +26,6 @@ const VALUE_COLUMNS: { key: ValueColumn; label: string }[] = [
   { key: 'costPln', label: 'planning.year.columns.cost' },
   { key: 'freeFundsPlanPln', label: 'planning.year.columns.freeFundsPlan' },
   { key: 'freeFundsForecastPln', label: 'planning.year.columns.freeFundsForecast' },
-  { key: 'toInvestPln', label: 'planning.year.columns.toInvest' },
 ];
 
 interface YearRow {
@@ -44,7 +34,6 @@ interface YearRow {
   current: boolean;
   overdue: boolean;
   cells: string[];
-  status: string | null;
 }
 
 @Component({
@@ -95,7 +84,6 @@ export class PlanningYear {
       current: month.month === now,
       overdue: month.hasOverdue,
       cells: VALUE_COLUMNS.map((column) => this.cell(month, column.key)),
-      status: this.status(month),
     }));
   });
 
@@ -138,13 +126,5 @@ export class PlanningYear {
 
     const value = month[key];
     return value === null || value === undefined ? '' : formatMoney(value, 'PLN');
-  }
-
-  private status(month: PlanningYearMonthResponse): string | null {
-    if (!month.hasDefinitions || month.transferPlanStatus == null) {
-      return null;
-    }
-
-    return STATUS_KEYS[month.transferPlanStatus];
   }
 }

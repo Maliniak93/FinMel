@@ -18,44 +18,6 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y
 Authorization: Bearer {{authToken}}
 
-### Target allocation — current value, share and deviation per group from the latest valuation (isConfigured false until a target is saved)
-GET {{baseUrl}}/api/reporting/target-allocation
-Authorization: Bearer {{authToken}}
-
-### Target allocation — save the whole target (AssetClass ints: 2 = Stock, 3 = Etf, 4 = Bond, 1 = Deposit, 6 = PreciousMetal); targets sum to 100, one decimal
-PUT {{baseUrl}}/api/reporting/target-allocation
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "groups": [
-    { "name": "Stocks and ETFs", "assetClasses": [2, 3], "targetPercent": 50, "bandPp": 5 },
-    { "name": "Bonds", "assetClasses": [4, 1], "targetPercent": 40, "bandPp": 5 },
-    { "name": "Metals", "assetClasses": [6], "targetPercent": 10, "bandPp": 5 }
-  ]
-}
-
-### Group target allocation — compared with the value of that group's assets only (isConfigured false and groups [] until saved; groupId from /api/portfolio/asset-groups)
-GET {{baseUrl}}/api/reporting/target-allocation/groups/00000000-0000-0000-0000-000000000000
-Authorization: Bearer {{authToken}}
-
-### Group target allocation — save the whole target of one group (same body and validation as the global one; publishes nothing)
-PUT {{baseUrl}}/api/reporting/target-allocation/groups/00000000-0000-0000-0000-000000000000
-Authorization: Bearer {{authToken}}
-Content-Type: application/json
-
-{
-  "groups": [
-    { "name": "Bonds", "assetClasses": [4, 1], "targetPercent": 60, "bandPp": 5 },
-    { "name": "Stocks and ETFs", "assetClasses": [2, 3], "targetPercent": 30, "bandPp": 5 },
-    { "name": "Metals", "assetClasses": [6], "targetPercent": 10, "bandPp": 3 }
-  ]
-}
-
-### Group target allocation — delete (204, also when none is saved)
-DELETE {{baseUrl}}/api/reporting/target-allocation/groups/00000000-0000-0000-0000-000000000000
-Authorization: Bearer {{authToken}}
-
 ### Net worth history — one asset class (AssetClass int: 3 = Etf), 0 on days the class was not held
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y&assetClass=3
 Authorization: Bearer {{authToken}}

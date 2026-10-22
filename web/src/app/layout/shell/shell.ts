@@ -72,7 +72,6 @@ export class Shell {
       label: 'shell.navSection.overview',
       links: [
         { path: 'dashboard', label: 'shell.nav.dashboard', icon: 'dashboard' },
-        { path: 'allocation', label: 'shell.nav.allocation', icon: 'donut_small' },
         { path: 'planning', label: 'shell.nav.planning', icon: 'event_note' },
       ],
     },

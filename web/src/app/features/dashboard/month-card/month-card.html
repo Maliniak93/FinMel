@@ -44,10 +44,6 @@
             | transloco: { done: settled().done, total: settled().total }
         }}
       </p>
-      <p class="month-card__line" data-testid="month-card-plan-status">
-        {{ 'dashboard.monthCard.planStatus' | transloco }}:
-        {{ 'dashboard.monthCard.status.' + planStatus() | transloco }}
-      </p>
 
       @if (itemCount() === 0) {
         <p class="month-card__empty" data-testid="month-card-empty">

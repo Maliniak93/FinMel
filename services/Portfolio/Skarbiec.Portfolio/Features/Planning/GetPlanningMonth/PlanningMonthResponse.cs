@@ -1,8 +1,6 @@
 using System.Text.Json.Serialization;
 using Skarbiec.Portfolio.Data;
-using Skarbiec.Portfolio.Features.Planning.Allocation;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
-using Skarbiec.Portfolio.Features.TransferPlan;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
 
@@ -14,127 +12,8 @@ public sealed record PlanningMonthResponse
 
     public required FreeFundsResponse FreeFunds { get; init; }
 
-    public required AllocationResponse Allocation { get; init; }
-
-    public required TransferPlanResponse TransferPlan { get; init; }
-
     /// <summary>The weekends and Polish holidays of the viewed month, each date once.</summary>
     public required IReadOnlyList<DateOnly> NonBusinessDays { get; init; }
-}
-
-public sealed record AllocationResponse
-{
-    /// <summary>The month (yyyy-MM) of the plan version in force, null when none is.</summary>
-    public required string? EffectiveFrom { get; init; }
-
-    /// <summary>The earliest scheduled plan version after the viewed month (yyyy-MM), null when there is none.</summary>
-    public required string? NextChange { get; init; }
-
-    /// <summary>The free-funds forecast the buckets split.</summary>
-    public required decimal ForecastPln { get; init; }
-
-    /// <summary>True when a needed FX rate is missing, so the forecast is incomplete.</summary>
-    public required bool Incomplete { get; init; }
-
-    /// <summary>The shortfall when the forecast is negative; 0 otherwise.</summary>
-    public required decimal DeficitPln { get; init; }
-
-    /// <summary>The fixed group first, then the percent group, each by position; empty when no version is in force.</summary>
-    public required IReadOnlyList<AllocationBucketResponse> Buckets { get; init; }
-
-    /// <summary>PLN sum of the Investments, IKE, IKZE and IKZE JDG buckets.</summary>
-    public required decimal ToInvestPln { get; init; }
-
-    /// <summary>The expense reserve held inside the month's cost, never split again; null when it is 0 and no account is set.</summary>
-    public required ReserveResponse? Reserve { get; init; }
-}
-
-public sealed record ReserveResponse
-{
-    /// <summary>PLN set aside this month for expenses due every more than one month.</summary>
-    public required decimal MonthPln { get; init; }
-
-    /// <summary>PLN accumulated by the end of the month and not yet paid out.</summary>
-    public required decimal BalancePln { get; init; }
-
-    public required Guid? AccountId { get; init; }
-    public required string? AccountName { get; init; }
-}
-
-public sealed record AllocationBucketResponse
-{
-    public required Guid BucketId { get; init; }
-    public required string Name { get; init; }
-    public required BucketKind Kind { get; init; }
-
-    /// <summary>Null for a cushion.</summary>
-    public required BucketShareType? ShareType { get; init; }
-
-    /// <summary>PLN for a Fixed bucket, percent for a Percent bucket; null for a cushion.</summary>
-    public required decimal? Share { get; init; }
-
-    public required int Position { get; init; }
-    public required bool IsRemainder { get; init; }
-    public required Guid? AccountId { get; init; }
-    public required string? AccountName { get; init; }
-    public required decimal AllocatedPln { get; init; }
-
-    /// <summary>True when a fixed bucket got less than its share.</summary>
-    public required bool Underfunded { get; init; }
-
-    /// <summary>The cushion's balance against its target, null for any other bucket.</summary>
-    public required CushionResponse? Cushion { get; init; }
-
-    /// <summary>True when the yearly limit cut the bucket's allocation short.</summary>
-    public required bool LimitReached { get; init; }
-
-    /// <summary>The year's contributions against the statutory limit, null for a bucket without one.</summary>
-    public required LimitResponse? Limit { get; init; }
-
-    /// <summary>Every balance adjustment of a cushion or limited bucket by month; null for any other bucket.</summary>
-    public required IReadOnlyList<BalanceAdjustmentResponse>? Adjustments { get; init; }
-}
-
-public sealed record BalanceAdjustmentResponse
-{
-    /// <summary>The month (yyyy-MM) the balance applies from.</summary>
-    public required string Month { get; init; }
-
-    public required decimal AmountPln { get; init; }
-}
-
-public sealed record LimitResponse
-{
-    public required int Year { get; init; }
-    public required decimal LimitPln { get; init; }
-
-    /// <summary>Contributed in the year before the month.</summary>
-    public required decimal ContributedStartPln { get; init; }
-
-    /// <summary>Contributed in the year after the month's allocation.</summary>
-    public required decimal ContributedEndPln { get; init; }
-
-    /// <summary>True when the counter is within 1 zł of the limit or above it.</summary>
-    public required bool Reached { get; init; }
-
-    /// <summary>True when the year's limit is taken from the last known year.</summary>
-    public required bool Estimated { get; init; }
-}
-
-public sealed record CushionResponse
-{
-    public required decimal BalanceStartPln { get; init; }
-
-    /// <summary>Target months times the month's expense cost.</summary>
-    public required decimal TargetPln { get; init; }
-
-    public required int TargetMonths { get; init; }
-
-    /// <summary>The balance after the month's allocation.</summary>
-    public required decimal BalanceEndPln { get; init; }
-
-    /// <summary>True when the balance is within 1 zł of the target or above it.</summary>
-    public required bool Reached { get; init; }
 }
 
 public sealed record PlanningExpensesResponse

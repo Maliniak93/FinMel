@@ -12,14 +12,12 @@ public sealed class GetPlanningSettingsHandler(PortfolioDbContext dbContext)
             .AsNoTracking()
             .Select(s => new PlanningSettingsResponse
             {
-                MinimumTransferPln = s.MinimumTransferPln,
                 PaymentLeadDays = s.PaymentLeadDays
             })
             .FirstOrDefaultAsync(cancellationToken);
 
         return settings ?? new PlanningSettingsResponse
         {
-            MinimumTransferPln = PlanningSettings.DefaultMinimumTransferPln,
             PaymentLeadDays = PlanningSettings.DefaultPaymentLeadDays
         };
     }

@@ -120,23 +120,6 @@ internal static class PortfolioConsumers
         throw new TimeoutException($"{description} never happened within the deadline.");
     }
 
-    public static async Task<TargetAllocationReplica> WaitForTargetReplicaAsync(
-        IServiceProvider provider,
-        Guid userId,
-        CancellationToken cancellationToken,
-        Func<TargetAllocationReplica, bool>? predicate = null)
-    {
-        predicate ??= _ => true;
-        var replica = await WaitForAsync(
-            provider,
-            (db, ct) => db.Set<TargetAllocationReplica>().IgnoreQueryFilters().SingleOrDefaultAsync(r => r.UserId == userId, ct),
-            r => r is not null && predicate(r),
-            $"A matching TargetAllocationReplica for user {userId}",
-            cancellationToken);
-
-        return replica!;
-    }
-
     public static async Task<ValuationReplica> WaitForValuationReplicaAsync(
         IServiceProvider provider,
         Guid userId,
@@ -152,14 +135,6 @@ internal static class PortfolioConsumers
             cancellationToken);
 
         return replica!;
-    }
-
-    public static async Task<TargetAllocationReplica?> GetTargetReplicaAsync(
-        SkarbiecContainersFixture containers, Guid userId, CancellationToken cancellationToken)
-    {
-        await using var db = OpenDbContext(containers);
-        return await db.Set<TargetAllocationReplica>().IgnoreQueryFilters()
-            .SingleOrDefaultAsync(r => r.UserId == userId, cancellationToken);
     }
 
     public static async Task<ValuationReplica?> GetValuationReplicaAsync(

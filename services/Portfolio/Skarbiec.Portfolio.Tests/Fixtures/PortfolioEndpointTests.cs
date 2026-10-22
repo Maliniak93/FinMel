@@ -32,54 +32,6 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return rows.ToDictionary(r => r.Id, r => (r.GroupId, r.Version));
     }
 
-    // Replaces both replicas of the user; a null argument leaves that replica absent.
-    protected async Task SeedReplicasAsync(
-        Guid userId,
-        CancellationToken cancellationToken,
-        IReadOnlyList<TargetAllocationReplicaGroup>? targets,
-        IReadOnlyList<ValuationReplicaClassValue>? values,
-        DateOnly? valuationDate = null,
-        bool stale = false)
-    {
-        var savedAt = new DateTimeOffset(2026, 10, 14, 10, 0, 0, TimeSpan.Zero);
-        await using var dbContext = CreateDbContext(userId);
-        await dbContext.Set<TargetAllocationReplica>().ExecuteDeleteAsync(cancellationToken);
-        await dbContext.Set<ValuationReplica>().ExecuteDeleteAsync(cancellationToken);
-        if (targets is not null)
-        {
-            dbContext.Set<TargetAllocationReplica>().Add(
-                new TargetAllocationReplica { UserId = userId, Groups = [.. targets], SavedAtUtc = savedAt });
-        }
-
-        if (values is not null)
-        {
-            dbContext.Set<ValuationReplica>().Add(new ValuationReplica
-            {
-                UserId = userId,
-                Date = valuationDate ?? new DateOnly(2026, 10, 14),
-                IsStale = stale,
-                TotalPln = values.Sum(v => v.ValuePln),
-                ByAssetClass = [.. values],
-                OccurredAtUtc = savedAt,
-            });
-        }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    // The worked example whose plan starts in firstMonth; leaves the clock on PlanningApi.CreationDayUtc (2026-10-15).
-    protected async Task<(Guid IkeAccountId, Guid IkzeAccountId)> SetUpTransferPlanFromAsync(
-        HttpClient client, Guid userId, string firstMonth, CancellationToken cancellationToken)
-    {
-        var setupDay = DateTimeOffset.Parse($"{firstMonth}-15T10:00:00+00:00", System.Globalization.CultureInfo.InvariantCulture);
-        Factory.Clock.SetUtcNow(setupDay);
-        var accounts = await PlanningApi.CreateTransferPlanSetupAsync(client, cancellationToken, firstMonth);
-        await SeedReplicasAsync(userId, cancellationToken, PlanningApi.TransferTargets, PlanningApi.TransferValues, PlanningApi.TransferValuationDate);
-        Factory.Clock.SetUtcNow(PlanningApi.CreationDayUtc);
-
-        return accounts;
-    }
-
     protected async Task<Guid> AddQuotedHoldingAsync(
         HttpClient client,
         Guid accountId,
@@ -193,24 +145,6 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         await using var dbContext = CreateDbContext(userId);
         return await dbContext.Set<RecurringExpenseVersion>()
             .CountAsync(v => v.RecurringExpenseId == expenseId, cancellationToken);
-    }
-
-    protected async Task<int> CountAllocationVersionsAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = CreateDbContext(userId);
-        return await dbContext.Set<AllocationPlanVersion>().CountAsync(cancellationToken);
-    }
-
-    protected async Task<int> CountAllocationBucketsAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = CreateDbContext(userId);
-        return await dbContext.Set<AllocationBucket>().CountAsync(cancellationToken);
-    }
-
-    protected async Task<int> CountAllocationBalanceOverridesAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        await using var dbContext = CreateDbContext(userId);
-        return await dbContext.Set<AllocationBalanceOverride>().CountAsync(cancellationToken);
     }
 
     protected async Task<List<BondRedemption>> ReadBondRedemptionsAsync(

@@ -46,8 +46,7 @@ public sealed class GetPlanningYearHandler(PlanningMonthLoader loader)
                 DifferencePln = Sum(months, m => m.DifferencePln),
                 CostPln = Sum(months, m => m.CostPln),
                 FreeFundsPlanPln = Sum(months, m => m.FreeFundsPlanPln),
-                FreeFundsForecastPln = Sum(months, m => m.FreeFundsForecastPln),
-                ToInvestPln = Sum(months, m => m.ToInvestPln)
+                FreeFundsForecastPln = Sum(months, m => m.FreeFundsForecastPln)
             }
         };
     }
@@ -73,8 +72,6 @@ public sealed class GetPlanningYearHandler(PlanningMonthLoader loader)
                 CostPln = null,
                 FreeFundsPlanPln = null,
                 FreeFundsForecastPln = null,
-                ToInvestPln = null,
-                TransferPlanStatus = null,
                 HasOverdue = false,
                 Incomplete = false
             };
@@ -92,8 +89,6 @@ public sealed class GetPlanningYearHandler(PlanningMonthLoader loader)
             CostPln = read.Expenses.CostPln,
             FreeFundsPlanPln = read.FreeFunds.PlanPln,
             FreeFundsForecastPln = read.FreeFunds.ForecastPln,
-            ToInvestPln = read.Allocation.EffectiveFrom is null ? null : read.Allocation.ToInvestPln,
-            TransferPlanStatus = read.TransferPlan.Status,
             HasOverdue = read.Incomes.Occurrences.Any(o => o.Overdue),
             Incomplete = read.FreeFunds.Incomplete
         };

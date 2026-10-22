@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Features.GetDashboard;
-using Skarbiec.Reporting.Features.TargetAllocation.GetTargetAllocation;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
@@ -16,66 +15,6 @@ internal static class ReportingApi
 {
     public const string DashboardUri = "/api/reporting/dashboard";
     public const string NetWorthHistoryBaseUri = "/api/reporting/net-worth-history";
-    public const string TargetAllocationUri = "/api/reporting/target-allocation";
-
-    public static object TargetGroup(string name, AssetClass[] assetClasses, decimal targetPercent, decimal bandPp = 5m) =>
-        new { name, assetClasses, targetPercent, bandPp };
-
-    public static async Task SaveTargetAllocationAsync(
-        this HttpClient client, CancellationToken cancellationToken, params object[] groups)
-    {
-        using var response = await client.PutAsJsonAsync(TargetAllocationUri, new { groups }, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task<TargetAllocationResponse> GetTargetAllocationAsync(
-        this HttpClient client, CancellationToken cancellationToken)
-    {
-        using var response = await client.GetAsync(TargetAllocationUri, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<TargetAllocationResponse>(cancellationToken))!;
-    }
-
-    public static string GroupTargetAllocationUri(Guid groupId) => $"{TargetAllocationUri}/groups/{groupId}";
-
-    public static async Task SaveGroupTargetAllocationAsync(
-        this HttpClient client, Guid groupId, CancellationToken cancellationToken, params object[] groups)
-    {
-        using var response = await client.PutAsJsonAsync(GroupTargetAllocationUri(groupId), new { groups }, cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    public static async Task<TargetAllocationResponse> GetGroupTargetAllocationAsync(
-        this HttpClient client, Guid groupId, CancellationToken cancellationToken)
-    {
-        using var response = await client.GetAsync(GroupTargetAllocationUri(groupId), cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<TargetAllocationResponse>(cancellationToken))!;
-    }
-
-    public static async Task DeleteGroupTargetAllocationAsync(
-        this HttpClient client, Guid groupId, CancellationToken cancellationToken)
-    {
-        using var response = await client.DeleteAsync(GroupTargetAllocationUri(groupId), cancellationToken);
-        response.EnsureSuccessStatusCode();
-    }
-
-    // Seeds the asset's position (with its group) and its valuation line; the snapshot is seeded separately.
-    public static async Task<Guid> SeedGroupAssetAsync(
-        this ReportingDbContext db,
-        Guid userId,
-        Guid? groupId,
-        DateOnly date,
-        AssetClass assetClass,
-        decimal valuePln,
-        CancellationToken cancellationToken)
-    {
-        var assetId = Guid.NewGuid();
-        await db.SeedPositionAsync(assetId, userId, null, cancellationToken, assetClass: assetClass, groupId: groupId);
-        await db.SeedValuationLineAsync(userId, null, assetId, date, valuePln, cancellationToken, assetClass: assetClass);
-        return assetId;
-    }
-
     public static async Task SeedValuationAsync(
         this ReportingDbContext db,
         Guid userId,

@@ -95,13 +95,6 @@ async function openAccounts(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
-async function openAllocation(page: Page): Promise<void> {
-  await navigation(page)
-    .getByRole('link', { name: /^(Alokacja|Allocation)$/ })
-    .click();
-  await expect(page).toHaveURL(/\/allocation$/);
-}
-
 async function syncPrices(page: Page): Promise<void> {
   await navigation(page).getByRole('link', { name: 'Ustawienia', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Ustawienia', level: 1 })).toBeVisible();
@@ -385,40 +378,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     );
   });
 
-  await test.step('Krok 7: the target allocation with Akcje, ETF and Gotówka counts the free cash in ETF', async () => {
-    const saved = await request.put('/api/reporting/target-allocation', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        groups: [
-          { name: 'Akcje', assetClasses: [ASSET_CLASS.stock], targetPercent: 40, bandPp: 5 },
-          { name: 'ETF', assetClasses: [ASSET_CLASS.etf], targetPercent: 40, bandPp: 5 },
-          { name: 'Gotówka', assetClasses: [ASSET_CLASS.cash], targetPercent: 20, bandPp: 5 },
-        ],
-      },
-    });
-    expect(saved.ok()).toBeTruthy();
-    await expectProjected(
-      () => openAllocation(page),
-      async () => {
-        const rows = page.getByTestId('group-row');
-        await expect(rows).toHaveCount(3, { timeout: 2_000 });
-        const values = ['2 000,00', '8 000,00', '0,00'];
-        for (const [index, value] of values.entries()) {
-          await expect(rows.nth(index).locator('td').nth(1)).toHaveText(exactPln(value), {
-            timeout: 2_000,
-          });
-        }
-      },
-    );
-    const names = ['Akcje', 'ETF', 'Gotówka'];
-    for (const [index, name] of names.entries()) {
-      await expect(
-        page.getByTestId('group-row').nth(index).locator('.allocation-page__group-name'),
-      ).toHaveText(name);
-    }
-  });
-
-  await test.step('Krok 8: the history with the ETF class has 350 zł more than the position from the purchase date and nothing before it', async () => {
+  await test.step('Krok 7: the history with the ETF class has 350 zł more than the position from the purchase date and nothing before it', async () => {
     await openDashboard(page);
     await page
       .getByRole('listbox', { name: 'Klasa aktywów' })
@@ -433,14 +393,14 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     });
   });
 
-  await test.step('Krok 9: the history with the Gotówka class holds the free cash from the deposit to the CDR.WA purchase and then drops to 0', async () => {
+  await test.step('Krok 8: the history with the Gotówka class holds the free cash from the deposit to the CDR.WA purchase and then drops to 0', async () => {
     await expectHistoryProjected(request, token, ASSET_CLASS.cash, (points) => {
       expectAllEqual(between(points, D90, D61), 10000, 'Gotówka from the deposit');
       expectAllEqual(between(points, D60, YESTERDAY), 0, 'Gotówka from the CDR.WA purchase');
     });
   });
 
-  await test.step('Krok 10: buying one more CDR.WA today moves the free cash to Akcje and leaves only the position in ETF', async () => {
+  await test.step('Krok 9: buying one more CDR.WA today moves the free cash to Akcje and leaves only the position in ETF', async () => {
     secondCdrBuyId = await recordTradeThroughApi(request, token, cdrId, {
       type: TYPE_BUY,
       quantity: 1,
@@ -456,7 +416,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     await expectAccountCash(page, BROKER, '250,00');
   });
 
-  await test.step('Krok 11: moving that purchase to the day before the ETF purchase returns the free cash to ETF and recalculates the history', async () => {
+  await test.step('Krok 10: moving that purchase to the day before the ETF purchase returns the free cash to ETF and recalculates the history', async () => {
     const moved = await request.put(
       `/api/portfolio/assets/${cdrId}/transactions/${secondCdrBuyId}`,
       {
@@ -479,7 +439,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     });
   });
 
-  await test.step('Krok 12: selling the whole CDR.WA keeps the free cash in ETF', async () => {
+  await test.step('Krok 11: selling the whole CDR.WA keeps the free cash in ETF', async () => {
     await recordTradeThroughApi(request, token, cdrId, {
       type: TYPE_SELL,
       quantity: 21,
@@ -494,7 +454,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     await expectLegend(page, { ETF: '10 000,00', Akcje: null, Gotówka: null });
   });
 
-  await test.step('Krok 13: selling the whole VWCE.DE returns the free cash to Gotówka in the current class split', async () => {
+  await test.step('Krok 12: selling the whole VWCE.DE returns the free cash to Gotówka in the current class split', async () => {
     await recordTradeThroughApi(request, token, vwceId, {
       type: TYPE_SELL,
       quantity: 18,
@@ -509,7 +469,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     await expectLegend(page, { Gotówka: '10 000,00', ETF: null, Akcje: null });
   });
 
-  await test.step('Krok 14: depositing 1 000 zł on the new brokerage account Pusty keeps it in Gotówka', async () => {
+  await test.step('Krok 13: depositing 1 000 zł on the new brokerage account Pusty keeps it in Gotówka', async () => {
     await createAccountThroughUi(page, EMPTY, 'Maklerski');
     const empty = (await accountIds(request, token)).get(EMPTY);
     expect(empty).toBeTruthy();
@@ -522,7 +482,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     await expectAccountCash(page, EMPTY, '1 000,00');
   });
 
-  await test.step('Krok 15: the class lines have no jumps outside the purchase and sale dates and the classes sum to the net worth every day', async () => {
+  await test.step('Krok 14: the class lines have no jumps outside the purchase and sale dates and the classes sum to the net worth every day', async () => {
     await openDashboard(page);
     await page
       .getByRole('listbox', { name: 'Klasa aktywów' })
@@ -562,7 +522,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     );
   });
 
-  await test.step('Krok 16: the dashboard card shows the value of each account and the free cash is a separate Wolne środki figure on the list and on the account', async () => {
+  await test.step('Krok 15: the dashboard card shows the value of each account and the free cash is a separate Wolne środki figure on the list and on the account', async () => {
     await expectProjected(
       () => openDashboard(page),
       async () => {
@@ -602,7 +562,7 @@ test('brokerage cash follows holdings: a bank account stays in Konta bankowe and
   await page.goto('/login');
   await logInThroughUi(page, user);
 
-  await test.step('Krok 17: a bank account with 2 000 zł stays in Konta bankowe and the cash place Sejf with 300 zł is in Gotówka', async () => {
+  await test.step('Krok 16: a bank account with 2 000 zł stays in Konta bankowe and the cash place Sejf with 300 zł is in Gotówka', async () => {
     const created = await request.post('/api/portfolio/accounts', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
