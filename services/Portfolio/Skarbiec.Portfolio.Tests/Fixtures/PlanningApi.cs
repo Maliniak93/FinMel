@@ -3,6 +3,7 @@ using System.Text.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
+using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
@@ -141,7 +142,31 @@ internal static class PlanningApi
         List<ExpensePaymentView> Payments,
         decimal CostPln,
         List<ExpenseDefinitionView> Definitions,
-        List<OneOffExpenseView>? OneOffs = null);
+        List<OneOffExpenseView>? OneOffs = null,
+        List<GroupContributionView>? GroupContributions = null);
+
+    public sealed record GroupContributionView(Guid GroupId, string Name, decimal AmountPln);
+
+    public sealed record ClassAmountView(AssetClass AssetClass, decimal AmountPln);
+
+    public sealed record SplitCushionView(
+        Guid GroupId, string Name, decimal LevelPln, decimal TargetPln, decimal MissingPln, decimal AllocationPln);
+
+    public sealed record SplitGroupView(
+        Guid GroupId,
+        string Name,
+        decimal SharePercent,
+        decimal ContributionPln,
+        decimal AllocationPln,
+        List<ClassAmountView>? Breakdown);
+
+    public sealed record SplitView(
+        decimal FreeFundsPln,
+        decimal? DeficitPln,
+        SplitCushionView? Cushion,
+        List<SplitGroupView> Groups,
+        decimal UnassignedPln,
+        bool ValuationMissing);
 
     public sealed record FreeFundsView(decimal PlanPln, decimal ForecastPln, bool Incomplete);
 
@@ -149,7 +174,8 @@ internal static class PlanningApi
         IncomesView Incomes,
         ExpensesView Expenses,
         FreeFundsView FreeFunds,
-        List<DateOnly>? NonBusinessDays = null);
+        List<DateOnly>? NonBusinessDays = null,
+        SplitView? Split = null);
 
     public sealed record PlanningYearView(
         int Year,
@@ -185,6 +211,32 @@ internal static class PlanningApi
         await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Pensja", 16_443.27m, dayOfMonth: 10);
 
         return await client.CreateRecurringExpenseAsync(cancellationToken, "Życie", 4_200m, dayOfMonth: 1);
+    }
+
+    public sealed record SplitGroups(Guid CushionId, Guid RetirementId, Guid InvestingId);
+
+    // Income 8 000 and rent 1 000 every month, so 7 000 is free before any group contribution.
+    public static async Task CreateFreeFundsOf7000Async(this HttpClient client, CancellationToken cancellationToken)
+    {
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank");
+        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Wypłata", 8_000m, dayOfMonth: 10);
+        await client.CreateRecurringExpenseAsync(cancellationToken, "Czynsz", 1_000m, dayOfMonth: 1);
+    }
+
+    // A cushion with a 12 000 target and two Regular groups contributing 2 000 and 1 000, split 50 / 50, each allocated Deposit 50 / BankAccount 50.
+    public static async Task<SplitGroups> CreateSplitGroupsAsync(
+        this HttpClient client, CancellationToken cancellationToken, decimal cushionContributionPln = 0m)
+    {
+        var allocation = Shares((AssetClass.Deposit, 50m), (AssetClass.BankAccount, 50m));
+        var cushion = await client.CreateAssetGroupAsync(
+            cancellationToken, "Poduszka", ColorKey(0), 12_000m, CushionKind, cushionContributionPln);
+        var retirement = await client.CreateAssetGroupAsync(
+            cancellationToken, "Emerytura", ColorKey(1), monthlyContributionPln: 2_000m, classAllocation: allocation);
+        var investing = await client.CreateAssetGroupAsync(
+            cancellationToken, "Inwestycje", ColorKey(2), monthlyContributionPln: 1_000m, classAllocation: allocation);
+        await client.SaveGroupSharesAsync(cancellationToken, (retirement.Id, 50m), (investing.Id, 50m));
+
+        return new SplitGroups(cushion.Id, retirement.Id, investing.Id);
     }
 
     public const string PlanningSettingsUri = "/api/portfolio/planning/settings";

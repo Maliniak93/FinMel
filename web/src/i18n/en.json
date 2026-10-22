@@ -857,6 +857,7 @@
       "add": "Add expense",
       "empty": "No expenses planned this month.",
       "cost": "Monthly cost (with reserves)",
+      "contribution": "Group contribution",
       "reserve": "{{ amount }}/mo.",
       "nextPayment": "next payment {{ date }}",
       "definitions": {
@@ -883,6 +884,22 @@
       "plan": "Plan",
       "forecast": "Forecast",
       "deficit": "deficit"
+    },
+    "split": {
+      "title": "Split of free funds",
+      "info": "A suggestion only, tied to no account, asset or transfer. It is not investment advice.",
+      "valuationMissing": "The valuation has not arrived yet: the cushion counts as empty and contributions follow the class percentages.",
+      "deficit": "Deficit, nothing to split",
+      "level": "Level",
+      "missing": "Missing",
+      "allocation": "Allocation",
+      "contribution": "Contribution",
+      "breakdown": "Breakdown by class",
+      "unassigned": "Not assigned to any group",
+      "shares": "Shares of the free funds",
+      "sum": "Sum",
+      "saveShares": "Save shares",
+      "sharesFailed": "Could not save the shares."
     },
     "form": {
       "title": "Add recurring income",

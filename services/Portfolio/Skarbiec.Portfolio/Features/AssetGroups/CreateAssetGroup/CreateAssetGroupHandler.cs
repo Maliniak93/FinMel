@@ -39,10 +39,19 @@ public sealed class CreateAssetGroupHandler(PortfolioDbContext dbContext)
             ClassAllocation = allocation
         };
 
+        if (group.Kind == AssetGroupKind.Regular)
+        {
+            var otherRegular = await dbContext.AssetGroups
+                .Where(g => g.Kind == AssetGroupKind.Regular)
+                .ToListAsync(cancellationToken);
+            GroupShares.StartNewRegular(group, otherRegular);
+        }
+
         dbContext.AssetGroups.Add(group);
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new AssetGroupResponse(
-            group.Id, group.Name, group.Color, group.TargetPln, 0, group.Kind, group.MonthlyContributionPln, group.ClassAllocation);
+            group.Id, group.Name, group.Color, group.TargetPln, 0, group.Kind, group.MonthlyContributionPln, group.ClassAllocation,
+            group.SharePercent);
     }
 }

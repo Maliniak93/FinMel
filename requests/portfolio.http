@@ -829,6 +829,17 @@ Content-Type: application/json
   "groupId": "{{createAssetGroup.response.body.id}}"
 }
 
+### Save the free-funds shares of the regular groups (exactly those groups, each 0 to 100 with one decimal, summing to 100: 400 Validation.SharesGroupMismatch, Validation.SharesSum, Validation.InvalidShare; a new regular group starts at 0, the first takes 100)
+PUT {{baseUrl}}/api/portfolio/asset-groups/shares
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "shares": [
+    { "groupId": "{{createAssetGroup.response.body.id}}", "sharePercent": 100 }
+  ]
+}
+
 ### Delete a group (clears and republishes its assets)
 DELETE {{baseUrl}}/api/portfolio/asset-groups/{{createAssetGroup.response.body.id}}
 Authorization: Bearer {{authToken}}
@@ -1303,7 +1314,7 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/portfolio/recurring-incomes/{{createRecurringIncome.response.body.id}}/changes/2027-01
 Authorization: Bearer {{authToken}}
 
-### Read a month (yyyy-MM, 2011-01 to 2099-12, else 400): occurrences by date then name (overdue flagged), the PLN balance (plan, actual, pending, difference; fxUnavailable when a foreign rate is missing) and every definition with its status, effectiveFrom and nextChange
+### Read a month (yyyy-MM, 2011-01 to 2099-12, else 400): occurrences by date then name (overdue flagged), the PLN balance (plan, actual, pending, difference; fxUnavailable when a foreign rate is missing) and every definition with its status, effectiveFrom and nextChange; from the current Warsaw month on expenses.groupContributions and costPln carry each group's monthly contribution, and split divides the free funds (cushion gap first, then the regular groups by share, floored to whole zloty) with a per-class breakdown of every contribution (null split in a past month or without groups; deficitPln when the free funds are 0 or less; valuationMissing until the valuation replica arrives)
 GET {{baseUrl}}/api/portfolio/planning/months/2026-10
 Authorization: Bearer {{authToken}}
 

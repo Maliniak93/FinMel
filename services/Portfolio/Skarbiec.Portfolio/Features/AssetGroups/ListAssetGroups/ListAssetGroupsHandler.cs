@@ -18,6 +18,7 @@ public sealed class ListAssetGroupsHandler(PortfolioDbContext dbContext)
                 g.Kind,
                 g.MonthlyContributionPln,
                 g.ClassAllocation,
+                g.SharePercent,
                 AssetCount = dbContext.Assets.Count(a => a.GroupId == g.Id)
             })
             .ToListAsync(cancellationToken);
@@ -25,6 +26,7 @@ public sealed class ListAssetGroupsHandler(PortfolioDbContext dbContext)
         return [.. groups
             .OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
             .Select(g => new AssetGroupResponse(
-                g.Id, g.Name, g.Color, g.TargetPln, g.AssetCount, g.Kind, g.MonthlyContributionPln, g.ClassAllocation))];
+                g.Id, g.Name, g.Color, g.TargetPln, g.AssetCount, g.Kind, g.MonthlyContributionPln, g.ClassAllocation,
+                g.SharePercent))];
     }
 }

@@ -95,6 +95,7 @@ export type AssetGroupResponse = {
     kind: AssetGroupKind;
     monthlyContributionPln: number | string;
     classAllocation: Array<AssetGroupClassShare>;
+    sharePercent: null | number | string;
 };
 
 export type AssetResponse = {
@@ -512,6 +513,17 @@ export type FreeFundsResponse = {
     incomplete: boolean;
 };
 
+export type GroupContributionResponse = {
+    groupId: string;
+    name: string;
+    amountPln: number | string;
+};
+
+export type GroupShareRequest = {
+    groupId: string;
+    sharePercent: number | string;
+};
+
 export type IncomeBalanceResponse = {
     planPln: number | string;
     actualPln: number | string;
@@ -647,6 +659,7 @@ export type PayOutDepositRequest = {
 export type PlanningExpensesResponse = {
     payments: Array<ExpensePaymentResponse>;
     costPln: number | string;
+    groupContributions: Array<GroupContributionResponse>;
     definitions: Array<ExpenseDefinitionResponse>;
     oneOffs: Array<OneOffExpenseResponse>;
 };
@@ -663,11 +676,21 @@ export type PlanningMonthResponse = {
     incomes: PlanningIncomesResponse;
     expenses: PlanningExpensesResponse;
     freeFunds: FreeFundsResponse;
+    split: null | PlanningSplitResponse;
     nonBusinessDays: Array<string>;
 };
 
 export type PlanningSettingsResponse = {
     paymentLeadDays: number | string;
+};
+
+export type PlanningSplitResponse = {
+    freeFundsPln: number | string;
+    deficitPln: null | number | string;
+    cushion: null | SplitCushionResponse;
+    groups: Array<SplitGroupResponse>;
+    unassignedPln: number | string;
+    valuationMissing: boolean;
 };
 
 export type PlanningTodoResponse = {
@@ -734,6 +757,10 @@ export type RollOverDepositRequest = {
     annualInterestRatePercent: number | string;
     grossInterest?: null | number | string;
     tax?: null | number | string;
+};
+
+export type SaveGroupSharesRequest = {
+    shares: Array<GroupShareRequest>;
 };
 
 export type SavePlanningSettingsRequest = {
@@ -813,6 +840,29 @@ export type SettleOneOffIncomeRequest = {
     actualDate: string;
     accountId: string;
     createDeposit?: boolean;
+};
+
+export type SplitClassAmountResponse = {
+    assetClass: AssetClass;
+    amountPln: number | string;
+};
+
+export type SplitCushionResponse = {
+    groupId: string;
+    name: string;
+    levelPln: number | string;
+    targetPln: number | string;
+    missingPln: number | string;
+    allocationPln: number | string;
+};
+
+export type SplitGroupResponse = {
+    groupId: string;
+    name: string;
+    sharePercent: number | string;
+    contributionPln: number | string;
+    allocationPln: number | string;
+    breakdown: null | Array<SplitClassAmountResponse>;
 };
 
 export type SwapBondRequest = {
@@ -1923,6 +1973,22 @@ export type PutApiPortfolioAssetGroupsAssignmentResponses = {
 };
 
 export type PutApiPortfolioAssetGroupsAssignmentResponse = PutApiPortfolioAssetGroupsAssignmentResponses[keyof PutApiPortfolioAssetGroupsAssignmentResponses];
+
+export type PutApiPortfolioAssetGroupsSharesData = {
+    body: SaveGroupSharesRequest;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/asset-groups/shares';
+};
+
+export type PutApiPortfolioAssetGroupsSharesResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioAssetGroupsSharesResponse = PutApiPortfolioAssetGroupsSharesResponses[keyof PutApiPortfolioAssetGroupsSharesResponses];
 
 export type GetApiPortfolioAssetGroupsAssetsData = {
     body?: never;

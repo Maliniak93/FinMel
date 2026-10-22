@@ -25,7 +25,9 @@ internal sealed class PlanningForecast
         IReadOnlyList<RecurringIncomeOccurrence> stored,
         IReadOnlyList<RecurringExpense> expenses,
         IReadOnlyList<OneOffIncome> oneOffIncomes,
-        IReadOnlyList<OneOffExpense> oneOffExpenses)
+        IReadOnlyList<OneOffExpense> oneOffExpenses,
+        IReadOnlyList<AssetGroup> groups,
+        YearMonth currentMonth)
     {
         OneOffIncomes = oneOffIncomes;
         OneOffExpenses = oneOffExpenses;
@@ -35,9 +37,21 @@ internal sealed class PlanningForecast
         storedKeys = stored.Select(o => (o.RecurringIncomeId, o.NominalMonth)).ToHashSet();
         incomesById = incomes.ToDictionary(i => i.Id);
         Plans = expenses.Select(e => (Expense: e, Plan: e.ToReservePlan())).ToList();
+        Groups = groups;
+        CurrentMonth = currentMonth;
     }
 
     public IReadOnlyList<(RecurringExpense Expense, ReservePlan Plan)> Plans { get; }
+
+    public IReadOnlyList<AssetGroup> Groups { get; }
+
+    public YearMonth CurrentMonth { get; }
+
+    // A contribution applies from the current month on, open-ended; the groups of the past months carry none.
+    public IReadOnlyList<AssetGroup> ContributingGroupsIn(YearMonth month) =>
+        month < CurrentMonth
+            ? []
+            : [.. Groups.Where(g => g.MonthlyContributionPln > 0m).OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)];
 
     public IReadOnlyList<OneOffIncome> OneOffIncomes { get; }
 
@@ -178,7 +192,8 @@ internal sealed class PlanningForecast
 
     public decimal CostIn(YearMonth month) =>
         Plans.Sum(p => ReserveSchedule.CostIn(month, p.Plan))
-        + OneOffExpenses.Where(e => YearMonth.From(e.Date) == month).Sum(e => e.Amount);
+        + OneOffExpenses.Where(e => YearMonth.From(e.Date) == month).Sum(e => e.Amount)
+        + ContributingGroupsIn(month).Sum(g => g.MonthlyContributionPln);
 
     public MonthFigures FiguresIn(YearMonth month, IReadOnlyDictionary<string, decimal> rates, DateOnly today)
     {

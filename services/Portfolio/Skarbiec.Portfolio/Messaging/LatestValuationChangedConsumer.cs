@@ -22,6 +22,12 @@ public sealed class LatestValuationChangedConsumer(PortfolioDbContext db, ILogge
         List<ValuationReplicaClassValue> byAssetClass =
             [.. message.ByAssetClass.Select(v => new ValuationReplicaClassValue(v.AssetClass, v.ValuePln))];
 
+        List<ValuationReplicaGroupValue> byGroup =
+        [
+            .. message.ByGroup.Select(g => new ValuationReplicaGroupValue(
+                g.GroupId, [.. g.ByAssetClass.Select(v => new ValuationReplicaClassValue(v.AssetClass, v.ValuePln))]))
+        ];
+
         if (replica is null)
         {
             db.ValuationReplicas.Add(new ValuationReplica
@@ -31,6 +37,7 @@ public sealed class LatestValuationChangedConsumer(PortfolioDbContext db, ILogge
                 IsStale = message.IsStale,
                 TotalPln = message.TotalPln,
                 ByAssetClass = byAssetClass,
+                ByGroup = byGroup,
                 OccurredAtUtc = message.OccurredAtUtc,
             });
         }
@@ -47,6 +54,7 @@ public sealed class LatestValuationChangedConsumer(PortfolioDbContext db, ILogge
             replica.IsStale = message.IsStale;
             replica.TotalPln = message.TotalPln;
             replica.ByAssetClass = byAssetClass;
+            replica.ByGroup = byGroup;
             replica.OccurredAtUtc = message.OccurredAtUtc;
         }
 

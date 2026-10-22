@@ -2,6 +2,7 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.MarketData;
 using Skarbiec.Reporting.Messaging;
@@ -57,6 +58,16 @@ internal static class ReportingConsumers
 
         return services.BuildServiceProvider();
     }
+
+    public static Task PublishDailyPricesSyncedAsync(IBus bus, DateOnly syncDate, CancellationToken cancellationToken) =>
+        bus.Publish(new DailyPricesSynced
+        {
+            RunId = Guid.NewGuid(),
+            SyncDate = syncDate,
+            SyncedCount = 1,
+            FailedCount = 0,
+            NoDataCount = 0,
+        }, cancellationToken);
 
     public static async Task MigrateAndResetAsync(SkarbiecContainersFixture containers)
     {

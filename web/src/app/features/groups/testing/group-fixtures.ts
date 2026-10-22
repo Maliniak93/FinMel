@@ -11,6 +11,7 @@ export const blueGroup: AssetGroupResponse = {
   assetCount: 3,
   kind: 0,
   monthlyContributionPln: 0,
+  sharePercent: 100,
   classAllocation: [],
 };
 
@@ -22,6 +23,7 @@ export const greenGroup: AssetGroupResponse = {
   assetCount: 1,
   kind: 1,
   monthlyContributionPln: 0,
+  sharePercent: null,
   classAllocation: [],
 };
 

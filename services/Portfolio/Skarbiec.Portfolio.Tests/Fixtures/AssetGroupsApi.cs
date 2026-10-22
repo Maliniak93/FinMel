@@ -38,6 +38,12 @@ internal static class AssetGroupsApi
 
     public const string ClassAllocationSumErrorCode = "Validation.ClassAllocationSum";
 
+    public const string SharesUri = AssetGroupsUri + "/shares";
+
+    public const string SharesSumErrorCode = "Validation.SharesSum";
+
+    public const string SharesGroupMismatchErrorCode = "Validation.SharesGroupMismatch";
+
     public const int RegularKind = 0;
 
     public const int CushionKind = 1;
@@ -52,7 +58,10 @@ internal static class AssetGroupsApi
         int AssetCount,
         int Kind = RegularKind,
         decimal MonthlyContributionPln = 0m,
-        List<ClassShare>? ClassAllocation = null);
+        List<ClassShare>? ClassAllocation = null,
+        decimal? SharePercent = null);
+
+    public sealed record GroupShareBody(Guid GroupId, decimal SharePercent);
 
     public sealed record AssignableAssetView(
         Guid AssetId,
@@ -125,4 +134,36 @@ internal static class AssetGroupsApi
         var response = await client.PutAsJsonAsync(AssignmentUri, NewAssignmentBody(assetIds, groupId), cancellationToken);
         response.EnsureSuccessStatusCode();
     }
+
+    public static object NewSharesBody(params (Guid GroupId, decimal SharePercent)[] shares) =>
+        new { shares = shares.Select(s => new GroupShareBody(s.GroupId, s.SharePercent)).ToArray() };
+
+    public static async Task SaveGroupSharesAsync(
+        this HttpClient client, CancellationToken cancellationToken, params (Guid GroupId, decimal SharePercent)[] shares)
+    {
+        var response = await client.PutAsJsonAsync(SharesUri, NewSharesBody(shares), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<AssetGroupView> UpdateAssetGroupAsync(
+        this HttpClient client,
+        Guid groupId,
+        CancellationToken cancellationToken,
+        string name = "Poduszka",
+        string? color = null,
+        decimal? targetPln = null,
+        int kind = RegularKind,
+        decimal monthlyContributionPln = 0m,
+        ClassShare[]? classAllocation = null)
+    {
+        var response = await client.PutAsJsonAsync(
+            AssetGroupUri(groupId), NewAssetGroupBody(name, color, targetPln, kind, monthlyContributionPln, classAllocation), cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<AssetGroupView>(cancellationToken))!;
+    }
+
+    public static async Task<Dictionary<Guid, decimal?>> ReadSharesAsync(
+        this HttpClient client, CancellationToken cancellationToken) =>
+        (await client.ListAssetGroupsAsync(cancellationToken)).ToDictionary(g => g.Id, g => g.SharePercent);
 }

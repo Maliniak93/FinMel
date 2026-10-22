@@ -357,6 +357,10 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
 
+                    b.Property<decimal?>("SharePercent")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("numeric(4,1)");
+
                     b.Property<decimal?>("TargetPln")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
@@ -1122,6 +1126,26 @@ namespace Skarbiec.Portfolio.Migrations
 
                             b1
                                 .ToJson("ByAssetClass")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "ByGroup", "Skarbiec.Portfolio.Data.ValuationReplica.ByGroup#ValuationReplicaGroupValue", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<Guid?>("GroupId");
+
+                            b1.ComplexCollection(typeof(List<Dictionary<string, object>>), "ByAssetClass", "Skarbiec.Portfolio.Data.ValuationReplica.ByGroup#ValuationReplicaGroupValue.ByAssetClass#ValuationReplicaClassValue", b2 =>
+                                {
+                                    b2.IsRequired();
+
+                                    b2.Property<int>("AssetClass");
+
+                                    b2.Property<decimal>("ValuePln");
+                                });
+
+                            b1
+                                .ToJson("ByGroup")
                                 .HasColumnType("jsonb");
                         });
 

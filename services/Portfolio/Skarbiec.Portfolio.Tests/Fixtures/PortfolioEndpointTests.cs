@@ -19,6 +19,27 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return new PortfolioDbContext(options, new StubCurrentUser(userId));
     }
 
+    protected async Task SeedValuationReplicaAsync(
+        Guid userId,
+        CancellationToken cancellationToken,
+        params (Guid? GroupId, (AssetClass AssetClass, decimal ValuePln)[] Values)[] groups)
+    {
+        var all = groups.SelectMany(g => g.Values).ToList();
+        await using var dbContext = CreateDbContext(userId);
+        dbContext.Set<ValuationReplica>().Add(new ValuationReplica
+        {
+            Date = new DateOnly(2026, 10, 15),
+            IsStale = false,
+            TotalPln = all.Sum(v => v.ValuePln),
+            ByAssetClass = [.. all.GroupBy(v => v.AssetClass).Select(g => new ValuationReplicaClassValue(g.Key, g.Sum(v => v.ValuePln)))],
+            ByGroup = [.. groups.Select(g => new ValuationReplicaGroupValue(
+                g.GroupId, [.. g.Values.Select(v => new ValuationReplicaClassValue(v.AssetClass, v.ValuePln))]))],
+            OccurredAtUtc = new DateTimeOffset(2026, 10, 15, 10, 0, 0, TimeSpan.Zero),
+        });
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     protected async Task<Dictionary<Guid, (Guid? GroupId, long Version)>> ReadAssetGroupStatesAsync(
         Guid userId, CancellationToken cancellationToken, params Guid[] assetIds)
     {

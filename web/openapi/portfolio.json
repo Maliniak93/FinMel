@@ -1683,6 +1683,28 @@
         }
       }
     },
+    "/api/portfolio/asset-groups/shares": {
+      "put": {
+        "tags": [
+          "SaveGroupSharesEndpoint"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveGroupSharesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/asset-groups/assets": {
       "get": {
         "tags": [
@@ -3511,7 +3533,8 @@
           "assetCount",
           "kind",
           "monthlyContributionPln",
-          "classAllocation"
+          "classAllocation",
+          "sharePercent"
         ],
         "type": "object",
         "properties": {
@@ -3558,6 +3581,15 @@
             "items": {
               "$ref": "#/components/schemas/AssetGroupClassShare"
             }
+          },
+          "sharePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -5702,6 +5734,52 @@
           }
         }
       },
+      "GroupContributionResponse": {
+        "required": [
+          "groupId",
+          "name",
+          "amountPln"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "amountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "GroupShareRequest": {
+        "required": [
+          "groupId",
+          "sharePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sharePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "IncomeBalanceResponse": {
         "required": [
           "planPln",
@@ -6378,6 +6456,7 @@
         "required": [
           "payments",
           "costPln",
+          "groupContributions",
           "definitions",
           "oneOffs"
         ],
@@ -6396,6 +6475,12 @@
               "string"
             ],
             "format": "double"
+          },
+          "groupContributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupContributionResponse"
+            }
           },
           "definitions": {
             "type": "array",
@@ -6452,6 +6537,7 @@
           "incomes",
           "expenses",
           "freeFunds",
+          "split",
           "nonBusinessDays"
         ],
         "type": "object",
@@ -6464,6 +6550,16 @@
           },
           "freeFunds": {
             "$ref": "#/components/schemas/FreeFundsResponse"
+          },
+          "split": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PlanningSplitResponse"
+              }
+            ]
           },
           "nonBusinessDays": {
             "type": "array",
@@ -6487,6 +6583,63 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "PlanningSplitResponse": {
+        "required": [
+          "freeFundsPln",
+          "deficitPln",
+          "cushion",
+          "groups",
+          "unassignedPln",
+          "valuationMissing"
+        ],
+        "type": "object",
+        "properties": {
+          "freeFundsPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "deficitPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "cushion": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SplitCushionResponse"
+              }
+            ]
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SplitGroupResponse"
+            }
+          },
+          "unassignedPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "valuationMissing": {
+            "type": "boolean"
           }
         }
       },
@@ -6851,6 +7004,20 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "SaveGroupSharesRequest": {
+        "required": [
+          "shares"
+        ],
+        "type": "object",
+        "properties": {
+          "shares": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupShareRequest"
+            }
           }
         }
       },
@@ -7266,6 +7433,131 @@
           },
           "createDeposit": {
             "type": "boolean"
+          }
+        }
+      },
+      "SplitClassAmountResponse": {
+        "required": [
+          "assetClass",
+          "amountPln"
+        ],
+        "type": "object",
+        "properties": {
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "amountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "SplitCushionResponse": {
+        "required": [
+          "groupId",
+          "name",
+          "levelPln",
+          "targetPln",
+          "missingPln",
+          "allocationPln"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "levelPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "targetPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "missingPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "allocationPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "SplitGroupResponse": {
+        "required": [
+          "groupId",
+          "name",
+          "sharePercent",
+          "contributionPln",
+          "allocationPln",
+          "breakdown"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sharePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "contributionPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "allocationPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "breakdown": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/SplitClassAmountResponse"
+            }
           }
         }
       },
@@ -8572,6 +8864,9 @@
     },
     {
       "name": "AssignAssetsToGroupEndpoint"
+    },
+    {
+      "name": "SaveGroupSharesEndpoint"
     },
     {
       "name": "ListAssignableAssetsEndpoint"

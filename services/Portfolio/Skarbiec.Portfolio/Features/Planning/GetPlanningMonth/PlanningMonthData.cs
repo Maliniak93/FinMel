@@ -8,4 +8,5 @@ internal sealed record PlanningMonthData(
     Dictionary<Guid, Account> Accounts,
     PlanningForecast Forecast,
     IReadOnlyDictionary<string, decimal> Rates,
+    ValuationReplica? Replica,
     int PaymentLeadDays);

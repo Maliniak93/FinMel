@@ -1,5 +1,13 @@
 import { DOCUMENT } from '@angular/common';
-import { Component, afterRenderEffect, computed, inject, input, resource } from '@angular/core';
+import {
+  Component,
+  afterRenderEffect,
+  computed,
+  inject,
+  input,
+  resource,
+  signal,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -23,8 +31,10 @@ import {
   deleteApiPortfolioRecurringIncomesByIdChangesByMonth,
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
   getApiPortfolioPlanningMonthsByMonth,
+  putApiPortfolioAssetGroupsShares,
   putApiPortfolioPlanningSettings,
   putApiPortfolioRecurringIncomesByIdOccurrencesByMonthSkip,
+  type AssetClass,
   type ExpenseDefinitionResponse,
   type IncomeDefinitionResponse,
   type IncomeOccurrenceResponse,
@@ -32,6 +42,7 @@ import {
   type OneOffExpenseResponse,
   type OneOffIncomeResponse,
   type RecurringIncomeStatus,
+  type SplitGroupResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import {
@@ -43,6 +54,7 @@ import {
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { fromDateOnly } from '../../shared/date-only';
 import { formatDate, formatMoney, formatMonth } from '../../shared/format';
+import { assetClassLabel } from '../assets/asset-class';
 import {
   EndRecurringExpenseDialog,
   type EndRecurringExpenseDialogData,
@@ -190,6 +202,34 @@ export class Planning {
 
   protected readonly freeFunds = computed(() =>
     this.monthResource.hasValue() ? this.monthResource.value().freeFunds : null,
+  );
+
+  protected readonly contributions = computed(() => this.expenses()?.groupContributions ?? []);
+
+  protected readonly split = computed(() => this.monthData()?.split ?? null);
+
+  private readonly expandedGroups = signal<ReadonlySet<string>>(new Set());
+  private readonly shareEdits = signal<Readonly<Record<string, string>>>({});
+
+  // Tenths of a percent, so the running sum never meets floating-point noise.
+  private readonly shareTenths = computed(() =>
+    (this.split()?.groups ?? []).map((group) => this.tenthsOf(this.shareValue(group))),
+  );
+
+  protected readonly shareSum = computed(() => {
+    const tenths = this.shareTenths();
+    return tenths.some((value) => value === null)
+      ? null
+      : tenths.reduce<number>((sum, value) => sum + (value ?? 0), 0) / 10;
+  });
+
+  protected readonly sharesSavable = computed(
+    () =>
+      this.shareSum() === 100 &&
+      (this.split()?.groups ?? []).some(
+        (group) =>
+          this.tenthsOf(this.shareValue(group)) !== this.tenthsOf(String(group.sharePercent)),
+      ),
   );
 
   constructor() {
@@ -576,6 +616,67 @@ export class Planning {
     }
 
     this.reloadAll();
+  }
+
+  protected assetClassLabel(assetClass: AssetClass): string {
+    return assetClassLabel(assetClass);
+  }
+
+  protected isExpanded(groupId: string): boolean {
+    return this.expandedGroups().has(groupId);
+  }
+
+  protected toggleBreakdown(groupId: string): void {
+    this.expandedGroups.update((expanded) => {
+      const next = new Set(expanded);
+      if (!next.delete(groupId)) {
+        next.add(groupId);
+      }
+      return next;
+    });
+  }
+
+  protected shareValue(group: SplitGroupResponse): string {
+    return this.shareEdits()[group.groupId] ?? String(group.sharePercent);
+  }
+
+  protected editShare(group: SplitGroupResponse, event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.shareEdits.update((edits) => ({ ...edits, [group.groupId]: value }));
+  }
+
+  protected async saveShares(): Promise<void> {
+    const groups = this.split()?.groups ?? [];
+    const result = await putApiPortfolioAssetGroupsShares({
+      body: {
+        shares: groups.map((group) => ({
+          groupId: group.groupId,
+          sharePercent: Number(this.shareValue(group)),
+        })),
+      },
+    });
+    if (result.error) {
+      this.snackBar.open(
+        readProblemDetails(result.error).detail ?? translate('planning.split.sharesFailed'),
+        translate('common.dismiss'),
+      );
+      return;
+    }
+
+    this.shareEdits.set({});
+    this.reloadAll();
+  }
+
+  private tenthsOf(value: string): number | null {
+    const number = Number(value);
+    const tenths = Math.round(number * 10);
+    return value.trim() === '' ||
+      !Number.isFinite(number) ||
+      number < 0 ||
+      number > 100 ||
+      Math.abs(number * 10 - tenths) > 1e-9
+      ? null
+      : tenths;
   }
 
   protected async savePaymentLeadDays(event: Event): Promise<void> {

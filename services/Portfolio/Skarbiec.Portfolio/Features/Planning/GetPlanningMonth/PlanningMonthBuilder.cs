@@ -1,6 +1,7 @@
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.Features.Planning.Reserves;
+using Skarbiec.Portfolio.Features.Planning.Split;
 using Skarbiec.Portfolio.Features.RecurringExpenses;
 using Skarbiec.Portfolio.Features.RecurringIncomes;
 
@@ -92,12 +93,97 @@ internal static class PlanningMonthBuilder
                 ForecastPln = viewedFigures.Forecast,
                 Incomplete = fxUnavailable
             },
+            Split = BuildSplit(data, viewed, viewedFigures.Forecast),
             NonBusinessDays = Enumerable.Range(0, viewed.LastDay.Day)
                 .Select(offset => viewed.FirstDay.AddDays(offset))
                 .Where(day => !PolishHolidayCalendar.IsBusinessDay(day))
                 .ToList()
         };
     }
+
+    private static PlanningSplitResponse? BuildSplit(PlanningMonthData data, YearMonth viewed, decimal freeFundsPln)
+    {
+        var forecast = data.Forecast;
+        if (viewed < forecast.CurrentMonth || forecast.Groups.Count == 0)
+        {
+            return null;
+        }
+
+        var replica = data.Replica;
+        decimal ValueOf(Guid groupId) => replica?.ByGroup
+            .Where(g => g.GroupId == groupId)
+            .SelectMany(g => g.ByAssetClass)
+            .Sum(c => c.ValuePln) ?? 0m;
+
+        var cushionGroup = forecast.Groups.FirstOrDefault(g => g.Kind == AssetGroupKind.Cushion);
+        SplitCushionResponse? cushion = null;
+        decimal missing = 0m;
+        if (cushionGroup is not null)
+        {
+            var earlierFreeFunds = Enumerable
+                .Range(0, Math.Max(0, MonthsBetween(forecast.CurrentMonth, viewed)))
+                .Select(offset => forecast.FiguresIn(forecast.CurrentMonth.AddMonths(offset), data.Rates, data.Today).Forecast);
+            var target = cushionGroup.TargetPln ?? 0m;
+            var level = CushionLedger.LevelAfter(ValueOf(cushionGroup.Id), target, cushionGroup.MonthlyContributionPln, earlierFreeFunds);
+            missing = Math.Max(0m, target - level);
+            cushion = new SplitCushionResponse
+            {
+                GroupId = cushionGroup.Id,
+                Name = cushionGroup.Name,
+                LevelPln = level,
+                TargetPln = target,
+                MissingPln = missing,
+                AllocationPln = 0m
+            };
+        }
+
+        var regular = forecast.Groups
+            .Where(g => g.Kind == AssetGroupKind.Regular)
+            .OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var split = GroupSplitCalculator.Split(
+            freeFundsPln,
+            missing,
+            [.. regular.Select(g => new GroupShareInput(g.Id, g.Name, g.SharePercent ?? 0m))]);
+
+        var allocations = split.Groups.ToDictionary(a => a.GroupId, a => a.AllocationPln);
+
+        return new PlanningSplitResponse
+        {
+            FreeFundsPln = freeFundsPln,
+            DeficitPln = freeFundsPln <= 0m ? split.DeficitPln : null,
+            Cushion = cushion is null ? null : cushion with { AllocationPln = split.CushionPln },
+            Groups =
+            [
+                .. regular.Select(g =>
+                {
+                    var contribution = g.MonthlyContributionPln;
+                    var values = (replica?.ByGroup ?? [])
+                        .Where(v => v.GroupId == g.Id)
+                        .SelectMany(v => v.ByAssetClass)
+                        .GroupBy(c => c.AssetClass)
+                        .ToDictionary(c => c.Key, c => c.Sum(v => v.ValuePln));
+
+                    return new SplitGroupResponse
+                    {
+                        GroupId = g.Id,
+                        Name = g.Name,
+                        SharePercent = g.SharePercent ?? 0m,
+                        ContributionPln = contribution,
+                        AllocationPln = allocations[g.Id],
+                        Breakdown = contribution > 0m && g.ClassAllocation.Count > 0
+                            ? [.. ContributionBreakdown.Compute(contribution, g.ClassAllocation, values)
+                                .Select(p => new SplitClassAmountResponse { AssetClass = p.AssetClass, AmountPln = p.AmountPln })]
+                            : null
+                    };
+                })
+            ],
+            UnassignedPln = split.UnassignedPln,
+            ValuationMissing = replica is null
+        };
+    }
+
+    private static int MonthsBetween(YearMonth from, YearMonth to) => (to.Year - from.Year) * 12 + to.Month - from.Month;
 
     private static PlanningExpensesResponse BuildExpenses(YearMonth viewed, PlanningForecast forecast)
     {
@@ -161,6 +247,11 @@ internal static class PlanningMonthBuilder
         {
             Payments = payments,
             CostPln = forecast.CostIn(viewed),
+            GroupContributions =
+            [
+                .. forecast.ContributingGroupsIn(viewed)
+                    .Select(g => new GroupContributionResponse { GroupId = g.Id, Name = g.Name, AmountPln = g.MonthlyContributionPln })
+            ],
             Definitions = definitions,
             OneOffs = forecast.OneOffExpensesIn(viewed)
         };

@@ -431,7 +431,11 @@
                   </button>
                 </div>
 
-                @if (spending.payments.length === 0 && monthOneOffExpenses().length === 0) {
+                @if (
+                  spending.payments.length === 0 &&
+                  monthOneOffExpenses().length === 0 &&
+                  contributions().length === 0
+                ) {
                   <p class="planning-section__empty">{{ 'planning.expenses.empty' | transloco }}</p>
                 } @else {
                   <table class="planning-table">
@@ -461,6 +465,18 @@
                           <td>{{ oneOff.name }}</td>
                           <td class="planning-table__amount">
                             {{ formatMoney(oneOff.amount, 'PLN') }}
+                          </td>
+                        </tr>
+                      }
+                      @for (line of contributions(); track line.groupId) {
+                        <tr data-testid="group-contribution">
+                          <td></td>
+                          <td>
+                            {{ line.name }}
+                            <mat-chip>{{ 'planning.expenses.contribution' | transloco }}</mat-chip>
+                          </td>
+                          <td class="planning-table__amount">
+                            {{ formatMoney(line.amountPln, 'PLN') }}
                           </td>
                         </tr>
                       }
@@ -642,6 +658,129 @@
               <span class="planning-section__incomplete" data-testid="free-funds-incomplete">
                 {{ 'planning.balance.incomplete' | transloco }}
               </span>
+            }
+          </section>
+        }
+
+        @if (split(); as plan) {
+          <section class="planning-section planning-split" data-testid="split-section">
+            <h2>{{ 'planning.split.title' | transloco }}</h2>
+            <p class="planning-section__empty">{{ 'planning.split.info' | transloco }}</p>
+
+            @if (plan.valuationMissing) {
+              <p class="planning-section__incomplete" data-testid="split-valuation-missing">
+                {{ 'planning.split.valuationMissing' | transloco }}
+              </p>
+            }
+
+            @if (plan.deficitPln !== null) {
+              <p class="planning-free-funds__deficit" data-testid="split-deficit">
+                {{ 'planning.split.deficit' | transloco }}:
+                {{ formatMoney(plan.deficitPln, 'PLN') }}
+              </p>
+            }
+
+            @if (plan.cushion; as cushion) {
+              <div class="planning-split__row" data-testid="split-cushion">
+                <strong>{{ cushion.name }}</strong>
+                <span>
+                  {{ 'planning.split.level' | transloco }}:
+                  {{ formatMoney(cushion.levelPln, 'PLN') }} /
+                  {{ formatMoney(cushion.targetPln, 'PLN') }}
+                </span>
+                <span>
+                  {{ 'planning.split.missing' | transloco }}:
+                  {{ formatMoney(cushion.missingPln, 'PLN') }}
+                </span>
+                @if (plan.deficitPln === null) {
+                  <span>
+                    {{ 'planning.split.allocation' | transloco }}:
+                    {{ formatMoney(cushion.allocationPln, 'PLN') }}
+                  </span>
+                }
+              </div>
+            }
+
+            <ul class="planning-definitions">
+              @for (group of plan.groups; track group.groupId) {
+                <li class="planning-definition" data-testid="split-group">
+                  <div class="planning-definition__main">
+                    <span class="planning-definition__name">{{ group.name }}</span>
+                    <span>{{ group.sharePercent }}%</span>
+                    @if (plan.deficitPln === null) {
+                      <span>
+                        {{ 'planning.split.allocation' | transloco }}:
+                        {{ formatMoney(group.allocationPln, 'PLN') }}
+                      </span>
+                    }
+                    @if (group.breakdown) {
+                      <span>
+                        {{ 'planning.split.contribution' | transloco }}:
+                        {{ formatMoney(group.contributionPln, 'PLN') }}
+                      </span>
+                      <button
+                        mat-button
+                        type="button"
+                        data-testid="split-breakdown-toggle"
+                        [attr.aria-expanded]="isExpanded(group.groupId)"
+                        (click)="toggleBreakdown(group.groupId)"
+                      >
+                        {{ 'planning.split.breakdown' | transloco }}
+                      </button>
+                    }
+                  </div>
+                  @if (group.breakdown && isExpanded(group.groupId)) {
+                    <ul>
+                      @for (part of group.breakdown; track part.assetClass) {
+                        <li data-testid="split-breakdown">
+                          {{ assetClassLabel(part.assetClass) | transloco }}:
+                          {{ formatMoney(part.amountPln, 'PLN') }}
+                        </li>
+                      }
+                    </ul>
+                  }
+                </li>
+              }
+            </ul>
+
+            @if (plan.unassignedPln !== 0) {
+              <p data-testid="split-unassigned">
+                {{ 'planning.split.unassigned' | transloco }}:
+                {{ formatMoney(plan.unassignedPln, 'PLN') }}
+              </p>
+            }
+
+            @if (plan.groups.length > 0) {
+              <h3>{{ 'planning.split.shares' | transloco }}</h3>
+              <div class="planning-split__shares">
+                @for (group of plan.groups; track group.groupId) {
+                  <label class="planning-settings__lead-days">
+                    <span>{{ group.name }} (%)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      [value]="shareValue(group)"
+                      (input)="editShare(group, $event)"
+                      data-testid="share-input"
+                    />
+                  </label>
+                }
+                <span data-testid="share-sum">
+                  {{ 'planning.split.sum' | transloco }}: {{ shareSum() ?? '-' }}%
+                </span>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  data-testid="shares-save"
+                  [disabled]="!sharesSavable()"
+                  (click)="saveShares()"
+                >
+                  {{ 'planning.split.saveShares' | transloco }}
+                </button>
+              </div>
             }
           </section>
         }

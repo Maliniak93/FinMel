@@ -35,6 +35,14 @@ public sealed class DeleteAssetGroupHandler(
             place.DefaultGroupId = null;
         }
 
+        if (group.Kind == AssetGroupKind.Regular)
+        {
+            var otherRegular = await dbContext.AssetGroups
+                .Where(g => g.Id != id && g.Kind == AssetGroupKind.Regular)
+                .ToListAsync(cancellationToken);
+            GroupShares.HandOver(group.SharePercent ?? 0m, otherRegular);
+        }
+
         dbContext.AssetGroups.Remove(group);
         await dbContext.SaveChangesAsync(cancellationToken);
 

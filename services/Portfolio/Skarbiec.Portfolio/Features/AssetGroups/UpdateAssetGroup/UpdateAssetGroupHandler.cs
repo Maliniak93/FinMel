@@ -30,6 +30,24 @@ public sealed class UpdateAssetGroupHandler(PortfolioDbContext dbContext)
             return conflict;
         }
 
+        if (group.Kind != request.Kind)
+        {
+            var otherRegular = await dbContext.AssetGroups
+                .Where(g => g.Id != id && g.Kind == AssetGroupKind.Regular)
+                .ToListAsync(cancellationToken);
+
+            if (request.Kind == AssetGroupKind.Cushion)
+            {
+                var released = group.SharePercent ?? 0m;
+                group.SharePercent = null;
+                GroupShares.HandOver(released, otherRegular);
+            }
+            else
+            {
+                GroupShares.StartNewRegular(group, otherRegular);
+            }
+        }
+
         // No event: AssetPositionChanged carries only the group id, not its name, colour or target.
         group.Name = name;
         group.Color = request.Color;
@@ -43,6 +61,7 @@ public sealed class UpdateAssetGroupHandler(PortfolioDbContext dbContext)
         var assetCount = await dbContext.Assets.CountAsync(a => a.GroupId == id, cancellationToken);
 
         return new AssetGroupResponse(
-            group.Id, group.Name, group.Color, group.TargetPln, assetCount, group.Kind, group.MonthlyContributionPln, group.ClassAllocation);
+            group.Id, group.Name, group.Color, group.TargetPln, assetCount, group.Kind, group.MonthlyContributionPln, group.ClassAllocation,
+            group.SharePercent);
     }
 }
