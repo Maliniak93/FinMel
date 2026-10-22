@@ -456,6 +456,9 @@
       "hint": "Podziel majątek na grupy, np. emeryturę albo poduszkę finansową, aby zobaczyć jego strukturę.",
       "link": "Przejdź do grup",
       "progress": "{{ value }} / {{ target }} ({{ percent }}%)",
+      "cushionLevel": "Stan poduszki: {{ value }} z {{ target }}.",
+      "cushionMissing": "Brakuje: {{ amount }}.",
+      "classShare": "{{ class }}: {{ current }} (cel {{ target }})",
       "filter": "Grupa",
       "loadFailed": "Nie udało się wczytać grup."
     },
@@ -704,6 +707,12 @@
     },
     "assetCount": "Aktywa: {{ count }}",
     "target": "Cel: {{ amount }}",
+    "contribution": "Wpłata miesięczna: {{ amount }}",
+    "allocationShare": "{{ class }} {{ percent }}",
+    "kind": {
+      "regular": "Zwykła",
+      "cushion": "Poduszka"
+    },
     "colors": {
       "blue": "Niebieski",
       "green": "Zielony",
@@ -726,10 +735,22 @@
       "color": "Kolor",
       "colorRequired": "Wybierz kolor.",
       "target": "Cel (PLN)",
-      "targetHint": "Opcjonalny",
-      "targetInvalid": "Cel musi być większy od zera."
+      "targetHint": "Opcjonalny, wymagany dla poduszki",
+      "targetInvalid": "Cel musi być większy od zera.",
+      "targetRequired": "Poduszka wymaga celu.",
+      "kind": "Rodzaj",
+      "contribution": "Wpłata miesięczna (PLN)",
+      "contributionInvalid": "Wpłata musi mieścić się w przedziale od 0 do 1 000 000 000.",
+      "allocation": "Alokacja klas aktywów",
+      "allocationClass": "Klasa",
+      "allocationPercent": "Udział (%)",
+      "allocationAdd": "Dodaj klasę",
+      "allocationSum": "Suma: {{ sum }}% z 100%",
+      "allocationDuplicate": "Każda klasa może wystąpić tylko raz."
     },
     "errors": {
+      "invalidContribution": "Wpłata musi być od 0 do 1 000 000 000 i mieć najwyżej 2 miejsca po przecinku.",
+      "cushionExists": "Możesz mieć tylko jedną poduszkę.",
       "duplicateName": "Grupa o tej nazwie już istnieje.",
       "colorTaken": "Ten kolor jest już używany przez inną grupę.",
       "invalidTarget": "Cel musi być większy od zera, mieć najwyżej 2 miejsca po przecinku i nie przekraczać dopuszczalnej wartości.",

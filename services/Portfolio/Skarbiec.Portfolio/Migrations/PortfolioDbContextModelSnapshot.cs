@@ -462,6 +462,17 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Regular");
+
+                    b.Property<decimal>("MonthlyContributionPln")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -473,6 +484,19 @@ namespace Skarbiec.Portfolio.Migrations
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "ClassAllocation", "Skarbiec.Portfolio.Data.AssetGroup.ClassAllocation#AssetGroupClassShare", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<int>("AssetClass");
+
+                            b1.Property<decimal>("Percent");
+
+                            b1
+                                .ToJson("ClassAllocation")
+                                .HasColumnType("jsonb");
+                        });
 
                     b.HasKey("Id");
 

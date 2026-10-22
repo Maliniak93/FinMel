@@ -20,6 +20,7 @@ import { formatAmount, formatDate, formatMoney, formatPercent } from '../../shar
 import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart';
 import { assetClassLabel } from '../assets/asset-class';
 import { UNGROUPED_COLOR, groupColor } from '../groups/group-color';
+import { GROUP_KIND } from '../groups/group-kind';
 import { assetClassColor } from './asset-class-color';
 import { AllocationCard } from './allocation-card/allocation-card';
 import { CashCard } from './cash-card/cash-card';
@@ -37,6 +38,19 @@ interface GroupProgress {
   readonly bar: number;
 }
 
+interface GroupClassShare {
+  readonly assetClass: number;
+  readonly label: string;
+  readonly currentPercent: number;
+  readonly targetPercent: number;
+}
+
+interface GroupCushion {
+  readonly valuePln: number;
+  readonly targetPln: number;
+  readonly missingPln: number;
+}
+
 interface GroupRow {
   readonly key: string;
   readonly label: string;
@@ -45,6 +59,8 @@ interface GroupRow {
   readonly percentage: number;
   readonly targetPln: number | null;
   readonly progress: GroupProgress | null;
+  readonly classShares: readonly GroupClassShare[];
+  readonly cushion: GroupCushion | null;
 }
 
 function toGrosze(amount: number | string): number {
@@ -225,6 +241,36 @@ export class Dashboard {
         targetPln === null || targetPln <= 0
           ? null
           : Math.round((toGrosze(valuePln) * 100) / toGrosze(targetPln));
+      const groupGrosze = toGrosze(valuePln);
+      const held = new Map(
+        (entry?.byAssetClass ?? []).map((value) => [
+          Number(value.assetClass),
+          toGrosze(value.valuePln),
+        ]),
+      );
+      const share = (assetClass: number, targetPercent: number): GroupClassShare => ({
+        assetClass,
+        label: assetClassLabel(assetClass),
+        currentPercent:
+          groupGrosze > 0 ? Math.round(((held.get(assetClass) ?? 0) * 1000) / groupGrosze) / 10 : 0,
+        targetPercent,
+      });
+      const allocation = group.classAllocation.map((item) => ({
+        assetClass: Number(item.assetClass),
+        percent: Number(item.percent),
+      }));
+      const classShares =
+        allocation.length === 0
+          ? []
+          : [
+              ...allocation.map((item) => share(item.assetClass, item.percent)),
+              ...[...held]
+                .filter(
+                  ([assetClass, grosze]) =>
+                    grosze > 0 && !allocation.some((item) => item.assetClass === assetClass),
+                )
+                .map(([assetClass]) => share(assetClass, 0)),
+            ];
       return {
         key: group.id,
         label: group.name,
@@ -236,6 +282,15 @@ export class Dashboard {
           percent === null
             ? null
             : { percent, bar: Math.min(MAX_BAR_PERCENT, Math.max(0, percent)) },
+        classShares,
+        cushion:
+          Number(group.kind) === GROUP_KIND.Cushion && targetPln !== null && targetPln > 0
+            ? {
+                valuePln,
+                targetPln,
+                missingPln: Math.max(0, toGrosze(targetPln) - groupGrosze) / 100,
+              }
+            : null,
       };
     });
     const ungrouped = entries.filter((entry) => !entry.groupId || !known.has(entry.groupId));
@@ -250,6 +305,8 @@ export class Dashboard {
         percentage: hundredths / 100,
         targetPln: null,
         progress: null,
+        classShares: [],
+        cushion: null,
       });
     }
     return rows;

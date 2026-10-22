@@ -273,10 +273,31 @@
           }
         }
       },
+      "DashboardGroupClassValue": {
+        "required": [
+          "assetClass",
+          "valuePln"
+        ],
+        "type": "object",
+        "properties": {
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "DashboardGroupValue": {
         "required": [
           "valuePln",
-          "percentage"
+          "percentage",
+          "byAssetClass"
         ],
         "type": "object",
         "properties": {
@@ -302,6 +323,12 @@
               "string"
             ],
             "format": "double"
+          },
+          "byAssetClass": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardGroupClassValue"
+            }
           }
         }
       },

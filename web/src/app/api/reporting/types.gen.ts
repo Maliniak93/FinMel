@@ -20,10 +20,16 @@ export type DashboardAssetClassValue = {
     percentage: number | string;
 };
 
+export type DashboardGroupClassValue = {
+    assetClass: AssetClass;
+    valuePln: number | string;
+};
+
 export type DashboardGroupValue = {
     groupId?: null | string;
     valuePln: number | string;
     percentage: number | string;
+    byAssetClass: Array<DashboardGroupClassValue>;
 };
 
 export type DashboardResponse = {

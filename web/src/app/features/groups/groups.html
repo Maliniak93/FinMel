@@ -60,6 +60,31 @@
               {{ 'groups.target' | transloco: { amount: formatMoney(group.targetPln) } }}
             </span>
           }
+          <span class="group-row__kind" data-testid="group-kind">{{
+            groupKindLabel(group.kind) | transloco
+          }}</span>
+          @if (hasContribution(group)) {
+            <span class="group-row__contribution" data-testid="group-contribution">
+              {{
+                'groups.contribution'
+                  | transloco: { amount: formatMoney(group.monthlyContributionPln) }
+              }}
+            </span>
+          }
+          @if (group.classAllocation.length > 0) {
+            <span class="group-row__allocation" data-testid="group-allocation">
+              @for (share of group.classAllocation; track share.assetClass; let last = $last) {
+                {{
+                  'groups.allocationShare'
+                    | transloco
+                      : {
+                          class: assetClassLabel(share.assetClass) | transloco,
+                          percent: formatPercent(share.percent),
+                        }
+                }}{{ last ? '' : ',' }}
+              }
+            </span>
+          }
           <span class="group-row__spacer"></span>
           <button
             mat-stroked-button

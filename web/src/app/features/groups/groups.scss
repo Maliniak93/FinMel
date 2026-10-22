@@ -49,7 +49,10 @@
 }
 
 .group-row__count,
-.group-row__target {
+.group-row__target,
+.group-row__kind,
+.group-row__contribution,
+.group-row__allocation {
   color: var(--mat-sys-on-surface-variant);
 }
 

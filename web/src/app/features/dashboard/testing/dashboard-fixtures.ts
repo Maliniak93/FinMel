@@ -33,7 +33,17 @@ export const dashboard: DashboardResponse = {
       percentage: 100,
     },
   ],
-  byGroup: [{ groupId: null, valuePln: 15000, percentage: 100 }],
+  byGroup: [
+    {
+      groupId: null,
+      valuePln: 15000,
+      percentage: 100,
+      byAssetClass: [
+        { assetClass: 0, valuePln: 5000 },
+        { assetClass: 2, valuePln: 10000 },
+      ],
+    },
+  ],
 };
 
 export const RETIREMENT_GROUP_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -41,20 +51,54 @@ export const INVESTMENTS_GROUP_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 export const CUSHION_GROUP_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
 export const groups: AssetGroupResponse[] = [
-  { id: RETIREMENT_GROUP_ID, name: 'Emerytura', color: 'blue', targetPln: null, assetCount: 2 },
-  { id: INVESTMENTS_GROUP_ID, name: 'Inwestycje', color: 'green', targetPln: null, assetCount: 1 },
-  { id: CUSHION_GROUP_ID, name: 'Poduszka', color: 'orange', targetPln: 30000, assetCount: 1 },
+  {
+    id: RETIREMENT_GROUP_ID,
+    name: 'Emerytura',
+    color: 'blue',
+    targetPln: null,
+    assetCount: 2,
+    kind: 0,
+    monthlyContributionPln: 0,
+    classAllocation: [],
+  },
+  {
+    id: INVESTMENTS_GROUP_ID,
+    name: 'Inwestycje',
+    color: 'green',
+    targetPln: null,
+    assetCount: 1,
+    kind: 0,
+    monthlyContributionPln: 0,
+    classAllocation: [],
+  },
+  {
+    id: CUSHION_GROUP_ID,
+    name: 'Poduszka',
+    color: 'orange',
+    targetPln: 30000,
+    assetCount: 1,
+    kind: 1,
+    monthlyContributionPln: 0,
+    classAllocation: [],
+  },
 ];
 
+type GroupEntry = Omit<DashboardResponse['byGroup'][number], 'byAssetClass'> &
+  Partial<Pick<DashboardResponse['byGroup'][number], 'byAssetClass'>>;
+
 export function dashboardWithGroups(
-  byGroup: DashboardResponse['byGroup'] = [
+  byGroup: GroupEntry[] = [
     { groupId: RETIREMENT_GROUP_ID, valuePln: 75000, percentage: 46.88 },
     { groupId: INVESTMENTS_GROUP_ID, valuePln: 55000, percentage: 34.38 },
     { groupId: CUSHION_GROUP_ID, valuePln: 28000, percentage: 17.5 },
     { groupId: null, valuePln: 2000, percentage: 1.25 },
   ],
 ): DashboardResponse {
-  return { ...dashboard, netWorthPln: 160000, byGroup };
+  return {
+    ...dashboard,
+    netWorthPln: 160000,
+    byGroup: byGroup.map((entry) => ({ ...entry, byAssetClass: entry.byAssetClass ?? [] })),
+  };
 }
 
 export const dashboardWithClasses: DashboardResponse = {

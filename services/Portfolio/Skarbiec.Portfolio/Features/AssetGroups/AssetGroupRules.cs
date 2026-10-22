@@ -6,7 +6,13 @@ namespace Skarbiec.Portfolio.Features.AssetGroups;
 
 internal static class AssetGroupRules
 {
-    public static Error? ValidateFields(string name, string color, decimal? targetPln)
+    public static Error? ValidateFields(
+        string name,
+        string color,
+        decimal? targetPln,
+        AssetGroupKind kind,
+        decimal monthlyContributionPln,
+        List<AssetGroupClassShare> classAllocation)
     {
         if (name.Length is 0 or > AssetGroupErrors.MaxNameLength)
         {
@@ -24,12 +30,44 @@ internal static class AssetGroupRules
             return AssetGroupErrors.InvalidTarget;
         }
 
-        return null;
+        if (kind == AssetGroupKind.Cushion && targetPln is not > 0)
+        {
+            return AssetGroupErrors.TargetRequiredForCushion;
+        }
+
+        if (monthlyContributionPln is < 0 or > AssetGroupErrors.MaxMonthlyContributionPln
+            || decimal.Round(monthlyContributionPln, 2) != monthlyContributionPln)
+        {
+            return AssetGroupErrors.InvalidContribution;
+        }
+
+        return ValidateAllocation(classAllocation);
+    }
+
+    private static Error? ValidateAllocation(List<AssetGroupClassShare> allocation)
+    {
+        if (allocation.Count == 0)
+        {
+            return null;
+        }
+
+        if (allocation.Any(s => !Enum.IsDefined(s.AssetClass) || s.Percent is <= 0 or > 100 || decimal.Round(s.Percent, 1) != s.Percent)
+            || allocation.Select(s => s.AssetClass).Distinct().Count() != allocation.Count)
+        {
+            return AssetGroupErrors.InvalidClassAllocation;
+        }
+
+        return allocation.Sum(s => s.Percent) == 100m ? null : AssetGroupErrors.ClassAllocationSum;
     }
 
     // The group being edited is excluded, so renaming it to its own name in another case succeeds.
     public static async Task<Error?> UniquenessErrorAsync(
-        this PortfolioDbContext dbContext, Guid? ownId, string name, string color, CancellationToken cancellationToken)
+        this PortfolioDbContext dbContext,
+        Guid? ownId,
+        string name,
+        string color,
+        AssetGroupKind kind,
+        CancellationToken cancellationToken)
     {
         var lowerName = name.ToLowerInvariant();
 
@@ -43,6 +81,11 @@ internal static class AssetGroupRules
         if (await others.AnyAsync(g => g.Color == color, cancellationToken))
         {
             return AssetGroupErrors.ColorTaken(color);
+        }
+
+        if (kind == AssetGroupKind.Cushion && await others.AnyAsync(g => g.Kind == AssetGroupKind.Cushion, cancellationToken))
+        {
+            return AssetGroupErrors.CushionGroupExists;
         }
 
         return null;

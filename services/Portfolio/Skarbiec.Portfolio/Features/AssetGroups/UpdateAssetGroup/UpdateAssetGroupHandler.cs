@@ -17,12 +17,15 @@ public sealed class UpdateAssetGroupHandler(PortfolioDbContext dbContext)
 
         var name = request.Name.Trim();
 
-        if (AssetGroupRules.ValidateFields(name, request.Color, request.TargetPln) is { } invalid)
+        var allocation = request.ClassAllocation ?? [];
+
+        if (AssetGroupRules.ValidateFields(
+                name, request.Color, request.TargetPln, request.Kind, request.MonthlyContributionPln, allocation) is { } invalid)
         {
             return invalid;
         }
 
-        if (await dbContext.UniquenessErrorAsync(id, name, request.Color, cancellationToken) is { } conflict)
+        if (await dbContext.UniquenessErrorAsync(id, name, request.Color, request.Kind, cancellationToken) is { } conflict)
         {
             return conflict;
         }
@@ -31,11 +34,15 @@ public sealed class UpdateAssetGroupHandler(PortfolioDbContext dbContext)
         group.Name = name;
         group.Color = request.Color;
         group.TargetPln = request.TargetPln;
+        group.Kind = request.Kind;
+        group.MonthlyContributionPln = request.MonthlyContributionPln;
+        group.ClassAllocation = allocation;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
         var assetCount = await dbContext.Assets.CountAsync(a => a.GroupId == id, cancellationToken);
 
-        return new AssetGroupResponse(group.Id, group.Name, group.Color, group.TargetPln, assetCount);
+        return new AssetGroupResponse(
+            group.Id, group.Name, group.Color, group.TargetPln, assetCount, group.Kind, group.MonthlyContributionPln, group.ClassAllocation);
     }
 }

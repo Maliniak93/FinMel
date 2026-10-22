@@ -456,6 +456,9 @@
       "hint": "Split your wealth into groups such as retirement or an emergency cushion to see how it divides.",
       "link": "Manage groups",
       "progress": "{{ value }} / {{ target }} ({{ percent }}%)",
+      "cushionLevel": "Cushion level: {{ value }} of {{ target }}.",
+      "cushionMissing": "Missing: {{ amount }}.",
+      "classShare": "{{ class }}: {{ current }} (target {{ target }})",
       "filter": "Group",
       "loadFailed": "Failed to load groups."
     },
@@ -704,6 +707,12 @@
     },
     "assetCount": "Assets: {{ count }}",
     "target": "Target: {{ amount }}",
+    "contribution": "Monthly contribution: {{ amount }}",
+    "allocationShare": "{{ class }} {{ percent }}",
+    "kind": {
+      "regular": "Regular",
+      "cushion": "Cushion"
+    },
     "colors": {
       "blue": "Blue",
       "green": "Green",
@@ -726,10 +735,22 @@
       "color": "Colour",
       "colorRequired": "Choose a colour.",
       "target": "Target (PLN)",
-      "targetHint": "Optional",
-      "targetInvalid": "The target must be above 0."
+      "targetHint": "Optional, required for a cushion",
+      "targetInvalid": "The target must be above 0.",
+      "targetRequired": "A cushion needs a target.",
+      "kind": "Kind",
+      "contribution": "Monthly contribution (PLN)",
+      "contributionInvalid": "The contribution must be between 0 and 1,000,000,000.",
+      "allocation": "Asset class allocation",
+      "allocationClass": "Class",
+      "allocationPercent": "Share (%)",
+      "allocationAdd": "Add class",
+      "allocationSum": "Sum: {{ sum }}% of 100%",
+      "allocationDuplicate": "Each class can appear only once."
     },
     "errors": {
+      "invalidContribution": "The contribution must be 0 to 1,000,000,000 with at most 2 decimals.",
+      "cushionExists": "Only one cushion group is allowed.",
       "duplicateName": "A group with this name already exists.",
       "colorTaken": "This colour is already used by another group.",
       "invalidTarget": "The target must be above 0, have at most 2 decimals and stay within the allowed maximum.",

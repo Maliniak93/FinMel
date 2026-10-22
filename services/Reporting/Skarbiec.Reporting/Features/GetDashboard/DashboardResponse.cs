@@ -23,6 +23,15 @@ public sealed record DashboardGroupValue
     public Guid? GroupId { get; init; }
     public required decimal ValuePln { get; init; }
     public required decimal Percentage { get; init; }
+
+    /// <summary>The group's value split by asset class, largest first; the values sum to ValuePln.</summary>
+    public required IReadOnlyList<DashboardGroupClassValue> ByAssetClass { get; init; }
+}
+
+public sealed record DashboardGroupClassValue
+{
+    public required AssetClass AssetClass { get; init; }
+    public required decimal ValuePln { get; init; }
 }
 
 public sealed record DashboardAssetClassValue

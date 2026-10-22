@@ -82,6 +82,11 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
                     GroupId = g.Key,
                     ValuePln = valuePln,
                     Percentage = netWorthPln == 0m ? 0m : Math.Round(valuePln / netWorthPln * 100m, 2),
+                    ByAssetClass = g
+                        .GroupBy(l => l.AssetClass)
+                        .Select(c => new DashboardGroupClassValue { AssetClass = c.Key, ValuePln = c.Sum(l => l.ValuePln) })
+                        .OrderByDescending(c => c.ValuePln)
+                        .ToList(),
                 };
             })
             .OrderByDescending(b => b.ValuePln)

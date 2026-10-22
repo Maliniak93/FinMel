@@ -182,6 +182,41 @@
                             [attr.aria-label]="row.label"
                           />
                         }
+                        @if (row.cushion; as cushion) {
+                          <p class="dashboard-page__group-detail" data-testid="cushion-level">
+                            {{
+                              'dashboard.groups.cushionLevel'
+                                | transloco
+                                  : {
+                                      value: formatMoney(cushion.valuePln),
+                                      target: formatMoney(cushion.targetPln),
+                                    }
+                            }}
+                            @if (cushion.missingPln > 0) {
+                              {{
+                                'dashboard.groups.cushionMissing'
+                                  | transloco: { amount: formatMoney(cushion.missingPln) }
+                              }}
+                            }
+                          </p>
+                        }
+                        @if (row.classShares.length > 0) {
+                          <ul class="dashboard-page__class-shares" data-testid="group-class-shares">
+                            @for (share of row.classShares; track share.assetClass) {
+                              <li>
+                                {{
+                                  'dashboard.groups.classShare'
+                                    | transloco
+                                      : {
+                                          class: share.label | transloco,
+                                          current: formatPercent(share.currentPercent),
+                                          target: formatPercent(share.targetPercent),
+                                        }
+                                }}
+                              </li>
+                            }
+                          </ul>
+                        }
                       </li>
                     }
                   </ul>

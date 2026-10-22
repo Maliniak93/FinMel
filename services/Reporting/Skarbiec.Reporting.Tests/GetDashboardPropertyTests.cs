@@ -28,21 +28,23 @@ public sealed class GetDashboardPropertyTests(SkarbiecContainersFixture containe
 
             await using (var db = CreateDbContext(userId))
             {
-                var lines = new List<(Guid AssetId, decimal Value)>();
+                var classes = new[] { AssetClass.Cash, AssetClass.Stock, AssetClass.Deposit };
+                var lines = new List<(Guid AssetId, decimal Value, AssetClass AssetClass)>();
                 for (var i = 0; i < assetCount; i++)
                 {
                     var assetId = Guid.NewGuid();
                     var value = random.Next(1, 100_000) / 100m;
                     var groupId = random.Next(groups.Length + 1) is var pick && pick < groups.Length ? groups[pick] : (Guid?)null;
                     total += value;
-                    lines.Add((assetId, value));
-                    await db.SeedPositionAsync(assetId, userId, null, cancellationToken, groupId: groupId);
+                    var assetClass = classes[random.Next(classes.Length)];
+                    lines.Add((assetId, value, assetClass));
+                    await db.SeedPositionAsync(assetId, userId, null, cancellationToken, assetClass, groupId: groupId);
                 }
 
                 await db.SeedSnapshotAsync(userId, snapshotDate, total, cancellationToken);
-                foreach (var (assetId, value) in lines)
+                foreach (var (assetId, value, assetClass) in lines)
                 {
-                    await db.SeedValuationLineAsync(userId, null, assetId, snapshotDate, value, cancellationToken);
+                    await db.SeedValuationLineAsync(userId, null, assetId, snapshotDate, value, cancellationToken, assetClass);
                 }
             }
 
@@ -52,6 +54,7 @@ public sealed class GetDashboardPropertyTests(SkarbiecContainersFixture containe
 
             Assert.Equal(total, body!.NetWorthPln);
             Assert.Equal(body.NetWorthPln, body.ByGroup.Sum(g => g.ValuePln));
+            Assert.All(body.ByGroup, g => Assert.Equal(g.ValuePln, g.ByAssetClass.Sum(c => c.ValuePln)));
         }
     }
 }

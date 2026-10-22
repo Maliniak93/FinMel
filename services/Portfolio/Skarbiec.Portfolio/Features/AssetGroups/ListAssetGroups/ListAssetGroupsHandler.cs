@@ -15,12 +15,16 @@ public sealed class ListAssetGroupsHandler(PortfolioDbContext dbContext)
                 g.Name,
                 g.Color,
                 g.TargetPln,
+                g.Kind,
+                g.MonthlyContributionPln,
+                g.ClassAllocation,
                 AssetCount = dbContext.Assets.Count(a => a.GroupId == g.Id)
             })
             .ToListAsync(cancellationToken);
 
         return [.. groups
             .OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(g => new AssetGroupResponse(g.Id, g.Name, g.Color, g.TargetPln, g.AssetCount))];
+            .Select(g => new AssetGroupResponse(
+                g.Id, g.Name, g.Color, g.TargetPln, g.AssetCount, g.Kind, g.MonthlyContributionPln, g.ClassAllocation))];
     }
 }
