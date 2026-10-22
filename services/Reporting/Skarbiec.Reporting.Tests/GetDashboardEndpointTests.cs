@@ -324,4 +324,42 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.DoesNotContain(body.ByGroup, g => g.GroupId == emptyGroup);
         Assert.Equal(body.NetWorthPln, body.ByGroup.Sum(g => g.ValuePln));
     }
+
+    [Fact]
+    public async Task ByGroupCarriesClassValues()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var group = Guid.NewGuid();
+        var snapshotDate = new DateOnly(2026, 8, 1);
+        var deposit = Guid.NewGuid();
+        var bank = Guid.NewGuid();
+        var bank2 = Guid.NewGuid();
+        var loose = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(deposit, userId, null, cancellationToken, AssetClass.Deposit, groupId: group);
+            await db.SeedPositionAsync(bank, userId, null, cancellationToken, AssetClass.BankAccount, groupId: group);
+            await db.SeedPositionAsync(bank2, userId, null, cancellationToken, AssetClass.BankAccount, groupId: group);
+            await db.SeedPositionAsync(loose, userId, null, cancellationToken, AssetClass.Cash);
+            await db.SeedSnapshotAsync(userId, snapshotDate, 1_000m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, null, deposit, snapshotDate, 600m, cancellationToken, AssetClass.Deposit);
+            await db.SeedValuationLineAsync(userId, null, bank, snapshotDate, 150m, cancellationToken, AssetClass.BankAccount);
+            await db.SeedValuationLineAsync(userId, null, bank2, snapshotDate, 50m, cancellationToken, AssetClass.BankAccount);
+            await db.SeedValuationLineAsync(userId, null, loose, snapshotDate, 200m, cancellationToken, AssetClass.Cash);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var grouped = Assert.Single(body!.ByGroup, g => g.GroupId == group);
+        Assert.Equal(
+            [(AssetClass.Deposit, 600m), (AssetClass.BankAccount, 200m)],
+            grouped.ByAssetClass.OrderByDescending(c => c.ValuePln).Select(c => (c.AssetClass, c.ValuePln)).ToArray());
+        var ungrouped = Assert.Single(body.ByGroup, g => g.GroupId == null);
+        Assert.Equal([(AssetClass.Cash, 200m)], ungrouped.ByAssetClass.Select(c => (c.AssetClass, c.ValuePln)).ToArray());
+    }
 }

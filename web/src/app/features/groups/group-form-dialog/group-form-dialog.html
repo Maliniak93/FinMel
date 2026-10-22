@@ -46,10 +46,23 @@
     </fieldset>
 
     <mat-form-field appearance="outline" class="group-form-dialog__field">
+      <mat-label>{{ 'groups.form.kind' | transloco }}</mat-label>
+      <mat-select formControlName="kind" data-testid="kind-select">
+        @for (kind of kinds; track kind.value) {
+          <mat-option [value]="kind.value">{{ kind.label | transloco }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="group-form-dialog__field">
       <mat-label>{{ 'groups.form.target' | transloco }}</mat-label>
       <input matInput type="number" min="0" step="0.01" formControlName="targetPln" />
       <mat-hint>{{ 'groups.form.targetHint' | transloco }}</mat-hint>
-      @if (form.controls.targetPln.hasError('min')) {
+      @if (form.controls.targetPln.hasError('required')) {
+        <mat-error data-testid="target-error">{{
+          'groups.form.targetRequired' | transloco
+        }}</mat-error>
+      } @else if (form.controls.targetPln.hasError('min')) {
         <mat-error data-testid="target-error">{{
           'groups.form.targetInvalid' | transloco
         }}</mat-error>
@@ -59,6 +72,82 @@
         }}</mat-error>
       }
     </mat-form-field>
+
+    <mat-form-field appearance="outline" class="group-form-dialog__field">
+      <mat-label>{{ 'groups.form.contribution' | transloco }}</mat-label>
+      <input matInput type="number" min="0" step="0.01" formControlName="monthlyContributionPln" />
+      @if (form.controls.monthlyContributionPln.hasError('server')) {
+        <mat-error data-testid="contribution-error">{{
+          form.controls.monthlyContributionPln.getError('server')
+        }}</mat-error>
+      } @else if (form.controls.monthlyContributionPln.invalid) {
+        <mat-error data-testid="contribution-error">{{
+          'groups.form.contributionInvalid' | transloco
+        }}</mat-error>
+      }
+    </mat-form-field>
+
+    <fieldset class="group-form-dialog__allocation" data-testid="allocation-editor">
+      <legend>{{ 'groups.form.allocation' | transloco }}</legend>
+      <div formArrayName="allocation">
+        @for (row of form.controls.allocation.controls; track row; let index = $index) {
+          <div class="group-form-dialog__allocation-row" [formGroupName]="index">
+            <mat-form-field appearance="outline" class="group-form-dialog__allocation-class">
+              <mat-label>{{ 'groups.form.allocationClass' | transloco }}</mat-label>
+              <mat-select formControlName="assetClass">
+                @for (assetClass of assetClasses; track assetClass.value) {
+                  <mat-option [value]="assetClass.value">{{
+                    assetClass.label | transloco
+                  }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="group-form-dialog__allocation-percent">
+              <mat-label>{{ 'groups.form.allocationPercent' | transloco }}</mat-label>
+              <input
+                matInput
+                type="number"
+                min="0.1"
+                max="100"
+                step="0.1"
+                formControlName="percent"
+              />
+            </mat-form-field>
+            <button
+              mat-icon-button
+              type="button"
+              data-testid="remove-allocation-row"
+              [attr.aria-label]="'common.delete' | transloco"
+              (click)="removeAllocationRow(index)"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+      <button
+        mat-button
+        type="button"
+        data-testid="add-allocation-row"
+        (click)="addAllocationRow()"
+      >
+        {{ 'groups.form.allocationAdd' | transloco }}
+      </button>
+      @if (form.controls.allocation.length > 0) {
+        <p
+          class="group-form-dialog__allocation-sum"
+          [class.group-form-dialog__error]="form.controls.allocation.invalid"
+          data-testid="allocation-sum"
+        >
+          {{ 'groups.form.allocationSum' | transloco: { sum: formatPercentNumber(sumPercent()) } }}
+        </p>
+      }
+      @if (form.controls.allocation.hasError('duplicateClass')) {
+        <p class="group-form-dialog__error" role="alert" data-testid="allocation-error">
+          {{ 'groups.form.allocationDuplicate' | transloco }}
+        </p>
+      }
+    </fieldset>
 
     @if (formError()) {
       <p class="group-form-dialog__error" role="alert" data-testid="form-error">

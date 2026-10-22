@@ -22,11 +22,12 @@ import {
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { formatMoney } from '../../shared/format';
+import { formatMoney, formatPercent } from '../../shared/format';
 import { GroupList } from '../../shared/group-select/group-list';
 import { ASSET_CLASSES, assetClassLabel } from '../assets/asset-class';
 import { GroupFormDialog, type GroupFormDialogData } from './group-form-dialog/group-form-dialog';
 import { groupColor } from './group-color';
+import { groupKindLabel } from './group-kind';
 
 const MAX_GROUPS = 12;
 
@@ -132,6 +133,12 @@ export class Groups {
   });
 
   protected readonly formatMoney = formatMoney;
+  protected readonly formatPercent = formatPercent;
+  protected readonly groupKindLabel = groupKindLabel;
+
+  protected hasContribution(group: AssetGroupResponse): boolean {
+    return Number(group.monthlyContributionPln) > 0;
+  }
   protected readonly groupColor = groupColor;
   protected readonly assetClassLabel = assetClassLabel;
 

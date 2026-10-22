@@ -25,13 +25,19 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var group = await owner.CreateAssetGroupAsync(cancellationToken, "Mine", ColorKey(0), 100m);
+        var allocation = Shares((AssetClass.Deposit, 60m), (AssetClass.Etf, 40m));
+        var group = await owner.CreateAssetGroupAsync(
+            cancellationToken, "Mine", ColorKey(0), 100m, monthlyContributionPln: 750m, classAllocation: allocation);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var response = await stranger.PutAsJsonAsync(AssetGroupUri(group.Id), NewAssetGroupBody("Stranger edit", ColorKey(3)), cancellationToken);
+        var response = await stranger.PutAsJsonAsync(
+            AssetGroupUri(group.Id), NewAssetGroupBody("Stranger edit", ColorKey(3), 5m, CushionKind, 1m), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal(group, Assert.Single(await owner.ListAssetGroupsAsync(cancellationToken)));
+        var after = Assert.Single(await owner.ListAssetGroupsAsync(cancellationToken));
+        Assert.Equal(("Mine", ColorKey(0), 100m, RegularKind, 750m), (after.Name, after.Color, after.TargetPln, after.Kind, after.MonthlyContributionPln));
+        Assert.Equal(allocation, after.ClassAllocation);
+        Assert.Empty(await stranger.ListAssetGroupsAsync(cancellationToken));
     }
 
     [Fact]

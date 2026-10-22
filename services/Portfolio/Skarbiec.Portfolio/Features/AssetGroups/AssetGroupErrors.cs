@@ -10,6 +10,8 @@ internal static class AssetGroupErrors
 
     public const decimal MaxTargetPln = 1_000_000_000m;
 
+    public const decimal MaxMonthlyContributionPln = 1_000_000_000m;
+
     public static Error NotFound(Guid id) =>
         new("NotFound.AssetGroup", $"Asset group '{id}' was not found.");
 
@@ -30,6 +32,21 @@ internal static class AssetGroupErrors
 
     public static Error InvalidTarget { get; } =
         new("Validation.InvalidTarget", $"The target must be above 0, have at most 2 decimals and not exceed {MaxTargetPln:0}.");
+
+    public static Error TargetRequiredForCushion { get; } =
+        new("Validation.TargetRequiredForCushion", "A cushion group needs a target above 0.");
+
+    public static Error CushionGroupExists { get; } =
+        new("Conflict.CushionGroupExists", "Only one cushion group is allowed.");
+
+    public static Error InvalidContribution { get; } =
+        new("Validation.InvalidContribution", $"The monthly contribution must be 0 to {MaxMonthlyContributionPln:0} with at most 2 decimals.");
+
+    public static Error InvalidClassAllocation { get; } =
+        new("Validation.InvalidClassAllocation", "Each class must be unique, with a percent above 0 up to 100 and at most 1 decimal.");
+
+    public static Error ClassAllocationSum { get; } =
+        new("Validation.ClassAllocationSum", "The class allocation must sum to exactly 100.");
 
     public static Error AssetIdsRequired { get; } =
         new("Validation.AssetIdsRequired", "Pick at least one asset.");

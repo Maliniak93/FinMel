@@ -82,6 +82,9 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             group.Property(g => g.Name).HasMaxLength(50);
             group.Property(g => g.Color).HasMaxLength(20);
             group.Property(g => g.TargetPln).HasPrecision(18, 2);
+            group.Property(g => g.Kind).HasConversion<string>().HasMaxLength(20).HasDefaultValue(AssetGroupKind.Regular);
+            group.Property(g => g.MonthlyContributionPln).HasPrecision(18, 2);
+            group.ComplexCollection(g => g.ClassAllocation, allocation => allocation.ToJson());
 
             group.HasIndex(g => new { g.UserId, g.Color }).IsUnique();
         });

@@ -28,7 +28,31 @@ internal static class AssetGroupsApi
 
     public const int GroupLimit = 12;
 
-    public sealed record AssetGroupView(Guid Id, string Name, string Color, decimal? TargetPln, int AssetCount);
+    public const string TargetRequiredForCushionErrorCode = "Validation.TargetRequiredForCushion";
+
+    public const string CushionGroupExistsErrorCode = "Conflict.CushionGroupExists";
+
+    public const string InvalidContributionErrorCode = "Validation.InvalidContribution";
+
+    public const string InvalidClassAllocationErrorCode = "Validation.InvalidClassAllocation";
+
+    public const string ClassAllocationSumErrorCode = "Validation.ClassAllocationSum";
+
+    public const int RegularKind = 0;
+
+    public const int CushionKind = 1;
+
+    public sealed record ClassShare(AssetClass AssetClass, decimal Percent);
+
+    public sealed record AssetGroupView(
+        Guid Id,
+        string Name,
+        string Color,
+        decimal? TargetPln,
+        int AssetCount,
+        int Kind = RegularKind,
+        decimal MonthlyContributionPln = 0m,
+        List<ClassShare>? ClassAllocation = null);
 
     public sealed record AssignableAssetView(
         Guid AssetId,
@@ -45,8 +69,17 @@ internal static class AssetGroupsApi
 
     public static string ColorKey(int index) => AssetGroupColors.Keys[index];
 
-    public static object NewAssetGroupBody(string name = "Poduszka", string? color = null, decimal? targetPln = null) =>
-        new { name, color = color ?? ColorKey(0), targetPln };
+    public static ClassShare[] Shares(params (AssetClass AssetClass, decimal Percent)[] shares) =>
+        shares.Select(s => new ClassShare(s.AssetClass, s.Percent)).ToArray();
+
+    public static object NewAssetGroupBody(
+        string name = "Poduszka",
+        string? color = null,
+        decimal? targetPln = null,
+        int kind = RegularKind,
+        decimal monthlyContributionPln = 0m,
+        ClassShare[]? classAllocation = null) =>
+        new { name, color = color ?? ColorKey(0), targetPln, kind, monthlyContributionPln, classAllocation = classAllocation ?? [] };
 
     public static object NewAssignmentBody(IEnumerable<Guid> assetIds, Guid? groupId) =>
         new { assetIds = assetIds.ToArray(), groupId };
@@ -56,9 +89,13 @@ internal static class AssetGroupsApi
         CancellationToken cancellationToken,
         string name = "Poduszka",
         string? color = null,
-        decimal? targetPln = null)
+        decimal? targetPln = null,
+        int kind = RegularKind,
+        decimal monthlyContributionPln = 0m,
+        ClassShare[]? classAllocation = null)
     {
-        var response = await client.PostAsJsonAsync(AssetGroupsUri, NewAssetGroupBody(name, color, targetPln), cancellationToken);
+        var response = await client.PostAsJsonAsync(
+            AssetGroupsUri, NewAssetGroupBody(name, color, targetPln, kind, monthlyContributionPln, classAllocation), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<AssetGroupView>(cancellationToken))!;

@@ -40,6 +40,30 @@
   box-shadow: 0 0 0 2px var(--mat-sys-surface);
 }
 
+.group-form-dialog__allocation {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.group-form-dialog__allocation-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.group-form-dialog__allocation-class {
+  flex: 2;
+}
+
+.group-form-dialog__allocation-percent {
+  flex: 1;
+}
+
+.group-form-dialog__allocation-sum {
+  margin: 4px 0 8px;
+}
+
 .group-form-dialog__error {
   color: var(--mat-sys-error);
   margin: 4px 0 8px;

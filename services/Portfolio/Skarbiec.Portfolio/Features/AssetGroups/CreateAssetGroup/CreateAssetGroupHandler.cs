@@ -10,7 +10,10 @@ public sealed class CreateAssetGroupHandler(PortfolioDbContext dbContext)
     {
         var name = request.Name.Trim();
 
-        if (AssetGroupRules.ValidateFields(name, request.Color, request.TargetPln) is { } invalid)
+        var allocation = request.ClassAllocation ?? [];
+
+        if (AssetGroupRules.ValidateFields(
+                name, request.Color, request.TargetPln, request.Kind, request.MonthlyContributionPln, allocation) is { } invalid)
         {
             return invalid;
         }
@@ -20,16 +23,26 @@ public sealed class CreateAssetGroupHandler(PortfolioDbContext dbContext)
             return AssetGroupErrors.GroupLimitReached;
         }
 
-        if (await dbContext.UniquenessErrorAsync(null, name, request.Color, cancellationToken) is { } conflict)
+        if (await dbContext.UniquenessErrorAsync(null, name, request.Color, request.Kind, cancellationToken) is { } conflict)
         {
             return conflict;
         }
 
-        var group = new AssetGroup { Id = Guid.NewGuid(), Name = name, Color = request.Color, TargetPln = request.TargetPln };
+        var group = new AssetGroup
+        {
+            Id = Guid.NewGuid(),
+            Name = name,
+            Color = request.Color,
+            TargetPln = request.TargetPln,
+            Kind = request.Kind,
+            MonthlyContributionPln = request.MonthlyContributionPln,
+            ClassAllocation = allocation
+        };
 
         dbContext.AssetGroups.Add(group);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        return new AssetGroupResponse(group.Id, group.Name, group.Color, group.TargetPln, 0);
+        return new AssetGroupResponse(
+            group.Id, group.Name, group.Color, group.TargetPln, 0, group.Kind, group.MonthlyContributionPln, group.ClassAllocation);
     }
 }

@@ -778,7 +778,7 @@ Authorization: Bearer {{authToken}}
 
 ### --- Asset groups ---
 
-### Create an asset group (colour is one of 12 keys, unique per user; 409 Conflict.DuplicateName, Conflict.GroupLimitReached, Conflict.GroupColorTaken; 400 Validation.InvalidColor, Validation.InvalidTarget)
+### Create an asset group (colour is one of 12 keys, unique per user; 409 Conflict.DuplicateName, Conflict.GroupLimitReached, Conflict.GroupColorTaken; 400 Validation.InvalidColor, Validation.InvalidTarget; kind 0 = Regular, 1 = Cushion (needs targetPln, one per user: 400 Validation.TargetRequiredForCushion, 409 Conflict.CushionGroupExists); 400 Validation.InvalidContribution, Validation.InvalidClassAllocation, Validation.ClassAllocationSum; classAllocation is empty or class ints with percents summing to 100)
 # @name createAssetGroup
 POST {{baseUrl}}/api/portfolio/asset-groups
 Authorization: Bearer {{authToken}}
@@ -787,7 +787,10 @@ Content-Type: application/json
 {
   "name": "Poduszka",
   "color": "blue",
-  "targetPln": 50000
+  "targetPln": 50000,
+  "kind": 1,
+  "monthlyContributionPln": 0,
+  "classAllocation": []
 }
 
 ### List asset groups by name, with the asset count
@@ -802,7 +805,13 @@ Content-Type: application/json
 {
   "name": "Poduszka bezpieczeństwa",
   "color": "green",
-  "targetPln": null
+  "targetPln": null,
+  "kind": 0,
+  "monthlyContributionPln": 2000,
+  "classAllocation": [
+    { "assetClass": 1, "percent": 50 },
+    { "assetClass": 9, "percent": 50 }
+  ]
 }
 
 ### Every asset the user can assign, archived ones and managed cash included

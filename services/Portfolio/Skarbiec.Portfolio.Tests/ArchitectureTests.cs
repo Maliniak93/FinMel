@@ -9,6 +9,7 @@ public sealed class ArchitectureTests
     // Values stored inside a tenant-scoped replica row, listed by type so any other entity in the namespace is still forced to be tenant-scoped.
     private static readonly HashSet<Type> StoredValues =
     [
+        typeof(AssetGroupClassShare),
         typeof(TargetAllocationReplicaGroup),
         typeof(ValuationReplicaClassValue),
     ];

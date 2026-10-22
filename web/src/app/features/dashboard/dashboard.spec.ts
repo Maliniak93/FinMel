@@ -722,6 +722,52 @@ describe('Dashboard', () => {
       expect(progressOf(groupLegendRow(element, 'Emerytura'))).toBeUndefined();
     });
 
+    it('shows class shares against the allocation and the cushion level', async () => {
+      const allocatedGroups = [
+        {
+          ...groups[0],
+          kind: 0,
+          monthlyContributionPln: 2000,
+          classAllocation: [
+            { assetClass: 1, percent: 50 },
+            { assetClass: 9, percent: 50 },
+          ],
+        },
+        groups[1],
+        { ...groups[2], kind: 1, targetPln: 12000, monthlyContributionPln: 0, classAllocation: [] },
+      ];
+      await setup(
+        jsonResponse(
+          dashboardWithGroups([
+            {
+              groupId: RETIREMENT_GROUP_ID,
+              valuePln: 10000,
+              percentage: 48,
+              byAssetClass: [
+                { assetClass: 1, valuePln: 9000 },
+                { assetClass: 9, valuePln: 1000 },
+              ],
+            },
+            {
+              groupId: CUSHION_GROUP_ID,
+              valuePln: 10500,
+              percentage: 52,
+              byAssetClass: [{ assetClass: 9, valuePln: 10500 }],
+            },
+          ] as DashboardResponse['byGroup']),
+        ),
+        undefined,
+        { groups: jsonResponse(allocatedGroups) },
+      );
+      const text = normalised(textOf(fixture.nativeElement as HTMLElement));
+
+      expect(text).toMatch(/90\s?%/);
+      expect(text).toMatch(/50\s?%/);
+      expect(text).toMatch(/10,500/);
+      expect(text).toMatch(/12,000/);
+      expect(text).toMatch(/1,500/);
+    });
+
     it('caps the bar at 100', async () => {
       await setup(
         jsonResponse(

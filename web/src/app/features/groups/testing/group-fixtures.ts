@@ -9,6 +9,9 @@ export const blueGroup: AssetGroupResponse = {
   color: 'blue',
   targetPln: null,
   assetCount: 3,
+  kind: 0,
+  monthlyContributionPln: 0,
+  classAllocation: [],
 };
 
 export const greenGroup: AssetGroupResponse = {
@@ -17,6 +20,9 @@ export const greenGroup: AssetGroupResponse = {
   color: 'green',
   targetPln: 30000,
   assetCount: 1,
+  kind: 1,
+  monthlyContributionPln: 0,
+  classAllocation: [],
 };
 
 export const assetGroups: AssetGroupResponse[] = [blueGroup, greenGroup];

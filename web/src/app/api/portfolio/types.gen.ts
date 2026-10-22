@@ -120,12 +120,22 @@ export type AllocationResponse = {
 
 export type AssetClass = number;
 
+export type AssetGroupClassShare = {
+    assetClass: AssetClass;
+    percent: number | string;
+};
+
+export type AssetGroupKind = number;
+
 export type AssetGroupResponse = {
     id: string;
     name: string;
     color: string;
     targetPln: null | number | string;
     assetCount: number | string;
+    kind: AssetGroupKind;
+    monthlyContributionPln: number | string;
+    classAllocation: Array<AssetGroupClassShare>;
 };
 
 export type AssetResponse = {
@@ -378,6 +388,9 @@ export type CreateAssetGroupRequest = {
     name: string;
     color: string;
     targetPln?: null | number | string;
+    kind?: AssetGroupKind;
+    monthlyContributionPln?: number | string;
+    classAllocation?: null | Array<AssetGroupClassShare>;
 };
 
 export type CreateCashPlaceRequest = {
@@ -1039,6 +1052,9 @@ export type UpdateAssetGroupRequest = {
     name: string;
     color: string;
     targetPln?: null | number | string;
+    kind?: AssetGroupKind;
+    monthlyContributionPln?: number | string;
+    classAllocation?: null | Array<AssetGroupClassShare>;
 };
 
 export type UpdateAssetRequest = {

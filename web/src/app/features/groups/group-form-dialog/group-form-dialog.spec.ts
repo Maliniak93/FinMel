@@ -87,7 +87,14 @@ describe('GroupFormDialog', () => {
     const [request] = writes();
     expect(request.method).toBe('POST');
     expect(request.url).toContain('/api/portfolio/asset-groups');
-    expect(await request.json()).toEqual({ name: 'Poduszka', color: 'orange', targetPln: 30000 });
+    expect(await request.json()).toEqual({
+      name: 'Poduszka',
+      color: 'orange',
+      targetPln: 30000,
+      kind: 0,
+      monthlyContributionPln: 0,
+      classAllocation: [],
+    });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
@@ -119,6 +126,9 @@ describe('GroupFormDialog', () => {
       name: 'Poduszka finansowa',
       color: 'purple',
       targetPln: 30000,
+      kind: 1,
+      monthlyContributionPln: 0,
+      classAllocation: [],
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
@@ -157,6 +167,75 @@ describe('GroupFormDialog', () => {
 
     expect(errorText(testId)).not.toBe('');
     expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  function setAllocation(rows: [number, number | null][]): void {
+    const allocation = component['form'].controls.allocation;
+    allocation.clear();
+    for (const [assetClass, percent] of rows) {
+      component['addAllocationRow']();
+      const row = allocation.at(allocation.length - 1);
+      row.controls.assetClass.setValue(assetClass);
+      row.controls.percent.setValue(percent);
+    }
+  }
+
+  async function submitNamed(): Promise<void> {
+    component['form'].controls.name.setValue('Emerytura');
+    component['form'].controls.color.setValue('orange');
+    await component['onSubmit']();
+  }
+
+  it('blocks save for a cushion without a target, an allocation off 100 or a repeated class', async () => {
+    await setup({ mode: 'create', groups: [] });
+
+    component['form'].controls.kind.setValue(1);
+    component['form'].controls.targetPln.setValue(null);
+    await submitNamed();
+    expect(writes()).toEqual([]);
+
+    component['form'].controls.kind.setValue(0);
+    setAllocation([
+      [1, 50],
+      [9, 40],
+    ]);
+    await submitNamed();
+    expect(writes()).toEqual([]);
+
+    setAllocation([
+      [1, 50],
+      [1, 50],
+    ]);
+    await submitNamed();
+    expect(writes()).toEqual([]);
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('posts kind, contribution and allocation from a valid form', async () => {
+    await setup({ mode: 'create', groups: [] });
+    component['form'].controls.kind.setValue(0);
+    component['form'].controls.monthlyContributionPln.setValue(2000);
+    setAllocation([
+      [1, 50],
+      [9, 50],
+    ]);
+
+    await submitNamed();
+
+    const [request] = writes();
+    expect(request.method).toBe('POST');
+    expect(await request.json()).toEqual({
+      name: 'Emerytura',
+      color: 'orange',
+      targetPln: null,
+      kind: 0,
+      monthlyContributionPln: 2000,
+      classAllocation: [
+        { assetClass: 1, percent: 50 },
+        { assetClass: 9, percent: 50 },
+      ],
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
   it('closes with false on cancel', async () => {

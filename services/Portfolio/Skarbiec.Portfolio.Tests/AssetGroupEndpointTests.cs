@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
@@ -48,6 +49,109 @@ public sealed class AssetGroupEndpointTests(SkarbiecContainersFixture containers
 
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.Equal(["Alfa"], (await client.ListAssetGroupsAsync(cancellationToken)).Select(g => g.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task CreatesGroupWithContributionAndAllocation()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var allocation = Shares((AssetClass.Deposit, 50m), (AssetClass.BankAccount, 50m));
+
+        var created = await client.PostAsJsonAsync(
+            AssetGroupsUri, NewAssetGroupBody("Emerytura", ColorKey(0), null, RegularKind, 2_000m, allocation), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var view = (await created.Content.ReadFromJsonAsync<AssetGroupView>(cancellationToken))!;
+        Assert.Equal((RegularKind, 2_000m), (view.Kind, view.MonthlyContributionPln));
+        Assert.Equal(allocation, view.ClassAllocation);
+        var listed = Assert.Single(await client.ListAssetGroupsAsync(cancellationToken));
+        Assert.Equal((RegularKind, 2_000m), (listed.Kind, listed.MonthlyContributionPln));
+        Assert.Equal(allocation, listed.ClassAllocation);
+        var updated = await client.PutAsJsonAsync(
+            AssetGroupUri(view.Id), NewAssetGroupBody("Emerytura", ColorKey(0), null, RegularKind, 0m), cancellationToken);
+        Assert.True(updated.IsSuccessStatusCode);
+        var cleared = Assert.Single(await client.ListAssetGroupsAsync(cancellationToken));
+        Assert.Equal(0m, cleared.MonthlyContributionPln);
+        Assert.Empty(cleared.ClassAllocation ?? []);
+    }
+
+    [Fact]
+    public async Task CushionWithoutTargetReturns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var regular = await client.CreateAssetGroupAsync(cancellationToken, "Zwykła", ColorKey(1));
+
+        var create = await client.PostAsJsonAsync(AssetGroupsUri, NewAssetGroupBody("Poduszka", ColorKey(0), null, CushionKind), cancellationToken);
+        var update = await client.PutAsJsonAsync(
+            AssetGroupUri(regular.Id), NewAssetGroupBody("Zwykła", ColorKey(1), null, CushionKind), cancellationToken);
+
+        await create.AssertProblemAsync(HttpStatusCode.BadRequest, TargetRequiredForCushionErrorCode, cancellationToken);
+        await update.AssertProblemAsync(HttpStatusCode.BadRequest, TargetRequiredForCushionErrorCode, cancellationToken);
+        var kinds = (await client.ListAssetGroupsAsync(cancellationToken)).Select(g => g.Kind).ToArray();
+        Assert.Equal([RegularKind], kinds);
+    }
+
+    [Fact]
+    public async Task SecondCushionReturns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var cushion = await client.CreateAssetGroupAsync(cancellationToken, "Poduszka", ColorKey(0), 12_000m, CushionKind);
+        var regular = await client.CreateAssetGroupAsync(cancellationToken, "Zwykła", ColorKey(1), 500m);
+
+        var create = await client.PostAsJsonAsync(
+            AssetGroupsUri, NewAssetGroupBody("Druga", ColorKey(2), 1_000m, CushionKind), cancellationToken);
+        var turn = await client.PutAsJsonAsync(
+            AssetGroupUri(regular.Id), NewAssetGroupBody("Zwykła", ColorKey(1), 500m, CushionKind), cancellationToken);
+        var keepOwn = await client.PutAsJsonAsync(
+            AssetGroupUri(cushion.Id), NewAssetGroupBody("Poduszka", ColorKey(0), 13_000m, CushionKind), cancellationToken);
+
+        await create.AssertProblemAsync(HttpStatusCode.Conflict, CushionGroupExistsErrorCode, cancellationToken);
+        await turn.AssertProblemAsync(HttpStatusCode.Conflict, CushionGroupExistsErrorCode, cancellationToken);
+        Assert.True(keepOwn.IsSuccessStatusCode);
+        Assert.Equal(2, (await client.ListAssetGroupsAsync(cancellationToken)).Count);
+    }
+
+    [Fact]
+    public async Task InvalidClassAllocationReturns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var existing = await client.CreateAssetGroupAsync(cancellationToken, "Existing", ColorKey(1));
+
+        var sum90 = await client.PostAsJsonAsync(
+            AssetGroupsUri, NewAssetGroupBody("Nowa", ColorKey(0), null, RegularKind, 0m, Shares((AssetClass.Deposit, 50m), (AssetClass.BankAccount, 40m))), cancellationToken);
+        var repeated = await client.PostAsJsonAsync(
+            AssetGroupsUri, NewAssetGroupBody("Nowa", ColorKey(0), null, RegularKind, 0m, Shares((AssetClass.Deposit, 50m), (AssetClass.Deposit, 50m))), cancellationToken);
+        var zero = await client.PostAsJsonAsync(
+            AssetGroupsUri, NewAssetGroupBody("Nowa", ColorKey(0), null, RegularKind, 0m, Shares((AssetClass.Deposit, 100m), (AssetClass.BankAccount, 0m))), cancellationToken);
+        var updateSum = await client.PutAsJsonAsync(
+            AssetGroupUri(existing.Id), NewAssetGroupBody("Existing", ColorKey(1), null, RegularKind, 0m, Shares((AssetClass.Etf, 70m))), cancellationToken);
+
+        await sum90.AssertProblemAsync(HttpStatusCode.BadRequest, ClassAllocationSumErrorCode, cancellationToken);
+        await repeated.AssertProblemAsync(HttpStatusCode.BadRequest, InvalidClassAllocationErrorCode, cancellationToken);
+        await zero.AssertProblemAsync(HttpStatusCode.BadRequest, InvalidClassAllocationErrorCode, cancellationToken);
+        await updateSum.AssertProblemAsync(HttpStatusCode.BadRequest, ClassAllocationSumErrorCode, cancellationToken);
+        Assert.Equal(["Existing"], (await client.ListAssetGroupsAsync(cancellationToken)).Select(g => g.Name).ToArray());
+    }
+
+    [Fact]
+    public async Task InvalidContributionReturns400()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var negative = await client.PostAsJsonAsync(AssetGroupsUri, NewAssetGroupBody("Nowa", ColorKey(0), null, RegularKind, -1m), cancellationToken);
+        var tooHigh = await client.PostAsJsonAsync(AssetGroupsUri, NewAssetGroupBody("Nowa", ColorKey(0), null, RegularKind, 1_000_000_000.01m), cancellationToken);
+        var threeDecimals = await client.PostAsJsonAsync(AssetGroupsUri, NewAssetGroupBody("Nowa", ColorKey(0), null, RegularKind, 10.123m), cancellationToken);
+        var zero = await client.PostAsJsonAsync(AssetGroupsUri, NewAssetGroupBody("Zero", ColorKey(0), null, RegularKind, 0m), cancellationToken);
+
+        await negative.AssertProblemAsync(HttpStatusCode.BadRequest, InvalidContributionErrorCode, cancellationToken);
+        await tooHigh.AssertProblemAsync(HttpStatusCode.BadRequest, InvalidContributionErrorCode, cancellationToken);
+        await threeDecimals.AssertProblemAsync(HttpStatusCode.BadRequest, InvalidContributionErrorCode, cancellationToken);
+        Assert.Equal(HttpStatusCode.Created, zero.StatusCode);
     }
 
     [Fact]

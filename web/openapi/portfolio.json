@@ -4000,13 +4000,39 @@
       "AssetClass": {
         "type": "integer"
       },
+      "AssetGroupClassShare": {
+        "required": [
+          "assetClass",
+          "percent"
+        ],
+        "type": "object",
+        "properties": {
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "percent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "AssetGroupKind": {
+        "type": "integer"
+      },
       "AssetGroupResponse": {
         "required": [
           "id",
           "name",
           "color",
           "targetPln",
-          "assetCount"
+          "assetCount",
+          "kind",
+          "monthlyContributionPln",
+          "classAllocation"
         ],
         "type": "object",
         "properties": {
@@ -4036,6 +4062,23 @@
               "string"
             ],
             "format": "int32"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AssetGroupKind"
+          },
+          "monthlyContributionPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "classAllocation": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetGroupClassShare"
+            }
           }
         }
       },
@@ -5352,6 +5395,26 @@
               "string"
             ],
             "format": "double"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AssetGroupKind"
+          },
+          "monthlyContributionPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "classAllocation": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AssetGroupClassShare"
+            }
           }
         }
       },
@@ -8781,6 +8844,26 @@
               "string"
             ],
             "format": "double"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AssetGroupKind"
+          },
+          "monthlyContributionPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "classAllocation": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AssetGroupClassShare"
+            }
           }
         }
       },
