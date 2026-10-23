@@ -1,0 +1,4 @@
+<p class="section-error__message">{{ message() ?? ('common.loadFailed' | transloco) }}</p>
+<button mat-stroked-button type="button" (click)="retry.emit()">
+  {{ 'common.retry' | transloco }}
+</button>

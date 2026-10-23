@@ -1,7 +1,6 @@
 import { Component, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
@@ -10,7 +9,11 @@ import {
   type SyncRunStatus,
 } from '../../api/marketdata';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { EmptyState } from '../../shared/empty-state/empty-state';
 import { formatDateTime } from '../../shared/format';
+import { PageHeader } from '../../shared/page-header/page-header';
+import { SectionError } from '../../shared/section-error/section-error';
+import { Skeleton } from '../../shared/skeleton/skeleton';
 
 // Mirrors Skarbiec.MarketData.Data.SyncRunStatus in declaration order: the enum travels as its int.
 const SYNC_RUN_STATUS_LABELS: readonly string[] = [
@@ -33,7 +36,15 @@ export const RUN_KINDS = [
 
 @Component({
   selector: 'app-settings',
-  imports: [MatButtonModule, MatChipsModule, MatProgressSpinnerModule, TranslocoPipe],
+  imports: [
+    EmptyState,
+    MatButtonModule,
+    MatChipsModule,
+    PageHeader,
+    SectionError,
+    Skeleton,
+    TranslocoPipe,
+  ],
   templateUrl: './settings.html',
   styleUrl: './settings.scss',
 })

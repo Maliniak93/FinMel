@@ -1,0 +1,12 @@
+.confirm-dialog__title {
+  font-family: var(--mat-sys-brand-family);
+}
+
+// The global flat-button border rule in styles.scss is (0,2,1); this selector outranks it.
+button.confirm-dialog__confirm--destructive:not(:disabled) {
+  --mat-button-filled-label-text-color: var(--mat-sys-error);
+  --mat-button-filled-container-color: transparent;
+  --mat-button-filled-ripple-color: var(--mat-sys-error);
+
+  border: 1px solid var(--mat-sys-error);
+}

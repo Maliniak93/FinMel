@@ -1,0 +1,43 @@
+<div class="allocation-bar__bar">
+  <span class="allocation-bar__bar-label">{{ targetLabel() }}</span>
+  <div class="allocation-bar__segments">
+    @for (row of rows(); track row.label) {
+      <div
+        class="allocation-bar__target"
+        [style.width.%]="row.target"
+        [style.border-color]="row.color"
+      ></div>
+    }
+  </div>
+</div>
+<div class="allocation-bar__bar">
+  <span class="allocation-bar__bar-label">{{ actualLabel() }}</span>
+  <div class="allocation-bar__segments">
+    @for (row of rows(); track row.label) {
+      <div
+        class="allocation-bar__actual"
+        [style.width.%]="row.actual"
+        [style.background-color]="row.color"
+      ></div>
+    }
+  </div>
+</div>
+<ul class="allocation-bar__legend">
+  @for (row of legend(); track row.label) {
+    <li class="allocation-bar__legend-row">
+      <span class="allocation-bar__swatch" [style.background-color]="row.color"></span>
+      <span class="allocation-bar__legend-label">{{ row.label }}</span>
+      <span>{{ formatPercent(row.target) }}</span>
+      <span>{{ formatPercent(row.actual) }}</span>
+      <span
+        class="allocation-bar__deviation"
+        [class.allocation-bar__deviation--warning]="row.highlighted"
+      >
+        @if (row.highlighted) {
+          <mat-icon class="allocation-bar__deviation-icon" aria-hidden="true">warning</mat-icon>
+        }
+        {{ formatSignedPoints(row.deviation) }}
+      </span>
+    </li>
+  }
+</ul>

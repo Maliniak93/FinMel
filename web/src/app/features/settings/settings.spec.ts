@@ -49,13 +49,14 @@ describe('Settings', () => {
   });
 
   async function setup(
-    statusResponse: Response,
+    statusResponse: Response | Promise<Response>,
     triggerResponse: Response = new Response(null, { status: 204 }),
+    settle = true,
   ): Promise<void> {
     fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async (input: RequestInfo | URL) =>
-        requestMethod(input) === 'POST' ? triggerResponse : statusResponse,
+        requestMethod(input) === 'POST' ? triggerResponse : await statusResponse,
       );
 
     await TestBed.configureTestingModule({
@@ -65,8 +66,42 @@ describe('Settings', () => {
 
     fixture = TestBed.createComponent(Settings);
     component = fixture.componentInstance;
-    await fixture.whenStable();
+    if (settle) {
+      await fixture.whenStable();
+    } else {
+      fixture.detectChanges();
+    }
   }
+
+  it('shows a skeleton while loading', async () => {
+    await setup(new Promise<Response>(() => undefined), undefined, false);
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('app-skeleton')).not.toBeNull();
+    expect(element.querySelector('[role="progressbar"]')).toBeNull();
+    expect(element.querySelector('app-page-header button')).not.toBeNull();
+  });
+
+  it('status failure shows a retry', async () => {
+    await setup(jsonResponse({ detail: 'Boom' }, 500));
+    const element = fixture.nativeElement as HTMLElement;
+    const error = element.querySelector('app-section-error') as HTMLElement;
+    expect(error).not.toBeNull();
+    expect(element.querySelector('app-page-header button')).not.toBeNull();
+
+    fetchSpy.mockImplementation(async () => jsonResponse(completedRun));
+    const retry = error.querySelector('button') as HTMLButtonElement;
+    retry.click();
+    await fixture.whenStable();
+
+    expect(element.querySelector('app-section-error')).toBeNull();
+    expect(element.textContent).toContain('synced 5');
+  });
+
+  it('empty state before any run', async () => {
+    await setup(jsonResponse(noRunYet));
+    const empty = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(empty?.textContent).toContain('No sync has run yet.');
+  });
 
   it('should create', async () => {
     await setup(jsonResponse(noRunYet));
@@ -183,7 +218,7 @@ describe('Settings', () => {
     await fixture.whenStable();
 
     const status = textOf(
-      (fixture.nativeElement as HTMLElement).querySelector('.settings-page__status-text'),
+      (fixture.nativeElement as HTMLElement).querySelector('app-empty-state .empty-state__message'),
     );
     expect(status).not.toBe('No sync has run yet.');
     expect(isTranslationIn('pl', status)).toBe(true);

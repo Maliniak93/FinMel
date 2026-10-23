@@ -1,0 +1,23 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skeleton__row {
+  height: 20px;
+  border-radius: var(--mat-sys-corner-small);
+  background-color: var(--sk-skeleton);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes skeleton-pulse {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .skeleton__row {
+    animation: skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
