@@ -1,0 +1,37 @@
+.money {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+}
+
+.money--zero,
+.money--empty {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.money--positive {
+  color: var(--sk-positive);
+}
+
+.money--negative {
+  color: var(--sk-negative);
+}
+
+.money__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 1.25rem;
+}
+
+.money__estimate {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.money__tag {
+  padding: 0 0.5rem;
+  border: 1px dashed var(--mat-sys-outline);
+  border-radius: 999px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.75rem;
+}

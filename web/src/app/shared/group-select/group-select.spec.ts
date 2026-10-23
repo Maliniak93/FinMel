@@ -5,7 +5,6 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { jsonResponse } from '../../features/assets/asset-form/testing/asset-form-fixtures';
-import { groupColor } from '../../features/groups/group-color';
 import {
   assetGroups,
   blueGroup,
@@ -15,6 +14,7 @@ import {
 import { selectOptionLabels } from '../../features/deposits/testing/deposit-fixtures';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { restoreEnglish } from '../../../testing/i18n';
+import { groupColor } from '../colors';
 import { GroupSelect } from './group-select';
 
 @Component({

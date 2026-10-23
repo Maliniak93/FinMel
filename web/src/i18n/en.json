@@ -16,6 +16,7 @@
     "status": "Status",
     "description": "Description",
     "stale": "Stale",
+    "rateUnavailable": "Rate unavailable",
     "actionsFor": "Actions for {{ name }}",
     "type": "Type",
     "unitPrice": "Unit price",

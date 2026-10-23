@@ -29,9 +29,9 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
+import { GROUP_COLOR_KEYS, groupColor } from '../../../shared/colors';
 import { formatPercentNumber } from '../../../shared/format';
 import { ASSET_CLASSES } from '../../assets/asset-class';
-import { GROUP_COLORS } from '../group-color';
 import { GROUP_KINDS, GROUP_KIND } from '../group-kind';
 
 export type GroupFormDialogData =
@@ -116,7 +116,7 @@ export class GroupFormDialog {
       [Validators.required, Validators.maxLength(50)],
     ],
     color: [
-      this.ownColor ?? GROUP_COLORS.find((color) => !this.takenColors.has(color.key))?.key ?? '',
+      this.ownColor ?? GROUP_COLOR_KEYS.find((key) => !this.takenColors.has(key)) ?? '',
       [Validators.required],
     ],
     targetPln: this.formBuilder.nonNullable.control<number | null>(
@@ -149,11 +149,12 @@ export class GroupFormDialog {
   private readonly formChange = toSignal(this.form.valueChanges, { initialValue: null });
 
   protected readonly palette = computed(() =>
-    GROUP_COLORS.map((color) => ({
-      ...color,
-      label: `groups.colors.${color.key}`,
-      disabled: this.takenColors.has(color.key),
-      selected: this.selectedColor() === color.key,
+    GROUP_COLOR_KEYS.map((key) => ({
+      key,
+      css: groupColor(key),
+      label: `groups.colors.${key}`,
+      disabled: this.takenColors.has(key),
+      selected: this.selectedColor() === key,
     })),
   );
 

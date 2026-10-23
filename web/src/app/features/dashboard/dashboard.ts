@@ -16,12 +16,11 @@ import {
 } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { activeLocale } from '../../core/i18n/language';
+import { assetClassColor, groupColor } from '../../shared/colors';
 import { formatAmount, formatDate, formatMoney, formatPercent } from '../../shared/format';
 import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart';
 import { assetClassLabel } from '../assets/asset-class';
-import { UNGROUPED_COLOR, groupColor } from '../groups/group-color';
 import { GROUP_KIND } from '../groups/group-kind';
-import { assetClassColor } from './asset-class-color';
 import { CashCard } from './cash-card/cash-card';
 import { AccountsCard } from './accounts-card/accounts-card';
 import { MonthCard } from './month-card/month-card';
@@ -298,7 +297,7 @@ export class Dashboard {
       rows.push({
         key: UNGROUPED_KEY,
         label: this.ungroupedLabel(),
-        color: UNGROUPED_COLOR,
+        color: groupColor(null),
         valuePln: grosze / 100,
         percentage: hundredths / 100,
         targetPln: null,

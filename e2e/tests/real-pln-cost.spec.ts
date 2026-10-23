@@ -146,7 +146,7 @@ test('real PLN cost: the PLN really paid drives cost basis, P/L and account cash
     await expect(async () => {
       await sidebar.getByRole('link', { name: 'Pulpit' }).click();
       const row = await openEtfRow(page);
-      await expect(row.locator('.mat-column-averageBuyPrice')).toContainText(/100,12\s€/, {
+      await expect(row.locator('.mat-column-averageBuyPrice')).toContainText(/100,12\sEUR/, {
         timeout: 3_000,
       });
       await expect(row.locator('.mat-column-averageBuyPricePln')).toContainText(pln('432,50'), {

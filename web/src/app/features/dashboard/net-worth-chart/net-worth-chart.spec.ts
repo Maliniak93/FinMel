@@ -19,7 +19,7 @@ function normalised(text: string): string {
   return text.replace(/\s+/g, ' ');
 }
 
-const ETF_COLOUR = /#82c91e|rgb\(130, 201, 30\)/i;
+const ETF_COLOUR = /var\(--sk-c-etf\)/;
 const CLASSES = [ASSET_CLASS.Etf, ASSET_CLASS.Stock, ASSET_CLASS.Cash];
 
 function paintOf(element: Element | null): string {
