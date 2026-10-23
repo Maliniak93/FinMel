@@ -1,12 +1,12 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
+import { MatBottomSheet } from '@angular/material/bottom-sheet';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatListModule } from '@angular/material/list';
 import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe } from '@jsverse/transloco';
 
@@ -14,6 +14,9 @@ import { AuthService } from '../../core/auth/auth';
 import { PlanningState } from '../../core/planning/planning-state';
 import { ThemeService, type ThemePreference } from '../../core/theme/theme';
 import { LanguageSwitch } from '../../shared/language-switch/language-switch';
+import { MoreSheet } from './more-sheet/more-sheet';
+import { ASSET_LINKS, BOTTOM_LINKS, NAV_SECTIONS, SETTINGS_LINK, type NavLink } from './nav';
+import { ShellLayout } from './shell-layout';
 
 const THEME_ICONS: Record<ThemePreference, string> = {
   system: 'brightness_auto',
@@ -27,30 +30,18 @@ const THEME_NEXT_LABELS: Record<ThemePreference, string> = {
   dark: 'shell.theme.dark',
 };
 
-interface NavLink {
-  path: string;
-  label: string;
-  icon: string;
-}
-
-interface NavSection {
-  label: string;
-  links: NavLink[];
-}
-
 const ORIGIN_PARAM = 'from';
 const TRANSACTIONS_ROUTE = /^\/assets\/[^/]+\/transactions$/;
 
 @Component({
   selector: 'app-shell',
   imports: [
+    NgTemplateOutlet,
     RouterLink,
     RouterOutlet,
     MatButtonModule,
     MatIconModule,
-    MatListModule,
     MatSidenavModule,
-    MatToolbarModule,
     MatTooltipModule,
     TranslocoPipe,
     LanguageSwitch,
@@ -60,41 +51,21 @@ const TRANSACTIONS_ROUTE = /^\/assets\/[^/]+\/transactions$/;
 })
 export class Shell {
   private readonly authService = inject(AuthService);
+  private readonly bottomSheet = inject(MatBottomSheet);
   protected readonly themeService = inject(ThemeService);
   protected readonly planningState = inject(PlanningState);
+  protected readonly layout = inject(ShellLayout).layout;
 
   constructor() {
     this.planningState.startSession();
   }
 
-  protected readonly navSections: NavSection[] = [
-    {
-      label: 'shell.navSection.overview',
-      links: [
-        { path: 'dashboard', label: 'shell.nav.dashboard', icon: 'dashboard' },
-        { path: 'planning', label: 'shell.nav.planning', icon: 'event_note' },
-      ],
-    },
-    {
-      label: 'shell.navSection.wealth',
-      links: [
-        { path: 'accounts', label: 'shell.nav.accounts', icon: 'account_balance_wallet' },
-        { path: 'bank-accounts', label: 'shell.nav.bankAccounts', icon: 'account_balance' },
-        { path: 'cash', label: 'shell.nav.cash', icon: 'payments' },
-        { path: 'deposits', label: 'shell.nav.deposits', icon: 'savings' },
-        { path: 'bonds', label: 'shell.nav.bonds', icon: 'receipt_long' },
-        { path: 'securities', label: 'shell.nav.securities', icon: 'show_chart' },
-        { path: 'metals', label: 'shell.nav.metals', icon: 'diamond' },
-        { path: 'groups', label: 'shell.nav.groups', icon: 'category' },
-      ],
-    },
-  ];
-
-  protected readonly settingsLink: NavLink = {
-    path: 'settings',
-    label: 'shell.nav.settings',
-    icon: 'settings',
-  };
+  protected readonly navSections = NAV_SECTIONS;
+  protected readonly allLinks: readonly NavLink[] = NAV_SECTIONS.flatMap(
+    (section) => section.links,
+  );
+  protected readonly bottomLinks = BOTTOM_LINKS;
+  protected readonly settingsLink = SETTINGS_LINK;
 
   private readonly router = inject(Router);
   private readonly url = toSignal(
@@ -117,6 +88,10 @@ export class Shell {
     );
   }
 
+  protected readonly moreActive = computed(() =>
+    ASSET_LINKS.some((link) => this.isActive(link.path)),
+  );
+
   protected readonly themeIcon = computed(() => THEME_ICONS[this.themeService.preference()]);
   protected readonly themeLabel = computed(() => THEME_NEXT_LABELS[this.themeService.preference()]);
 
@@ -126,5 +101,9 @@ export class Shell {
 
   protected logout(): void {
     void this.authService.logout();
+  }
+
+  protected openMore(): void {
+    this.bottomSheet.open(MoreSheet);
   }
 }

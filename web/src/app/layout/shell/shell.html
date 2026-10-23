@@ -1,81 +1,134 @@
+<ng-template #navItem let-link>
+  @let active = isActive(link.path);
+  @let rail = layout() === 'rail';
+  <a
+    class="shell__nav-link"
+    [routerLink]="'/' + link.path"
+    [class.shell__nav-link--active]="active"
+    [attr.aria-current]="active ? 'page' : null"
+    [attr.aria-label]="rail ? (link.label | transloco) : null"
+  >
+    <mat-icon class="shell__nav-icon">{{ link.icon }}</mat-icon>
+    <span class="shell__nav-label">{{
+      (rail && link.shortLabel ? link.shortLabel : link.label) | transloco
+    }}</span>
+    @if (link.path === 'planning' && planningState.todoCount() > 0) {
+      <span
+        class="shell__badge"
+        data-testid="todo-badge"
+        [attr.aria-label]="'planning.todo.badge' | transloco"
+        >{{ planningState.todoCount() }}</span
+      >
+    }
+  </a>
+</ng-template>
+
+<ng-template #actions let-variant>
+  <button
+    mat-icon-button
+    type="button"
+    (click)="cycleTheme()"
+    [matTooltip]="themeLabel() | transloco"
+    [attr.aria-label]="themeLabel() | transloco"
+  >
+    <mat-icon>{{ themeIcon() }}</mat-icon>
+  </button>
+  <app-language-switch [variant]="variant" />
+  <button
+    mat-icon-button
+    type="button"
+    (click)="logout()"
+    [attr.aria-label]="'shell.logOut' | transloco"
+  >
+    <mat-icon>logout</mat-icon>
+  </button>
+</ng-template>
+
 <mat-sidenav-container class="shell">
-  <mat-sidenav #drawer mode="side" opened class="shell__nav">
-    <div class="shell__nav-body">
-      <div class="shell__nav-list" data-testid="nav-list">
-        @for (section of navSections; track section.label) {
-          <div class="shell__nav-section" data-testid="nav-section">
-            {{ section.label | transloco }}
-          </div>
-          <mat-nav-list>
-            @for (link of section.links; track link.path) {
-              <a
-                mat-list-item
-                [routerLink]="link.path"
-                [class.shell__nav-link--active]="isActive(link.path)"
-              >
-                <mat-icon matListItemIcon>{{ link.icon }}</mat-icon>
-                <span matListItemTitle>{{ link.label | transloco }}</span>
-                @if (link.path === 'planning' && planningState.todoCount() > 0) {
-                  <span
-                    matListItemMeta
-                    class="shell__badge"
-                    data-testid="todo-badge"
-                    [attr.aria-label]="'planning.todo.badge' | transloco"
-                    >{{ planningState.todoCount() }}</span
-                  >
-                }
-              </a>
-            }
-          </mat-nav-list>
+  @if (layout() !== 'bottom') {
+    <mat-sidenav
+      mode="side"
+      opened
+      class="shell__nav"
+      [class.shell__nav--rail]="layout() === 'rail'"
+    >
+      <div class="shell__nav-body">
+        @if (layout() === 'full') {
+          <div class="shell__brand">Skarbiec</div>
         }
+        <div class="shell__nav-list" data-testid="nav-list">
+          @if (layout() === 'full') {
+            @for (section of navSections; track section.label) {
+              <div class="shell__nav-section" data-testid="nav-section">
+                {{ section.label | transloco }}
+              </div>
+              @for (link of section.links; track link.path) {
+                <ng-container *ngTemplateOutlet="navItem; context: { $implicit: link }" />
+              }
+            }
+          } @else {
+            @for (link of allLinks; track link.path) {
+              <ng-container *ngTemplateOutlet="navItem; context: { $implicit: link }" />
+            }
+          }
+        </div>
+        <div class="shell__nav-pinned" data-testid="nav-pinned">
+          <ng-container *ngTemplateOutlet="navItem; context: { $implicit: settingsLink }" />
+        </div>
+        <div class="shell__nav-footer" data-testid="nav-footer">
+          <ng-container
+            *ngTemplateOutlet="
+              actions;
+              context: { $implicit: layout() === 'full' ? 'code' : 'icon' }
+            "
+          />
+        </div>
       </div>
-      <mat-nav-list class="shell__nav-pinned" data-testid="nav-pinned">
-        <a
-          mat-list-item
-          [routerLink]="settingsLink.path"
-          [class.shell__nav-link--active]="isActive(settingsLink.path)"
-        >
-          <mat-icon matListItemIcon>{{ settingsLink.icon }}</mat-icon>
-          <span matListItemTitle>{{ settingsLink.label | transloco }}</span>
-        </a>
-      </mat-nav-list>
-    </div>
-  </mat-sidenav>
+    </mat-sidenav>
+  }
 
   <mat-sidenav-content class="shell__content-area">
-    <mat-toolbar color="primary" class="shell__toolbar">
-      <button
-        mat-icon-button
-        type="button"
-        (click)="drawer.toggle()"
-        [attr.aria-label]="'shell.toggleNavigation' | transloco"
-      >
-        <mat-icon>menu</mat-icon>
-      </button>
-      <span>Skarbiec</span>
-      <span class="shell__spacer"></span>
-      <button
-        mat-icon-button
-        type="button"
-        (click)="cycleTheme()"
-        [matTooltip]="themeLabel() | transloco"
-        [attr.aria-label]="themeLabel() | transloco"
-      >
-        <mat-icon>{{ themeIcon() }}</mat-icon>
-      </button>
-      <app-language-switch />
-      <button
-        mat-icon-button
-        type="button"
-        (click)="logout()"
-        [attr.aria-label]="'shell.logOut' | transloco"
-      >
-        <mat-icon>logout</mat-icon>
-      </button>
-    </mat-toolbar>
+    @if (layout() === 'bottom') {
+      <header class="shell__top-bar" data-testid="top-bar">
+        <span class="shell__brand">Skarbiec</span>
+        <span class="shell__spacer"></span>
+        <a
+          mat-icon-button
+          [routerLink]="'/' + settingsLink.path"
+          [class.shell__nav-link--active]="isActive(settingsLink.path)"
+          [attr.aria-current]="isActive(settingsLink.path) ? 'page' : null"
+          [attr.aria-label]="settingsLink.label | transloco"
+        >
+          <mat-icon>{{ settingsLink.icon }}</mat-icon>
+        </a>
+        <ng-container *ngTemplateOutlet="actions; context: { $implicit: 'icon' }" />
+      </header>
+    }
 
     <main class="shell__content">
       <router-outlet />
     </main>
+
+    @if (layout() === 'bottom') {
+      <nav
+        class="shell__bottom-nav"
+        data-testid="bottom-nav"
+        [attr.aria-label]="'shell.mainNavigation' | transloco"
+      >
+        @for (link of bottomLinks; track link.path) {
+          <ng-container *ngTemplateOutlet="navItem; context: { $implicit: link }" />
+        }
+        <button
+          type="button"
+          class="shell__nav-link"
+          [class.shell__nav-link--active]="moreActive()"
+          [attr.aria-current]="moreActive() ? 'page' : null"
+          (click)="openMore()"
+        >
+          <mat-icon class="shell__nav-icon">more_horiz</mat-icon>
+          <span class="shell__nav-label">{{ 'shell.more' | transloco }}</span>
+        </button>
+      </nav>
+    }
   </mat-sidenav-content>
 </mat-sidenav-container>
