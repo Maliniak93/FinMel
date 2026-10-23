@@ -714,6 +714,36 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
     }
 
     [Fact]
+    public async Task Consume_ClassPointAfterUtcToday_StampsTodayLineWithEventClass()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var history = new[] { (today.AddDays(-30), 10m) };
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                quantityHistory: history, classHistory: [(today.AddDays(-30), AssetClass.Cash)]);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            await provider.GetRequiredService<IBus>().Publish(
+                Event(assetId, accountId, userId, quantity: 10m, version: 1, history: history, assetClass: AssetClass.Stock,
+                    classHistory: [(today.AddDays(-30), AssetClass.Etf), (today.AddDays(1), AssetClass.Stock)]),
+                cancellationToken);
+            await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
+
+            var line = Assert.Single(await GetLinesAsync(containers, accountId, today, cancellationToken));
+            Assert.Equal(AssetClass.Stock, line.AssetClass);
+        }, cancellationToken);
+    }
+
+    [Fact]
     public async Task StoresGroupId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
