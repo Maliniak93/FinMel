@@ -1,17 +1,17 @@
-<h2 mat-dialog-title>{{ data.title }}</h2>
+<h2 mat-dialog-title class="confirm-dialog__title">{{ data.title }}</h2>
 
 <mat-dialog-content>
   <p>{{ data.message }}</p>
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="cancel()">
+  <button mat-button type="button" cdkFocusInitial (click)="cancel()">
     {{ data.cancelLabel ?? ('common.cancel' | transloco) }}
   </button>
   <button
     mat-flat-button
     type="button"
-    [color]="data.destructive ? 'warn' : 'primary'"
+    [class.confirm-dialog__confirm--destructive]="data.destructive"
     (click)="confirm()"
   >
     {{ data.confirmLabel ?? ('common.confirm' | transloco) }}

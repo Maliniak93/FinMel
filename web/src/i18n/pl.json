@@ -3,6 +3,7 @@
     "cancel": "Anuluj",
     "confirm": "Potwierdź",
     "retry": "Ponów",
+    "loadFailed": "Nie udało się wczytać danych.",
     "dismiss": "Zamknij",
     "save": "Zapisz",
     "create": "Utwórz",

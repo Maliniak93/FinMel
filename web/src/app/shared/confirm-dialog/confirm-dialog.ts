@@ -15,6 +15,8 @@ export interface ConfirmDialogData {
   selector: 'app-confirm-dialog',
   imports: [MatButtonModule, MatDialogModule, TranslocoPipe],
   templateUrl: './confirm-dialog.html',
+  styleUrl: './confirm-dialog.scss',
+  host: { role: 'alertdialog' },
 })
 export class ConfirmDialog {
   protected readonly data = inject<ConfirmDialogData>(MAT_DIALOG_DATA);

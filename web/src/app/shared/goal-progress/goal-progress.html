@@ -1,0 +1,21 @@
+<div
+  class="goal-progress__track"
+  role="progressbar"
+  aria-valuemin="0"
+  aria-valuemax="100"
+  [attr.aria-valuenow]="valueNow()"
+>
+  <div
+    class="goal-progress__fill"
+    [style.width.%]="percent()"
+    [style.background-color]="fill()"
+  ></div>
+  @if (markPercent() !== null) {
+    <div class="goal-progress__mark" [style.left.%]="markPercent()"></div>
+  }
+</div>
+@if (icon(); as icon) {
+  <mat-icon class="goal-progress__icon goal-progress__icon--{{ tone() }}" aria-hidden="true">{{
+    icon
+  }}</mat-icon>
+}

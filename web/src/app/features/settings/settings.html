@@ -1,30 +1,33 @@
-<h1>{{ 'settings.title' | transloco }}</h1>
+<app-page-header [title]="'settings.title' | transloco">
+  <button
+    actions
+    mat-flat-button
+    color="primary"
+    type="button"
+    [disabled]="triggering()"
+    [attr.aria-busy]="triggering()"
+    (click)="triggerSync()"
+  >
+    {{ 'settings.syncNow' | transloco }}
+  </button>
+</app-page-header>
 
 <section class="settings-page__section">
   <h2>{{ 'settings.marketDataSync' | transloco }}</h2>
 
   <div class="settings-page__sync-row">
-    <button
-      mat-flat-button
-      color="primary"
-      type="button"
-      [disabled]="triggering()"
-      (click)="triggerSync()"
-    >
-      @if (triggering()) {
-        <mat-spinner diameter="18" />
-      } @else {
-        {{ 'settings.syncNow' | transloco }}
-      }
-    </button>
-
-    @if (statusResource.isLoading() && !statusResource.hasValue()) {
-      <mat-spinner diameter="18" />
+    @if (statusResource.error()) {
+      <app-section-error
+        [message]="'settings.loadFailed' | transloco"
+        (retry)="statusResource.reload()"
+      />
+    } @else if (statusResource.isLoading() && !statusResource.hasValue()) {
+      <app-skeleton [rows]="2" />
     } @else if (statusResource.hasValue()) {
       @let status = statusResource.value();
 
       @if (!status.hasRun) {
-        <span class="settings-page__status-text">{{ 'settings.noSyncYet' | transloco }}</span>
+        <app-empty-state icon="sync" [message]="'settings.noSyncYet' | transloco" />
       } @else {
         <div class="settings-page__runs">
           @for (kind of runKinds; track kind.key) {

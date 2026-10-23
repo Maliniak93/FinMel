@@ -80,6 +80,13 @@ html {
       track-height: 8px,
     )
   );
+  @include mat.dialog-overrides(
+    (
+      container-color: var(--mat-sys-surface-container),
+      container-elevation-shadow: var(--mat-sys-level3),
+      subhead-font: var(--mat-sys-brand-family),
+    )
+  );
   @include mat.table-overrides(
     (
       background-color: transparent,
@@ -118,7 +125,8 @@ a[mat-flat-button] {
   border: 1px solid var(--sk-accent-stroke);
 }
 
-.mat-mdc-card {
+.mat-mdc-card,
+.mat-mdc-dialog-surface {
   border: 1px solid var(--mat-sys-outline-variant);
 }
 
