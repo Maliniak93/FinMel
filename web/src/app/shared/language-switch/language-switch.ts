@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, input } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -18,6 +18,8 @@ const LANGUAGE_OPTIONS: readonly { id: Language; name: string }[] = [
   templateUrl: './language-switch.html',
 })
 export class LanguageSwitch {
+  readonly variant = input<'code' | 'icon'>('icon');
+
   protected readonly languageService = inject(LanguageService);
   protected readonly options = LANGUAGE_OPTIONS;
 

@@ -1,0 +1,9 @@
+<h2 class="shell__sheet-title">{{ 'shell.navSection.wealth' | transloco }}</h2>
+<mat-nav-list>
+  @for (link of links; track link.path) {
+    <a mat-list-item [routerLink]="'/' + link.path" (click)="close()">
+      <mat-icon matListItemIcon>{{ link.icon }}</mat-icon>
+      <span matListItemTitle>{{ link.label | transloco }}</span>
+    </a>
+  }
+</mat-nav-list>
