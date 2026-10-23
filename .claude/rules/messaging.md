@@ -14,7 +14,7 @@ Full walkthrough and the poison-message story: `Skarbiec.ServiceDefaults/Messagi
 
 - An event is a **fact that already happened**: past-tense name (`AssetPositionChanged`, `AssetRemoved`, `DailyPricesSynced`), never a command or a request.
 - Carry the **full state** a consumer needs — every id involved plus `UserId`, and the whole payload it will store. A consumer must never call the publishing service back to fill in the rest; that is the point of event-carried state transfer (ADR-021).
-- Contracts are `record`s in `contracts/Skarbiec.Contracts/Events/`. Greenfield (ADR-019): **edit the record in place, never add a `V2`** — and update every publisher, every consumer and every test in the same change.
+- Contracts are `record`s in `contracts/Skarbiec.Contracts/Events/`. **Edit the record in place, never add a `V2`** (ADR-043) — and update every publisher, every consumer and every test in the same change.
 - Consumers must still tolerate an unknown field arriving (System.Text.Json ignores it by default; do not turn on strict handling).
 
 ## Publishing

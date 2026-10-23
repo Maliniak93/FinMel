@@ -274,8 +274,8 @@ const MANUAL_LINE = epicLast
     issue +
     '.manual.md` and return `manualTest: [{ issue, file }]`; otherwise return no `manualTest`.'
 const VERIFY_LINE = verifyAll
-  ? 'Before you return, run the full verification (`scripts/verify.mjs --all --fix --cache`: this is the last non-e2e part of its epic) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it.'
-  : 'Before you return, run the scoped verification (`scripts/verify.mjs --fix --cache`, scoped by the changed files) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it.'
+  ? 'Before you return, run the full verification (`scripts/verify.mjs --all --fix --cache`: this is the last non-e2e part of its epic) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it. A `migrations` failure naming a missing `## Utrata danych` or `## Przeniesienie danych` section is a stop: return `verified: false`, never write that section or edit the ticket.'
+  : 'Before you return, run the scoped verification (`scripts/verify.mjs --fix --cache`, scoped by the changed files) as your agent prompt describes, with at most 3 fixes. `verified: true` only on a green result, and edit nothing after it. A `migrations` failure naming a missing `## Utrata danych` or `## Przeniesienie danych` section is a stop: return `verified: false`, never write that section or edit the ticket.'
 async function implement(label, lines) {
   const result = await step(
     'implementer',

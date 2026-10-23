@@ -86,10 +86,19 @@ reproduction first. Say so and stop. "I want it to work differently" is a **chan
 9. If the design changes a hard rule, append a draft ADR (status 🕐) to `skarbiec-plan/decisions.md`
    and reference it from Design decisions. Do not silently break an ADR. This is the only repo file
    `/design` may touch.
-10. Scope is a promise: everything the change does **not** include goes under Out of scope, especially
+10. **Protected data (ADR-043).** A change that adds a migration touching the protected set (Identity, Portfolio
+   except its replicas and MassTransit tables, MarketData `Instruments`) or deletes a column, table or
+   entity there is checked for loss before the draft. Preserve the data where it is proportionate: a
+   migration that moves it, with a `## Przeniesienie danych` section whose `proof:` names a migration test
+   on a database holding data from the previous version. When preserving is disproportionate, say plainly
+   what is lost and why, then ask the user with `AskUserQuestion`. Only an explicit yes becomes
+   `## Utrata danych` with a dated `Zgoda:` line; never decide the loss yourself, and never write the
+   section on a guess. A change that deletes **computed** data (Reporting snapshots and the like) needs no
+   consent: its spec carries an AC and a test for the automatic rebuild after deployment instead.
+11. Scope is a promise: everything the change does **not** include goes under Out of scope, especially
    the adjacent thing the user will assume is included. For a change spec, the adjacent thing is
    usually "and while we are in there, clean up X" — name it and exclude it.
-11. Watch for a split the whole time — see **Splitting into an epic** below.
+12. Watch for a split the whole time — see **Splitting into an epic** below.
 
 ## Splitting into an epic
 

@@ -145,7 +145,7 @@ node scripts/plan-status.mjs --no-gh    # skip the GitHub calls
 
 ## Resetting local state
 
-After a destructive or squashed migration, or when Postgres/RabbitMQ show "Unhealthy":
+After a destructive migration of an Aspire database, or when Postgres/RabbitMQ show "Unhealthy":
 
 ```bash
 docker volume ls                                       # find the volume names

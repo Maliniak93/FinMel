@@ -1,6 +1,6 @@
 # Decisions
 
-Abbreviated format. Status: ✅ accepted / 🕐 pending / ❌ rejected. ADR-001…019 are copied verbatim from the original plan (`archive/06-adr-decisions.md`) — their text is not rewritten, only a one-line "Amended by" note is added where a later ADR narrows one. ADR-020 onward implement the 2026-09 redesign (`architecture.md`, `domain.md`, `workflow.md`) and stay 🕐 pending until their spec ships, except ADR-024 (development model), which took effect immediately.
+Abbreviated format. Status: ✅ accepted / 🕐 pending / ❌ rejected. ADR-001…018 are copied verbatim from the original plan (`archive/06-adr-decisions.md`) — their text is not rewritten, only a one-line "Amended by" note is added where a later ADR narrows one; ADR-019 is superseded by ADR-043 and its decision trimmed to what still holds. ADR-020 onward implement the 2026-09 redesign (`architecture.md`, `domain.md`, `workflow.md`) and stay 🕐 pending until their spec ships, except ADR-024 (development model), which took effect immediately.
 
 ## ADR-001 ✅ Microservices (goal: learning) — revised
 
@@ -62,7 +62,7 @@ Unchanged (Portfolio service). Data ready for FIFO/PIT-38.
 **Context:** MassTransit v9 moves to a commercial license; v8 remains OSS. Alternative: Rebus (lighter, OSS).
 **Decision:** RabbitMQ as the broker; **MassTransit v8** (best documentation, built-in EF Outbox, inbox/dedup, retry, trace-context propagation). Events published exclusively through the outbox; consumers idempotent.
 **Consequences:** pinned to v8 (no v9 upgrade); if v8 stops being maintained — migration to Rebus/Wolverine behind an `IEventBus` abstraction is realistic because the contracts are POCOs.
-Contract-versioning clause suspended by ADR-019 (greenfield mode); outbox and consumer idempotency stand unchanged.
+Contract-versioning clause suspended by ADR-043; outbox and consumer idempotency stand unchanged.
 
 ## ADR-013 ✅ YARP as the API Gateway
 
@@ -79,7 +79,7 @@ Contract-versioning clause suspended by ADR-019 (greenfield mode); outbox and co
 
 **Decision:** "here and now" queries — internal REST with resilience (retry+jitter, circuit breaker, timeout); domain facts — events over RabbitMQ (`Skarbiec.Contracts`, additive versioning, breaking = `V2`). Reporting builds a local read model (dashboard without fan-out). gRPC will be introduced on one route (Strategy→Portfolio) in Phase 3+ as a learning exercise.
 **Consequences:** dashboard is eventually consistent (acceptable: daily data); dual knowledge of the "truth" (Portfolio) and the "projection" (Reporting) — explicitly documented.
-Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by ADR-019 (greenfield mode).
+Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by ADR-043.
 
 ## ADR-016 ❌ Service discovery, saga, Redis, K8s from day 1 — rejected at the start
 
@@ -104,15 +104,17 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 
 ## ADR-019 ✅ Greenfield mode — no backward compatibility until the data matters
 
+**Superseded by ADR-043.**
+
 **Context:** the system has exactly one user (the author), holds no real data, and runs local-only — every `[VPS]`/production task is deferred (`zadania/README.md`), so nothing has ever been deployed with a portfolio in it. Yet the project carries the full compatibility ceremony of a system with live consumers: additive-only event contracts with `V2` types for breaking changes (ADR-012, ADR-015, `CONTRACTS.md`, E9), and an implicit assumption that EF migration history is append-only and data-preserving. That ceremony costs work on every change and clutters the code while protecting consumers and rows that do not exist.
-**Decision:** while greenfield mode holds, any change may be implemented **as if the feature were being written from scratch** — no legacy data, no legacy processes, no migration paths:
+**Decision:** while greenfield mode holds, any change may be implemented **as if the feature were being written from scratch** — no legacy shapes, no compatibility layers:
 - event/DTO records in `Skarbiec.Contracts` are **edited in place** — fields renamed, retyped or removed outright; no `V2` types, no deprecation window, no two shapes coexisting. Every publisher and consumer of a changed record is updated in the same change;
-- EF migrations may **drop columns/tables and change types with no data backfill**; when the history gets in the way, a service's migrations may be deleted and regenerated as a single `InitialCreate`, and the local databases dropped (Aspire recreates them);
 - HTTP routes, request/response shapes and enum members change freely — the Angular client is regenerated (`npm run gen:api`);
 - code, tests and documentation describing a replaced approach are **deleted, not deprecated**. A rewrite is a legitimate answer to "change X" when it produces a better design than an incremental patch.
+- Data is governed by ADR-043, not by this ADR: migrations of computed data and replicas may change freely, with no backfill.
 
 **Unchanged by this ADR** — everything that is not about compatibility *over time*: tenancy isolation by `UserId` (ADR-006), the outbox and idempotent consumers (ADR-012 — duplicate delivery is a runtime property of the broker, not a legacy concern), the `Result` pattern (ADR-017), and the per-slice definition of done (tests green, zero warnings, `dotnet format`). Consumers still tolerate unknown fields (forward compatibility), guarded by the deserialization tests in `Skarbiec.Contracts.Tests`.
-**Consequences:** the versioning clause of ADR-012 and ADR-015 is **suspended, not deleted** — the discipline is written down and comes back the day it is needed; backlog story E9 `[S]` (additive contract versioning) is deferred for the same reason. After pulling a destructive or squashed migration, local databases must be reset before running the app. **This ADR has no automatic expiry: it holds until the user explicitly revokes it** — at which point a new ADR supersedes it and reinstates the compatibility rules (the first real deployment carrying data worth keeping is the natural moment to do so).
+**Consequences:** the versioning clause of ADR-012 and ADR-015 is **suspended, not deleted** — the discipline is written down and comes back the day it is needed; backlog story E9 `[S]` (additive contract versioning) is deferred for the same reason.
 
 ---
 
@@ -194,7 +196,7 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Shipped:** 2026-10-07 (spec `yahoo-price-source`, #198).
 
 **Context:** Stooq, the only source for Stock/Etf (ADR-007), sits behind a JavaScript proof-of-work challenge (ADR-018's known constraint), so no stock or ETF has had a quote since 2026-08. The user holds GPW and Xetra listings. Twelve Data's free plan covers practically only US markets; EODHD covers both but costs ~20 €/month (its free tier is 20 calls/day). Yahoo's unofficial `v8/finance/chart` and `v1/finance/search` answer without a key or crumb (probed 2026-10-06: `CDR.WA` in PLN, `VWCE.DE` on XETRA).
-**Decision:** `PriceSource.Yahoo` replaces `PriceSource.Stooq` for Stock and Etf, behind the unchanged `IPriceSource`; the Stooq source, client and fixtures are deleted (ADR-019). Tickers are Yahoo symbols (`CDR.WA`, `VWCE.DE`). The source sends a browser User-Agent and nothing else.
+**Decision:** `PriceSource.Yahoo` replaces `PriceSource.Stooq` for Stock and Etf, behind the unchanged `IPriceSource`; the Stooq source, client and fixtures are deleted (ADR-043: replaced code is deleted). Tickers are Yahoo symbols (`CDR.WA`, `VWCE.DE`). The source sends a browser User-Agent and nothing else.
 **Consequences:** an unofficial API can change or rate-limit without notice — a failure surfaces as `PriceFetchResult.Error`, the `SyncRun` turns Partial/Failed and quotes go stale (Reporting already flags a quote older than 7 days); swapping the provider again is one `IPriceSource` (plus the search source of ADR-030). ADR-018's "every Stock/Etf ticker is Unreachable" constraint no longer holds.
 
 ## ADR-030 ✅ Instrument search may query the provider in the request path — a second narrow exception to ADR-007
@@ -289,5 +291,19 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 ## ADR-042 🕐 Allocation lives on asset groups; the target allocation, transfer plan and buckets are removed
 
 **Context:** the user plans investing per asset group (kind, class allocation, monthly contribution — epic `group-allocation-planning`). The global and per-group target allocation (Reporting), the transfer plan with allocation buckets, plan versions, balances and IKE/IKZE limits (Portfolio) and the events that kept them in sync (ADR-038, ADR-041) describe the same intent in a second, heavier model.
-**Decision:** the group is the only carrier of allocation. `TargetAllocation`, `GroupTargetAllocation`, `TargetAllocationReplica`, the transfer plan, `AllocationBucket`/`AllocationPlanVersion`/`AllocationPlanEntry`/`AllocationBalanceOverride`, the allocation-plan reserve row, `PlanningSettings.MinimumTransferPln`, `TargetAllocationSaved` and `AssetGroupDeleted` are deleted with their endpoints, pages and tables (destructive migrations, ADR-019). Deleting a group still clears the assets', accounts' and cash places' group, publishing only the assets' `AssetPositionChanged`. `ValuationReplica` and `LatestValuationChanged` stay for the group planning of the next part. The planning month keeps income, expenses and free funds; the expense reserve of rare expenses stays.
+**Decision:** the group is the only carrier of allocation. `TargetAllocation`, `GroupTargetAllocation`, `TargetAllocationReplica`, the transfer plan, `AllocationBucket`/`AllocationPlanVersion`/`AllocationPlanEntry`/`AllocationBalanceOverride`, the allocation-plan reserve row, `PlanningSettings.MinimumTransferPln`, `TargetAllocationSaved` and `AssetGroupDeleted` are deleted with their endpoints, pages and tables (destructive migrations). Deleting a group still clears the assets', accounts' and cash places' group, publishing only the assets' `AssetPositionChanged`. `ValuationReplica` and `LatestValuationChanged` stay for the group planning of the next part. The planning month keeps income, expenses and free funds; the expense reserve of rare expenses stays.
 **Consequences:** Reporting publishes only `LatestValuationChanged` and consumes no group event; a user's former targets, plans and balances are gone. Supersedes ADR-041 and the transfer-plan half of ADR-038; ADR-039 and ADR-040 stand.
+
+## ADR-043 🕐 Compose data is protected: greenfield is revoked for data, loss needs the user's consent
+
+**Supersedes ADR-019.**
+
+**Context:** the user has entered real data into the local compose stack (`skarbiec-local`). ADR-019 let any migration drop data, squash a service to one `InitialCreate` and drop the local databases, with no backup anywhere. The user revokes that part of greenfield mode. Contracts, enums, HTTP shapes and deleted code stay free to change: they hold no data.
+**Decision:**
+- **Protected set:** the Identity database; the Portfolio database except the replicas of other services' events and the MassTransit outbox/inbox tables; MarketData `Instruments` (user-added and seeded instruments share the table). Reporting, MarketData quotes and FX, and replicas are computed and may be rebuilt without consent.
+- **Loss needs consent:** a migration that destroys protected data requires a `## Utrata danych` section in its ticket with a dated `Zgoda:` line. Only the user grants it, in `/design`; no agent writes or decides it. A migration that moves protected data requires `## Przeniesienie danych`, each move proven by a migration test on a database holding data from the previous version.
+- **History only grows:** an existing migration is never edited, deleted or renamed, and no service is squashed to `InitialCreate`.
+- **Computed data:** a ticket that deletes computed data (Reporting snapshots and the like) ships an automatic rebuild after deployment, with an AC and a test; no consent is needed.
+- **Disposable databases:** the Aspire and `skarbiec-e2e` databases are still dropped after a destructive migration; the compose stack is not.
+- **Backups:** the compose stack's `up` and `reset` dump all four databases first (`scripts/compose.mjs`, `~/skarbiec-backups`), and `backup`, `backups` and `restore` work on them.
+**Consequences:** `scripts/migration-guard.mjs`, run by `verify.mjs`, `ship.mjs` and `gh-project.mjs check`, blocks a destructive migration without its section before it becomes a PR, so `autobuild.mjs` stops on it. The backup directory sits on the same disk as the Docker volume: it protects against a bad migration or a mistyped reset, not against a disk failure or a manual `docker volume rm`; copying it off the machine is manual and out of scope. Versioning of contracts (ADR-012, ADR-015) stays suspended, as ADR-019 left it.

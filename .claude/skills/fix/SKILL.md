@@ -191,5 +191,7 @@ an interrupted fix: continue from it). One fix per PR, no second attempt.
 - Never run `git add`, `git commit`, `git push`, `git switch`, `git checkout`, `git stash` yourself — `ship.mjs`
   commits, pushes and opens the PR. Read-only git is fine. Never merge.
 - A flaky test is a bug in the test or the fixture, not a reason to retry until green — treat it like any other bug.
+- A `migrations` verify failure naming a missing `## Utrata danych` or `## Przeniesienie danych` section is a stop, not a fix:
+  report it and never write the consent section or edit the ticket — only the user grants consent, in `/design`.
 - Never widen the fix into cleanup. One cause, one fix, one PR — several causes or a sequenced fix become an
   epic of such parts (3a), never one wide PR.

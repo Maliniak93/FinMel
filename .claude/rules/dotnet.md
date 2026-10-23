@@ -50,7 +50,7 @@ Messaging lives in `messaging.md`, tests in `testing.md`, domain rules in `domai
 - Concurrency: an `xmin` shadow property as the concurrency token. A migration must never create, drop or alter it — if a generated migration touches `xmin`, delete those lines by hand.
 - Enums are stored as ints, so with `HasDefaultValue` the CLR default 0 is what an existing row gets: the member that means "not set" (or the intended default) must be the one with value 0. Ordering enum members carelessly silently rewrites history.
 - Run `dotnet format` right after `dotnet ef migrations add` — generated migration files are not formatted.
-- Migrations may be destructive and may be squashed to a single `InitialCreate` (ADR-019). No backfill scripts, no compatibility shims; drop the local database instead.
+- Migration history only grows: never edit, delete, rename or squash an existing migration (ADR-043). A destructive migration of protected data (Identity, Portfolio except replicas, MarketData `Instruments`) needs `## Utrata danych` in its ticket with the user's consent; a data move needs `## Przeniesienie danych` and a migration test on data from the previous version. Computed data may be dropped and rebuilt automatically; no compatibility shims.
 - Cross-service references are plain `Guid` columns — no FK, no navigation property (ADR-003).
 
 ## HTTP between services
