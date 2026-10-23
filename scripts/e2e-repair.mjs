@@ -1,12 +1,48 @@
 // Usage: imported by autobuild.mjs (repair loop), autobuild-ci.mjs (CI fix), gh-project.mjs (report, prepare) - e2e block lines, FIX_RESULT parsing, repair and CI fix outcome, diagnosis and rebuild inputs
 
-export const E2E_BLOCKED = "**Blocked** at `e2e`";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+export const E2E_BLOCKED ="**Blocked** at `e2e`";
 export const E2E_APP_BLOCKED = `${E2E_BLOCKED} (app)`;
 export const E2E_DIAGNOSIS = "**E2E test defect**";
 
-export function appBlocks(comments) {
-  return (comments ?? []).filter((c) => (c.body ?? "").startsWith(E2E_APP_BLOCKED)).length;
+export function failedTests(blockBody) {
+  const names = [...String(blockBody ?? "").matchAll(/^- test `([^`]+)`/gm)].map((m) => m[1]);
+  return [...new Set(names)].sort();
 }
+
+export function repairBudget(state, { part, tests, sha, max }) {
+  const entry = state?.[part];
+  if (!entry) return { ok: true, used: 0 };
+  if (entry.count >= max) return { ok: false, used: entry.count, reason: `${entry.count} unattended repairs of #${part} did not make it green` };
+  const same = entry.sha === sha && JSON.stringify(entry.tests ?? []) === JSON.stringify(tests ?? []);
+  if (same) return { ok: false, used: entry.count, reason: `the same failing test(s) ${(tests ?? []).map((t) => `"${t}"`).join(", ") || "(none named)"} at master ${sha} as the previous repair` };
+  return { ok: true, used: entry.count };
+}
+
+export function recordRepair(state, { part, tests, sha, fixes = [] }) {
+  const entry = state?.[part] ?? { count: 0, fixes: [] };
+  return { ...state, [part]: { count: entry.count + 1, fixes: [...entry.fixes, ...fixes], tests, sha } };
+}
+
+export function loadRepairState(file) {
+  try {
+    return JSON.parse(readFileSync(file, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+export function saveRepairState(file, state) {
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, `${JSON.stringify(state, null, 2)}\n`);
+}
+
+export const blockAfterBuild = ({ pr, commented, block }) => (!pr && commented ? block : null);
+
+export const noPrReason = ({ part, commented, code }) =>
+  commented ? `#${part}: no PR after the build (exit ${code}) - see the report on the issue` : `#${part}: the build did not start (no comment on the part since its start, exit ${code}) - see the build output`;
 
 export function newestDiagnosis(comments) {
   const body = comments?.at(-1)?.body ?? "";

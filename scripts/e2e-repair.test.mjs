@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { E2E_APP_BLOCKED, E2E_DIAGNOSIS, appBlocks, ciFixOutcome, e2eBlockLines, newestDiagnosis, parseFixResult, rebuildInputs, repairOutcome } from "./e2e-repair.mjs";
+import { E2E_APP_BLOCKED, E2E_DIAGNOSIS, blockAfterBuild, ciFixOutcome, e2eBlockLines, failedTests, loadRepairState, newestDiagnosis, noPrReason, parseFixResult, rebuildInputs, recordRepair, repairBudget, repairOutcome, saveRepairState } from "./e2e-repair.mjs";
 
 const SELF_CHECK = "rewrote the total with expectProjected (30 s): still 0 PLN after the re-fetch";
 
@@ -74,11 +75,60 @@ test("app and plan outcomes unchanged", () => {
   assert.equal(repairOutcome({ ok: true, kind: "plan", summary: "x" }, { part: 332, nextOpen: 332 }).action, "rebuild");
 });
 
-test("app blocks counted across test repairs", () => {
-  const app = c(`${E2E_APP_BLOCKED} — x`);
-  const comments = [app, c(DIAGNOSIS), app, c("ship report"), c(DIAGNOSIS), app, c(DIAGNOSIS), app, c("**Blocked** at `e2e` (environment)")];
-  assert.equal(appBlocks(comments), 4);
-  assert.equal(appBlocks([]), 0);
+const OLD_BLOCK = `${E2E_APP_BLOCKED} — x\n- test \`b test\` — Krok 2\n- test \`a test\` — Krok 1\n- report: \`r.json\``;
+
+test("failing test names are parsed from a block comment", () => {
+  assert.deepEqual(failedTests(OLD_BLOCK), ["a test", "b test"]);
+  assert.deepEqual(failedTests("nothing"), []);
+});
+
+test("a build that posted no comment since its start did not start", () => {
+  assert.equal(blockAfterBuild({ pr: null, commented: false, block: { cls: "app" } }), null);
+  assert.deepEqual(blockAfterBuild({ pr: null, commented: true, block: { cls: "app" } }), { cls: "app" });
+  assert.equal(blockAfterBuild({ pr: { number: 1 }, commented: true, block: { cls: "app" } }), null);
+  assert.match(noPrReason({ part: 560, commented: false, code: 0 }), /did not start/);
+  assert.doesNotMatch(noPrReason({ part: 560, commented: true, code: 0 }), /did not start/);
+});
+
+test("the repair budget survives a reload and a merged fix, and refuses the same failure", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "repairs-"));
+  const file = path.join(dir, "e2e-repairs.json");
+  try {
+    const tests = ["a test"];
+    assert.equal(repairBudget(loadRepairState(file), { part: 560, tests, sha: "s1", max: 3 }).ok, true);
+    let state = recordRepair({}, { part: 560, tests, sha: "s1", fixes: [564] });
+    saveRepairState(file, state);
+    state = loadRepairState(file);
+    assert.equal(state[560].count, 1);
+    assert.deepEqual(state[560].fixes, [564]);
+
+    const same = repairBudget(state, { part: 560, tests, sha: "s1", max: 3 });
+    assert.equal(same.ok, false);
+    assert.match(same.reason, /a test/);
+    assert.match(same.reason, /s1/);
+
+    assert.equal(repairBudget(state, { part: 560, tests, sha: "s2", max: 3 }).ok, true);
+    assert.equal(repairBudget(state, { part: 560, tests: ["other"], sha: "s1", max: 3 }).ok, true);
+    assert.equal(repairBudget(state, { part: 561, tests, sha: "s1", max: 3 }).ok, true);
+
+    for (const sha of ["s2", "s3"]) state = recordRepair(state, { part: 560, tests, sha });
+    assert.equal(state[560].count, 3);
+    const fourth = repairBudget(state, { part: 560, tests: ["new"], sha: "s9", max: 3 });
+    assert.equal(fourth.ok, false);
+    assert.match(fourth.reason, /3 unattended repairs/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the fix skill documents the unattended e2e repair rules", () => {
+  const skill = readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "..", ".claude", "skills", "fix", "SKILL.md"), "utf8");
+  const start = skill.indexOf("## Unattended e2e repair");
+  const section = skill.slice(start, skill.indexOf("\n## ", start + 5));
+  assert.ok(section.length > 200);
+  for (const word of ["Never start the local stack", "AppHost", "dotnet run", "compose.mjs", "skarbiec-e2e", "scratch test", "**open** `Fix:` part", "create nothing"]) {
+    assert.ok(section.includes(word), word);
+  }
 });
 
 test("only the newest comment is a diagnosis", () => {

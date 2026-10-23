@@ -14,7 +14,7 @@
 //   node scripts/autobuild.mjs --stop   creates the one stop file; the running driver stops before the next build
 //   node scripts/autobuild.mjs --sleep-test MIN | --hibernate-test MIN   suspend or hibernate with a wake timer MIN minutes ahead (no popup), print the planned and actual wake time and `powercfg /lastwake`, exit
 //   an unknown reset ends the run with `limit-unknown`; a PC that wakes but is not ready within 15 min with `wake-not-ready`; every line also goes to skarbiec-plan/autobuild-runs/<timestamp>.log
-//   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`
+//   an e2e part blocked at `e2e` (app) is repaired unattended: `/fix e2e:#<n>` publishes fix part(s) ahead of it, corrects the epic's plan, or comments a test-defect diagnosis on the part; the loop builds and merges fix parts, then rebuilds the e2e part; after 3 app blocks on one part, or a repair that stops, the run ends with reason `e2e app`; the limit is kept in skarbiec-plan/autobuild-runs/e2e-repairs.json (3 repairs per e2e part, survives restarts and merged fixes; the same failing tests at an unchanged origin/master stop at once); a build that posts no comment on its part counts as "did not start" and stops the run, never as an e2e block; the next part of an epic comes from the issue view (the one prepare refuses on), not the board list
 //   an e2e part blocked at `e2e` (environment) is rebuilt once per run after stop-stack; a second block ends the run with reason `e2e environment`
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
 //   a part without Branch is healed first (gh-project.mjs heal); a card with a missing or invalid Tier is skipped with the later open parts of its epic and the cards whose Depends on names it (a log line and one comment each, Status unchanged) and the run ends `done` listing them as `pominięte: …`
@@ -32,7 +32,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findReplay, latestRunRecord } from "./build-replay.mjs";
-import { E2E_BLOCKED, appBlocks, parseFixResult, repairOutcome } from "./e2e-repair.mjs";
+import { E2E_BLOCKED,blockAfterBuild, failedTests, loadRepairState, noPrReason, parseFixResult, recordRepair, repairBudget, repairOutcome, saveRepairState } from "./e2e-repair.mjs";
 import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnlessMerged, postOnce, runStepWithLimit } from "./autobuild-gh.mjs";
 import { CI_FIX_MARKER, CI_POLICY_LINE, driveCi, partLine, runCiFix, summaryPartLine } from "./autobuild-ci.mjs";
 import { activityLabel, createActivityTracker, short } from "./autobuild-activity.mjs";
@@ -53,6 +53,7 @@ const CI_MISSING_MS = 10 * 60e3;
 const CI_TIMEOUT_MS = 90 * 60e3;
 const NODE = process.execPath;
 const MAX_E2E_REPAIRS = 3;
+const REPAIR_STATE =path.join(REPO_ROOT, "skarbiec-plan", "autobuild-runs", "e2e-repairs.json");
 const FIX_MODEL = "claude-opus-5-5";
 
 class Stop extends Error {
@@ -222,12 +223,6 @@ function commentedSince(number, since) {
 
 const SHIP_BLOCKED = "**Blocked** at `ship`";
 
-function e2eAppBlocks(number) {
-  const res = retryTransient(`issue view ${number}`, () => gh(["issue", "view", String(number), "--repo", REPO, "--json", "comments", "--jq", "[.comments[] | {body}]"]));
-  if (!res.ok) throw new Stop("github", `gh issue view ${number}: ${res.firstErr}`);
-  return appBlocks(JSON.parse(res.out));
-}
-
 // "ship" retries a failed ship step, "resume" continues an interrupted build on the tree on disk, "build" starts fresh
 // (a part blocked at e2e commits nothing and ship cleaned the tree: prepare recuts its branch from master)
 function partPlan(part, dirtyCount) {
@@ -246,7 +241,7 @@ function e2eBlock(number) {
   const cls = /^\*\*Blocked\*\* at `e2e` \((\w+)\)/.exec(last)?.[1] ?? "app";
   const trace = /trace: `([^`]+)`/.exec(last)?.[1];
   const report = /report: `([^`]+)`/.exec(last)?.[1];
-  return { cls, reason: `e2e ${cls}`, where: trace ? `trace ${trace}` : report ? `report ${report}` : "see the report on the issue" };
+  return { cls, reason: `e2e ${cls}`, tests: failedTests(last), where: trace ? `trace ${trace}` : report ? `report ${report}` : "see the report on the issue" };
 }
 
 function resolveClaude() {
@@ -834,10 +829,11 @@ async function handlePart(sub, ctx) {
       if (built.timedOut) throw new Stop("timeout", `#${part.number}: build exceeded 4 h of awake time and was killed`);
       if (built.hangStop) throw new Stop("hang", `#${part.number}: no progress for 45 min again after a restart (${hangLabel(built.hung)}); resume with ${resumeCommand(ctx)}`);
       pr = builtPr;
-      const blockedAtE2e = pr ? null : e2eBlock(part.number);
+      const commented = pr ? true : commentedSince(part.number, buildStart);
+      const blockedAtE2e = blockAfterBuild({ pr, commented, block: commented && !pr ? e2eBlock(part.number) : null });
       if (blockedAtE2e) return repairE2e(part, blockedAtE2e, ctx);
       if (!pr && (await shipUnshippedRun(part, buildStart))) pr = openPr(part.branch);
-      if (!pr) throw new Stop("blocked", `#${part.number}: no PR after the build (exit ${built.code}) - see the report on the issue`);
+      if (!pr) throw new Stop("blocked", noPrReason({ part: part.number, commented, code: built.code }));
     }
   }
 
@@ -858,8 +854,11 @@ async function repairE2e(part, block, ctx) {
     run(NODE, ["scripts/stop-stack.mjs"], { timeout: 10 * 60e3 });
     return;
   }
-  const blocks = e2eAppBlocks(part.number);
-  if (blocks > MAX_E2E_REPAIRS) throw giveUp(`${blocks} app blocks, ${MAX_E2E_REPAIRS} unattended repairs did not make it green; fix it with /fix`);
+  const sha = git(["rev-parse", "origin/master"]).out;
+  const state = loadRepairState(REPAIR_STATE);
+  const budget = repairBudget(state, { part: part.number, tests: block.tests, sha, max: MAX_E2E_REPAIRS });
+  if (!budget.ok) throw giveUp(`${budget.reason}; fix it with /fix`);
+  const blocks = budget.used + 1;
   if (existsSync(stopFile())) throw new Stop("stopped", "stop file found");
   if (ctx.builds >= ctx.maxTasks) throw new Stop("max-tasks", `${ctx.maxTasks} build(s) done in this run`);
   assertWindowOpen(ctx);
@@ -871,6 +870,7 @@ async function repairE2e(part, block, ctx) {
   if (fixed.limitHit) throw new Stop("limit", `#${part.number}: usage limit reached during the e2e repair, resets ${resetClock(fixed.resetsAt)}; resume with ${resumeCommand(ctx)}`);
   const result = parseFixResult(fixed.text);
   if (!result?.ok) throw giveUp(result ? `the repair stopped: ${result.summary}` : `the repair gave no FIX_RESULT (exit ${fixed.code})`);
+  saveRepairState(REPAIR_STATE, recordRepair(state, { part: part.number, tests: block.tests, sha, fixes: result.issues ?? [] }));
   const dirty = dirtyFiles();
   if (dirty.length || currentBranch() !== "master") throw new Stop("dirty-tree", `the e2e repair left ${currentBranch()} with ${dirty.length} uncommitted file(s): ${dirty.slice(0, 5).join(", ")}`);
   const nextOpen = (getIssue(ctx.item).subIssues ?? []).find((s) => s.state !== "CLOSED")?.number;
@@ -1263,6 +1263,7 @@ try {
     only: flags.only ?? null,
     readCards,
     buildPart,
+    nextPart: async (item) => (getIssue(item.number).subIssues ?? []).find((s) => s.state !== "CLOSED")?.number ?? null,
     isClosed: async (number) => getIssue(number).state === "CLOSED",
     finishEpic,
     onSkip: noteSkip,

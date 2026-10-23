@@ -124,10 +124,13 @@ previous one has merged. Build it exactly as `/build` steps 1–5 do and report 
    epic's `## Test manualny`, or the part's own when its body has a numbered `## Test manualny` (an own-plan part). Read it, the sibling parts' Goal / ACs / Design decisions
    (`node scripts/gh-project.mjs get <m>`), the test code in `skarbiec-plan/issues/<n>.e2e.patch` and
    `e2e/test-results/stack.log`. The closed `Fix:` parts of the same epic are earlier repairs: the same symptom again
-   means the earlier fix missed the cause — go deeper, never repeat it.
-2. **Reproduce** below the browser, as in step 1: a filtered `dotnet test`, an Angular spec, or the stack and an
-   `.http` request. The e2e run counts as the symptom, not as the reproduction. Stop the stack when done; never start
-   `scripts/e2e.mjs` or touch `scripts/compose.mjs`. Leave the working tree clean and on master — `autobuild.mjs` refuses a dirty one.
+   means the earlier fix missed the cause — go deeper, never repeat it. An **open** `Fix:` part of the same epic already
+   ahead of `#<n>` is an earlier repair still waiting to be built: create nothing, finish with
+   `FIX_RESULT: {"ok":true,"kind":"app","issues":[<that number>],"summary":"…"}` instead of a second part.
+2. **Reproduce** below the browser, as in step 1: a filtered `dotnet test`, an Angular spec or a scratch test that
+   reproduces it. Never start the local stack (the AppHost, `dotnet run`, `scripts/compose.mjs`): diagnose from the
+   trace, `e2e/test-results/stack.log` and the code. The e2e run counts as the symptom, not as the reproduction. The
+   isolated `skarbiec-e2e` project (ADR-034) is not affected by this rule, but never start `scripts/e2e.mjs`. Leave the working tree clean and on master — `autobuild.mjs` refuses a dirty one.
 3. **Decide which side is wrong**, with a quoted line as evidence:
    - **app** — the app contradicts the plan, and nothing in the epic or its parts specifies what the app does → steps 2–3
      above, then `node scripts/gh-project.mjs check --body-file …` and

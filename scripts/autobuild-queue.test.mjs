@@ -177,6 +177,59 @@ test("a merged part is not built again while its card lags behind the closed iss
   assert.deepEqual(finishedEpics, [434]);
 });
 
+const epicWithFix = () => [
+  { number: 556, title: "Epic", status: "In progress", epic: true, parent: null, autobuild: true, subIssues: [559, 560], priority: "P2", area: null, tier: "1" },
+  { number: 559, title: "Part", status: "Done", parent: 556, area: "Backend", tier: "1" },
+  { number: 560, title: "E2E", status: "Todo", parent: 556, area: "E2E", tier: "1" },
+  { number: 600, title: "Other", status: "Todo", epic: false, parent: null, priority: "P3", area: "Scripts", tier: "1" },
+];
+
+test("the next part comes from the issue view when the board list lags behind a new fix part", async () => {
+  const built = [];
+  await runQueue({
+    only: 556,
+    readCards: async () => epicWithFix(),
+    nextPart: async () => (built.length ? null : 564),
+    buildPart: async (item, part) => void built.push(part),
+    finishEpic: async () => {},
+  });
+  assert.deepEqual(built, [564]);
+});
+
+test("a repaired epic builds the fix, then the e2e part, and closes before the next item", async () => {
+  const open = [564, 560];
+  const built = [];
+  const events = [];
+  await runQueue({
+    readCards: async () => epicWithFix(),
+    nextPart: async () => open[0] ?? null,
+    buildPart: async (item, part) => {
+      built.push(part);
+      events.push(`build ${part}`);
+      open.shift();
+    },
+    isClosed: async () => true,
+    finishEpic: async (item) => void events.push(`finish ${item.number}`),
+  });
+  assert.deepEqual(events, ["build 564", "build 560", "finish 556", "build 600"]);
+});
+
+test("a stop while building the fix part ends the run before the e2e part and the next item", async () => {
+  const built = [];
+  await assert.rejects(
+    runQueue({
+      readCards: async () => epicWithFix(),
+      nextPart: async () => 564,
+      buildPart: async (item, part) => {
+        built.push(part);
+        throw new Error("ci-failed");
+      },
+    }),
+    /ci-failed/,
+  );
+  assert.deepEqual(built, [564]);
+});
+
 const standalone = (number, extra = {}) => ({ number, title: `Card ${number}`, status: "Todo", epic: false, parent: null, priority: "P2", area: "Scripts", tier: "1", dependsOn: [], ...extra });
 
 async function drive(cards, hooks = {}) {
