@@ -35,7 +35,7 @@ Angular talks only to the Gateway (ADR-013).
 | `InstrumentHistoryBackfilled` | `InstrumentId, From, To, OccurredAtUtc` (the clamped window the backfill fetched) | `HistoryBackfillJob` finishes with quotes stored (not on NoData or Error) |
 | `UserRegistered` | as today | no consumer yet (Notifications is an idea, not built) |
 
-`AssetChanged` and `TransactionRecorded` are removed — today they have no consumers and don't carry full state. Contracts are edited in place, no `V2` types (ADR-019).
+`AssetChanged` and `TransactionRecorded` are removed — today they have no consumers and don't carry full state. Contracts are edited in place, no `V2` types (ADR-043).
 
 ## Current vs target
 
@@ -44,7 +44,6 @@ Angular talks only to the Gateway (ADR-013).
 | `AssetChanged`/`TransactionRecorded` publish with no consumers; updating or deleting a transaction publishes nothing | replaced by `AssetPositionChanged`/`AssetRemoved` from every mutating slice | spec-02 |
 | Strategy service exists as an empty skeleton | removed; its future features live in Reporting | spec-01 |
 | `Portfolio.AssetCount` / `Asset.TransactionCount` counters; unused `ApplicationUser.BaseCurrency` | removed — deletes cascade in the handler (spec-08); PLN is the only base currency everywhere (ADR-008) | spec-02, spec-05, spec-08 |
-| 3/5/7/1 migrations per service, carrying task-history names | one `InitialCreate` migration per service (ADR-019) | spec-06 |
 | Worktree branch `worktree-marketdata-currency-redesign` (a currency catalog + `FxSyncJob` prototype) | superseded by spec-04's design (no fallback rate) | delete after spec-04 merges |
 
 ## Diagrams

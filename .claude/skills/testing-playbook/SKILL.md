@@ -31,7 +31,10 @@ Use `HostlessOutboxProvider.Build<TDbContext>(containers, configureServices, con
 
 ## Idempotency and contract tests — required for every new/changed event
 - **Idempotency**: deliver the same `MessageId` to the consumer twice; assert the side effect (a row, a counter) happened exactly once.
-- **Contract deserialization**: a previously-serialized payload — and one with unknown extra fields — still deserializes. Events carry full state and are edited in place (ADR-019), so this is what catches an accidental breaking shape change.
+- **Contract deserialization**: a previously-serialized payload — and one with unknown extra fields — still deserializes. Events carry full state and are edited in place (ADR-043), so this is what catches an accidental breaking shape change.
+
+## Migration tests — required for a migration that moves protected data (ADR-043)
+A test migrates a fresh database to the migration before the change (`Database.MigrateAsync(<previous migration id>)`), seeds rows through SQL or the old model, applies the rest, and asserts the rows survived or were moved. Its name is the `proof:` of the ticket's `## Przeniesienie danych` line. A purely additive migration needs no such test.
 
 ## Pure functions
 Valuation, allocation, rebalancing, quantity-recompute math: table-driven `[Theory]`/`[InlineData]` unit tests, no containers, no host. Property-style assertions (e.g. "recompute from scratch always agrees with the incremental result") where they're cheap to state.

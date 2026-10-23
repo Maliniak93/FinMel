@@ -104,9 +104,8 @@ but only when `ASPNETCORE_ENVIRONMENT=Development` — convenient for local Aspi
 schema changes on every container start is not something production should do implicitly. In
 production (T0.18), migrations are an explicit step in the deploy script instead.
 
-While ADR-019 (greenfield mode) holds, migrations carry no data: dropping a database and letting it
-be recreated from scratch is an acceptable upgrade path, and a service's migration history may be
-squashed to a single `InitialCreate`. Production migration discipline arrives with T0.18.
+The compose stack's data is protected (ADR-043): a destructive migration of protected data needs the
+ticket's consent, and migration history is never squashed. Production migration discipline arrives with T0.18.
 
 MarketData's Quartz job store is not part of its migrations: the scheduler provisions its own
 `quartz.qrtz_*` tables at first start (`ProvisionSchema()`, `Sources/QuartzStore.cs`) and creates the

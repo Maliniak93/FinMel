@@ -64,6 +64,8 @@ spec does not ask for. Every extra test is paid for again by the implementer and
 - No production code, no interfaces, no stubs outside the test projects, no edits under
   `services/*/Skarbiec.<Service>/`, `contracts/`, `gateway/` or `web/src/app` except `*.spec.ts`.
 - Never run `git add`, `git commit`, `git push`, `git checkout` or any other git mutation.
+- A migration you are asked to test that lacks its `## Utrata danych` / `## Przeniesienie danych` section in the
+  ticket: stop and report it in `notes`. Never write the consent section and never edit the ticket.
 - No test may be `[Fact(Skip = ...)]` or commented out.
 - Never run `node scripts/e2e.mjs` and never start the `skarbiec-e2e` stack: the e2e suite belongs to the e2e agent of an epic's e2e part.
 - A running local stack (Aspire AppHost, the services, `ng serve`) can block your test runs: MSB3021 / MSB3026 /

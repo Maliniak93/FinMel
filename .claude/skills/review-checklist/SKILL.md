@@ -25,6 +25,8 @@ Each section below is blocking for its Area; `Common` applies to every change.
 - Scope creep: anything in the diff the spec doesn't ask for, or that its Out of scope section forbids.
 - A convention or hard rule changed without a matching update to `.claude/rules/*` or `skarbiec-plan/decisions.md`.
 - A `## Test manualny` plan — kept from the spec or rewritten in `skarbiec-plan/issues/<n>.manual.md` — that names a route, screen or action absent from the code. Wording problems in it are minor.
+- A migration that destroys protected data (see `decisions.md` ADR-043) without the ticket's `## Utrata danych` section with a `Zgoda:` line, or without a `## Przeniesienie danych` entry whose `proof:` test exists; an existing migration edited, deleted or renamed.
+- A change that deletes computed data (Reporting snapshots and the like) with no automatic rebuild after deployment, or with no AC and test proving that rebuild.
 
 ### Backend
 - A hard-rule violation: throwing (instead of returning `Result`/`Result<T>`) for an expected failure path; a Service/Repository layer, or MediatR; `UserId` sourced from the request body or route instead of JWT claims; an event published outside the MassTransit outbox, or a consumer that isn't idempotent; a consumer calling the event's publisher back over REST instead of using the state the event already carries; cross-database access or a foreign key between services; `float`/`double` used for money instead of `decimal`; a new call to an external price/FX API from anywhere other than a MarketData job or `ITickerVerifier`.

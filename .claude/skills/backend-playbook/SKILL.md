@@ -23,7 +23,7 @@ endpoints. Both hit anonymous `/internal/**` endpoints with no token (ADR-027).
 9. Copy the nearest existing slice in the same service rather than inventing structure.
 
 ## New event
-1. Contract: a `record` in `contracts/Skarbiec.Contracts/Events` carrying the **full state** a consumer needs (event-carried state transfer) — not a delta, not just an id. ADR-019 (greenfield): edit the record in place; no `V2` type, no deprecate-and-add. Update every publisher, consumer, and test in the same change.
+1. Contract: a `record` in `contracts/Skarbiec.Contracts/Events` carrying the **full state** a consumer needs (event-carried state transfer) — not a delta, not just an id. Edit the record in place; no `V2` type, no deprecate-and-add (ADR-043). Update every publisher, consumer, and test in the same change.
 2. Publish only through the outbox: `await publishEndpoint.Publish(new TheEvent {...}, cancellationToken);` **before** the same `SaveChangesAsync` call that saves the business change, so both commit in one transaction. Never resolve `IBus` directly; never publish outside that transaction.
 3. Consumer: `sealed class XConsumer(...) : IConsumer<TheEvent> { ... }`. Keep `Consume` idempotent in spirit even though the inbox stops redelivery — an outbound call inside it can still double-fire on a retry before the first attempt's inbox row commits. A consumer must never call the publishing service back over REST for more data — the event already carries what's needed.
 4. Definition: `internal sealed class XConsumerDefinition : IdempotentConsumerDefinition<XConsumer, XDbContext>;` (empty — the base wires capped retry + `UseEntityFrameworkOutbox`).
@@ -33,7 +33,7 @@ endpoints. Both hit anonymous `/internal/**` endpoints with no token (ADR-027).
 
 ## EF migrations
 - `dotnet ef migrations add <Name> --project services/<Service>/Skarbiec.<Service>`, then `dotnet format`.
-- Destructive changes are fine and backfill is optional (ADR-019, greenfield) — don't add compatibility shims for data that doesn't exist yet.
+- Data rules for a migration (history only grows, consent for protected data, moves proven by a migration test): `.claude/rules/dotnet.md` and ADR-043. No compatibility shims.
 - `xmin` is EF's Postgres concurrency token, added as a **shadow property** — never let a migration add or drop a real `xmin` column; one appearing in a migration diff means the model is wrong, not the DB.
 - An enum property configured with `HasDefaultValue(SomeEnum.X)` relies on EF treating the CLR-default value (`0`) as "unset" so it defers to the DB default. The member meant as the default **must be the first one declared** (value `0`) — reordering the enum silently breaks this.
 
@@ -74,7 +74,7 @@ Changing a convention or a hard rule in the same change that motivated it: updat
 ## Definition of done
 - Tests green, including tenancy isolation for any new user-owned resource: the four isolation facts of `TenancyIsolationTests<TProgram>`, or their hand-written nested equivalents.
 - Zero warnings (`TreatWarningsAsErrors`), `dotnet format` clean.
-- Migration added → reviewed for destructiveness and named after the change; the runbook note in the spec's Verification section still holds.
+- Migration added → reviewed for destructiveness against the protected set (ADR-043), named after the change, and the consent or move section of its ticket written where it applies.
 
 > **Who runs what.** While implementing, run only `dotnet test <project> --filter "FullyQualifiedName~<Name>"`
 > for the tests you are driving green. `dotnet format`, a solution build, the full suites and

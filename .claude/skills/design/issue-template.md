@@ -45,6 +45,12 @@
 |---|---|---|
 | | | |
 
+<!-- Only when a migration touches protected data (ADR-043); otherwise delete both sections. Przeniesienie danych: one line per moved item, `- Portfolio.Assets.Quantity … proof: Class.Method`, the method being a migration test on a database holding data from the previous version. Utrata danych: only with the user's explicit yes in /design — one line per destroyed item (what is lost, why it cannot be avoided), then `Zgoda: <date> — <the user's answer>`. Deleting computed data (Reporting snapshots and the like) needs neither: an AC and a test for the automatic rebuild after deployment. -->
+
+## Przeniesienie danych
+
+## Utrata danych
+
 ## Acceptance criteria
 
 <!-- Checkboxes so the project card shows progress. Each one Given/When/Then with a proof the reviewer can run. -->

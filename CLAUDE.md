@@ -3,9 +3,9 @@
 Personal wealth-management web app and a deliberate microservices learning project.
 Stack: .NET 10 (4 services + YARP gateway) · Angular 22 · PostgreSQL (db per service) · RabbitMQ + MassTransit v8 (outbox/inbox) · .NET Aspire locally.
 
-## Project state: greenfield (ADR-019)
-One user, no real data, local-only — so: edit contracts in place (never add a `V2` type); write destructive migrations with no backfill (squashing a service to one `InitialCreate` is allowed); delete replaced code, tests and docs instead of deprecating them; propose a rewrite when it beats a patch.
-Greenfield changes none of: tenancy isolation, outbox + idempotent consumers, the Result pattern, the definition of done.
+## Project state: contracts free, data protected (ADR-043)
+One user, local-only — contracts, API shapes and enums change in place (never add a `V2` type); delete replaced code, tests and docs instead of deprecating them; propose a rewrite when it beats a patch.
+Data in the compose stack is protected: a migration that destroys it needs the user's consent in the ticket (`## Utrata danych`), a move needs `## Przeniesienie danych`; migration history only grows. Tenancy isolation, outbox + idempotent consumers, the Result pattern and the definition of done are unchanged.
 
 ## Commands
 | Task | Command |
@@ -68,7 +68,7 @@ Verify scope comes from the changed files against master: a full-scope file (`co
 - A running local stack (AppHost, services, `ng serve`) locks build outputs and `node_modules` binaries (MSB3021/3026/3027, EBUSY/EPERM, port in use): run `node scripts/stop-stack.mjs` and retry; `verify.mjs` does it itself. Never restart the stack afterwards.
 - e2e (`.claude/rules/e2e.md`, ADR-034): web `:18080`, market stub `:18081`, dashboard `:18898`; `verify.mjs` only typechecks and formats `e2e/`, never runs Playwright; `stop-stack.mjs` never touches the e2e containers.
 - `dotnet test` needs Docker; test hosts set `Testing:DisableBackgroundJobs` (Quartz off, triggers NoOp). The Gateway rate limit is 100 requests / 10 s, and seed and smoke scripts trip it.
-- After a destructive migration, drop the local databases (`skarbiec-plan/runbooks/local-dev.md`). The Angular CLI needs Node ≥ 22.22.3 / 24.15 / 26. `npm run gen:api` can drop `.js` import extensions repo-wide: diff it and keep only the real schema delta.
+- Aspire and e2e databases are disposable: after a destructive migration drop them (`skarbiec-plan/runbooks/local-dev.md`); the compose stack is not (ADR-043). The Angular CLI needs Node ≥ 22.22.3 / 24.15 / 26. `npm run gen:api` can drop `.js` import extensions repo-wide: diff it and keep only the real schema delta.
 
 ## Response style
 Be terse: no narration of steps, no restating file contents, no closing summaries unless asked. One short clarifying question beats guessing. Every file is written in English; talk to the user in Polish.

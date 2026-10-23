@@ -35,7 +35,7 @@ A multi-user web application for managing personal wealth. The user enters asset
 
 ### Next
 
-Bring-up specs `spec-00`…`spec-06` close the gap between today's code and the target architecture (`architecture.md`) — event-carried positions, a currency catalog with its own sync job, squashed migrations — with no new user-facing feature. After that, v1.0's insight features land as ordinary specs against the new model:
+Bring-up specs `spec-00`…`spec-06` close the gap between today's code and the target architecture (`architecture.md`) — event-carried positions, a currency catalog with its own sync job — with no new user-facing feature. After that, v1.0's insight features land as ordinary specs against the new model:
 
 - Target allocation per portfolio or total wealth, with deviation detection.
 - Rebalancing suggestions (asset-class buy/sell amounts) and a "where should I deposit X" contribution-planning mode.

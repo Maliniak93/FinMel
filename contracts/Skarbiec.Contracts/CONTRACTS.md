@@ -10,7 +10,7 @@ Validating factories (e.g. `Money.Create(...)`) return a failed `Result` instead
 
 Consumers must tolerate fields they don't know about yet (forward compatibility) — see the
 deserialization contract test in `Skarbiec.Contracts.Tests`. Everything else about compatibility
-over time is suspended while ADR-019 (greenfield mode) holds — see the rules below.
+over time is suspended (ADR-043) — see the rules below.
 
 ## Rules
 
@@ -22,16 +22,16 @@ shared primitives (`Money`, `AssetClass`, `AssetValuationMode`, `TreasuryBondTyp
 the bond offer in, so reordering it reorders the offer. `Metal` and `MetalInstruments` pin each precious metal
 to its seeded MarketData instrument id, so changing an id orphans every stored reference to it.
 
-1. **Edit the record in place** (ADR-019 — greenfield mode). The system has one user and no real
-   data, so there is no old shape to stay compatible with: rename, retype or remove a field
-   directly. No `V2` types, no deprecation window, no two shapes coexisting.
+1. **Edit the record in place** (ADR-043). The whole app deploys at once, so there is no old shape to
+   stay compatible with: rename, retype or remove a field directly. No `V2` types, no deprecation
+   window, no two shapes coexisting.
 2. **Change every side in the same change.** A changed record means every publisher, every
    consumer and every test using it is updated together — the compiler is the compatibility check,
    and the build must be green before the change is done. The same goes for enums: a member may be
    removed or renumbered as long as everything reading it is updated.
 3. **Consumers still tolerate unknown fields** (forward compatibility) — a payload with extra
    fields must deserialize without error, so an in-flight message from a not-yet-restarted service
-   never poisons a queue. This is the one wire rule ADR-019 keeps; the deserialization tests in
+   never poisons a queue. This is the one wire rule that stays; the deserialization tests in
    `Skarbiec.Contracts.Tests` (fixtures `*-with-extra-fields.json`) guard it.
 4. **A `required` member must be in every payload.** System.Text.Json rejects a message missing a
    `required` property, so adding one (e.g. `AssetPositionChanged.IsArchived`, asset-archive) means
@@ -55,6 +55,6 @@ Portfolio's facts about a user's watchlist; MarketData counts watchers from them
 `LatestValuationChanged` (`UserId, Date, IsStale, TotalPln, ByAssetClass, ByGroup, OccurredAtUtc`) is Reporting's fact;
 Portfolio replicates it per user and ignores a message older than the stored one (`Date` then `OccurredAtUtc`).
 
-When ADR-019 is revoked (real data in production), the classic discipline comes back: additive
-only, never rename or remove, breaking change → a new `V2` record published alongside the old one.
-Until then, don't pay for it.
+The classic discipline is suspended (ADR-043): additive only, never rename or remove, breaking change
+→ a new `V2` record published alongside the old one. It returns the day the app can no longer deploy
+all at once. Until then, don't pay for it.
