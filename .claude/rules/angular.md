@@ -19,6 +19,11 @@ Verified against angular.dev, 2026-09. Workspace tour and generator details: `we
 
 Angular Material + CDK (ADR-010, decided). Use Material components and the CDK for overlays, a11y and layout primitives; do not pull in a second component library.
 
+- Colours, type and shape come from the Classical tokens in `web/src/skarbiec-tokens.css`, loaded after `styles.scss` (`mat.theme()`) in `angular.json`, so its `--mat-sys-*` and `--sk-*` win. Use the tokens, never literal colours.
+- `<html data-theme="light|dark">` always holds the resolved theme: `ThemeService` (and the pre-paint script in `index.html`) resolve `system` through `matchMedia`; no inline `color-scheme`.
+- Fonts (Cormorant Garamond, Lora, Material Symbols Outlined) are self-hosted from `@fontsource/*` woff2 files declared in `styles.scss`; no Google Fonts, Roboto or Material Icons. Icons are Material Symbols ligatures in `<mat-icon>` (default font set `material-symbols-outlined`); every ligature name must exist in the `material-symbols` package (`icons.spec.ts`).
+- Figures are tabular (`body { font-variant-numeric: tabular-nums lining-nums }`, `.sk-num`).
+
 ## Forms
 
 Reactive Forms (typed, `FormBuilder.nonNullable`), with errors rendered in `mat-error`. **Not Signal Forms**: `[formField]` needs a control implementing the Signal Forms control interfaces, which Material's form-field components do not — revisit when Material ships that support.

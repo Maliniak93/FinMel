@@ -27,6 +27,21 @@ class MemoryStorage implements Storage {
   }
 }
 
+// jsdom has no matchMedia; ThemeService needs one, and a light device is the neutral default.
+if (typeof window.matchMedia !== 'function') {
+  window.matchMedia = (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+      onchange: null,
+    }) as MediaQueryList;
+}
+
 for (const key of ['localStorage', 'sessionStorage'] as const) {
   Object.defineProperty(globalThis, key, {
     value: new MemoryStorage(),

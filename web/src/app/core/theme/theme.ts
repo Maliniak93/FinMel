@@ -4,6 +4,7 @@ export type ThemePreference = 'system' | 'light' | 'dark';
 
 export const THEME_STORAGE_KEY = 'skarbiec-theme';
 const THEME_ATTRIBUTE = 'data-theme';
+const DARK_QUERY = '(prefers-color-scheme: dark)';
 const CYCLE: readonly ThemePreference[] = ['system', 'light', 'dark'];
 
 function readStoredPreference(): ThemePreference {
@@ -14,15 +15,17 @@ function readStoredPreference(): ThemePreference {
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
   readonly preference = signal<ThemePreference>(readStoredPreference());
+  private readonly deviceScheme = window.matchMedia(DARK_QUERY);
 
   constructor() {
-    this.applyToDocument(this.preference());
+    this.deviceScheme.addEventListener('change', () => this.applyToDocument());
+    this.applyToDocument();
   }
 
   setPreference(preference: ThemePreference): void {
     this.preference.set(preference);
     localStorage.setItem(THEME_STORAGE_KEY, preference);
-    this.applyToDocument(preference);
+    this.applyToDocument();
   }
 
   cycle(): void {
@@ -30,14 +33,10 @@ export class ThemeService {
     this.setPreference(next);
   }
 
-  private applyToDocument(preference: ThemePreference): void {
-    const html = document.documentElement;
-    if (preference === 'system') {
-      html.removeAttribute(THEME_ATTRIBUTE);
-      html.style.removeProperty('color-scheme');
-    } else {
-      html.setAttribute(THEME_ATTRIBUTE, preference);
-      html.style.setProperty('color-scheme', preference);
-    }
+  private applyToDocument(): void {
+    const preference = this.preference();
+    const resolved =
+      preference === 'system' ? (this.deviceScheme.matches ? 'dark' : 'light') : preference;
+    document.documentElement.setAttribute(THEME_ATTRIBUTE, resolved);
   }
 }

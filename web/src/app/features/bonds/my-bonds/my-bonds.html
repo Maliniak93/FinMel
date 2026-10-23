@@ -65,7 +65,9 @@
           [attr.aria-label]="'bonds.periods.toggle' | transloco: { name: bond.name }"
           (click)="toggleExpanded(bond)"
         >
-          <mat-icon>{{ expandedId() === bond.assetId ? 'expand_less' : 'expand_more' }}</mat-icon>
+          <mat-icon>{{
+            expandedId() === bond.assetId ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
+          }}</mat-icon>
         </button>
       </td>
     </ng-container>

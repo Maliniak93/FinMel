@@ -16,6 +16,7 @@ import {
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { THEME_STORAGE_KEY, ThemeService } from '../../core/theme/theme';
+import { stubMatchMedia, type MatchMediaStub } from '../../../testing/match-media';
 import { Shell } from './shell';
 
 function todoItem(name: string): Record<string, unknown> {
@@ -125,8 +126,10 @@ describe('Shell', () => {
   let component: Shell;
   let fixture: ComponentFixture<Shell>;
   let themeService: ThemeService;
+  let media: MatchMediaStub;
 
   beforeEach(async () => {
+    media = stubMatchMedia(false);
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ items: [] }));
 
     localStorage.clear();
@@ -146,6 +149,7 @@ describe('Shell', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    media.restore();
     await TestBed.inject(LanguageService).setLanguage('en');
     localStorage.clear();
     document.documentElement.lang = 'en';
@@ -159,7 +163,10 @@ describe('Shell', () => {
 
   it('cycles the theme and reflects it on <html> when the toggle is clicked', () => {
     expect(themeService.preference()).toBe('system');
-    expect(document.documentElement.hasAttribute('data-theme')).toBe(false);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+
+    media.setDark(true);
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
 
     const toggle: HTMLButtonElement = fixture.nativeElement.querySelectorAll('button')[1];
     toggle.click();
@@ -167,7 +174,7 @@ describe('Shell', () => {
 
     expect(themeService.preference()).toBe('light');
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
-    expect(document.documentElement.style.getPropertyValue('color-scheme')).toBe('light');
+    expect(document.documentElement.style.getPropertyValue('color-scheme')).toBe('');
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('light');
   });
 

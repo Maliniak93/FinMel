@@ -1,31 +1,130 @@
 @use '@angular/material' as mat;
 
+$font-subsets: (
+  'latin':
+    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD',
+  'latin-ext':
+    'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF',
+);
+$font-families: (
+  'Cormorant Garamond': 'cormorant-garamond',
+  'Lora': 'lora',
+);
+
+@each $family, $slug in $font-families {
+  @each $weight in (400, 600) {
+    @each $subset, $range in $font-subsets {
+      @font-face {
+        font-family: $family;
+        font-style: normal;
+        font-weight: $weight;
+        font-display: swap;
+        src: url('../node_modules/@fontsource/#{$slug}/files/#{$slug}-#{$subset}-#{$weight}-normal.woff2')
+          format('woff2');
+        unicode-range: #{$range};
+      }
+    }
+  }
+}
+
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('../node_modules/@fontsource/material-symbols-outlined/files/material-symbols-outlined-latin-400-normal.woff2')
+    format('woff2');
+}
+
 html {
   height: 100%;
-
-  // Follows the OS; a pinned theme is an inline style, which beats the async-loaded rest of this file.
-  color-scheme: light dark;
 
   @include mat.theme(
     (
       color: (
-        primary: mat.$azure-palette,
-        tertiary: mat.$blue-palette,
+        primary: mat.$orange-palette,
+        theme-type: color-scheme,
       ),
-      typography: Roboto,
+      typography: (
+        brand-family: 'Cormorant Garamond',
+        plain-family: 'Lora',
+      ),
       density: 0,
+    )
+  );
+
+  // mat-flat-button and mat-stroked-button both render as the outlined primary button.
+  @include mat.button-overrides(
+    (
+      filled-container-color: transparent,
+      filled-label-text-color: var(--mat-sys-primary),
+      filled-container-shape: var(--mat-sys-corner-small),
+      outlined-label-text-color: var(--mat-sys-primary),
+      outlined-outline-color: var(--sk-accent-stroke),
+      outlined-container-shape: var(--mat-sys-corner-small),
+    )
+  );
+  @include mat.card-overrides(
+    (
+      elevated-container-color: transparent,
+      elevated-container-shape: var(--mat-sys-corner-small),
+      elevated-container-elevation: none,
+      outlined-container-color: transparent,
+      outlined-outline-color: var(--mat-sys-outline-variant),
+      outlined-container-shape: var(--mat-sys-corner-small),
+    )
+  );
+  @include mat.progress-bar-overrides(
+    (
+      active-indicator-height: 8px,
+      track-height: 8px,
+    )
+  );
+  @include mat.table-overrides(
+    (
+      background-color: transparent,
+      row-item-outline-color: var(--mat-sys-outline-variant),
     )
   );
 }
 
 body {
-  // No `color-scheme` here: it must inherit from <html>, or the theme toggle stops working.
   background-color: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
   font: var(--mat-sys-body-medium);
+  font-variant-numeric: tabular-nums lining-nums;
 
   margin: 0;
   height: 100%;
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  font-feature-settings: 'liga';
+  font-variant-ligatures: common-ligatures;
+  -webkit-font-smoothing: antialiased;
+}
+
+button[mat-flat-button]:not(:disabled),
+a[mat-flat-button] {
+  border: 1px solid var(--sk-accent-stroke);
+}
+
+.mat-mdc-card {
+  border: 1px solid var(--mat-sys-outline-variant);
+}
+
+:focus-visible {
+  outline: 2px solid var(--sk-accent-stroke);
+  outline-offset: 2px;
 }
 
 // The CDK overlay renders outside the component host, so this tooltip style has to be global.
