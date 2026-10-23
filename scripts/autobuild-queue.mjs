@@ -78,7 +78,7 @@ function skipReason(card, item, blocked) {
   return dependency === undefined ? null : `zależy od #${dependency}`;
 }
 
-export async function runQueue({ items = Infinity, includeManual = false, only = null, readCards, buildPart, isClosed = async () => false, finishEpic = async () => {}, onSkip = async () => {}, log = () => {} }) {
+export async function runQueue({ items = Infinity, includeManual = false, only = null, readCards, buildPart, nextPart = null, isClosed = async () => false, finishEpic = async () => {}, onSkip = async () => {}, log = () => {} }) {
   const started = new Set();
   const finished = new Set();
   const closedParts = new Set();
@@ -96,7 +96,11 @@ export async function runQueue({ items = Infinity, includeManual = false, only =
   for (;;) {
     // the project's "Item closed" workflow moves a merged part's card to Done asynchronously, so a closed issue is Done here already
     const cards = (await readCards()).map((c) => (closedParts.has(c.number) ? { ...c, status: "Done" } : c));
-    const queue = queueOf(cards).filter((q) => !finished.has(q.number));
+    const queue = [];
+    for (const q of queueOf(cards)) {
+      if (finished.has(q.number)) continue;
+      queue.push(nextPart && q.epic && started.has(q.number) ? { ...q, next: await nextPart(q) } : q);
+    }
 
     const closable = queue.find((q) => q.epic && started.has(q.number) && q.next === null);
     if (closable) {
@@ -108,7 +112,7 @@ export async function runQueue({ items = Infinity, includeManual = false, only =
     const item = only !== null && only !== undefined ? planOne(queue, Number(only), cards)[0] : pickNext(queue, { started, items, includeManual });
     if (!item) return { skipped };
 
-    const part = nextWork(item, cards);
+    const part = nextPart && item.epic ? (started.has(item.number) ? item.next : await nextPart(item)) : nextWork(item, cards);
     const partCard = part === null ? null : cards.find((c) => c.number === part);
     const reason = partCard ? skipReason(partCard, item, blocked) : null;
     if (reason) {
