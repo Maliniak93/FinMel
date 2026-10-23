@@ -47,6 +47,8 @@ skarbiec-plan/flows/
 skarbiec-plan/autobuild-runs/
 # Test timing measurements (scripts/test-timings.mjs)
 skarbiec-plan/test-timings/
+# Claude Design handoff bundles (visual reference for /idea and /design, never implemented 1:1)
+skarbiec-plan/design/
 
 # e2e run output (scripts/e2e.mjs)
 e2e/test-results/
