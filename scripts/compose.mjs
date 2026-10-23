@@ -1,17 +1,22 @@
 #!/usr/bin/env node
-// Usage: node scripts/compose.mjs <build|up|down|reset|status> [--ref <ref>]
+// Usage: node scripts/compose.mjs <build|up|down|reset|backup|backups|restore|status> [--ref <ref>] [--yes] [--reason <text>] [--force]
 //   build [--ref <ref>]  build the six skarbiec-local images from a git archive of <ref> (default HEAD); never touches running containers
-//   up                   docker compose up -d --wait on the existing images (no build)
+//   up                   back up the four databases (when the volume exists), then docker compose up -d --wait on the existing images (no build)
 //   down                 stop and remove the containers, keep the volumes
-//   reset                down plus remove the stack's volumes
+//   reset [--yes]        back up, ask for "reset" to be typed (--yes skips it, required without a terminal), then down plus remove the stack's volumes
+//   backup [--reason <text>]  dump the four databases to ~/skarbiec-backups (postgres must be running); the 5 newest are kept
+//   backups              list the kept backups: name, time, reason, latest migrations
+//   restore [<name>|latest] [--force]  stop all but postgres, recreate and restore the databases; --force restores a dump the images cannot be proven to match
 //   status               container states, the sha each runs, the sha of the newest built image
 //   build prints COMPOSE_RESULT: {...} (ok, revision, error) as its last stdout line; exit 0 ok, 2 failed
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { closeSync, mkdirSync, mkdtempSync, openSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
+import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
+import { POSTGRES_VOLUME, backupAll, formatBackups, listBackups, resetWithBackup, restoreBackup, upWithBackup } from "./compose-backup.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const COMPOSE_FILE = path.join(REPO_ROOT, "deploy", "compose", "compose.yaml");
@@ -29,14 +34,22 @@ const IMAGES = [
 ];
 const imageTag = (name) => `skarbiec-local/${name}:latest`;
 
-function run(cmd, argv, { cwd = REPO_ROOT, inherit = false } = {}) {
-  const res = spawnSync(cmd, argv, {
-    cwd,
-    encoding: "utf8",
-    windowsHide: true,
-    maxBuffer: 512 * 1024 * 1024,
-    stdio: inherit ? "inherit" : "pipe",
-  });
+function run(cmd, argv, { cwd = REPO_ROOT, inherit = false, stdoutFile, stdinFile } = {}) {
+  const stdinFd = stdinFile ? openSync(stdinFile, "r") : null;
+  const stdoutFd = stdoutFile ? openSync(stdoutFile, "w") : null;
+  let res;
+  try {
+    res = spawnSync(cmd, argv, {
+      cwd,
+      encoding: "utf8",
+      windowsHide: true,
+      maxBuffer: 512 * 1024 * 1024,
+      stdio: inherit ? "inherit" : [stdinFd ?? "pipe", stdoutFd ?? "pipe", "pipe"],
+    });
+  } finally {
+    if (stdinFd !== null) closeSync(stdinFd);
+    if (stdoutFd !== null) closeSync(stdoutFd);
+  }
   const all = `${res.stdout ?? ""}\n${res.stderr ?? ""}`;
   return {
     ok: !res.error && res.status === 0,
@@ -134,6 +147,38 @@ function status() {
   return true;
 }
 
+function parseArgs(argv, { flags = [], values = [], positional = 0 }) {
+  const parsed = { flags: new Set(), values: new Map(), positional: [] };
+  for (let i = 0; i < argv.length; i++) {
+    if (flags.includes(argv[i])) parsed.flags.add(argv[i]);
+    else if (values.includes(argv[i]) && argv[i + 1] !== undefined) parsed.values.set(argv[i], argv[++i]);
+    else if (!argv[i].startsWith("--") && parsed.positional.length < positional) parsed.positional.push(argv[i]);
+    else throw new Error(`unexpected argument: ${argv[i]}`);
+  }
+  return parsed;
+}
+
+function backupContext() {
+  return {
+    run,
+    compose,
+    revisionOf,
+    root: path.join(homedir(), "skarbiec-backups"),
+    now: () => new Date(),
+    log: (message) => console.log(message),
+    interactive: Boolean(process.stdin.isTTY),
+    ask: async (question) => {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        return await rl.question(question);
+      } finally {
+        rl.close();
+      }
+    },
+    volumeExists: () => run("docker", ["volume", "inspect", POSTGRES_VOLUME]).ok,
+  };
+}
+
 const [command, ...rest] = process.argv.slice(2);
 let exitCode = 0;
 try {
@@ -156,20 +201,36 @@ try {
     case "up": {
       const missing = missingImages();
       if (missing.length) throw new Error(`no image for ${missing.join(", ")}; run: node scripts/compose.mjs build`);
-      exitCode = compose(["up", "-d", "--wait"], { inherit: true }).ok ? 0 : 2;
+      exitCode = upWithBackup(backupContext());
       break;
     }
     case "down":
       exitCode = compose(["down"], { inherit: true }).ok ? 0 : 2;
       break;
-    case "reset":
-      exitCode = compose(["down", "--volumes"], { inherit: true }).ok ? 0 : 2;
+    case "reset": {
+      const { flags } = parseArgs(rest, { flags: ["--yes"] });
+      exitCode = await resetWithBackup(backupContext(), { yes: flags.has("--yes") });
       break;
+    }
+    case "backup": {
+      const { values } = parseArgs(rest, { values: ["--reason"] });
+      backupAll(backupContext(), { reason: values.get("--reason") ?? "manual" });
+      break;
+    }
+    case "backups":
+      parseArgs(rest, {});
+      for (const line of formatBackups(listBackups(backupContext()))) console.log(line);
+      break;
+    case "restore": {
+      const { flags, positional } = parseArgs(rest, { flags: ["--force"], positional: 1 });
+      restoreBackup(backupContext(), { name: positional[0], force: flags.has("--force") });
+      break;
+    }
     case "status":
       status();
       break;
     default:
-      throw new Error("usage: node scripts/compose.mjs <build [--ref <ref>]|up|down|reset|status>");
+      throw new Error("usage: node scripts/compose.mjs <build [--ref <ref>]|up|down|reset [--yes]|backup [--reason <text>]|backups|restore [<name>|latest] [--force]|status>");
   }
 } catch (err) {
   console.error(err.message);
