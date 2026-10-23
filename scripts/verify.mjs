@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--jobs N] [--deadline-min N] [--out <file>] [--cache] [--cache-check] [--detach] [--await <file> [--max-min N]]
+// Usage: node scripts/verify.mjs [--quick] [--projects a,b] [--web] [--api] [--all] [--fix] [--jobs N] [--deadline-min N] [--out <file>] [--spec <file>] [--cache] [--cache-check] [--detach] [--await <file> [--max-min N]]
 //   (no flags)        steps picked from the files changed against master: scripts tests always, build + format only with .NET in scope, a full-scope file means --all
 //   --quick           format + build only; overrides everything below
 //   --projects a,b    exactly these .NET test projects; web/api still need --web/--api/--all
@@ -10,6 +10,7 @@
 //   --jobs N          run N .NET test projects at once, alongside the web checks (default 1: sequential, then web)
 //   --deadline-min N  wall-clock budget for the whole run (default 120)
 //   --out <file>      also write the result JSON to <file>
+//   --spec <file>     the ticket body (skarbiec-plan/issues/<n>.md): a migration among the changed files adds a "migrations" step (scripts/migration-guard.mjs) that needs it for the data-loss consent; its hash joins the cache key
 //   --cache           skip the run when the same working tree already passed these steps or a superset of them (green only, .git/verify-cache.json)
 //   --cache-check     run nothing: ok if this exact working tree already passed these steps under --cache, else a "cache" failure (exit 2)
 //   --detach          needs --out: start the run as an independent process, print VERIFY_STARTED and exit 0 at once (log in <out>.log); collect it with --await
@@ -20,6 +21,7 @@ import { createHash } from "node:crypto";
 import { existsSync, openSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { changedEntries, checkChange, formatResult, isMigrationFile } from "./migration-guard.mjs";
 import { stopStack } from "./stop-stack.mjs";
 
 const IS_WIN = process.platform === "win32";
@@ -50,6 +52,7 @@ function parseArgs(argv) {
     projects: null,
     deadlineMin: DEFAULT_DEADLINE_MIN,
     out: null,
+    spec: null,
     cache: false,
     cacheCheck: false,
     detach: false,
@@ -81,6 +84,10 @@ function parseArgs(argv) {
       const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
       if (!val) fatal("--out requires a file path");
       args.out = path.resolve(val);
+    } else if (a === "--spec" || a.startsWith("--spec=")) {
+      const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
+      if (!val) fatal("--spec requires a file path");
+      args.spec = path.resolve(val);
     } else if (a === "--await" || a.startsWith("--await=")) {
       const val = a.includes("=") ? a.slice(a.indexOf("=") + 1) : argv[++i];
       if (!val) fatal("--await requires a file path");
@@ -708,9 +715,9 @@ function readCache(file) {
 function storeGreen(ctx, result) {
   const file = cacheFile();
   if (!file) return;
-  const superseded = (e) => e.tree === ctx.tree && !!e.quick === !!ctx.quick && Array.isArray(e.steps) && e.steps.every((s) => ctx.steps.includes(s));
+  const superseded = (e) => e.tree === ctx.tree && (e.spec ?? null) === (ctx.spec ?? null) && !!e.quick === !!ctx.quick && Array.isArray(e.steps) && e.steps.every((s) => ctx.steps.includes(s));
   const entries = readCache(file).filter((e) => !superseded(e));
-  entries.push({ tree: ctx.tree, quick: !!ctx.quick, steps: [...ctx.steps], at: new Date().toISOString(), result });
+  entries.push({ tree: ctx.tree, spec: ctx.spec ?? null, quick: !!ctx.quick, steps: [...ctx.steps], at: new Date().toISOString(), result });
   try {
     writeFileSync(file, JSON.stringify(entries.slice(-CACHE_MAX_ENTRIES)));
   } catch (e) {
@@ -925,11 +932,28 @@ function computeScope(args, serviceNames, projectMap, changedInput) {
   }
 
   selectedRels = [...new Set(selectedRels)].sort();
-  return { selectedRels, runWeb, runApi, runE2e, runBuild, runScriptsTest, modeDescription, changed };
+  const runMigrations = ((changed ?? changedInput)?.files ?? []).some(isMigrationFile);
+  return { selectedRels, runWeb, runApi, runE2e, runBuild, runScriptsTest, runMigrations, modeDescription, changed };
+}
+
+function migrationsFailure({ files, specPath, specBody, readSource, proofExists }) {
+  const result = checkChange({ files, body: specBody ?? "", readSource, proofExists });
+  if (result.ok) return null;
+  const lines = formatResult(result);
+  const file = result.history[0]?.path ?? result.missing[0]?.file;
+  if (!result.history.length && !specPath) {
+    const keys = result.missing.map((m) => m.key).join(", ");
+    return { step: "migrations", summary: truncate(`destructive migration (${keys}) needs the ticket's consent: pass --spec <skarbiec-plan/issues/<n>.md>`, 1500), file };
+  }
+  if (!result.history.length && specBody === null) {
+    return { step: "migrations", summary: truncate(`cannot read --spec ${specPath}; ${lines.join("; ")}`, 1500), file };
+  }
+  return { step: "migrations", summary: truncate(lines.join("; "), 1500), file };
 }
 
 function stepSet(scope) {
   const steps = new Set();
+  if (scope.runMigrations) steps.add("migrations");
   if (scope.runBuild) {
     steps.add("build");
     steps.add("format");
@@ -946,12 +970,31 @@ function neededSteps(args, scope) {
   return args.quick ? ["build", "format"] : [...stepSet(scope)];
 }
 
-function findCacheHit(entries, { tree, quick, steps }) {
+function readSpecBody(specPath) {
+  try {
+    return readFileSync(specPath, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function specFingerprint(specPath) {
+  if (!specPath) return null;
+  try {
+    return createHash("sha1").update(readFileSync(specPath)).digest("hex");
+  } catch {
+    return `unreadable:${specPath}`;
+  }
+}
+
+// A check without a spec (ship's --cache-check) accepts any entry; one with a spec needs a run against that same content.
+function findCacheHit(entries, { tree, quick, steps, spec = null }) {
   if (!tree) return null;
   return (
     entries.find(
       (e) =>
         e.tree === tree &&
+        (!spec || e.spec === spec) &&
         !!e.quick === !!quick &&
         Array.isArray(e.steps) &&
         steps.every((s) => e.steps.includes(s)) &&
@@ -961,7 +1004,8 @@ function findCacheHit(entries, { tree, quick, steps }) {
 }
 
 function lookupCache(args, scope) {
-  const ctx = { tree: computeTreeHash(), quick: args.quick, steps: neededSteps(args, scope) };
+  const steps = neededSteps(args, scope);
+  const ctx = { tree: computeTreeHash(), quick: args.quick, steps, spec: steps.includes("migrations") ? specFingerprint(args.spec) : null };
   const file = cacheFile();
   if (!ctx.tree || !file) return { ctx: null, hit: null };
   return { ctx, hit: findCacheHit(readCache(file), ctx) };
@@ -1157,7 +1201,7 @@ async function main() {
 
   const serviceNames = discoverServiceNames();
   const projectMap = buildProjectMap(serviceNames);
-  const scope = computeScope(args, serviceNames, projectMap);
+  const scope = computeScope(args, serviceNames, projectMap, getChangedFiles());
   const { selectedRels, runWeb, runApi, runE2e } = scope;
 
   if (args.cacheCheck) {
@@ -1191,6 +1235,16 @@ async function main() {
       return finish(true, hit.result.failures ?? [], { cached: true });
     }
     if (ctx) cacheCtx = ctx;
+  }
+
+  if (scope.runMigrations && !args.quick) {
+    console.log("\n==> migrations (migration-guard)");
+    const files = changedEntries();
+    const specBody = args.spec ? readSpecBody(args.spec) : null;
+    const failure = files
+      ? migrationsFailure({ files, specPath: args.spec, specBody })
+      : { step: "migrations", summary: "no master or origin/master ref to compare the migrations with", file: null };
+    if (failure) return finish(false, [failure]);
   }
 
   const runDotnet = args.quick || scope.runBuild;
@@ -1233,4 +1287,4 @@ if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToP
   main().catch((e) => fatal(`verify.mjs crashed: ${e?.stack ?? e}`));
 }
 
-export { computeAffected, computeScope, computeTreeHash, findCacheHit, stepSet, storeGreen };
+export { computeAffected, computeScope, computeTreeHash, findCacheHit, migrationsFailure, stepSet, storeGreen };

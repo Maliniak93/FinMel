@@ -4,6 +4,7 @@
 //   --blocked   only post the report, no git; --dry-run prints the commands and runs the read-only guards only
 //   --fix-pr    a CI fix on the open PR of <b>: same lane guard and verify gate (scope against master), commit `Fix CI: <t>`, plain push (never force), no `gh pr create`, then a PR comment with the hidden marker
 //               `<!-- skarbiec-ci-fix -->`: failing jobs, cause, what changed (--json {"jobs":[…],"cause":"…","changed":"…"}), **Poza obszarem:**, verify result; nothing to commit or no open PR fails (exit 2)
+//   a shipping run (--fix-pr too) first runs scripts/migration-guard.mjs on the live card body: a destructive migration without its consent section, or a rewritten one, ends blocked at stage ship with no commit or PR
 //   a shipping run first needs the tree proven green: node scripts/verify.mjs --all --cache-check
 //   an e2e part ("e2e": true in --json) instead needs node scripts/verify.mjs --projects e2e --cache-check and a green node scripts/e2e.mjs check
 //   --blocked at stage e2e also saves the uncommitted diff to skarbiec-plan/issues/<issue>.e2e.patch, restores the tree and switches to master
@@ -11,12 +12,14 @@
 //   last stdout line: SHIP_RESULT: {...}; exit 0 ok, 2 failed, 4 GitHub limit exhausted (stderr: reset time and a GITHUB_LIMIT line; rerun after the reset)
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { latestRunRecord } from "./build-replay.mjs";
 import { CI_FIX_MARKER } from "./autobuild-ci.mjs";
 import { GH_LIMIT_EXIT, GhLimitError, limitFromGhFailure, limitFromText, limitText, spawnGh } from "./gh.mjs";
+import { formatResult, guardBranch } from "./migration-guard.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = "Maliniak93/FinMel";
@@ -118,9 +121,20 @@ export function gateCommand(gate) {
 }
 
 function readCard() {
-  const res = run(process.execPath, ["scripts/gh-project.mjs", "get", issue]);
-  if (!res.ok) throw new Error(`gh-project.mjs get ${issue} failed: ${res.firstErr}`);
-  return JSON.parse(res.out.split(/\r?\n/).pop());
+  const bodyFile = path.join(os.tmpdir(), `skarbiec-ship-${issue}-${process.pid}.md`);
+  try {
+    const res = run(process.execPath, ["scripts/gh-project.mjs", "get", issue, "--out", bodyFile, "--raw"]);
+    if (!res.ok) throw new Error(`gh-project.mjs get ${issue} failed: ${res.firstErr}`);
+    return { ...JSON.parse(res.out.split(/\r?\n/).pop()), body: readFileSync(bodyFile, "utf8") };
+  } finally {
+    rmSync(bodyFile, { force: true });
+  }
+}
+
+function migrationBlock(body) {
+  const checked = guardBranch({ body });
+  if (checked.ok) return null;
+  return checked.error ?? formatResult(checked).join("; ");
 }
 
 function outsideOf(area) {
@@ -216,7 +230,10 @@ function shipFixPr({ branch, title, report, dryRun }) {
   if (current.out !== branch) return fail("guard", `current branch is ${current.out}, expected ${branch}`);
   if (!/^(feat|fix|chore)\//.test(branch) || ["master", "main"].includes(branch)) return fail("guard", `refusing to ship branch ${branch}`);
 
-  const outsideArea = outsideOf(readCard().area);
+  const card = readCard();
+  const outsideArea = outsideOf(card.area);
+  const migrationProblem = migrationBlock(card.body);
+  if (migrationProblem) return fail("migration-guard", migrationProblem);
   const pending = run("git", ["status", "--porcelain"]);
   if (!pending.ok) return fail("git status --porcelain", pending.firstErr);
   const ahead = run("git", ["rev-list", "--count", `origin/${branch}..HEAD`]);
@@ -324,6 +341,11 @@ try {
     if (failed) console.log(`guard failed: ${failed.error}`);
     console.log(`would run: ${gateCommand(gate)}`);
     if (!failed) {
+      const problem = migrationBlock(card.body);
+      console.log(problem ? `migration guard: ${problem}` : "migration guard: ok");
+      if (problem) failed = { command: "migration-guard", error: problem };
+    }
+    if (!failed) {
       const verified = checkGate(gate);
       console.log(verified.ok ? `${e2e ? "verify and e2e gate" : "verify cache"}: green` : `${e2e ? "gate" : "verify cache"}: ${verified.error}`);
       if (!verified.ok) failed = { command: gateCommand(gate), error: verified.error };
@@ -338,6 +360,13 @@ try {
   }
 
   if (!failed) {
+    const problem = migrationBlock(card.body);
+    if (problem) {
+      const posted = postReport({ deviations: report.deviations, status: "blocked", stage: "ship", reason: `migration-guard: ${problem}` });
+      result = { ok: false, branch, reportPosted: posted.ok, failedCommand: "migration-guard", error: problem };
+      exitCode = 2;
+      finish();
+    }
     const verified = checkGate(gate);
     if (!verified.ok) {
       const posted = postReport({ deviations: report.deviations, status: "blocked", stage: "verify", reason: e2e ? NOT_E2E_GREEN : NOT_GREEN });

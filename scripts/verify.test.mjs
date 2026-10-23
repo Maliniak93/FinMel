@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { computeAffected, computeScope, findCacheHit, stepSet } from "./verify.mjs";
+import { computeAffected, computeScope, findCacheHit, migrationsFailure, stepSet } from "./verify.mjs";
 
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -165,7 +165,7 @@ test("cache-check end to end", async () => {
       return r.stdout;
     };
     mkdirSync(path.join(dir, "scripts"));
-    for (const f of ["verify.mjs", "stop-stack.mjs"]) cpSync(path.join(SCRIPTS_DIR, f), path.join(dir, "scripts", f));
+    for (const f of ["verify.mjs", "stop-stack.mjs", "migration-guard.mjs", "protected-data.json"]) cpSync(path.join(SCRIPTS_DIR, f), path.join(dir, "scripts", f));
     writeFileSync(path.join(dir, "README.md"), "x\n");
     git("init", "-q", "-b", "master");
     git("config", "user.email", "t@t");
@@ -195,6 +195,86 @@ test("cache-check end to end", async () => {
     const miss = check();
     assert.equal(miss.status, 2, miss.stdout + miss.stderr);
     assert.match(miss.stdout, /"step":"cache"/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+const MIGRATION_DIR = "services/Portfolio/Skarbiec.Portfolio/Migrations";
+const DESTRUCTIVE = `public partial class Drop : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropTable(
+            name: "Accounts");
+    }
+}
+`;
+const CONSENT = "## Utrata danych\n\n- Portfolio.Accounts\n\nZgoda: tak, dane testowe\n";
+
+test("migrations step", async () => {
+  const migrationFile = `${MIGRATION_DIR}/20270101000000_Drop.cs`;
+  assert.ok(stepsOfFiles([migrationFile]).includes("migrations"));
+  assert.ok(stepsOfFiles([migrationFile, PORTFOLIO_PLAIN]).includes("migrations"));
+  assert.ok(!stepsOfFiles([`${MIGRATION_DIR}/PortfolioDbContextModelSnapshot.cs`, PORTFOLIO_PLAIN]).includes("migrations"));
+  assert.ok(!stepsOfFiles([PORTFOLIO_PLAIN, "scripts/verify.mjs"]).includes("migrations"));
+  assert.ok([...stepSet(scopeOfFiles([migrationFile], { all: true }))].includes("migrations"));
+
+  const files = [{ status: "A", path: migrationFile }];
+  const readSource = () => DESTRUCTIVE;
+  const noSpec = migrationsFailure({ files, specPath: null, specBody: null, readSource });
+  assert.equal(noSpec.step, "migrations");
+  assert.match(noSpec.summary, /--spec/);
+  assert.match(noSpec.summary, /Portfolio\.Accounts/);
+
+  const unconsented = migrationsFailure({ files, specPath: "s.md", specBody: "## Goal\n\nx\n", readSource });
+  assert.match(unconsented.summary, /Portfolio\.Accounts/);
+  assert.doesNotMatch(unconsented.summary, /--spec/);
+  assert.equal(migrationsFailure({ files, specPath: "s.md", specBody: CONSENT, readSource }), null);
+
+  const rewritten = migrationsFailure({ files: [{ status: "M", path: migrationFile }], specPath: "s.md", specBody: CONSENT, readSource });
+  assert.match(rewritten.summary, /append-only/);
+  assert.equal(migrationsFailure({ files: [{ status: "M", path: `${MIGRATION_DIR}/PortfolioDbContextModelSnapshot.cs` }], specPath: null, specBody: null, readSource }), null);
+
+  const entry = green({ steps: ["migrations", "scripts-test"], spec: "H1" });
+  const needSpec = (spec) => need({ steps: ["migrations", "scripts-test"], spec });
+  assert.equal(findCacheHit([entry], needSpec("H1")), entry);
+  assert.equal(findCacheHit([entry], needSpec("H2")), null);
+  assert.equal(findCacheHit([green({ steps: ["migrations", "scripts-test"], spec: null })], needSpec("H1")), null);
+  assert.equal(findCacheHit([entry], needSpec(null)), entry);
+
+  const dir = mkdtempSync(path.join(os.tmpdir(), "verify-migrations-"));
+  try {
+    const git = (...a) => {
+      const r = spawnSync("git", a, { cwd: dir, encoding: "utf8", windowsHide: true });
+      assert.equal(r.status, 0, r.stderr);
+    };
+    mkdirSync(path.join(dir, "scripts"));
+    for (const f of ["verify.mjs", "stop-stack.mjs", "migration-guard.mjs", "protected-data.json"]) cpSync(path.join(SCRIPTS_DIR, f), path.join(dir, "scripts", f));
+    writeFileSync(path.join(dir, "README.md"), "x\n");
+    git("init", "-q", "-b", "master");
+    git("config", "user.email", "t@t");
+    git("config", "user.name", "t");
+    git("add", "-A");
+    git("commit", "-q", "-m", "init");
+    git("checkout", "-q", "-b", "work");
+    mkdirSync(path.join(dir, MIGRATION_DIR), { recursive: true });
+    writeFileSync(path.join(dir, migrationFile), DESTRUCTIVE);
+
+    const run = (...extra) =>
+      spawnSync(process.execPath, [path.join(dir, "scripts", "verify.mjs"), ...extra], { cwd: dir, encoding: "utf8", windowsHide: true });
+    const resultOf = (r) => JSON.parse(r.stdout.split(/\r?\n/).reverse().find((l) => l.startsWith("VERIFY_RESULT: ")).slice("VERIFY_RESULT: ".length));
+
+    const missingSpec = run();
+    assert.equal(missingSpec.status, 2, missingSpec.stdout + missingSpec.stderr);
+    assert.equal(resultOf(missingSpec).failures[0].step, "migrations");
+    assert.match(resultOf(missingSpec).failures[0].summary, /--spec/);
+
+    writeFileSync(path.join(dir, "spec.md"), "## Goal\n\nx\n");
+    const noConsent = run("--spec", "spec.md");
+    assert.equal(noConsent.status, 2, noConsent.stdout + noConsent.stderr);
+    assert.equal(resultOf(noConsent).failures[0].step, "migrations");
+    assert.match(resultOf(noConsent).failures[0].summary, /Portfolio\.Accounts/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

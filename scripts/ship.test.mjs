@@ -59,9 +59,9 @@ function gitIn(dir, argv) {
   return res.stdout.trim();
 }
 
-function fixSandbox({ verify = GREEN, branch = FIX_BRANCH, prs = [{ number: 77, headRefName: FIX_BRANCH }] } = {}) {
+function fixSandbox({ verify = GREEN, branch = FIX_BRANCH, prs = [{ number: 77, headRefName: FIX_BRANCH }], body = "" } = {}) {
   const sandbox = createSandbox(
-    buildState({ issues: [{ number: 50, status: "In progress", labels: ["spec"], area: "Scripts", branch: FIX_BRANCH }], prs }),
+    buildState({ issues: [{ number: 50, status: "In progress", labels: ["spec"], area: "Scripts", branch: FIX_BRANCH, body }], prs }),
     { branch },
   );
   fs.writeFileSync(path.join(sandbox.dir, "scripts", "verify.mjs"), verify);
@@ -204,5 +204,96 @@ test("--fix-pr fails on nothing to commit and on a missing PR", () => {
     assert.equal(gitIn(noPr.dir, ["rev-parse", "HEAD"]), before);
   } finally {
     noPr.cleanup();
+  }
+});
+
+const DESTRUCTIVE_MIGRATION = `public partial class Drop : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropTable(
+            name: "Accounts");
+    }
+}
+`;
+const CONSENT_BODY = "## Goal\n\nx\n\n## Utrata danych\n\n- Portfolio.Accounts\n\nZgoda: tak, dane testowe\n";
+const SHIP_REPORT = JSON.stringify({ rounds: 0, reviewRan: true, minor: [] });
+
+function addMigration(sandbox) {
+  const dir = path.join(sandbox.dir, "services", "Portfolio", "Skarbiec.Portfolio", "Migrations");
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, "20270101000000_Drop.cs"), DESTRUCTIVE_MIGRATION);
+}
+
+const shipNormal = (sandbox, extra = []) => sandbox.run("ship.mjs", ["50", "--branch", FIX_BRANCH, "--title", "Drop accounts", "--json", SHIP_REPORT, ...extra]);
+const gitCalls = (sandbox) => sandbox.log().filter((e) => e.args?.[0] === "pr" && e.args?.[1] === "create");
+
+test("destructive migration without consent blocks", () => {
+  const sandbox = fixSandbox({ body: "## Goal\n\nx\n" });
+  try {
+    addMigration(sandbox);
+    const before = gitIn(sandbox.dir, ["rev-parse", "HEAD"]);
+
+    const normal = shipNormal(sandbox);
+    assert.equal(normal.code, 2, normal.out);
+    assert.equal(resultOf(normal).failedCommand, "migration-guard");
+    assert.match(resultOf(normal).error, /Portfolio\.Accounts/);
+    assert.match(resultOf(normal).error, /Utrata danych/);
+    assert.match(resultOf(normal).error, /Przeniesienie danych/);
+    const reports = sandbox.log().filter((e) => e.kind === "comment");
+    assert.equal(reports.length, 1);
+    assert.match(reports[0].body, /Portfolio\.Accounts/);
+    assert.equal(gitIn(sandbox.dir, ["rev-parse", "HEAD"]), before);
+    assert.equal(gitCalls(sandbox).length, 0);
+
+    const fix = fixShip(sandbox);
+    assert.equal(fix.code, 2, fix.out);
+    assert.equal(resultOf(fix).failedCommand, "migration-guard");
+    assert.match(resultOf(fix).error, /Portfolio\.Accounts/);
+    assert.equal(gitIn(sandbox.dir, ["rev-parse", "HEAD"]), before);
+    assert.equal(sandbox.log().filter((e) => e.kind === "prComment").length, 0);
+
+    const dry = shipNormal(sandbox, ["--dry-run"]);
+    assert.equal(dry.code, 2, dry.out);
+    assert.match(dry.stdout, /migration guard: .*Portfolio\.Accounts/);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("destructive migration with consent ships", () => {
+  const sandbox = fixSandbox({ body: CONSENT_BODY });
+  try {
+    addMigration(sandbox);
+
+    const dry = shipNormal(sandbox, ["--dry-run"]);
+    assert.equal(dry.code, 0, dry.out);
+    assert.match(dry.stdout, /migration guard: ok/);
+
+    const fix = fixShip(sandbox);
+    assert.equal(fix.code, 0, fix.out);
+    assert.equal(resultOf(fix).ok, true);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
+test("a rewritten migration blocks whatever the body says", () => {
+  const sandbox = fixSandbox({ body: CONSENT_BODY });
+  try {
+    const dir = path.join(sandbox.dir, "services", "Portfolio", "Skarbiec.Portfolio", "Migrations");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "20260101000000_Old.cs"), "// old\n");
+    gitIn(sandbox.dir, ["add", "-A"]);
+    gitIn(sandbox.dir, ["commit", "-m", "old migration"]);
+    gitIn(sandbox.dir, ["branch", "-f", "master", "HEAD"]);
+    fs.writeFileSync(path.join(dir, "20260101000000_Old.cs"), "// edited\n");
+
+    const fix = fixShip(sandbox);
+    assert.equal(fix.code, 2, fix.out);
+    assert.equal(resultOf(fix).failedCommand, "migration-guard");
+    assert.match(resultOf(fix).error, /append-only/);
+  } finally {
+    sandbox.cleanup();
   }
 });
