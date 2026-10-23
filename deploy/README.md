@@ -120,11 +120,18 @@ The whole stack (Postgres, RabbitMQ, four services, Gateway, Angular app behind 
 
 ```bash
 node scripts/compose.mjs build [--ref <ref>]   # six skarbiec-local/* images from a git archive of <ref> (default HEAD)
-node scripts/compose.mjs up                    # docker compose up -d --wait on the built images
+node scripts/compose.mjs up                    # back up the databases, then docker compose up -d --wait on the built images
 node scripts/compose.mjs down                  # stop and remove the containers, keep the volumes
-node scripts/compose.mjs reset                 # down + remove the volumes (databases and queues gone)
+node scripts/compose.mjs reset [--yes]         # back up, ask for "reset" to be typed, then down + remove the volumes (databases and queues gone)
+node scripts/compose.mjs backup [--reason <text>]          # dump the four databases now (postgres must be running)
+node scripts/compose.mjs backups                           # list the kept backups: name, time, reason, latest migrations
+node scripts/compose.mjs restore [<name>|latest] [--force] # recreate and restore the databases from a backup
 node scripts/compose.mjs status                # container states and whether each runs the newest image
 ```
+
+- Backups: `up` (when the `skarbiec-local_postgres-data` volume exists; postgres is started alone if the stack is down) and `reset` dump `identity_db`, `portfolio_db`, `marketdata_db` and `reporting_db` (`pg_dump -Fc`) to `~/skarbiec-backups/<yyyymmdd-hhmmss>/` with a `manifest.json` (time, reason, latest EF migration per service). A failed dump stops `up` and `reset` before anything changes. The 5 newest backups are kept; RabbitMQ is not backed up (the outbox/inbox tables in the dumps redeliver what matters).
+- `restore` stops every container except postgres, drops and recreates each database with its owner, restores the dump and leaves the stack stopped: start it with `compose.mjs up`, which backs up the restored state first. It compares the dump's latest migrations with the migrations in git at the `:latest` images' revision: a dump newer than the images (or images that are missing or have an unknown revision) is refused without `--force`; an older dump only warns, because the services apply the missing migrations at start.
+- The backups sit on the same disk as the Docker volume: they protect against a destructive migration or a mistyped `reset`, not against losing the disk. Copy `~/skarbiec-backups` elsewhere for that.
 
 - Images are built from a commit (`git archive`), never the working tree; each is labelled `org.opencontainers.image.revision=<sha>`. `ship.mjs` runs `build --ref <shipped sha>` after every successful ship; `build` never starts, stops or recreates a container, so a running stack keeps its old image until the next `up` (`status` flags it as outdated). The previous, now-dangling image is removed unless a container still uses it.
 - Ports: app `http://localhost:8080` (nginx: the Angular app, `/api/` proxied to the Gateway), Aspire dashboard `http://localhost:18888`, Postgres `localhost:55432`. RabbitMQ, the services and the Gateway publish no host port, so `/internal` stays unreachable (ADR-027).
