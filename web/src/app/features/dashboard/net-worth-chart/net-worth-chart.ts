@@ -7,8 +7,8 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 import type { AssetClass, NetWorthHistoryPoint } from '../../../api/reporting';
 import { fromDateOnly } from '../../../shared/date-only';
+import { assetClassColor } from '../../../shared/colors';
 import { assetClassLabel } from '../../assets/asset-class';
-import { assetClassColor } from '../asset-class-color';
 import {
   formatAxisDate,
   formatDate,

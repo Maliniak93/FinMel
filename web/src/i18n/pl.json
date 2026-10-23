@@ -16,6 +16,7 @@
     "status": "Status",
     "description": "Opis",
     "stale": "Nieaktualna",
+    "rateUnavailable": "Kurs niedostępny",
     "actionsFor": "Akcje dla: {{ name }}",
     "type": "Typ",
     "unitPrice": "Cena jednostkowa",

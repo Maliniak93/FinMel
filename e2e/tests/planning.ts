@@ -47,7 +47,7 @@ export function pln(amount: string): RegExp {
 }
 
 export function eur(amount: string): RegExp {
-  return money(amount, '(?:EUR|€)');
+  return money(amount, 'EUR');
 }
 
 export async function expectPlan(page: Page, amount: string): Promise<void> {

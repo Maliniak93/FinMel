@@ -4,7 +4,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { groupColor } from '../../features/groups/group-color';
+import { groupColor } from '../colors';
 import { GroupList } from './group-list';
 
 const NO_GROUP = '';

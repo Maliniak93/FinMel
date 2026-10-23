@@ -1,11 +1,31 @@
 import { activeLocale } from '../core/i18n/language';
 import { fromDateOnly } from './date-only';
 
+const MINUS = '−';
+
+function withTrueMinus(text: string): string {
+  return text.replace(/-/g, MINUS);
+}
+
+export function roundsToZero(value: number): boolean {
+  return Math.round(Math.abs(value) * 100) === 0;
+}
+
+function currencyFormat(currency: string, extra: Intl.NumberFormatOptions = {}): Intl.NumberFormat {
+  const options = {
+    style: 'currency',
+    currency,
+    currencyDisplay: currency === 'PLN' ? 'symbol' : 'code',
+    useGrouping: 'always',
+    ...extra,
+  } as unknown as Intl.NumberFormatOptions;
+  return new Intl.NumberFormat(activeLocale(), options);
+}
+
 export function formatMoney(amount: number | string, currency = 'PLN'): string {
   try {
-    return new Intl.NumberFormat(activeLocale(), { style: 'currency', currency }).format(
-      Number(amount),
-    );
+    const value = Number(amount);
+    return withTrueMinus(currencyFormat(currency).format(roundsToZero(value) ? 0 : value));
   } catch {
     return `${amount} ${currency}`;
   }
@@ -17,14 +37,15 @@ export function formatMoneyCompact(
   maximumFractionDigits?: number,
 ): string {
   try {
-    return new Intl.NumberFormat(activeLocale(), {
-      style: 'currency',
-      currency,
-      notation: 'compact',
-      ...(maximumFractionDigits === undefined
-        ? {}
-        : { minimumFractionDigits: 0, maximumFractionDigits }),
-    }).format(Number(amount));
+    return withTrueMinus(
+      currencyFormat(currency, {
+        currencyDisplay: 'symbol',
+        notation: 'compact',
+        ...(maximumFractionDigits === undefined
+          ? {}
+          : { minimumFractionDigits: 0, maximumFractionDigits }),
+      }).format(Number(amount)),
+    );
   } catch {
     return `${amount} ${currency}`;
   }
@@ -67,11 +88,10 @@ export function formatPercent(value: number | string): string {
 }
 
 export function formatSignedMoney(amount: number | string, currency = 'PLN'): string {
-  return new Intl.NumberFormat(activeLocale(), {
-    style: 'currency',
-    currency,
-    signDisplay: 'exceptZero',
-  }).format(Number(amount));
+  const value = Number(amount);
+  return withTrueMinus(
+    currencyFormat(currency, { signDisplay: 'exceptZero' }).format(roundsToZero(value) ? 0 : value),
+  );
 }
 
 export function formatSignedPoints(value: number | string): string {

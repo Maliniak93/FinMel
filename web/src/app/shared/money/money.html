@@ -1,0 +1,26 @@
+@if (present()) {
+  <span
+    class="money"
+    [class.money--zero]="zero()"
+    [class.money--positive]="direction() === 'up'"
+    [class.money--negative]="direction() === 'down'"
+  >
+    @if (direction() === 'up') {
+      <mat-icon class="money__icon" aria-hidden="true">trending_up</mat-icon>
+    } @else if (direction() === 'down') {
+      <mat-icon class="money__icon" aria-hidden="true">trending_down</mat-icon>
+    }
+    <span class="money__amount sk-num">{{ text() }}</span>
+    @if (estimate(); as estimate) {
+      <span class="money__estimate sk-num">{{ approx }}{{ estimate }}</span>
+    }
+    @if (foreign() && rateMissing()) {
+      <span class="money__tag">{{ 'common.rateUnavailable' | transloco }}</span>
+    }
+    @if (stale()) {
+      <span class="money__tag">{{ 'dashboard.stale' | transloco }}</span>
+    }
+  </span>
+} @else {
+  <span class="money money--empty">—</span>
+}

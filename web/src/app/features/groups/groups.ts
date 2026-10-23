@@ -21,12 +21,12 @@ import {
   type AssetGroupResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { groupColor } from '../../shared/colors';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney, formatPercent } from '../../shared/format';
 import { GroupList } from '../../shared/group-select/group-list';
 import { ASSET_CLASSES, assetClassLabel } from '../assets/asset-class';
 import { GroupFormDialog, type GroupFormDialogData } from './group-form-dialog/group-form-dialog';
-import { groupColor } from './group-color';
 import { groupKindLabel } from './group-kind';
 
 const MAX_GROUPS = 12;

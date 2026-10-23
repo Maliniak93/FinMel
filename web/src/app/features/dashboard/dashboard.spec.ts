@@ -109,13 +109,13 @@ describe('Dashboard', () => {
         key: String(ASSET_CLASS.Cash),
         label: assetClassLabel(ASSET_CLASS.Cash),
         percentage: 33.33,
-        color: '#4C6EF5',
+        color: 'var(--sk-c-cash)',
       },
       {
         key: String(ASSET_CLASS.Stock),
         label: assetClassLabel(ASSET_CLASS.Stock),
         percentage: 66.67,
-        color: '#12B886',
+        color: 'var(--sk-c-stock)',
       },
     ]);
   });
@@ -619,12 +619,11 @@ describe('Dashboard', () => {
       const element = fixture.nativeElement as HTMLElement;
 
       expect(element.querySelectorAll('app-pie-chart')).toHaveLength(2);
-      expect(groupCircles(element).map((circle) => circle.getAttribute('stroke'))).toEqual([
-        '#4C6EF5',
-        '#12B886',
-        '#F76707',
-        '#868E96',
-      ]);
+      const strokes = groupCircles(element).map((circle) => circle.getAttribute('style') ?? '');
+      expect(strokes).toHaveLength(4);
+      ['var(--sk-g-blue)', 'var(--sk-g-green)', 'var(--sk-g-orange)', 'var(--sk-g-none)'].forEach(
+        (token, i) => expect(strokes[i]).toContain(token),
+      );
       expect(groupLegend(element).map((button) => textOf(button).split(' ')[0])).toEqual([
         'Emerytura',
         'Inwestycje',
@@ -757,9 +756,11 @@ describe('Dashboard', () => {
       const element = fixture.nativeElement as HTMLElement;
 
       expect(normalised(textOf(groupLegendRow(element, 'Bez grupy')))).toMatch(/3\s?000/);
-      expect(groupCircles(element).map((circle) => circle.getAttribute('stroke'))).toContain(
-        '#868E96',
-      );
+      expect(
+        groupCircles(element).some((circle) =>
+          (circle.getAttribute('style') ?? '').includes('var(--sk-g-none)'),
+        ),
+      ).toBe(true);
     });
 
     it('sends group and class filters', async () => {

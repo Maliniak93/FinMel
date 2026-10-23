@@ -452,10 +452,10 @@ describe('TransactionFormDialog', () => {
       expect(groups).toHaveLength(2);
       expect(groups[0]).toContain('Gotówka');
       expect(groups[0]).toContain('Sejf');
-      expect(groups[0]).toContain('2000,00');
+      expect(groups[0]).toContain('2 000,00');
       expect(groups[1]).toContain('Konta bankowe');
       expect(groups[1]).toContain('mBank');
-      expect(groups[1]).toContain('5000,00');
+      expect(groups[1]).toContain('5 000,00');
     });
 
     it('sends the chosen cashAssetId and the invoice total, not a unit price', async () => {

@@ -8,7 +8,12 @@ import {
   formatMoneyCompact,
   formatPercent,
   formatQuantity,
+  formatSignedMoney,
 } from './format';
+
+function flat(text: string): string {
+  return text.replace(/\s/g, ' ');
+}
 
 const LOCALES = { en: 'en-US', pl: 'pl-PL' } as const;
 
@@ -30,10 +35,19 @@ describe('locale-aware formatters', () => {
       const locale = LOCALES[lang];
 
       expect(formatMoney(1234.56, 'PLN')).toBe(
-        new Intl.NumberFormat(locale, { style: 'currency', currency: 'PLN' }).format(1234.56),
+        new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency: 'PLN',
+          useGrouping: 'always',
+        } as unknown as Intl.NumberFormatOptions).format(1234.56),
       );
       expect(formatMoney('1234.56', 'USD')).toBe(
-        new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(1234.56),
+        new Intl.NumberFormat(locale, {
+          style: 'currency',
+          currency: 'USD',
+          currencyDisplay: 'code',
+          useGrouping: 'always',
+        } as unknown as Intl.NumberFormatOptions).format(1234.56),
       );
       const percent = formatPercent(5.25);
       expect(percent).toContain(
@@ -76,9 +90,53 @@ describe('locale-aware formatters', () => {
   });
 
   it('formats money in the default language (English) before any switch', () => {
-    expect(formatMoney(1234.56)).toBe(
-      new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PLN' }).format(1234.56),
-    );
+    expect(flat(formatMoney(1234.56))).toBe('PLN 1,234.56');
+  });
+
+  it('formats money for the new rules', async () => {
+    const language = TestBed.inject(LanguageService);
+
+    await language.setLanguage('pl');
+    expect(flat(formatMoney(12345.67, 'PLN'))).toBe('12 345,67 zł');
+    expect(flat(formatMoney(420, 'EUR'))).toBe('420,00 EUR');
+    expect(formatMoney(420, 'EUR')).not.toContain('€');
+
+    await language.setLanguage('en');
+    expect(flat(formatMoney(12345.67, 'PLN'))).toBe('PLN 12,345.67');
+    expect(flat(formatMoney(420, 'EUR'))).toBe('EUR 420.00');
+  });
+
+  it('negative amounts use the true minus', async () => {
+    const language = TestBed.inject(LanguageService);
+
+    await language.setLanguage('pl');
+    expect(flat(formatMoney(-1220, 'PLN'))).toBe('−1 220,00 zł');
+    expect(formatMoney(-5, 'EUR')).toContain('−');
+    expect(formatMoney(-5, 'EUR')).not.toContain('-');
+    expect(formatMoneyCompact(-250000)).toContain('−');
+    expect(formatMoneyCompact(-250000)).not.toContain('-');
+
+    await language.setLanguage('en');
+    expect(formatMoney(-1220, 'PLN')).toContain('−');
+    expect(formatMoney(-1220, 'PLN')).not.toContain('-');
+  });
+
+  it('zero has no sign', async () => {
+    await TestBed.inject(LanguageService).setLanguage('pl');
+
+    for (const value of [0, -0, -0.001, 0.004]) {
+      expect(flat(formatMoney(value, 'PLN'))).toBe('0,00 zł');
+    }
+  });
+
+  it('signed money', async () => {
+    await TestBed.inject(LanguageService).setLanguage('pl');
+
+    expect(flat(formatSignedMoney(41208.1, 'PLN'))).toBe('+41 208,10 zł');
+    expect(flat(formatSignedMoney(-1220, 'PLN'))).toBe('−1 220,00 zł');
+    expect(flat(formatSignedMoney(0, 'PLN'))).toBe('0,00 zł');
+    expect(flat(formatSignedMoney(0.004, 'PLN'))).toBe('0,00 zł');
+    expect(flat(formatSignedMoney(-0.004, 'PLN'))).toBe('0,00 zł');
   });
 
   it('formats a quantity with at most two decimals, rounded half-up, grouped, without trailing zeros', async () => {
