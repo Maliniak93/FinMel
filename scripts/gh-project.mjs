@@ -63,6 +63,7 @@ import {
   raisePlan,
   shortOf,
 } from "./priority.mjs";
+import { consentProblems } from "./migration-guard.mjs";
 import { positionTarget, queueOf } from "./queue.mjs";
 
 const REPO_ROOT = path.resolve(
@@ -399,6 +400,7 @@ function lintBody(body, { epic }) {
   if (!/^## Goal\s*$/m.test(body))
     problems.push("no `## Goal` section (or it is empty)");
   problems.push(...testPlanProblems(body));
+  problems.push(...consentProblems(body));
   if (epic) return problems;
   if (!/^## Out of scope\s*$/m.test(body))
     problems.push(

@@ -1119,3 +1119,33 @@ test("prepare heals a missing Branch", () => {
     sandbox.cleanup();
   }
 });
+
+test("consent section shape", () => {
+  const sandbox = createSandbox(buildState({ issues: [{ number: 1, status: "Todo", labels: ["spec"] }] }));
+  try {
+    const check = (extra) => {
+      fs.writeFileSync(sandbox.bodyFile, `${BODY}\n${extra}`);
+      return sandbox.run("gh-project.mjs", ["check", "--body-file", sandbox.bodyFile]);
+    };
+
+    const valid = check("## Utrata danych\n\n- Portfolio.Accounts\n\nZgoda: tak, dane testowe\n\n## Przeniesienie danych\n\n- Portfolio.Assets.Note - proof: MoveTests.CopiesNote\n");
+    assert.equal(valid.code, 0, valid.out);
+
+    const noZgoda = check("## Utrata danych\n\n- Portfolio.Accounts\n");
+    assert.equal(noZgoda.code, 1, noZgoda.out);
+    assert.match(noZgoda.out, /Zgoda:/);
+
+    const emptyZgoda = check("## Utrata danych\n\n- Portfolio.Accounts\n\nZgoda:\n");
+    assert.equal(emptyZgoda.code, 1, emptyZgoda.out);
+    assert.match(emptyZgoda.out, /Zgoda:/);
+
+    const noProof = check("## Przeniesienie danych\n\n- Portfolio.Assets.Note - copied to Notes\n");
+    assert.equal(noProof.code, 1, noProof.out);
+    assert.match(noProof.out, /proof:/);
+
+    const none = check("");
+    assert.equal(none.code, 0, none.out);
+  } finally {
+    sandbox.cleanup();
+  }
+});

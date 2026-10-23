@@ -1,0 +1,28 @@
+{
+  "Identity": {
+    "protected": "*",
+    "derived": []
+  },
+  "Portfolio": {
+    "protected": "*",
+    "derived": ["ValuationReplicas", "PortfolioOutboxMessage", "PortfolioOutboxState", "PortfolioInboxState"]
+  },
+  "MarketData": {
+    "protected": ["Instruments"],
+    "derived": []
+  },
+  "Reporting": {
+    "protected": [],
+    "derived": [
+      "AssetValuations",
+      "HistoryRebuildRequests",
+      "LatestFxRates",
+      "LatestInstrumentPrices",
+      "Positions",
+      "ReportingInboxState",
+      "ReportingOutboxMessage",
+      "ReportingOutboxState",
+      "ValuationSnapshots"
+    ]
+  }
+}

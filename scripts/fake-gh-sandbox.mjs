@@ -81,7 +81,7 @@ export function createSandbox(state, { branch = null } = {}) {
   const scriptsDir = path.join(dir, "scripts");
   fs.mkdirSync(scriptsDir);
   for (const file of fs.readdirSync(SCRIPTS)) {
-    if ((file.endsWith(".mjs") && !file.endsWith(".test.mjs")) || file === "fake-gh.cjs") {
+    if ((file.endsWith(".mjs") && !file.endsWith(".test.mjs")) || file === "fake-gh.cjs" || file === "protected-data.json") {
       fs.copyFileSync(path.join(SCRIPTS, file), path.join(scriptsDir, file));
     }
   }
