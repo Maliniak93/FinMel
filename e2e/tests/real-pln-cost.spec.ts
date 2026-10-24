@@ -89,7 +89,7 @@ test('real PLN cost: the PLN really paid drives cost basis, P/L and account cash
 
   await test.step('Krok 2: new Brokerage / Regular account XTB with 0,00 PLN cash', async () => {
     await wealthTab(page, 'Rachunki inwestycyjne');
-    await page.getByRole('button', { name: 'Utwórz pierwszy rachunek' }).click();
+    await page.getByRole('button', { name: 'Nowy rachunek' }).first().click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Nazwa').fill(ACCOUNT);
     await dialog.getByRole('button', { name: 'Utwórz' }).click();

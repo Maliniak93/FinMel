@@ -178,7 +178,7 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
 
   await test.step('Krok 9: create the XTB account and deposit 10 000 zł, shown as 10 000,00 zł', async () => {
     await wealthTab(page, 'Rachunki inwestycyjne');
-    await page.getByRole('button', { name: 'Utwórz pierwszy rachunek' }).click();
+    await page.getByRole('button', { name: 'Nowy rachunek' }).first().click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Nazwa').fill('XTB');
     await dialog.getByRole('button', { name: 'Utwórz' }).click();

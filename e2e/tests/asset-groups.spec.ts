@@ -568,10 +568,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await expect(dialog).toBeHidden();
 
     await openPage(page, 'Lokaty');
-    await page
-      .getByRole('button', { name: /^(Dodaj lokatę|Dodaj pierwszą lokatę)$/ })
-      .first()
-      .click();
+    await page.getByRole('button', { name: 'Nowa lokata', exact: true }).first().click();
     await dialog.getByLabel('Nazwa').fill('Lokata 5000');
     await selectOption(
       page,

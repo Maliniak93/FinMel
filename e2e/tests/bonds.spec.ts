@@ -26,7 +26,7 @@ function bondRow(page: Page): Locator {
 }
 
 async function openBuyDialog(page: Page): Promise<Locator> {
-  await page.getByRole('button', { name: 'Kup obligacje' }).click();
+  await page.getByRole('button', { name: 'Kup obligacje' }).first().click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('heading', { name: 'Zakup obligacji skarbowych' })).toBeVisible();
   return dialog;
