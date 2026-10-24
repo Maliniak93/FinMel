@@ -152,6 +152,39 @@
           }
         }
       },
+      "DashboardAssetValue": {
+        "required": [
+          "assetId",
+          "valuePln",
+          "priceDate",
+          "isStale"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "valuePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "priceDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "isStale": {
+            "type": "boolean"
+          }
+        }
+      },
       "DashboardGroupClassValue": {
         "required": [
           "assetClass",
@@ -218,7 +251,8 @@
           "isStale",
           "byAssetClass",
           "byAccount",
-          "byGroup"
+          "byGroup",
+          "byAsset"
         ],
         "type": "object",
         "properties": {
@@ -256,6 +290,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/DashboardGroupValue"
+            }
+          },
+          "byAsset": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardAssetValue"
             }
           }
         }

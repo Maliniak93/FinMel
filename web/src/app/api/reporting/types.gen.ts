@@ -20,6 +20,13 @@ export type DashboardAssetClassValue = {
     percentage: number | string;
 };
 
+export type DashboardAssetValue = {
+    assetId: string;
+    valuePln: number | string;
+    priceDate: null | string;
+    isStale: boolean;
+};
+
 export type DashboardGroupClassValue = {
     assetClass: AssetClass;
     valuePln: number | string;
@@ -39,6 +46,7 @@ export type DashboardResponse = {
     byAssetClass: Array<DashboardAssetClassValue>;
     byAccount: Array<DashboardAccountValue>;
     byGroup: Array<DashboardGroupValue>;
+    byAsset: Array<DashboardAssetValue>;
 };
 
 export type NetWorthHistoryPoint = {

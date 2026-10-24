@@ -44,6 +44,7 @@ export const dashboard: DashboardResponse = {
       ],
     },
   ],
+  byAsset: [],
 };
 
 export const RETIREMENT_GROUP_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';

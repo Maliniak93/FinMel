@@ -43,6 +43,7 @@ const withOutsideAccounts: DashboardResponse = {
     },
   ],
   byGroup: [],
+  byAsset: [],
 };
 
 describe('AccountsCard', () => {

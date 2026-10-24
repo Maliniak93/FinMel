@@ -2729,6 +2729,14 @@
             "schema": {
               "$ref": "#/components/schemas/AssetClass"
             }
+          },
+          {
+            "name": "includeArchived",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
           }
         ],
         "responses": {
@@ -3683,6 +3691,42 @@
           },
           "isArchived": {
             "type": "boolean"
+          },
+          "costPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "averagePricePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "dividendPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "unitCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -7092,6 +7136,8 @@
       "SecurityHoldingResponse": {
         "required": [
           "assetId",
+          "groupId",
+          "isArchived",
           "accountId",
           "accountName",
           "name",
@@ -7116,6 +7162,16 @@
           "assetId": {
             "type": "string",
             "format": "uuid"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "isArchived": {
+            "type": "boolean"
           },
           "accountId": {
             "type": "string",

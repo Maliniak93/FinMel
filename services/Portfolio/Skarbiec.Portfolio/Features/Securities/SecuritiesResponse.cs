@@ -18,6 +18,11 @@ public sealed record SecuritiesResponse
 public sealed record SecurityHoldingResponse
 {
     public required Guid AssetId { get; init; }
+    public required Guid? GroupId { get; init; }
+
+    /// <summary>The asset or its account is archived; such holdings appear only with includeArchived.</summary>
+    public required bool IsArchived { get; init; }
+
     public required Guid AccountId { get; init; }
     public required string AccountName { get; init; }
     public required string Name { get; init; }

@@ -288,7 +288,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/portfolio/assets?accountId={{createBrokerageAccount.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### Get an asset
+### Get an asset (Stock, Etf, PreciousMetal and Bond also carry costPln, averagePricePln, unitCount; Stock and Etf dividendPln; the rest null)
 GET {{baseUrl}}/api/portfolio/assets/{{addAsset.response.body.id}}
 Authorization: Bearer {{authToken}}
 
@@ -943,8 +943,12 @@ Authorization: Bearer {{authToken}}
 DELETE {{baseUrl}}/api/portfolio/cash-places/{{createCashPlace.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### List Stock holdings, with value in PLN and unrealised gain — assetClass=Stock|Etf
+### List Stock holdings, with value in PLN and unrealised gain — assetClass=Stock|Etf; rows carry groupId and isArchived
 GET {{baseUrl}}/api/portfolio/securities?assetClass=Stock
+Authorization: Bearer {{authToken}}
+
+### List Stock holdings including archived ones (asset or account archived, flagged isArchived; Totals still count active holdings only)
+GET {{baseUrl}}/api/portfolio/securities?assetClass=Stock&includeArchived=true
 Authorization: Bearer {{authToken}}
 
 ### List ETF holdings

@@ -231,6 +231,59 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task List_ReturnsGroupId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await client.CreateAccountAsync(cancellationToken);
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+        var grouped = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "Grouped", ticker: "GRP", groupId: group.Id);
+        var loose = await AddQuotedHoldingAsync(client, accountId, cancellationToken, name: "Loose", ticker: "LSE");
+
+        var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
+        var groupedRow = Assert.Single(body.Holdings, h => h.AssetId == grouped);
+        var looseRow = Assert.Single(body.Holdings, h => h.AssetId == loose);
+        Assert.Equal(group.Id, groupedRow.GroupId);
+        Assert.Null(looseRow.GroupId);
+        Assert.All(body.Holdings, h => Assert.False(h.IsArchived));
+    }
+
+    [Fact]
+    public async Task List_IncludeArchived_FlagsArchivedHoldings()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var activeAccountId = await client.CreateAccountAsync(cancellationToken, name: "Active");
+        await client.FundAccountAsync(activeAccountId, cancellationToken);
+        var active = await AddQuotedHoldingAsync(client, activeAccountId, cancellationToken, name: "Active stock", ticker: "ACT");
+        await client.RecordTransactionAsync(active, TransactionType.Buy, 10m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 50m);
+        var closedAccountId = await client.CreateAccountAsync(cancellationToken, name: "Closed");
+        var closed = await AddQuotedHoldingAsync(client, closedAccountId, cancellationToken, name: "Closed stock", ticker: "CLS");
+        await client.ArchiveAccountAsync(closedAccountId, cancellationToken);
+
+        var withoutResponse = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
+        var withResponse = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock, includeArchived: true), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, withoutResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, withResponse.StatusCode);
+        var without = (await withoutResponse.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
+        var with = (await withResponse.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
+        Assert.Equal(active, Assert.Single(without.Holdings).AssetId);
+        Assert.Equal(2, with.Holdings.Count);
+        Assert.False(Assert.Single(with.Holdings, h => h.AssetId == active).IsArchived);
+        Assert.True(Assert.Single(with.Holdings, h => h.AssetId == closed).IsArchived);
+        Assert.Multiple(
+            () => Assert.Equal(without.Totals.ValuePln, with.Totals.ValuePln),
+            () => Assert.Equal(without.Totals.CostPln, with.Totals.CostPln),
+            () => Assert.Equal(without.Totals.UnrealizedPlPln, with.Totals.UnrealizedPlPln));
+    }
+
+    [Fact]
     public async Task List_UsesAmountPlnForPlnCostAndPl()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

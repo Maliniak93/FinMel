@@ -64,11 +64,12 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         decimal? lastPrice = 100m,
         string? exchange = "XETRA",
         DateOnly? lastPriceDate = null,
-        Guid? instrumentId = null)
+        Guid? instrumentId = null,
+        Guid? groupId = null)
     {
         var id = instrumentId ?? ScriptInstrument(assetClass, currency, ticker, lastPrice, exchange, name, lastPriceDate);
 
-        return await client.AddMarketAssetAsync(accountId, cancellationToken, assetClass, currency, id, name);
+        return await client.AddMarketAssetAsync(accountId, cancellationToken, assetClass, currency, id, name, groupId);
     }
 
     protected Guid ScriptInstrument(

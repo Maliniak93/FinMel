@@ -96,6 +96,59 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task ByAsset_ReturnsLatestSnapshotLines()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var olderAsset = Guid.NewGuid();
+        var freshAsset = Guid.NewGuid();
+        var staleAsset = Guid.NewGuid();
+        var olderDate = new DateOnly(2026, 7, 31);
+        var snapshotDate = new DateOnly(2026, 8, 1);
+        var stalePriceDate = new DateOnly(2026, 7, 10);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, olderDate, 9_999m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, null, olderAsset, olderDate, 9_999m, cancellationToken, assetClass: AssetClass.Stock);
+            await db.SeedSnapshotAsync(userId, snapshotDate, 1_500m, cancellationToken, isStale: true);
+            await db.SeedValuationLineAsync(
+                userId, null, freshAsset, snapshotDate, 1_000m, cancellationToken, assetClass: AssetClass.Stock, priceDate: snapshotDate);
+            await db.SeedValuationLineAsync(
+                userId, null, staleAsset, snapshotDate, 500m, cancellationToken, assetClass: AssetClass.Etf, priceDate: stalePriceDate, isStale: true);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(2, body!.ByAsset.Count);
+        var fresh = Assert.Single(body.ByAsset, a => a.AssetId == freshAsset);
+        Assert.Equal(1_000m, fresh.ValuePln);
+        Assert.Equal(snapshotDate, fresh.PriceDate);
+        Assert.False(fresh.IsStale);
+        var stale = Assert.Single(body.ByAsset, a => a.AssetId == staleAsset);
+        Assert.Equal(500m, stale.ValuePln);
+        Assert.Equal(stalePriceDate, stale.PriceDate);
+        Assert.True(stale.IsStale);
+        Assert.DoesNotContain(body.ByAsset, a => a.AssetId == olderAsset);
+    }
+
+    [Fact]
+    public async Task ByAsset_BeforeAnySnapshot_IsEmpty()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.GetAsync(DashboardUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(body!.ByAsset);
+    }
+
+    [Fact]
     public async Task TenancyIsolation()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -118,6 +171,7 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.Null(body.AsOf);
         Assert.Empty(body.ByAccount);
         Assert.Empty(body.ByAssetClass);
+        Assert.Empty(body.ByAsset);
     }
 
     [Fact]
