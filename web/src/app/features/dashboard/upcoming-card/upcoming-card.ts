@@ -1,5 +1,4 @@
 import { Component, computed, resource } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
@@ -13,12 +12,13 @@ import {
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { toDateOnly } from '../../../shared/date-only';
 import { formatDate, formatMoney } from '../../../shared/format';
+import { SectionError } from '../../../shared/section-error/section-error';
 import { ACCOUNT_TYPE } from '../../accounts/account-type';
 import { upcomingItems } from '../upcoming';
 
 @Component({
   selector: 'app-upcoming-card',
-  imports: [MatButtonModule, MatCardModule, MatProgressSpinnerModule, RouterLink, TranslocoPipe],
+  imports: [MatCardModule, MatProgressSpinnerModule, RouterLink, SectionError, TranslocoPipe],
   templateUrl: './upcoming-card.html',
   styleUrl: './upcoming-card.scss',
 })

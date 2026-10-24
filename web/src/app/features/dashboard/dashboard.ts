@@ -2,7 +2,6 @@ import { Component, computed, linkedSignal, resource, signal } from '@angular/co
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
@@ -17,21 +16,18 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { activeLocale } from '../../core/i18n/language';
 import { assetClassColor, groupColor } from '../../shared/colors';
-import {
-  formatAmount,
-  formatDate,
-  formatMoney,
-  formatPercent,
-  formatSignedMoney,
-} from '../../shared/format';
+import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
 import { EmptyState } from '../../shared/empty-state/empty-state';
-import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart';
+import { ALLOCATION_DEVIATION_PP } from '../../shared/allocation-bar/allocation-bar';
+import { GoalProgress } from '../../shared/goal-progress/goal-progress';
+import { SectionError } from '../../shared/section-error/section-error';
 import { SplitBar, type SplitBarSegment } from '../../shared/split-bar/split-bar';
 import { assetClassLabel, assetClassPage } from '../assets/asset-class';
 import { GROUP_KIND } from '../groups/group-kind';
 import { CashCard } from './cash-card/cash-card';
 import { AccountsCard } from './accounts-card/accounts-card';
 import { MonthCard } from './month-card/month-card';
+import { TodoCard } from './todo-card/todo-card';
 import { UpcomingCard } from './upcoming-card/upcoming-card';
 import type { ChartRange } from './net-worth-chart/chart-scale';
 import { NetWorthChart, type NetWorthChartGroup } from './net-worth-chart/net-worth-chart';
@@ -73,6 +69,8 @@ interface GroupRow {
   readonly progress: GroupProgress | null;
   readonly classShares: readonly GroupClassShare[];
   readonly cushion: GroupCushion | null;
+  readonly isCushionKind: boolean;
+  readonly isUngrouped: boolean;
 }
 
 function toGrosze(amount: number | string): number {
@@ -85,18 +83,19 @@ function toGrosze(amount: number | string): number {
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
-    MatProgressBarModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
     RouterLink,
     TranslocoPipe,
     EmptyState,
+    GoalProgress,
     NetWorthChart,
-    PieChart,
+    SectionError,
     SplitBar,
     AccountsCard,
     CashCard,
     MonthCard,
+    TodoCard,
     UpcomingCard,
   ],
   templateUrl: './dashboard.html',
@@ -175,7 +174,6 @@ export class Dashboard {
 
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly formatMoney = formatMoney;
-  protected readonly formatAmount = formatAmount;
   protected readonly formatPercent = formatPercent;
   protected readonly formatDate = formatDate;
   protected readonly formatSignedMoney = formatSignedMoney;
@@ -297,7 +295,13 @@ export class Dashboard {
                     grosze > 0 && !allocation.some((item) => item.assetClass === assetClass),
                 )
                 .map(([assetClass]) => share(assetClass, 0)),
-            ];
+            ].filter(
+              (item) =>
+                Math.abs(
+                  Math.round(item.currentPercent * 10) - Math.round(item.targetPercent * 10),
+                ) >=
+                ALLOCATION_DEVIATION_PP * 10,
+            );
       return {
         key: group.id,
         label: group.name,
@@ -318,6 +322,8 @@ export class Dashboard {
                 missingPln: Math.max(0, toGrosze(targetPln) - groupGrosze) / 100,
               }
             : null,
+        isCushionKind: Number(group.kind) === GROUP_KIND.Cushion,
+        isUngrouped: false,
       };
     });
     const ungrouped = entries.filter((entry) => !entry.groupId || !known.has(entry.groupId));
@@ -334,21 +340,12 @@ export class Dashboard {
         progress: null,
         classShares: [],
         cushion: null,
+        isCushionKind: false,
+        isUngrouped: true,
       });
     }
     return rows;
   });
-
-  protected readonly groupSegments = computed<PieChartSegment[]>(() =>
-    this.groupRows()
-      .filter((row) => row.valuePln > 0)
-      .map((row) => ({
-        key: row.key,
-        label: row.label,
-        percentage: row.percentage,
-        color: row.color,
-      })),
-  );
 
   protected readonly groupOptions = computed<NetWorthChartGroup[]>(() => {
     if (!this.groupsResource.hasValue() || this.groupsResource.value().length === 0) {

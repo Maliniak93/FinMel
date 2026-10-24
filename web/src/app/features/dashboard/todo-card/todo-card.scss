@@ -1,0 +1,61 @@
+.todo-card__title {
+  margin: 0 0 12px;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.todo-card__state {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.todo-card__empty {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.todo-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-card__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name amount'
+    'meta settle';
+  align-items: center;
+  column-gap: 16px;
+  row-gap: 2px;
+}
+
+.todo-card__name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-card__meta {
+  grid-area: meta;
+  font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.todo-card__amount {
+  grid-area: amount;
+  font-weight: 500;
+  text-align: right;
+}
+
+.todo-card__settle {
+  grid-area: settle;
+  justify-self: end;
+  min-height: 44px;
+}

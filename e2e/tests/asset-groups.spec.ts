@@ -35,11 +35,11 @@ function pln(amount: string): RegExp {
   return new RegExp(`${num(amount)}\\szł`);
 }
 
-function legendName(label: string, value: string, target?: { amount: string; percent: number }) {
+function legendName(label: string, value: string, target?: { amount: string }) {
   const body = target
-    ? `${num(value)}\\s/\\s${num(target.amount)}\\szł\\s\\(${target.percent}%\\)`
+    ? `${num(value)}\\szł\\sz\\s${num(target.amount)}\\szł`
     : `${num(value)}\\szł`;
-  return new RegExp(`^\\s*${label} — ${body}`);
+  return new RegExp(`^\\s*${label}\\s.*?${body}`);
 }
 
 function navigation(page: Page): Locator {
@@ -83,15 +83,15 @@ function assetRow(page: Page, name: string): Locator {
 }
 
 function groupLegend(page: Page): Locator {
-  return page.locator('.dashboard-page__group-legend');
+  return page.locator('.dashboard-page__group-rows');
 }
 
 function groupLegendEntry(page: Page, text: RegExp): Locator {
-  return groupLegend(page).locator('.dashboard-page__legend-item').filter({ hasText: text });
+  return groupLegend(page).getByTestId('group-row').filter({ hasText: text });
 }
 
 function groupLegendItem(page: Page, label: string): Locator {
-  return groupLegendEntry(page, new RegExp(`^\\s*${label} — `));
+  return groupLegendEntry(page, new RegExp(`^\\s*${label}\\s`));
 }
 
 function filterButton(page: Page): Locator {
@@ -476,7 +476,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '50 000,00'),
         legendName('Emerytura', '30 000,00'),
-        legendName('Poduszka', '23 000,00', { amount: '30 000,00', percent: 77 }),
+        legendName('Poduszka', '23 000,00', { amount: '30 000,00' }),
       ],
     });
   });
@@ -496,7 +496,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '50 000,00'),
         legendName('Emerytura', '30 000,00'),
-        legendName('Poduszka', '23 000,00', { amount: '30 000,00', percent: 77 }),
+        legendName('Poduszka', '23 000,00', { amount: '30 000,00' }),
       ],
     });
   });
@@ -519,7 +519,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '45 750,00'),
         legendName('Emerytura', '34 250,00'),
-        legendName('Poduszka', '23 000,00', { amount: '30 000,00', percent: 77 }),
+        legendName('Poduszka', '23 000,00', { amount: '30 000,00' }),
       ],
     });
   });
@@ -549,7 +549,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '46 750,00'),
         legendName('Emerytura', '33 250,00'),
-        legendName('Poduszka', '23 000,00', { amount: '30 000,00', percent: 77 }),
+        legendName('Poduszka', '23 000,00', { amount: '30 000,00' }),
       ],
     });
   });
@@ -591,7 +591,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '46 750,00'),
         legendName('Emerytura', '33 250,00'),
-        legendName('Poduszka', '16 800,00', { amount: '30 000,00', percent: 56 }),
+        legendName('Poduszka', '16 800,00', { amount: '30 000,00' }),
         legendName('Bez grupy', '6 200,00'),
       ],
     });
@@ -609,7 +609,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '46 750,00'),
         legendName('Emerytura', '34 450,00'),
-        legendName('Poduszka', '21 800,00', { amount: '30 000,00', percent: 73 }),
+        legendName('Poduszka', '21 800,00', { amount: '30 000,00' }),
       ],
       absent: 'Bez grupy',
     });
@@ -629,7 +629,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '47 750,00'),
         legendName('Emerytura', '33 450,00'),
-        legendName('Poduszka', '21 800,00', { amount: '30 000,00', percent: 73 }),
+        legendName('Poduszka', '21 800,00', { amount: '30 000,00' }),
       ],
     });
   });
@@ -643,11 +643,12 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await cashOperation(dialog, { amount: '11200' });
     await expectDashboard(page, {
       netWorth: '114 200,00',
-      groups: [legendName('Poduszka', '33 000,00', { amount: '30 000,00', percent: 110 })],
+      groups: [legendName('Poduszka', '33 000,00', { amount: '30 000,00' })],
     });
-    await expect(
-      groupLegend(page).locator('mat-progress-bar[aria-label="Poduszka"]'),
-    ).toHaveAttribute('aria-valuenow', '100');
+    await expect(groupLegendItem(page, 'Poduszka').getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '100',
+    );
   });
 
   await test.step('Krok 14: the group filter Emerytura draws only the Emerytura assets in every range', async () => {
@@ -723,7 +724,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Bez grupy', '52 000,00'),
         legendName('Emerytura', '29 200,00'),
-        legendName('Poduszka', '33 000,00', { amount: '30 000,00', percent: 110 }),
+        legendName('Poduszka', '33 000,00', { amount: '30 000,00' }),
       ],
     });
     await expect(filterButton(page)).toContainText('Wszystko');

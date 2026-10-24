@@ -150,10 +150,6 @@
   "notFound": {
     "message": "Page not found."
   },
-  "pieChart": {
-    "ariaLabel": "Net worth breakdown by asset class",
-    "empty": "No data to chart yet."
-  },
   "enums": {
     "assetClass": {
       "cash": "Cash",
@@ -450,11 +446,11 @@
       "ungrouped": "No group",
       "hint": "Split your wealth into groups such as retirement or an emergency cushion to see how it divides.",
       "link": "Manage groups",
-      "progress": "{{ value }} / {{ target }} ({{ percent }}%)",
-      "cushionLevel": "Cushion level: {{ value }} of {{ target }}.",
-      "cushionMissing": "Missing: {{ amount }}.",
+      "cushionTag": "Cushion",
+      "cushionLevel": "{{ value }} of {{ target }}",
+      "cushionMissing": "{{ value }} of {{ target }}, missing {{ missing }}",
+      "ofWealth": "{{ percent }} of net worth",
       "classShare": "{{ class }}: {{ current }} (target {{ target }})",
-      "filter": "Group",
       "loadFailed": "Failed to load groups."
     },
     "empty": "You haven't entered any wealth yet.",
@@ -470,7 +466,7 @@
       "loadFailed": "Failed to load cash."
     },
     "upcoming": {
-      "title": "Upcoming",
+      "title": "Upcoming · 30 days",
       "empty": "Nothing in the next 30 days.",
       "loadFailed": "Failed to load upcoming dates.",
       "kind": {
@@ -489,19 +485,28 @@
       "loadFailed": "Failed to load accounts."
     },
     "monthCard": {
-      "title": "This month",
+      "title": "{{ month }} · plan",
       "setup": "Plan the month",
-      "plan": "Plan",
-      "forecast": "Forecast",
+      "incomes": "Incomes",
+      "expenses": "− Expenses",
+      "contributions": "− Group contributions",
+      "free": "= Free funds",
+      "splitTarget": "→ {{ name }}",
+      "splitGroup": "→ {{ name }} · {{ share }}",
+      "forecast": "Free funds forecast:",
       "deficit": "deficit",
       "settled": "Incomes settled: {{ done }} of {{ total }}",
+      "loadFailed": "Failed to load the month."
+    },
+    "todo": {
+      "heading": "To do",
+      "planning": "Planning →",
+      "title": "To settle",
       "empty": "All done",
       "showAll": "show all",
-      "loadFailed": "Failed to load the month.",
-      "todo": {
-        "overdueIncome": "{{ name }} — {{ date }}, overdue by {{ days }} d, {{ amount }}",
-        "payment": "{{ name }} — {{ date }} (in {{ days }} d), {{ amount }}"
-      }
+      "settle": "Settle",
+      "overdue": "{{ date }} · overdue: {{ days }} days",
+      "payment": "{{ date }} · in {{ days }} days · expense"
     }
   },
   "netWorthChart": {

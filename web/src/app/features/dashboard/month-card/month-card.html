@@ -1,14 +1,11 @@
 <mat-card class="month-card">
   <mat-card-content>
-    <h2 class="month-card__title">{{ 'dashboard.monthCard.title' | transloco }}</h2>
+    <h2 class="month-card__title">
+      {{ 'dashboard.monthCard.title' | transloco: { month: monthLabel() } }}
+    </h2>
 
     @if (monthResource.error(); as error) {
-      <div class="month-card__state" role="alert">
-        <p>{{ error.message }}</p>
-        <button mat-button type="button" (click)="monthResource.reload()">
-          {{ 'common.retry' | transloco }}
-        </button>
-      </div>
+      <app-section-error [message]="error.message" (retry)="monthResource.reload()" />
     } @else if (!month()) {
       <div class="month-card__state">
         <mat-spinner diameter="24" />
@@ -18,25 +15,91 @@
         {{ 'dashboard.monthCard.setup' | transloco }}
       </a>
     } @else {
-      <dl class="month-card__figures">
-        <div data-testid="month-card-plan">
-          <dt>{{ 'dashboard.monthCard.plan' | transloco }}</dt>
-          <dd>{{ formatMoney(planPln(), 'PLN') }}</dd>
+      <div class="month-card__cascade">
+        <div class="month-card__row" data-testid="month-card-incomes">
+          <span class="month-card__label">{{ 'dashboard.monthCard.incomes' | transloco }}</span>
+          <span class="month-card__amount">{{ formatMoney(incomesPln(), 'PLN') }}</span>
+          <div class="month-card__track">
+            <div
+              class="month-card__bar month-card__bar--income"
+              [style.width.%]="bars().incomes.percent"
+            ></div>
+          </div>
         </div>
-        <div data-testid="month-card-forecast">
-          <dt>{{ 'dashboard.monthCard.forecast' | transloco }}</dt>
-          <dd>
-            @if (forecastPln() < 0) {
-              <span class="month-card__deficit" data-testid="month-card-deficit">
-                {{ formatMoney(forecastPln(), 'PLN') }}
-                {{ 'dashboard.monthCard.deficit' | transloco }}
-              </span>
-            } @else {
-              {{ formatMoney(forecastPln(), 'PLN') }}
+
+        <div class="month-card__row" data-testid="month-card-expenses">
+          <span class="month-card__label">{{ 'dashboard.monthCard.expenses' | transloco }}</span>
+          <span class="month-card__amount">{{ formatMoney(expensesPln(), 'PLN') }}</span>
+          <div class="month-card__track">
+            <div
+              class="month-card__bar month-card__bar--expense"
+              [style.width.%]="bars().expenses.percent"
+            ></div>
+          </div>
+        </div>
+
+        <div class="month-card__row" data-testid="month-card-contributions">
+          <span class="month-card__label">{{
+            'dashboard.monthCard.contributions' | transloco
+          }}</span>
+          <span class="month-card__amount">{{ formatMoney(contributionsPln(), 'PLN') }}</span>
+          <div class="month-card__track">
+            <div class="month-card__bar" [style.width.%]="bars().contributions.percent">
+              <app-split-bar [segments]="contributionSegments()" />
+            </div>
+          </div>
+        </div>
+
+        <div class="month-card__row month-card__row--free" data-testid="month-card-free">
+          <span class="month-card__label">
+            {{ 'dashboard.monthCard.free' | transloco }}
+            @if (deficitPln() > 0) {
+              <span class="month-card__deficit" data-testid="month-card-free-deficit">{{
+                'dashboard.monthCard.deficit' | transloco
+              }}</span>
             }
-          </dd>
+          </span>
+          <span class="month-card__amount" [class.month-card__deficit]="isDeficit()">{{
+            formatMoney(freePln(), 'PLN')
+          }}</span>
+          <div class="month-card__track">
+            <div
+              class="month-card__bar"
+              [class.month-card__bar--free]="!isDeficit()"
+              [class.month-card__bar--deficit]="isDeficit()"
+              [style.width.%]="bars().free.percent"
+            ></div>
+          </div>
         </div>
-      </dl>
+
+        @if (splitRows().length > 0) {
+          <ul class="month-card__split">
+            @for (row of splitRows(); track row.key) {
+              <li class="month-card__split-row" data-testid="month-card-split-row">
+                <span>{{
+                  (row.share === null
+                    ? 'dashboard.monthCard.splitTarget'
+                    : 'dashboard.monthCard.splitGroup'
+                  ) | transloco: { name: row.label, share: row.share }
+                }}</span>
+                <span class="month-card__amount">{{ formatMoney(row.amountPln, 'PLN') }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+
+      <p class="month-card__line" data-testid="month-card-forecast">
+        {{ 'dashboard.monthCard.forecast' | transloco }}
+        @if (forecastPln() < 0) {
+          <span class="month-card__deficit" data-testid="month-card-deficit">
+            {{ formatMoney(forecastPln(), 'PLN') }}
+            {{ 'dashboard.monthCard.deficit' | transloco }}
+          </span>
+        } @else {
+          {{ formatMoney(forecastPln(), 'PLN') }}
+        }
+      </p>
 
       <p class="month-card__line" data-testid="month-card-settled">
         {{
@@ -44,32 +107,6 @@
             | transloco: { done: settled().done, total: settled().total }
         }}
       </p>
-
-      @if (itemCount() === 0) {
-        <p class="month-card__empty" data-testid="month-card-empty">
-          {{ 'dashboard.monthCard.empty' | transloco }}
-        </p>
-      } @else {
-        <ul class="month-card__list">
-          @for (item of visibleItems(); track $index) {
-            <li>
-              <a
-                class="month-card__item"
-                data-testid="month-card-todo-item"
-                routerLink="/planning"
-                [queryParams]="{ month: item.month }"
-                [fragment]="item.fragment"
-                >{{ item.key | transloco: item.params }}</a
-              >
-            </li>
-          }
-        </ul>
-        @if (canExpand()) {
-          <button mat-button type="button" data-testid="month-card-show-all" (click)="showAll()">
-            {{ 'dashboard.monthCard.showAll' | transloco }}
-          </button>
-        }
-      }
     }
   </mat-card-content>
 </mat-card>

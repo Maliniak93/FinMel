@@ -64,6 +64,45 @@ describe('UpcomingCard', () => {
     expect(element.querySelector('a[href="/wealth/bank"]')).not.toBeNull();
   });
 
+  it('renders the 30-day rows', async () => {
+    const maturity = dateOnlyFromToday(28);
+    const deposit = depositResponse({
+      name: 'Lokata zapada',
+      status: DEPOSIT_STATUS.Active,
+      maturityDate: maturity,
+    });
+    const interestBond = bondResponse({
+      name: 'Obligacje odsetki',
+      status: BOND_STATUS.InterestDue,
+      duePeriodCount: 1,
+      maturityDate: '2030-01-01',
+      bookValue: 5000,
+    });
+    const { fixture } = await renderCard(UpcomingCard, {
+      deposits: jsonResponse([deposit]),
+      bonds: jsonResponse([interestBond]),
+      accounts: EMPTY,
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    await switchLanguage(fixture, 'pl');
+
+    expect(textOf(element.querySelector('h2'))).toBe('Nadchodzące · 30 dni');
+    const rows = Array.from(element.querySelectorAll<HTMLElement>('.upcoming-card__row'));
+    expect(rows).toHaveLength(2);
+
+    const depositRow = rows.find((row) => textOf(row).includes('Lokata zapada')) as HTMLElement;
+    expect(textOf(depositRow.querySelector('.upcoming-card__date'))).toBe(formatDate(maturity));
+    expect(depositRow.querySelector('a.upcoming-card__name')?.getAttribute('href')).toBe(
+      '/wealth/deposits',
+    );
+    expect(textOf(depositRow.querySelector('.upcoming-card__kind'))).not.toBe('');
+
+    const bondRow = rows.find((row) => textOf(row).includes('Obligacje odsetki')) as HTMLElement;
+    expect(textOf(bondRow.querySelector('.upcoming-card__amount'))).toBe(
+      formatMoney(5000, 'PLN').replace(/\s+/g, ' '),
+    );
+  });
+
   it('empty', async () => {
     const { fixture } = await renderCard(UpcomingCard, {
       deposits: EMPTY,

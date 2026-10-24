@@ -1,6 +1,14 @@
 import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { formatMoney } from '../../../shared/format';
-import { jsonResponse, planningMonthResponse, renderCard } from '../testing/dashboard-fixtures';
+import {
+  CUSHION_GROUP_ID,
+  INVESTMENTS_GROUP_ID,
+  RETIREMENT_GROUP_ID,
+  groups,
+  jsonResponse,
+  planningMonthResponse,
+  renderCard,
+} from '../testing/dashboard-fixtures';
 import { MonthCard } from './month-card';
 
 function occurrence(name: string, status: string): Record<string, unknown> {
@@ -24,21 +32,49 @@ function incomeMonth(extra: Record<string, unknown> = {}): Record<string, unknow
   });
 }
 
-const todoItems = [
-  { kind: 'OverdueIncome', name: '800+', date: '2026-11-10', amount: 800, currency: 'PLN' },
-  { kind: 'UpcomingPayment', name: 'Przegląd', date: '2026-11-02', amount: 400, currency: 'PLN' },
-  { kind: 'UpcomingPayment', name: 'OC Toyota', date: '2026-11-05', amount: 1200, currency: 'PLN' },
-  {
-    kind: 'UpcomingPayment',
-    name: 'Ubezpieczenie',
-    date: '2026-12-01',
-    amount: 900,
-    currency: 'PLN',
-  },
-  { kind: 'UpcomingPayment', name: 'Podatek', date: '2026-12-02', amount: 300, currency: 'PLN' },
-  { kind: 'UpcomingPayment', name: 'Szkoła', date: '2026-12-03', amount: 500, currency: 'PLN' },
-  { kind: 'UpcomingPayment', name: 'Czynsz', date: '2026-12-04', amount: 700, currency: 'PLN' },
-];
+function plain(text: string): string {
+  return text.replace(/\s+/g, ' ');
+}
+
+function splitOf(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    freeFundsPln: 5000,
+    deficitPln: null,
+    cushion: {
+      groupId: CUSHION_GROUP_ID,
+      name: 'Poduszka',
+      levelPln: 28000,
+      targetPln: 30000,
+      missingPln: 2000,
+      allocationPln: 2000,
+    },
+    groups: [
+      {
+        groupId: RETIREMENT_GROUP_ID,
+        name: 'Emerytura',
+        sharePercent: 60,
+        contributionPln: 1500,
+        allocationPln: 1800,
+        breakdown: null,
+      },
+      {
+        groupId: INVESTMENTS_GROUP_ID,
+        name: 'Inwestycje',
+        sharePercent: 40,
+        contributionPln: 1000,
+        allocationPln: 1200,
+        breakdown: null,
+      },
+    ],
+    unassignedPln: 0,
+    valuationMissing: false,
+    ...overrides,
+  };
+}
+
+function splitMonth(split: Record<string, unknown>): Record<string, unknown> {
+  return incomeMonth({ split });
+}
 
 describe('MonthCard', () => {
   beforeEach(() => {
@@ -52,13 +88,11 @@ describe('MonthCard', () => {
     await restoreEnglish();
   });
 
-  async function render(
-    month: Record<string, unknown>,
-    items: Record<string, unknown>[] = [],
-  ): Promise<HTMLElement> {
+  async function render(month: Record<string, unknown>): Promise<HTMLElement> {
     const { fixture } = await renderCard(MonthCard, {
       planningMonth: jsonResponse(month),
-      todo: jsonResponse({ items, paymentLeadDays: 7 }),
+      todo: jsonResponse({ items: [], paymentLeadDays: 7 }),
+      groups: jsonResponse(groups),
     });
     await fixture.whenStable();
     fixture.detectChanges();
@@ -71,29 +105,74 @@ describe('MonthCard', () => {
     return Array.from(element.querySelectorAll<HTMLElement>(`[data-testid="${testId}"]`));
   }
 
-  it('shows the free funds, the settled incomes and five todo items, then reveals the rest', async () => {
-    const element = await render(incomeMonth(), todoItems);
-
-    expect(all(element, 'month-card-plan')[0].textContent).toContain(formatMoney(12300, 'PLN'));
-    expect(all(element, 'month-card-forecast')[0].textContent).toContain(
-      formatMoney(12243.27, 'PLN'),
+  it('renders the cascade', async () => {
+    const element = await render(
+      planningMonthResponse({
+        incomes: {
+          occurrences: [occurrence('Wypłata', 'Settled'), occurrence('Premia', 'Pending')],
+          balance: { planPln: 13600, actualPln: 0, pendingPln: 0, differencePln: 0 },
+          fxUnavailable: false,
+          definitions: [{ id: 'income-1', name: 'Wypłata' }],
+          oneOffs: [],
+        },
+        expenses: {
+          payments: [],
+          costPln: 8179.99,
+          groupContributions: [
+            { groupId: RETIREMENT_GROUP_ID, name: 'Emerytura', amountPln: 1500 },
+            { groupId: INVESTMENTS_GROUP_ID, name: 'Inwestycje', amountPln: 1000 },
+          ],
+          definitions: [],
+          oneOffs: [],
+        },
+        freeFunds: { planPln: 5420.01, forecastPln: 5300, incomplete: false },
+      }),
     );
-    expect(all(element, 'month-card-settled')[0].textContent).toMatch(/2\D+3/);
-    expect(all(element, 'month-card-todo-item')).toHaveLength(5);
-    expect(all(element, 'month-card-empty')).toHaveLength(0);
+    const text = (id: string) => plain(all(element, id)[0].textContent ?? '');
 
-    all(element, 'month-card-show-all')[0].click();
-    await vi.waitFor(() => expect(all(element, 'month-card-todo-item')).toHaveLength(7));
+    expect(text('month-card-incomes')).toContain(plain(formatMoney(13600, 'PLN')));
+    expect(text('month-card-expenses')).toContain(plain(formatMoney(5679.99, 'PLN')));
+    expect(text('month-card-contributions')).toContain(plain(formatMoney(2500, 'PLN')));
+    expect(text('month-card-free')).toContain(plain(formatMoney(5420.01, 'PLN')));
+    const colours = Array.from(
+      all(element, 'month-card-contributions')[0].querySelectorAll('.split-bar__segment'),
+    ).map((segment) => segment.getAttribute('style') ?? '');
+    expect(colours).toHaveLength(2);
+    expect(colours[0]).toContain('var(--sk-g-blue)');
+    expect(colours[1]).toContain('var(--sk-g-green)');
+    expect(all(element, 'month-card-forecast')[0].textContent).toContain(formatMoney(5300, 'PLN'));
+    expect(all(element, 'month-card-settled')[0].textContent).toMatch(/1\D+2/);
+  });
 
-    expect(all(element, 'month-card-todo-item').map((item) => item.getAttribute('href'))).toEqual([
-      '/planning?month=2026-11#do-rozliczenia',
-      '/planning?month=2026-11#wydatki',
-      '/planning?month=2026-11#wydatki',
-      '/planning?month=2026-12#wydatki',
-      '/planning?month=2026-12#wydatki',
-      '/planning?month=2026-12#wydatki',
-      '/planning?month=2026-12#wydatki',
-    ]);
+  it('shows the free-funds split', async () => {
+    const element = await render(splitMonth(splitOf()));
+    const rows = all(element, 'month-card-split-row').map((row) => plain(row.textContent ?? ''));
+
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toContain('Poduszka');
+    expect(rows[0]).toContain(plain(formatMoney(2000, 'PLN')));
+    expect(rows[1]).toContain('Emerytura');
+    expect(rows[1]).toMatch(/60\s?%/);
+    expect(rows[1]).toContain(plain(formatMoney(1800, 'PLN')));
+    expect(rows[2]).toContain('Inwestycje');
+    expect(rows[2]).toMatch(/40\s?%/);
+    expect(rows[2]).toContain(plain(formatMoney(1200, 'PLN')));
+    expect(all(element, 'month-card-free-deficit')).toHaveLength(0);
+  });
+
+  it('marks a deficit', async () => {
+    const element = await render(splitMonth(splitOf({ deficitPln: 300, freeFundsPln: -300 })));
+
+    expect(all(element, 'month-card-free-deficit')).toHaveLength(1);
+    expect(all(element, 'month-card-split-row')).toHaveLength(0);
+  });
+
+  it('hides the split without valuation', async () => {
+    const element = await render(splitMonth(splitOf({ valuationMissing: true })));
+
+    expect(all(element, 'month-card-free')).toHaveLength(1);
+    expect(all(element, 'month-card-split-row')).toHaveLength(0);
+    expect(all(element, 'month-card-free-deficit')).toHaveLength(0);
   });
 
   it('styles a negative forecast as a deficit', async () => {
@@ -105,24 +184,15 @@ describe('MonthCard', () => {
     expect(all(element, 'month-card-deficit')[0].textContent).toContain(formatMoney(-700, 'PLN'));
   });
 
-  it('shows "Wszystko załatwione" when the list is empty', async () => {
-    const element = await render(incomeMonth(), []);
-
-    expect(all(element, 'month-card-empty')).toHaveLength(1);
-    expect(all(element, 'month-card-todo-item')).toHaveLength(0);
-    expect(all(element, 'month-card-show-all')).toHaveLength(0);
-  });
-
-  it('shows only the "Zaplanuj miesiąc" link when there are no definitions', async () => {
-    const element = await render(planningMonthResponse(), []);
+  it('shows the setup link without definitions', async () => {
+    const element = await render(planningMonthResponse());
 
     const setup = all(element, 'month-card-setup');
     expect(setup).toHaveLength(1);
     expect(setup[0].getAttribute('href')).toBe('/planning');
-    expect(all(element, 'month-card-plan')).toHaveLength(0);
     expect(all(element, 'month-card-forecast')).toHaveLength(0);
-    expect(all(element, 'month-card-todo-item')).toHaveLength(0);
-    expect(all(element, 'month-card-empty')).toHaveLength(0);
+    expect(all(element, 'month-card-incomes')).toHaveLength(0);
+    expect(all(element, 'month-card-free')).toHaveLength(0);
   });
 
   it('renders in Polish', async () => {
@@ -136,6 +206,6 @@ describe('MonthCard', () => {
 
     await switchLanguage(fixture, 'pl');
 
-    expect(all(element, 'month-card-empty')[0].textContent).toContain('Wszystko załatwione');
+    expect(all(element, 'month-card-settled')[0].textContent).toContain('Wpływy załatwione');
   });
 });

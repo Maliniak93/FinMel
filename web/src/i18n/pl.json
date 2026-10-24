@@ -150,10 +150,6 @@
   "notFound": {
     "message": "Nie znaleziono strony."
   },
-  "pieChart": {
-    "ariaLabel": "Podział majątku według klas aktywów",
-    "empty": "Brak danych do wykresu."
-  },
   "enums": {
     "assetClass": {
       "cash": "Gotówka",
@@ -450,11 +446,11 @@
       "ungrouped": "Bez grupy",
       "hint": "Podziel majątek na grupy, np. emeryturę albo poduszkę finansową, aby zobaczyć jego strukturę.",
       "link": "Przejdź do grup",
-      "progress": "{{ value }} / {{ target }} ({{ percent }}%)",
-      "cushionLevel": "Stan poduszki: {{ value }} z {{ target }}.",
-      "cushionMissing": "Brakuje: {{ amount }}.",
+      "cushionTag": "Poduszka",
+      "cushionLevel": "{{ value }} z {{ target }}",
+      "cushionMissing": "{{ value }} z {{ target }}, brakuje {{ missing }}",
+      "ofWealth": "{{ percent }} majątku",
       "classShare": "{{ class }}: {{ current }} (cel {{ target }})",
-      "filter": "Grupa",
       "loadFailed": "Nie udało się wczytać grup."
     },
     "empty": "Nie wprowadzono jeszcze żadnego majątku.",
@@ -470,7 +466,7 @@
       "loadFailed": "Nie udało się wczytać gotówki."
     },
     "upcoming": {
-      "title": "Nadchodzące",
+      "title": "Nadchodzące · 30 dni",
       "empty": "Nic w ciągu najbliższych 30 dni.",
       "loadFailed": "Nie udało się wczytać nadchodzących terminów.",
       "kind": {
@@ -489,19 +485,28 @@
       "loadFailed": "Nie udało się wczytać rachunków."
     },
     "monthCard": {
-      "title": "Ten miesiąc",
+      "title": "{{ month }} · plan",
       "setup": "Zaplanuj miesiąc",
-      "plan": "Plan",
-      "forecast": "Prognoza",
+      "incomes": "Wpływy",
+      "expenses": "− Wydatki",
+      "contributions": "− Wpłaty do grup",
+      "free": "= Wolne środki",
+      "splitTarget": "→ {{ name }}",
+      "splitGroup": "→ {{ name }} · {{ share }}",
+      "forecast": "Prognoza wolnych środków:",
       "deficit": "deficyt",
       "settled": "Wpływy załatwione: {{ done }} z {{ total }}",
+      "loadFailed": "Nie udało się wczytać miesiąca."
+    },
+    "todo": {
+      "heading": "Do zrobienia",
+      "planning": "Planowanie →",
+      "title": "Do rozliczenia",
       "empty": "Wszystko załatwione",
       "showAll": "pokaż wszystkie",
-      "loadFailed": "Nie udało się wczytać miesiąca.",
-      "todo": {
-        "overdueIncome": "{{ name }} — {{ date }}, zaległe: {{ days }} dni, {{ amount }}",
-        "payment": "{{ name }} — {{ date }} (za {{ days }} dni), {{ amount }}"
-      }
+      "settle": "Rozlicz",
+      "overdue": "{{ date }} · zaległe: {{ days }} dni",
+      "payment": "{{ date }} · za {{ days }} dni · wydatek"
     }
   },
   "netWorthChart": {

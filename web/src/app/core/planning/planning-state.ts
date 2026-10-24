@@ -67,6 +67,10 @@ export class PlanningState {
 
   readonly todoCount = computed(() => this.todo().length);
 
+  readonly todoError = computed(() => this.todoResource.error());
+
+  readonly todoLoaded = computed(() => this.todoResource.hasValue());
+
   readonly paymentLeadDays = computed(() =>
     this.todoResource.hasValue()
       ? Number(this.todoResource.value()?.paymentLeadDays ?? DEFAULT_PAYMENT_LEAD_DAYS)
@@ -75,6 +79,10 @@ export class PlanningState {
 
   startSession(): void {
     this.session.update((value) => value + 1);
+  }
+
+  reloadTodo(): void {
+    this.todoResource.reload();
   }
 
   reload(): void {

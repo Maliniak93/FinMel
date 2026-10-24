@@ -25,12 +25,12 @@ import {
   type ApiRoute,
   type Responder,
   cashPlacesResponse,
+  dateOnlyFromToday,
   dashboard,
   dashboardWithClasses,
   dashboardWithGroups,
   groups,
   RETIREMENT_GROUP_ID,
-  INVESTMENTS_GROUP_ID,
   CUSHION_GROUP_ID,
   jsonResponse,
   lastHistoryParams,
@@ -297,7 +297,6 @@ describe('Dashboard', () => {
     ) as HTMLElement;
 
     expect(structure.textContent).toContain('Struktura majątku');
-    expect(structure.querySelector('app-pie-chart')).toBeNull();
     expect(structure.querySelectorAll('app-split-bar')).toHaveLength(1);
     expect(structure.querySelectorAll('app-split-bar .split-bar__segment')).toHaveLength(3);
 
@@ -508,55 +507,170 @@ describe('Dashboard', () => {
     expect(accountHrefs.every((href) => !/^\/(accounts|bank-accounts)\b/.test(href))).toBe(true);
   });
 
-  describe('groups', () => {
-    const groupCard = '.dashboard-page__group-card';
-
-    function groupCircles(element: HTMLElement): SVGElement[] {
-      return [...element.querySelectorAll<SVGElement>(`${groupCard} app-pie-chart circle`)];
-    }
-
-    function groupLegend(element: HTMLElement): HTMLElement[] {
-      return [
-        ...element.querySelectorAll<HTMLElement>(
-          '.dashboard-page__group-legend .dashboard-page__legend-item',
-        ),
-      ];
-    }
-
-    function groupLegendRow(element: HTMLElement, name: string): HTMLElement {
-      const row = groupLegend(element).find((button) => textOf(button).includes(name));
+  it('lists overdue income with Rozlicz and upcoming payments', async () => {
+    await setup(jsonResponse(dashboard), undefined, {
+      todo: jsonResponse({
+        paymentLeadDays: 7,
+        items: [
+          {
+            kind: 'OverdueIncome',
+            name: 'Premia kwartalna',
+            date: dateOnlyFromToday(-23),
+            amount: 1800,
+            currency: 'PLN',
+            daysOverdue: 23,
+            daysUntil: null,
+          },
+          {
+            kind: 'UpcomingPayment',
+            name: 'Ubezpieczenie OC',
+            date: dateOnlyFromToday(5),
+            amount: 1200,
+            currency: 'PLN',
+            daysOverdue: null,
+            daysUntil: 5,
+          },
+        ],
+      }),
+    });
+    await switchLanguage(fixture, 'pl');
+    const element = fixture.nativeElement as HTMLElement;
+    const rowOf = (name: string): HTMLElement => {
+      const row = [...element.querySelectorAll<HTMLElement>('li')]
+        .filter((candidate) => candidate.textContent?.includes(name))
+        .at(-1);
       if (!row) {
-        throw new Error(`No group legend row for "${name}".`);
+        throw new Error(`No todo row for "${name}".`);
+      }
+      return row;
+    };
+
+    const income = rowOf('Premia kwartalna');
+    expect(normalised(textOf(income))).toContain('zaległe: 23 dni');
+    const settle = [...income.querySelectorAll<HTMLAnchorElement>('a')].find(
+      (link) => textOf(link) === 'Rozlicz',
+    );
+    expect(settle).toBeDefined();
+    expect(settle?.getAttribute('href')).toContain('/planning');
+    expect(settle?.getAttribute('href')).toContain('#do-rozliczenia');
+
+    const payment = rowOf('Ubezpieczenie OC');
+    expect(normalised(textOf(payment))).toContain('za 5 dni · wydatek');
+    expect(normalised(textOf(payment))).not.toContain('Rozlicz');
+    expect(payment.querySelector('button')).toBeNull();
+  });
+
+  it('a failed section does not replace the page', async () => {
+    await setup(jsonResponse(dashboard), historyWithChange(250, 25), {
+      todo: jsonResponse({ detail: 'Todo unavailable.' }, 500),
+      planningMonth: jsonResponse({ detail: 'Month unavailable.' }, 500),
+      groups: jsonResponse({ detail: 'Groups unavailable.' }, 500),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const alerts = [...element.querySelectorAll<HTMLElement>('[role="alert"]')];
+
+    expect(alerts).toHaveLength(3);
+    expect(alerts.every((alert) => alert.querySelector('button') !== null)).toBe(true);
+    expect(element.textContent).toContain('Todo unavailable.');
+    expect(element.textContent).toContain('Month unavailable.');
+    expect(element.textContent).toContain('Groups unavailable.');
+    expect(element.querySelector('.dashboard-page__value')).not.toBeNull();
+    expect(element.querySelector('app-net-worth-chart')).not.toBeNull();
+    expect(element.querySelector('app-split-bar')).not.toBeNull();
+  });
+
+  describe('groups', () => {
+    function groupRows(element: HTMLElement): HTMLElement[] {
+      return [...element.querySelectorAll<HTMLElement>('[data-testid="group-row"]')];
+    }
+
+    function groupRow(element: HTMLElement, name: string): HTMLElement {
+      const row = groupRows(element).find((candidate) => textOf(candidate).includes(name));
+      if (!row) {
+        throw new Error(`No group row for "${name}".`);
       }
       return row;
     }
 
-    function clickSvg(target: SVGElement): void {
-      target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    }
-
     function progressOf(row: HTMLElement): string | null | undefined {
-      return row.parentElement?.querySelector('mat-progress-bar')?.getAttribute('aria-valuenow');
+      return row.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow');
     }
 
-    it('renders the group pie', async () => {
+    it('renders group rows with progress and the cushion', async () => {
       await setup(jsonResponse(dashboardWithGroups()), undefined, {
         groups: jsonResponse(groups),
       });
+      await switchLanguage(fixture, 'pl');
       const element = fixture.nativeElement as HTMLElement;
 
-      expect(element.querySelectorAll('app-pie-chart')).toHaveLength(1);
-      const strokes = groupCircles(element).map((circle) => circle.getAttribute('style') ?? '');
-      expect(strokes).toHaveLength(4);
-      ['var(--sk-g-blue)', 'var(--sk-g-green)', 'var(--sk-g-orange)', 'var(--sk-g-none)'].forEach(
-        (token, i) => expect(strokes[i]).toContain(token),
-      );
-      expect(groupLegend(element).map((button) => textOf(button).split(' ')[0])).toEqual([
+      expect(groupRows(element).map((row) => textOf(row).split(' ')[0])).toEqual([
         'Emerytura',
         'Inwestycje',
         'Poduszka',
-        'No',
+        'Bez',
       ]);
+
+      const retirement = groupRow(element, 'Emerytura');
+      expect(
+        retirement.querySelector('[data-testid="group-dot"]')?.getAttribute('style') ?? '',
+      ).toContain('var(--sk-g-blue)');
+      expect(retirement.querySelector('a[href="/groups"]')).not.toBeNull();
+      expect(normalised(textOf(retirement))).toContain(normalised(formatMoney(75000, 'PLN')));
+      expect(progressOf(retirement)).toBeUndefined();
+
+      const cushion = groupRow(element, 'Poduszka');
+      expect(normalised(textOf(cushion))).toMatch(/Poduszka.*Poduszka/);
+      expect(progressOf(cushion)).toBe('93');
+      expect(normalised(textOf(cushion))).toContain(
+        normalised(
+          `${formatMoney(28000, 'PLN')} z ${formatMoney(30000, 'PLN')}, brakuje ${formatMoney(2000, 'PLN')}`,
+        ),
+      );
+
+      const ungrouped = groupRows(element).at(-1) as HTMLElement;
+      expect(textOf(ungrouped)).toContain('Bez grupy');
+      expect(progressOf(ungrouped)).toBeUndefined();
+      expect(normalised(textOf(ungrouped))).toMatch(/%\s*majątku/);
+    });
+
+    it('flags class shares that drift from the allocation', async () => {
+      const allocatedGroups = [
+        {
+          ...groups[0],
+          monthlyContributionPln: 2000,
+          classAllocation: [
+            { assetClass: 3, percent: 70 },
+            { assetClass: 2, percent: 20 },
+            { assetClass: 4, percent: 10 },
+          ],
+        },
+        groups[1],
+        groups[2],
+      ];
+      await setup(
+        jsonResponse(
+          dashboardWithGroups([
+            {
+              groupId: RETIREMENT_GROUP_ID,
+              valuePln: 10000,
+              percentage: 100,
+              byAssetClass: [
+                { assetClass: 3, valuePln: 6200 },
+                { assetClass: 2, valuePln: 2400 },
+                { assetClass: 4, valuePln: 1400 },
+              ],
+            },
+          ] as DashboardResponse['byGroup']),
+        ),
+        undefined,
+        { groups: jsonResponse(allocatedGroups) },
+      );
+      await switchLanguage(fixture, 'pl');
+      const text = normalised(textOf(groupRow(fixture.nativeElement as HTMLElement, 'Emerytura')));
+
+      expect(text).toMatch(/ETF: 62\s?% \(cel 70\s?%\)/);
+      expect(text).not.toMatch(/\(cel 20\s?%\)/);
+      expect(text).not.toMatch(/\(cel 10\s?%\)/);
     });
 
     it('shows the groups hint without groups', async () => {
@@ -565,89 +679,8 @@ describe('Dashboard', () => {
       );
       const element = fixture.nativeElement as HTMLElement;
 
-      expect(groupCircles(element)).toHaveLength(0);
-      expect(element.querySelector(`${groupCard} a[href="/groups"]`)).not.toBeNull();
-    });
-
-    it('hides non-positive groups from the pie only', async () => {
-      await setup(
-        jsonResponse(
-          dashboardWithGroups([
-            { groupId: RETIREMENT_GROUP_ID, valuePln: 75000, percentage: 100 },
-            { groupId: INVESTMENTS_GROUP_ID, valuePln: 0, percentage: 0 },
-            { groupId: CUSHION_GROUP_ID, valuePln: -500, percentage: -0.5 },
-          ]),
-        ),
-        undefined,
-        { groups: jsonResponse(groups) },
-      );
-      const element = fixture.nativeElement as HTMLElement;
-
-      expect(groupCircles(element)).toHaveLength(1);
-      const legend = groupLegend(element).map((button) => textOf(button));
-      expect(legend.some((text) => text.includes('Inwestycje'))).toBe(true);
-      expect(legend.some((text) => text.includes('Poduszka'))).toBe(true);
-    });
-
-    it('shows target progress', async () => {
-      await setup(jsonResponse(dashboardWithGroups()), undefined, {
-        groups: jsonResponse(groups),
-      });
-      await switchLanguage(fixture, 'pl');
-      const element = fixture.nativeElement as HTMLElement;
-
-      const row = groupLegendRow(element, 'Poduszka');
-      expect(normalised(textOf(row))).toMatch(
-        /28\s000(,00)?\s*\/\s*30\s000(,00)?\s*zł\s*\(93\s?%\)/,
-      );
-      expect(progressOf(row)).toBe('93');
-      expect(progressOf(groupLegendRow(element, 'Emerytura'))).toBeUndefined();
-    });
-
-    it('shows class shares against the allocation and the cushion level', async () => {
-      const allocatedGroups = [
-        {
-          ...groups[0],
-          kind: 0,
-          monthlyContributionPln: 2000,
-          classAllocation: [
-            { assetClass: 1, percent: 50 },
-            { assetClass: 9, percent: 50 },
-          ],
-        },
-        groups[1],
-        { ...groups[2], kind: 1, targetPln: 12000, monthlyContributionPln: 0, classAllocation: [] },
-      ];
-      await setup(
-        jsonResponse(
-          dashboardWithGroups([
-            {
-              groupId: RETIREMENT_GROUP_ID,
-              valuePln: 10000,
-              percentage: 48,
-              byAssetClass: [
-                { assetClass: 1, valuePln: 9000 },
-                { assetClass: 9, valuePln: 1000 },
-              ],
-            },
-            {
-              groupId: CUSHION_GROUP_ID,
-              valuePln: 10500,
-              percentage: 52,
-              byAssetClass: [{ assetClass: 9, valuePln: 10500 }],
-            },
-          ] as DashboardResponse['byGroup']),
-        ),
-        undefined,
-        { groups: jsonResponse(allocatedGroups) },
-      );
-      const text = normalised(textOf(fixture.nativeElement as HTMLElement));
-
-      expect(text).toMatch(/90\s?%/);
-      expect(text).toMatch(/50\s?%/);
-      expect(text).toMatch(/10,500/);
-      expect(text).toMatch(/12,000/);
-      expect(text).toMatch(/1,500/);
+      expect(groupRows(element).filter((row) => textOf(row).includes('Emerytura'))).toHaveLength(0);
+      expect(element.querySelector('.dashboard-page__group-card a[href="/groups"]')).not.toBeNull();
     });
 
     it('caps the bar at 100', async () => {
@@ -658,14 +691,9 @@ describe('Dashboard', () => {
         undefined,
         { groups: jsonResponse(groups) },
       );
-      await switchLanguage(fixture, 'pl');
       const element = fixture.nativeElement as HTMLElement;
 
-      const row = groupLegendRow(element, 'Poduszka');
-      expect(normalised(textOf(row))).toMatch(
-        /33\s000(,00)?\s*\/\s*30\s000(,00)?\s*zł\s*\(110\s?%\)/,
-      );
-      expect(progressOf(row)).toBe('100');
+      expect(progressOf(groupRow(element, 'Poduszka'))).toBe('100');
     });
 
     it('treats an unknown group as ungrouped', async () => {
@@ -682,12 +710,7 @@ describe('Dashboard', () => {
       await switchLanguage(fixture, 'pl');
       const element = fixture.nativeElement as HTMLElement;
 
-      expect(normalised(textOf(groupLegendRow(element, 'Bez grupy')))).toMatch(/3\s?000/);
-      expect(
-        groupCircles(element).some((circle) =>
-          (circle.getAttribute('style') ?? '').includes('var(--sk-g-none)'),
-        ),
-      ).toBe(true);
+      expect(normalised(textOf(groupRow(element, 'Bez grupy')))).toMatch(/3\s?000/);
     });
 
     it('sends the filter from the menu', async () => {
@@ -730,20 +753,16 @@ describe('Dashboard', () => {
       expect(filterButton()).toContain('All');
     });
 
-    it('group rows do not filter the history', async () => {
+    it('group rows are links and do not filter', async () => {
       await setup(jsonResponse(dashboardWithGroups()), undefined, {
         groups: jsonResponse(groups),
       });
       const element = fixture.nativeElement as HTMLElement;
       const before = fetchSpy.mock.calls.length;
 
-      for (const row of element.querySelectorAll<HTMLElement>(
-        '.dashboard-page__group-legend .dashboard-page__legend-item, .dashboard-page__group-legend li',
-      )) {
+      expect(groupRows(element).length).toBeGreaterThan(0);
+      for (const row of groupRows(element)) {
         row.click();
-      }
-      for (const circle of groupCircles(element)) {
-        clickSvg(circle);
       }
       await fixture.whenStable();
 
@@ -792,8 +811,8 @@ describe('dashboard.groups translations', () => {
         'dashboard.groups.ungrouped',
         'dashboard.groups.hint',
         'dashboard.groups.link',
-        'dashboard.groups.progress',
-        'dashboard.groups.filter',
+        'dashboard.groups.cushionTag',
+        'dashboard.groups.classShare',
       ]),
     );
     expect(keysOf('pl')).toEqual(keysOf('en'));

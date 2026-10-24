@@ -13,42 +13,79 @@
   text-align: center;
 }
 
-.month-card__figures {
+.month-card__cascade {
   display: flex;
-  gap: 32px;
-  margin: 0 0 8px;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
 
-  dt {
-    font-size: 0.875rem;
-    color: var(--mat-sys-on-surface-variant);
-  }
+.month-card__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 16px;
+  row-gap: 4px;
+}
 
-  dd {
-    margin: 0;
-    font-weight: 500;
-  }
+.month-card__row--free {
+  font-weight: 600;
+}
+
+.month-card__amount {
+  text-align: right;
+}
+
+.month-card__track {
+  grid-column: 1 / -1;
+  height: 8px;
+}
+
+.month-card__bar {
+  height: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.month-card__bar--income {
+  background-color: var(--sk-positive);
+}
+
+.month-card__bar--expense {
+  background-color: var(--mat-sys-outline);
+}
+
+.month-card__bar--free {
+  background-color: var(--mat-sys-primary);
+}
+
+.month-card__bar--deficit {
+  background-color: var(--mat-sys-error);
 }
 
 .month-card__deficit {
   color: var(--mat-sys-error);
 }
 
-.month-card__line {
-  margin: 0 0 4px;
+.month-card__split {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   font-size: 0.875rem;
   color: var(--mat-sys-on-surface-variant);
 }
 
-.month-card__empty {
-  margin: 12px 0 0;
-  color: var(--mat-sys-on-surface-variant);
+.month-card__split-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.month-card__list {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.month-card__line {
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant);
 }
