@@ -1185,7 +1185,6 @@
     }
   },
   "bankAccounts": {
-    "title": "Konta bankowe",
     "add": "Dodaj konto",
     "addFirst": "Dodaj pierwsze konto bankowe",
     "empty": "Nie masz jeszcze żadnych kont bankowych.",
@@ -1198,7 +1197,6 @@
     "balance": "Saldo",
     "interestCredited": "Naliczone odsetki",
     "interestDue": "Odsetki do rozliczenia",
-    "back": "Wróć do kont bankowych",
     "hasOpenDeposit": "Na to konto wróci otwarta lokata",
     "interest": {
       "settle": "Rozlicz odsetki",
@@ -1229,11 +1227,17 @@
     }
   },
   "accounts": {
-    "title": "Rachunki inwestycyjne",
     "showArchived": "Pokaż zarchiwizowane",
     "newAccount": "Nowy rachunek",
     "empty": "Nie masz jeszcze żadnych rachunków.",
-    "createFirst": "Utwórz pierwszy rachunek",
+    "summary": {
+      "total": "Razem",
+      "cash": "Wolne środki",
+      "securities": "Papiery"
+    },
+    "breadcrumb": {
+      "back": "Majątek · {{ tab }}"
+    },
     "type": "Typ",
     "wrapper": "Opakowanie podatkowe",
     "value": "Wartość",
@@ -1248,7 +1252,6 @@
       "total": "Razem"
     },
     "detail": {
-      "back": "Wróć do rachunków",
       "holdings": "Pozycje",
       "noHoldings": "Ten rachunek nie ma jeszcze żadnych aktywów.",
       "cashHistory": "Historia gotówki",
@@ -1304,8 +1307,10 @@
       "fixedHint": "Typu, opakowania podatkowego i waluty nie można zmienić po utworzeniu rachunku."
     },
     "contribution": {
-      "withLimit": "Wpłacono {{ contributed }} / {{ limit }} zł w {{ year }}",
-      "noLimit": "Wpłacono {{ contributed }} zł w {{ year }}",
+      "label": "Limit wpłat",
+      "status": "Wpłacono {{ paid }} / {{ limit }} zł w {{ year }} · zostało {{ left }} zł",
+      "exceeded": "Wpłacono {{ paid }} / {{ limit }} zł w {{ year }} · limit przekroczony",
+      "noLimit": "Wpłacono {{ paid }} zł w {{ year }}",
       "action": "Limit wpłat",
       "year": "Rok",
       "amount": "Limit (zł)",

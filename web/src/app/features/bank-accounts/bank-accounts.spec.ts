@@ -70,8 +70,12 @@ describe('BankAccounts', () => {
     await restoreEnglish();
   });
 
-  async function setup(accounts = [mBank, nest]): Promise<void> {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse(accounts));
+  async function setup(
+    accounts = [mBank, nest],
+    respond: () => Promise<Response> = async () => jsonResponse(accounts),
+    settle = true,
+  ): Promise<void> {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(respond);
     dialog = { open: vi.fn() };
     snackBar = { open: vi.fn() };
 
@@ -87,7 +91,10 @@ describe('BankAccounts', () => {
 
     fixture = TestBed.createComponent(BankAccounts);
     component = fixture.componentInstance;
-    await fixture.whenStable();
+    if (settle) {
+      await fixture.whenStable();
+    }
+    fixture.detectChanges();
   }
 
   function pageText(): string {
@@ -139,7 +146,9 @@ describe('BankAccounts', () => {
     const nestRow = rows.find((row) => (row.textContent ?? '').includes('Nest Oszczędnościowe'));
     const mBankRow = rows.find((row) => (row.textContent ?? '').includes('mBank'));
 
-    expect(nestRow?.textContent).toContain('Odsetki do rozliczenia');
+    expect(nestRow?.querySelector('app-status-chip')?.textContent).toContain(
+      'Odsetki do rozliczenia',
+    );
     expect(mBankRow?.textContent).not.toContain('Odsetki do rozliczenia');
   });
 
@@ -170,6 +179,45 @@ describe('BankAccounts', () => {
     fixture.detectChanges();
 
     expect(pageText()).toContain('Old bank');
+  });
+
+  it('archived rows', async () => {
+    await setup([mBank, archived]);
+    component['includeArchived'].set(true);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+
+    const archivedRow = element.querySelector<HTMLElement>('tr[data-archived="true"]');
+    expect(archivedRow?.textContent).toContain('Old bank');
+    expect(archivedRow?.querySelector('app-status-chip')?.textContent).toContain('Archived');
+    expect(element.querySelectorAll('tr[data-archived="true"]').length).toBe(1);
+
+    await switchLanguage(fixture, 'pl');
+    expect(archivedRow?.querySelector('app-status-chip')?.textContent).toContain('Zarchiwizowany');
+  });
+
+  it('states', async () => {
+    await setup([], () => new Promise<Response>(() => undefined), false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-skeleton')).not.toBeNull();
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup([], async () => jsonResponse({ detail: 'Boom.' }, 500));
+    const errorBlock = (fixture.nativeElement as HTMLElement).querySelector('app-section-error');
+    expect(errorBlock).not.toBeNull();
+    expect(errorBlock?.textContent).toContain('Retry');
+    await switchLanguage(fixture, 'pl');
+    expect(errorBlock?.textContent).toContain('Ponów');
+    fetchSpy.mockRestore();
+    await restoreEnglish();
+    TestBed.resetTestingModule();
+
+    await setup([]);
+    const empty = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(empty).not.toBeNull();
+    expect(empty?.querySelector('button')).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('h1')).toBeNull();
   });
 
   it('links each row to its account page', async () => {

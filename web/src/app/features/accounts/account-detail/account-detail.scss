@@ -2,10 +2,15 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  margin-bottom: 8px;
   text-decoration: none;
-  color: inherit;
-  opacity: 0.7;
+  color: var(--mat-sys-on-surface-variant);
   font-size: 0.875rem;
+}
+
+.account-detail__title {
+  margin: 0 0 8px;
+  font: var(--mat-sys-headline-medium);
 }
 
 .account-detail__header {
@@ -20,42 +25,14 @@
 .account-detail__meta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 0;
-  opacity: 0.7;
 }
 
 .account-detail__actions {
   display: flex;
   gap: 8px;
-}
-
-.account-detail__totals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 32px;
-  margin: 0 0 24px;
-
-  dt {
-    opacity: 0.7;
-    font-size: 0.875rem;
-  }
-
-  dd {
-    margin: 0;
-    font-size: 1.25rem;
-    font-weight: 500;
-  }
-}
-
-.account-detail__state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 24px 16px;
-  text-align: center;
 }
 
 .account-detail__empty {

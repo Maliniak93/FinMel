@@ -2,27 +2,45 @@
 <div
   class="contribution-bar"
   data-testid="contribution-bar"
-  [class.contribution-bar--exceeded]="exceeded()"
+  [attr.data-state]="state()"
+  [class.contribution-bar--exceeded]="state() === 'error'"
 >
   @if (limit() !== null) {
-    <span>{{
-      'accounts.contribution.withLimit'
-        | transloco
-          : {
-              contributed: formatAmount(data.contributedPln),
-              limit: formatAmount(limit()!),
-              year: data.year,
-            }
-    }}</span>
-    <mat-progress-bar
-      mode="determinate"
-      [value]="percent()"
-      [color]="exceeded() ? 'warn' : 'primary'"
-    />
+    <div
+      class="contribution-bar__track"
+      role="progressbar"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      [attr.aria-valuenow]="percent()"
+      [attr.aria-label]="'accounts.contribution.label' | transloco"
+    >
+      <div
+        class="contribution-bar__fill"
+        data-testid="contribution-fill"
+        [style.width.%]="percent()"
+      ></div>
+      <div class="contribution-bar__marker" data-testid="contribution-marker"></div>
+    </div>
+    <p class="contribution-bar__text">
+      <mat-icon class="contribution-bar__icon" aria-hidden="true">{{ icon() }}</mat-icon>
+      <span>{{
+        (state() === 'error' ? 'accounts.contribution.exceeded' : 'accounts.contribution.status')
+          | transloco
+            : {
+                paid: formatAmount(data.contributedPln),
+                limit: formatAmount(limit()!),
+                year: data.year,
+                left: formatAmount(left()),
+              }
+      }}</span>
+    </p>
   } @else {
-    <span>{{
-      'accounts.contribution.noLimit'
-        | transloco: { contributed: formatAmount(data.contributedPln), year: data.year }
-    }}</span>
+    <p class="contribution-bar__text">
+      <mat-icon class="contribution-bar__icon" aria-hidden="true">info</mat-icon>
+      <span>{{
+        'accounts.contribution.noLimit'
+          | transloco: { paid: formatAmount(data.contributedPln), year: data.year }
+      }}</span>
+    </p>
   }
 </div>

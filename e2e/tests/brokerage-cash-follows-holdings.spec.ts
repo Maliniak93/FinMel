@@ -93,7 +93,7 @@ async function openDashboard(page: Page): Promise<void> {
 async function openAccounts(page: Page): Promise<void> {
   await wealthTab(page, 'Rachunki inwestycyjne');
   await expect(
-    page.getByRole('heading', { name: 'Rachunki inwestycyjne', level: 1 }),
+    page.getByRole('tab', { name: /^Rachunki inwestycyjne(\s|$)/, selected: true }),
   ).toBeVisible();
 }
 
@@ -547,7 +547,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
     await expectAccountRowAmounts(page, EMPTY, { cash: '1 000,00', value: '1 000,00' });
     await accountRow(page, EMPTY).getByRole('link', { name: EMPTY, exact: true }).click();
     await expect(
-      page.locator('.account-detail__totals dt', { hasText: 'Wolne środki' }),
+      page.getByTestId('summary-strip').locator('dt', { hasText: 'Wolne środki' }),
     ).toBeVisible();
     await expect(page.getByTestId('account-cash')).toHaveText(exactPln('1 000,00'));
   });

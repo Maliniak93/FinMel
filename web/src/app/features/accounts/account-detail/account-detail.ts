@@ -1,11 +1,9 @@
 import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatPaginatorModule, type PageEvent } from '@angular/material/paginator';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -32,6 +30,10 @@ import {
   formatPercent,
   formatQuantity,
 } from '../../../shared/format';
+import { SectionError } from '../../../shared/section-error/section-error';
+import { Skeleton } from '../../../shared/skeleton/skeleton';
+import { StatusChip } from '../../../shared/status-chip/status-chip';
+import { SummaryStrip, type SummaryItem } from '../../../shared/summary-strip/summary-strip';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import {
   CashBankTransferDialog,
@@ -54,14 +56,16 @@ const DEFAULT_PAGE_SIZE = 20;
   selector: 'app-account-detail',
   imports: [
     MatButtonModule,
-    MatChipsModule,
     MatIconModule,
     MatSelectModule,
     MatPaginatorModule,
-    MatProgressSpinnerModule,
     MatTableModule,
     ContributionBar,
     RouterLink,
+    SectionError,
+    Skeleton,
+    StatusChip,
+    SummaryStrip,
     TranslocoPipe,
   ],
   templateUrl: './account-detail.html',
@@ -187,6 +191,31 @@ export class AccountDetail {
     }
     const total = Number(entry.valuePln);
     return { cash, securities: Math.round((total - cash) * 100) / 100, total };
+  });
+
+  protected readonly summary = computed<SummaryItem[]>(() => {
+    if (!this.accountResource.hasValue()) {
+      return [];
+    }
+    const account = this.accountResource.value();
+    const totals = this.totals();
+    const currency = account.currency;
+    return [
+      {
+        labelKey: account.bank ? 'bankAccounts.balance' : 'accounts.balances.cash',
+        amount: Number(account.cashBalance),
+        currency,
+        testId: 'account-cash',
+      },
+      account.bank
+        ? {
+            labelKey: 'bankAccounts.interestCredited',
+            amount: Number(account.bank.interestCreditedNet),
+            currency,
+          }
+        : { labelKey: 'accounts.balances.securities', amount: totals?.securities },
+      { labelKey: 'accounts.balances.total', amount: totals?.total },
+    ];
   });
 
   protected readonly displayedColumns = computed(() => [

@@ -1,10 +1,8 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
@@ -22,24 +20,35 @@ import {
 } from '../../api/portfolio';
 import { getApiReportingDashboard, type DashboardAccountValue } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
-import { formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { EmptyState } from '../../shared/empty-state/empty-state';
+import { Money } from '../../shared/money/money';
+import { SectionError } from '../../shared/section-error/section-error';
+import { Skeleton } from '../../shared/skeleton/skeleton';
+import { StatusChip } from '../../shared/status-chip/status-chip';
+import { SummaryStrip, type SummaryItem } from '../../shared/summary-strip/summary-strip';
 import { ACCOUNT_TYPE, accountTypeLabel, taxWrapperLabel } from './account-type';
 import { AccountFormDialog } from './account-form-dialog/account-form-dialog';
 import { ContributionBar } from './contribution-bar/contribution-bar';
+
+const toGrosze = (amount: number | string): number => Math.round(Number(amount) * 100);
 
 // MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
 @Component({
   selector: 'app-accounts',
   imports: [
+    EmptyState,
     MatButtonModule,
-    MatChipsModule,
     MatIconModule,
     MatMenuModule,
-    MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
+    Money,
+    SectionError,
+    Skeleton,
+    StatusChip,
+    SummaryStrip,
     ContributionBar,
     RouterLink,
     TranslocoPipe,
@@ -53,11 +62,15 @@ export class Accounts {
 
   protected readonly includeArchived = signal(false);
 
-  protected readonly displayedColumns = computed(() =>
-    this.includeArchived()
-      ? ['name', 'type', 'wrapper', 'cash', 'securities', 'value', 'status', 'actions']
-      : ['name', 'type', 'wrapper', 'cash', 'securities', 'value', 'actions'],
-  );
+  protected readonly displayedColumns = [
+    'name',
+    'type',
+    'wrapper',
+    'cash',
+    'securities',
+    'value',
+    'actions',
+  ];
 
   protected readonly accountsResource = resource({
     loader: async ({ abortSignal }) => {
@@ -107,7 +120,29 @@ export class Accounts {
     return map;
   });
 
-  protected readonly formatMoney = formatMoney;
+  protected readonly summary = computed<SummaryItem[]>(() => {
+    let cash = 0;
+    let total = 0;
+    let securities = 0;
+    let valued = false;
+    for (const account of this.visibleAccounts()) {
+      const cashGrosze = toGrosze(account.cashBalance);
+      cash += cashGrosze;
+      const entry = this.accountValues().get(account.id);
+      if (entry) {
+        valued = true;
+        total += toGrosze(entry.valuePln);
+        securities += toGrosze(entry.valuePln) - cashGrosze;
+      }
+    }
+    return [
+      { labelKey: 'accounts.summary.total', amount: valued ? total / 100 : null },
+      { labelKey: 'accounts.summary.cash', amount: cash / 100 },
+      { labelKey: 'accounts.summary.securities', amount: valued ? securities / 100 : null },
+    ];
+  });
+
+  protected readonly toNumber = Number;
   protected readonly accountTypeLabel = accountTypeLabel;
   protected readonly taxWrapperLabel = taxWrapperLabel;
 

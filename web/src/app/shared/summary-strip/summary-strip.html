@@ -1,0 +1,10 @@
+<dl class="summary-strip__list">
+  @for (item of items(); track item.labelKey) {
+    <div class="summary-strip__item">
+      <dt class="summary-strip__label">{{ item.labelKey | transloco }}</dt>
+      <dd class="summary-strip__value sk-num" [attr.data-testid]="item.testId ?? null">
+        <app-money [amount]="item.amount" [currency]="item.currency ?? 'PLN'" />
+      </dd>
+    </div>
+  }
+</dl>

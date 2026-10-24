@@ -1,7 +1,10 @@
 <div class="bank-accounts">
-  <div class="bank-accounts__header">
-    <h1>{{ 'bankAccounts.title' | transloco }}</h1>
-    <div class="bank-accounts__header-actions">
+  @if (accountsResource.error(); as loadError) {
+    <app-section-error [message]="loadError.message" (retry)="accountsResource.reload()" />
+  } @else if (accountsResource.isLoading() && !accountsResource.hasValue()) {
+    <app-skeleton [rows]="4" />
+  } @else if (accountsResource.hasValue()) {
+    <div class="bank-accounts__toolbar">
       <mat-slide-toggle
         [checked]="includeArchived()"
         (change)="includeArchived.set($event.checked)"
@@ -13,177 +16,185 @@
         {{ 'bankAccounts.add' | transloco }}
       </button>
     </div>
-  </div>
 
-  <mat-chip-listbox
-    class="bank-accounts__variants"
-    hideSingleSelectionIndicator
-    [value]="variantFilter()"
-    (change)="onVariantChange($event.value)"
-    [attr.aria-label]="'bankAccounts.variantFilter' | transloco"
-  >
-    <mat-chip-option [value]="allVariants">{{
-      'bankAccounts.allVariants' | transloco
-    }}</mat-chip-option>
-    @for (variant of variants; track variant.value) {
-      <mat-chip-option [value]="variant.value">{{ variant.label | transloco }}</mat-chip-option>
-    }
-  </mat-chip-listbox>
+    @if (accountsResource.value().length === 0) {
+      <app-empty-state icon="account_balance" [message]="'bankAccounts.empty' | transloco">
+        <button action mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+          <mat-icon>add</mat-icon>
+          {{ 'bankAccounts.addFirst' | transloco }}
+        </button>
+      </app-empty-state>
+    } @else {
+      <mat-chip-listbox
+        class="bank-accounts__variants"
+        hideSingleSelectionIndicator
+        [value]="variantFilter()"
+        (change)="onVariantChange($event.value)"
+        [attr.aria-label]="'bankAccounts.variantFilter' | transloco"
+      >
+        <mat-chip-option [value]="allVariants">{{
+          'bankAccounts.allVariants' | transloco
+        }}</mat-chip-option>
+        @for (variant of variants; track variant.value) {
+          <mat-chip-option [value]="variant.value">{{ variant.label | transloco }}</mat-chip-option>
+        }
+      </mat-chip-listbox>
 
-  @if (accountsResource.error(); as loadError) {
-    <div class="bank-accounts__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="accountsResource.reload()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
-  } @else if (accountsResource.isLoading() && !accountsResource.hasValue()) {
-    <div class="bank-accounts__state">
-      <mat-spinner diameter="32" />
-    </div>
-  } @else if (accountsResource.hasValue() && accountsResource.value().length === 0) {
-    <div class="bank-accounts__state">
-      <p>{{ 'bankAccounts.empty' | transloco }}</p>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        {{ 'bankAccounts.addFirst' | transloco }}
-      </button>
-    </div>
-  } @else if (accountsResource.hasValue()) {
-    <table mat-table [dataSource]="visibleAccounts()" class="bank-accounts__table">
-      <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          <a [routerLink]="['/wealth/bank', account.id]">{{ account.name }}</a>
-        </td>
-      </ng-container>
+      <table mat-table [dataSource]="visibleAccounts()" class="bank-accounts__table">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">
+            <a [routerLink]="['/wealth/bank', account.id]">{{ account.name }}</a>
+          </td>
+        </ng-container>
 
-      <ng-container matColumnDef="variant">
-        <th mat-header-cell *matHeaderCellDef>{{ 'bankAccounts.variant' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          {{ bankVariantLabel(account.bank.variant) | transloco }}
-        </td>
-      </ng-container>
+        <ng-container matColumnDef="variant">
+          <th mat-header-cell *matHeaderCellDef>{{ 'bankAccounts.variant' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">
+            {{ bankVariantLabel(account.bank.variant) | transloco }}
+          </td>
+        </ng-container>
 
-      <ng-container matColumnDef="bankName">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.bank' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">{{ account.bank.bankName ?? '—' }}</td>
-      </ng-container>
+        <ng-container matColumnDef="bankName">
+          <th mat-header-cell *matHeaderCellDef>{{ 'deposits.bank' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">{{ account.bank.bankName ?? '—' }}</td>
+        </ng-container>
 
-      <ng-container matColumnDef="currency">
-        <th mat-header-cell *matHeaderCellDef>{{ 'common.currency' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">{{ account.currency }}</td>
-      </ng-container>
+        <ng-container matColumnDef="currency">
+          <th mat-header-cell *matHeaderCellDef>{{ 'common.currency' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">{{ account.currency }}</td>
+        </ng-container>
 
-      <ng-container matColumnDef="rate">
-        <th mat-header-cell *matHeaderCellDef>{{ 'deposits.rate' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          {{ formatPercent(account.bank.annualInterestRatePercent) }}
-        </td>
-      </ng-container>
+        <ng-container matColumnDef="rate">
+          <th mat-header-cell *matHeaderCellDef>{{ 'deposits.rate' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">
+            {{ formatPercent(account.bank.annualInterestRatePercent) }}
+          </td>
+        </ng-container>
 
-      <ng-container matColumnDef="balance">
-        <th mat-header-cell *matHeaderCellDef>{{ 'bankAccounts.balance' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          {{ formatMoney(account.cashBalance, account.currency) }}
-        </td>
-      </ng-container>
+        <ng-container matColumnDef="balance">
+          <th mat-header-cell *matHeaderCellDef class="bank-accounts__num">
+            {{ 'bankAccounts.balance' | transloco }}
+          </th>
+          <td mat-cell *matCellDef="let account" class="bank-accounts__num">
+            <app-money [amount]="toNumber(account.cashBalance)" [currency]="account.currency" />
+          </td>
+        </ng-container>
 
-      <ng-container matColumnDef="interestCredited">
-        <th mat-header-cell *matHeaderCellDef>{{ 'bankAccounts.interestCredited' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          {{ formatMoney(account.bank.interestCreditedNet, account.currency) }}
-        </td>
-      </ng-container>
+        <ng-container matColumnDef="interestCredited">
+          <th mat-header-cell *matHeaderCellDef class="bank-accounts__num">
+            {{ 'bankAccounts.interestCredited' | transloco }}
+          </th>
+          <td mat-cell *matCellDef="let account" class="bank-accounts__num">
+            <app-money
+              [amount]="toNumber(account.bank.interestCreditedNet)"
+              [currency]="account.currency"
+            />
+          </td>
+        </ng-container>
 
-      <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef>{{ 'common.status' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          <mat-chip-set>
+        <ng-container matColumnDef="status">
+          <th mat-header-cell *matHeaderCellDef>{{ 'common.status' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">
             @if (account.bank.interestDue && !account.isArchived) {
-              <mat-chip
+              <app-status-chip
+                [label]="'bankAccounts.interestDue' | transloco"
+                icon="schedule"
+                tone="warning"
                 [matTooltip]="
                   monthsDue(account) > 1
                     ? ('bankAccounts.interest.settleMonths'
                       | transloco: { count: monthsDue(account) })
                     : ('bankAccounts.interest.settle' | transloco)
                 "
-              >
-                {{ 'bankAccounts.interestDue' | transloco }}
-              </mat-chip>
+              />
             }
             @if (account.isArchived) {
-              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
+              <app-status-chip
+                [label]="'common.archived' | transloco"
+                icon="inventory_2"
+                tone="neutral"
+              />
             }
-          </mat-chip-set>
-        </td>
-      </ng-container>
+          </td>
+        </ng-container>
 
-      <ng-container matColumnDef="actions">
-        <th mat-header-cell *matHeaderCellDef></th>
-        <td mat-cell *matCellDef="let account">
-          <button
-            mat-icon-button
-            type="button"
-            [matMenuTriggerFor]="menu"
-            [attr.aria-label]="'common.actionsFor' | transloco: { name: account.name }"
-          >
-            <mat-icon>more_vert</mat-icon>
-          </button>
-          <mat-menu #menu="matMenu">
-            @if (!account.isArchived) {
-              <button mat-menu-item type="button" (click)="openEditDialog(account)">
-                <mat-icon>edit</mat-icon>
-                <span>{{ 'common.edit' | transloco }}</span>
-              </button>
-              <button mat-menu-item type="button" (click)="openCashOperation(account, 'deposit')">
-                <mat-icon>add_circle</mat-icon>
-                <span>{{ 'accounts.cash.deposit' | transloco }}</span>
-              </button>
-              <button mat-menu-item type="button" (click)="openCashOperation(account, 'withdraw')">
-                <mat-icon>do_not_disturb_on</mat-icon>
-                <span>{{ 'accounts.cash.withdraw' | transloco }}</span>
-              </button>
-              <button mat-menu-item type="button" (click)="openTransferDialog(account)">
-                <mat-icon>swap_horiz</mat-icon>
-                <span>{{ 'accounts.transfer.action' | transloco }}</span>
-              </button>
-              @if (account.bank.interestDue) {
-                <button mat-menu-item type="button" (click)="openSettleDialog(account)">
-                  <mat-icon>task_alt</mat-icon>
-                  <span>{{ 'bankAccounts.interest.settle' | transloco }}</span>
-                </button>
-              }
-              @if (account.bank.lastSettlement) {
-                <button mat-menu-item type="button" (click)="undoLastSettlement(account)">
-                  <mat-icon>undo</mat-icon>
-                  <span>{{ 'bankAccounts.interest.undo' | transloco }}</span>
-                </button>
-              }
-              <button mat-menu-item type="button" (click)="archive(account)">
-                <mat-icon>archive</mat-icon>
-                <span>{{ 'common.archive' | transloco }}</span>
-              </button>
-            } @else {
-              <button mat-menu-item type="button" (click)="restore(account)">
-                <mat-icon>unarchive</mat-icon>
-                <span>{{ 'common.restore' | transloco }}</span>
-              </button>
-            }
-            <button mat-menu-item type="button" (click)="remove(account)">
-              <mat-icon>delete</mat-icon>
-              <span>{{ 'common.delete' | transloco }}</span>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let account">
+            <button
+              mat-icon-button
+              type="button"
+              [matMenuTriggerFor]="menu"
+              [attr.aria-label]="'common.actionsFor' | transloco: { name: account.name }"
+            >
+              <mat-icon>more_vert</mat-icon>
             </button>
-          </mat-menu>
-        </td>
-      </ng-container>
+            <mat-menu #menu="matMenu">
+              @if (!account.isArchived) {
+                <button mat-menu-item type="button" (click)="openEditDialog(account)">
+                  <mat-icon>edit</mat-icon>
+                  <span>{{ 'common.edit' | transloco }}</span>
+                </button>
+                <button mat-menu-item type="button" (click)="openCashOperation(account, 'deposit')">
+                  <mat-icon>add_circle</mat-icon>
+                  <span>{{ 'accounts.cash.deposit' | transloco }}</span>
+                </button>
+                <button
+                  mat-menu-item
+                  type="button"
+                  (click)="openCashOperation(account, 'withdraw')"
+                >
+                  <mat-icon>do_not_disturb_on</mat-icon>
+                  <span>{{ 'accounts.cash.withdraw' | transloco }}</span>
+                </button>
+                <button mat-menu-item type="button" (click)="openTransferDialog(account)">
+                  <mat-icon>swap_horiz</mat-icon>
+                  <span>{{ 'accounts.transfer.action' | transloco }}</span>
+                </button>
+                @if (account.bank.interestDue) {
+                  <button mat-menu-item type="button" (click)="openSettleDialog(account)">
+                    <mat-icon>task_alt</mat-icon>
+                    <span>{{ 'bankAccounts.interest.settle' | transloco }}</span>
+                  </button>
+                }
+                @if (account.bank.lastSettlement) {
+                  <button mat-menu-item type="button" (click)="undoLastSettlement(account)">
+                    <mat-icon>undo</mat-icon>
+                    <span>{{ 'bankAccounts.interest.undo' | transloco }}</span>
+                  </button>
+                }
+                <button mat-menu-item type="button" (click)="archive(account)">
+                  <mat-icon>archive</mat-icon>
+                  <span>{{ 'common.archive' | transloco }}</span>
+                </button>
+              } @else {
+                <button mat-menu-item type="button" (click)="restore(account)">
+                  <mat-icon>unarchive</mat-icon>
+                  <span>{{ 'common.restore' | transloco }}</span>
+                </button>
+              }
+              <button mat-menu-item type="button" (click)="remove(account)">
+                <mat-icon>delete</mat-icon>
+                <span>{{ 'common.delete' | transloco }}</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-      <tr *matNoDataRow>
-        <td class="bank-accounts__no-data" [attr.colspan]="displayedColumns.length">
-          {{ 'bankAccounts.noMatch' | transloco }}
-        </td>
-      </tr>
-    </table>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: displayedColumns"
+          [class.bank-accounts__row--archived]="row.isArchived"
+          [attr.data-archived]="row.isArchived ? 'true' : null"
+        ></tr>
+        <tr *matNoDataRow>
+          <td class="bank-accounts__no-data" [attr.colspan]="displayedColumns.length">
+            {{ 'bankAccounts.noMatch' | transloco }}
+          </td>
+        </tr>
+      </table>
+    }
   }
 </div>

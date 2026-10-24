@@ -108,7 +108,7 @@ test('accounts: an IKE account with a contribution limit, deposits, withdrawals,
   });
 
   await test.step('Krok 8: archiving IKE Bossa removes it from the list, and "Pokaż zarchiwizowane" shows it with the "Zarchiwizowany" mark', async () => {
-    await page.getByRole('link', { name: 'Wróć do rachunków' }).click();
+    await page.getByRole('link', { name: /Majątek · Rachunki inwestycyjne/ }).click();
     await openRowMenu(page, 'Archiwizuj');
     await dialog.getByRole('button', { name: 'Archiwizuj', exact: true }).click();
     await expect(dialog).toBeHidden();
