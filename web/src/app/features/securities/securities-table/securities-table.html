@@ -13,32 +13,27 @@
 </div>
 
 @if (holdingsResource.error(); as loadError) {
-  <div class="securities-table__state" role="alert">
-    <p>{{ loadError.message }}</p>
-    <button mat-button type="button" (click)="holdingsResource.reload()">
-      {{ 'common.retry' | transloco }}
-    </button>
-  </div>
+  <app-section-error [message]="loadError.message" (retry)="holdingsResource.reload()" />
 } @else if (holdingsResource.isLoading() && !holdingsResource.hasValue()) {
-  <div class="securities-table__state">
-    <mat-spinner diameter="32" />
-  </div>
+  <app-skeleton [rows]="4" />
 } @else if (holdingsResource.hasValue() && holdings().length === 0) {
-  <div class="securities-table__state">
-    <p>{{ emptyKey() | transloco }}</p>
-    <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+  <app-empty-state icon="show_chart" [message]="emptyKey() | transloco">
+    <button action mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+      <mat-icon>add</mat-icon>
       {{ 'securities.add' | transloco }}
     </button>
-  </div>
+  </app-empty-state>
 } @else if (holdingsResource.hasValue()) {
   <table mat-table [dataSource]="holdings()" class="securities-table__table">
     <ng-container matColumnDef="instrument">
       <th mat-header-cell *matHeaderCellDef>{{ 'securities.columns.instrument' | transloco }}</th>
       <td mat-cell *matCellDef="let holding">
-        <div>{{ holding.name }}</div>
-        @if (instrumentLabel(holding); as label) {
-          <div class="securities-table__muted">{{ label }}</div>
-        }
+        <a class="securities-table__name" [routerLink]="transactionsLink(holding)">{{
+          holding.name
+        }}</a>
+        <div class="securities-table__muted">
+          {{ 'securities.subtitle' | transloco: subtitleParams(holding, classKey() | transloco) }}
+        </div>
       </td>
       <td mat-footer-cell *matFooterCellDef>{{ 'securities.total' | transloco }}</td>
     </ng-container>
@@ -60,11 +55,7 @@
         {{ 'securities.columns.averageBuyPrice' | transloco }}
       </th>
       <td mat-cell *matCellDef="let holding">
-        @if (holding.averageBuyPrice !== null) {
-          {{ formatMoney(holding.averageBuyPrice, holding.currency) }}
-        } @else {
-          —
-        }
+        <app-money [amount]="toNumber(holding.averageBuyPrice)" [currency]="holding.currency" />
       </td>
       <td mat-footer-cell *matFooterCellDef></td>
     </ng-container>
@@ -74,11 +65,7 @@
         {{ 'securities.columns.averageBuyPricePln' | transloco }}
       </th>
       <td mat-cell *matCellDef="let holding">
-        @if (holding.averageBuyPricePln !== null) {
-          {{ formatMoney(holding.averageBuyPricePln, 'PLN') }}
-        } @else {
-          —
-        }
+        <app-money [amount]="toNumber(holding.averageBuyPricePln)" />
       </td>
       <td mat-footer-cell *matFooterCellDef></td>
     </ng-container>
@@ -87,12 +74,19 @@
       <th mat-header-cell *matHeaderCellDef>{{ 'securities.columns.price' | transloco }}</th>
       <td mat-cell *matCellDef="let holding">
         @if (holding.lastPrice !== null) {
-          <div>{{ formatMoney(holding.lastPrice, holding.currency) }}</div>
+          <app-money [amount]="toNumber(holding.lastPrice)" [currency]="holding.currency" />
           @if (holding.lastPriceDate) {
             <div class="securities-table__muted">{{ formatDate(holding.lastPriceDate) }}</div>
+            @if (isStale(holding.lastPriceDate)) {
+              <app-status-chip
+                [label]="'common.stale' | transloco"
+                icon="schedule"
+                tone="warning"
+              />
+            }
           }
         } @else if (unavailableLabel(holding); as reasonKey) {
-          <span data-testid="price-unavailable" [matTooltip]="reasonKey | transloco">—</span>
+          <app-status-chip [label]="reasonKey | transloco" icon="warning" tone="warning" />
         } @else {
           —
         }
@@ -103,14 +97,10 @@
     <ng-container matColumnDef="value">
       <th mat-header-cell *matHeaderCellDef>{{ 'securities.columns.value' | transloco }}</th>
       <td mat-cell *matCellDef="let holding">
-        @if (holding.valuePln !== null) {
-          {{ formatMoney(holding.valuePln, 'PLN') }}
-        } @else {
-          —
-        }
+        <app-money [amount]="toNumber(holding.valuePln)" />
       </td>
       <td mat-footer-cell *matFooterCellDef>
-        {{ formatMoney(holdingsResource.value().totals.valuePln, 'PLN') }}
+        <app-money [amount]="toNumber(holdingsResource.value().totals.valuePln)" />
       </td>
     </ng-container>
 
@@ -118,24 +108,21 @@
       <th mat-header-cell *matHeaderCellDef>{{ 'securities.columns.gain' | transloco }}</th>
       <td mat-cell *matCellDef="let holding">
         @if (gainAmount(holding); as gain) {
-          <span data-testid="gain" [class]="'securities-table__gain ' + gainSign(gain.value)">
-            {{ formatMoney(gain.value, gain.currency) }}
-            @if (holding.unrealizedPlPercent !== null) {
+          <app-money kind="change" [amount]="gain.value" [currency]="gain.currency" />
+          @if (holding.unrealizedPlPercent !== null) {
+            <span class="securities-table__percent">
               ({{ formatPercent(holding.unrealizedPlPercent) }})
-            }
-          </span>
+            </span>
+          }
         } @else {
-          —
+          <app-money [amount]="null" />
         }
       </td>
       <td mat-footer-cell *matFooterCellDef>
-        <span
-          [class]="
-            'securities-table__gain ' + gainSign(holdingsResource.value().totals.unrealizedPlPln)
-          "
-        >
-          {{ formatMoney(holdingsResource.value().totals.unrealizedPlPln, 'PLN') }}
-        </span>
+        <app-money
+          kind="change"
+          [amount]="toNumber(holdingsResource.value().totals.unrealizedPlPln)"
+        />
       </td>
     </ng-container>
 
@@ -169,7 +156,7 @@
           </button>
           <a mat-menu-item [routerLink]="transactionsLink(holding)">
             <mat-icon>receipt_long</mat-icon>
-            <span>{{ 'securities.transactions' | transloco }}</span>
+            <span>{{ 'securities.action.history' | transloco }}</span>
           </a>
         </mat-menu>
       </td>

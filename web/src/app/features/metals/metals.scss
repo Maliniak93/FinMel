@@ -24,7 +24,6 @@
   font-size: 0.875em;
 }
 
-.metals-page__stale,
 .metals-page__prices-error {
   color: var(--mat-sys-error);
 }
@@ -32,16 +31,6 @@
 .metals-page__prices-error {
   flex-basis: 100%;
   margin: 0;
-}
-
-.metals-page__state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 48px 16px;
-  text-align: center;
 }
 
 .metals-page__table {

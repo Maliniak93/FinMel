@@ -1,15 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
-import { MatTooltip } from '@angular/material/tooltip';
-import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
-import type { SecuritiesResponse } from '../../api/portfolio';
+import type { SecuritiesResponse, WatchlistItemResponse } from '../../api/portfolio';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../shared/format';
-import { clickRowMenuItem, rowMenuItems } from '../../../testing/archive';
+import { clickRowMenuItem } from '../../../testing/archive';
 import { restoreEnglish, switchLanguage, textOf } from '../../../testing/i18n';
 import { ASSET_CLASS } from '../assets/asset-class';
 import { AssetFormDialog } from '../assets/asset-form/asset-form-dialog/asset-form-dialog';
@@ -18,101 +16,18 @@ import { TransactionFormDialog } from '../transactions/transaction-form-dialog/t
 import { Securities } from './securities';
 import { WatchlistBuyDialog } from './watchlist-buy-dialog/watchlist-buy-dialog';
 import { isWatchlistList, watchlistItem } from './testing/watchlist-fixtures';
-
-const PRICE_UNAVAILABLE_REASON = {
-  NoQuote: 0,
-  FxRateMissing: 1,
-  MarketDataUnavailable: 2,
-} as const;
-
-const vwce = {
-  assetId: '11111111-1111-1111-1111-111111111111',
-  accountId: '22222222-2222-2222-2222-222222222222',
-  accountName: 'XTB IKE',
-  name: 'Vanguard FTSE All-World',
-  instrumentId: '33333333-3333-3333-3333-333333333333',
-  ticker: 'VWCE',
-  exchange: 'XETRA',
-  currency: 'EUR',
-  quantity: 15,
-  averageBuyPrice: 110,
-  costPln: 6780,
-  lastPrice: 120,
-  lastPriceDate: '2026-01-30',
-  valuePln: 7740,
-  unrealizedPl: 150,
-  unrealizedPlPercent: 9.09,
-  unrealizedPlPln: 960,
-};
-
-const cdr = {
-  assetId: '44444444-4444-4444-4444-444444444444',
-  accountId: '55555555-5555-5555-5555-555555555555',
-  accountName: 'XTB zwykly',
-  name: 'CD Projekt',
-  instrumentId: '66666666-6666-6666-6666-666666666666',
-  ticker: 'CDR',
-  exchange: 'GPW',
-  currency: 'PLN',
-  quantity: 10,
-  averageBuyPrice: 200,
-  costPln: 2000,
-  lastPrice: 150,
-  lastPriceDate: '2026-01-30',
-  valuePln: 1500,
-  unrealizedPl: -500,
-  unrealizedPlPercent: -25,
-  unrealizedPlPln: -500,
-};
-
-const noRateCost = {
-  ...vwce,
-  assetId: '77777777-7777-7777-7777-777777777777',
-  name: 'Xetra ETF bought early',
-  ticker: 'XETF',
-  costPln: null,
-  unrealizedPlPln: null,
-};
-
-function unavailable(
-  assetId: string,
-  name: string,
-  reason: number,
-): typeof vwce & { priceUnavailableReason: number } {
-  return {
-    ...vwce,
-    assetId,
-    name,
-    lastPrice: null as never,
-    lastPriceDate: null as never,
-    valuePln: null as never,
-    unrealizedPl: null as never,
-    unrealizedPlPercent: null as never,
-    unrealizedPlPln: null as never,
-    priceUnavailableReason: reason,
-  };
-}
-
-const stocks: SecuritiesResponse = {
-  holdings: [vwce, cdr],
-  totals: { valuePln: 9240, costPln: 8780, unrealizedPlPln: 460 },
-} as SecuritiesResponse;
-
-const etfs: SecuritiesResponse = {
-  holdings: [{ ...vwce, assetId: '88888888-8888-8888-8888-888888888888', name: 'World ETF' }],
-  totals: { valuePln: 7740, costPln: 6780, unrealizedPlPln: 960 },
-} as SecuritiesResponse;
-
-const empty: SecuritiesResponse = {
-  holdings: [],
-  totals: { valuePln: 0, costPln: 0, unrealizedPlPln: 0 },
-} as SecuritiesResponse;
+import { cdr, empty, etfs, noRateCost, stocks, vwce } from './testing/securities-fixtures';
 
 function isClass(url: string, assetClass: number, name: string): boolean {
   return (
     url.includes('/api/portfolio/securities') &&
     new RegExp(`assetClass=(${assetClass}|${name})\\b`).test(url)
   );
+}
+
+function watchlistOf(url: string, items: WatchlistItemResponse[]): WatchlistItemResponse[] {
+  const assetClass = new URL(url).searchParams.get('assetClass');
+  return items.filter((item) => String(item.assetClass) === assetClass);
 }
 
 describe('Securities page', () => {
@@ -132,7 +47,7 @@ describe('Securities page', () => {
   async function setup(
     stockBody: SecuritiesResponse = stocks,
     etfBody: SecuritiesResponse = etfs,
-    watchlistBody: unknown[] = [],
+    watchlistBody: WatchlistItemResponse[] = [],
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
@@ -143,7 +58,7 @@ describe('Securities page', () => {
         return jsonResponse(etfBody);
       }
       if (isWatchlistList(input)) {
-        return jsonResponse(watchlistBody);
+        return jsonResponse(watchlistOf(url, watchlistBody));
       }
       return jsonResponse({ detail: 'Not found.' }, 404);
     });
@@ -185,6 +100,22 @@ describe('Securities page', () => {
 
   function money(value: number, currency: string): string {
     return formatMoney(value, currency).replace(/\s+/g, ' ');
+  }
+
+  function bodyAt(index: number): HTMLElement {
+    const body = element().querySelectorAll<HTMLElement>('mat-tab-body')[index];
+    if (!body) {
+      throw new Error(`No tab body ${index}.`);
+    }
+    return body;
+  }
+
+  function within(root: HTMLElement, selector: string): HTMLElement {
+    const found = root.querySelector<HTMLElement>(selector);
+    if (!found) {
+      throw new Error(`No ${selector} in the tab.`);
+    }
+    return found;
   }
 
   async function openEtfTab(): Promise<void> {
@@ -239,7 +170,7 @@ describe('Securities page', () => {
     }
     expect(rows()).toHaveLength(2);
     const text = textOf(rowFor('Vanguard FTSE All-World'));
-    expect(text).toContain('VWCE · XETRA');
+    expect(text).toContain('Akcje · 15 szt. · ' + money(120, 'EUR'));
     expect(text).toContain('XTB IKE');
     expect(text).toContain(formatQuantity(15));
     expect(text).toContain(money(110, 'EUR'));
@@ -253,16 +184,6 @@ describe('Securities page', () => {
     expect(footer).toContain(money(460, 'PLN'));
   });
 
-  it('colours a gain green and a loss red', async () => {
-    await setup();
-
-    const gain = rowFor('Vanguard FTSE All-World').querySelector('[data-testid="gain"]');
-    const loss = rowFor('CD Projekt').querySelector('[data-testid="gain"]');
-
-    expect(gain?.classList.contains('positive')).toBe(true);
-    expect(loss?.classList.contains('negative')).toBe(true);
-  });
-
   it('shows the quote-currency gain when the PLN gain is unknown', async () => {
     await setup({ holdings: [noRateCost], totals: stocks.totals } as SecuritiesResponse);
 
@@ -270,28 +191,6 @@ describe('Securities page', () => {
 
     expect(text).toContain(money(150, 'EUR'));
     expect(text).toContain(formatPercent(9.09).replace(/\s+/g, ' '));
-  });
-
-  it('shows "—" with a tooltip for each reason a price is unavailable', async () => {
-    await setup({
-      holdings: [
-        unavailable('a1', 'No quote holding', PRICE_UNAVAILABLE_REASON.NoQuote),
-        unavailable('a2', 'No rate holding', PRICE_UNAVAILABLE_REASON.FxRateMissing),
-        unavailable('a3', 'Down holding', PRICE_UNAVAILABLE_REASON.MarketDataUnavailable),
-      ],
-      totals: empty.totals,
-    } as SecuritiesResponse);
-
-    const tooltipIn = (name: string): string | undefined =>
-      fixture.debugElement
-        .queryAll(By.css('[data-testid="price-unavailable"]'))
-        .filter((candidate) => rowFor(name).contains(candidate.nativeElement as HTMLElement))
-        .map((candidate) => candidate.injector.get(MatTooltip).message)[0];
-
-    expect(textOf(rowFor('No quote holding'))).toContain('—');
-    expect(tooltipIn('No quote holding')).toBe('Brak notowania');
-    expect(tooltipIn('No rate holding')).toBe('Brak kursu waluty');
-    expect(tooltipIn('Down holding')).toBe('Notowania chwilowo niedostępne');
   });
 
   it('shows the empty state of each tab with the add button', async () => {
@@ -361,13 +260,41 @@ describe('Securities page', () => {
     });
   });
 
-  it('links each row to its transactions', async () => {
-    await setup();
+  it('subtabs', async () => {
+    await setup(stocks, etfs, [
+      watchlistItem({
+        id: 'b3333333-3333-3333-3333-333333333333',
+        assetClass: ASSET_CLASS.Stock,
+        name: 'Stock watch',
+        ticker: 'STKW',
+      }),
+      watchlistItem({
+        id: 'b4444444-4444-4444-4444-444444444444',
+        assetClass: ASSET_CLASS.Etf,
+        name: 'ETF watch',
+        ticker: 'ETFW',
+      }),
+    ]);
+    const stockTable = within(bodyAt(0), 'app-securities-table');
+    const stockWatchlist = within(bodyAt(0), 'app-watchlist-table');
+    await vi.waitFor(() => expect(textOf(stockWatchlist)).toContain('Stock watch'));
+    expect(textOf(stockTable)).toContain('CD Projekt');
+    expect(textOf(stockTable)).not.toContain('World ETF');
+    expect(textOf(stockWatchlist)).not.toContain('ETF watch');
+    expect(
+      stockTable.compareDocumentPosition(stockWatchlist) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
-    const items = await rowMenuItems(fixture, rowFor('Vanguard FTSE All-World'));
-    const link = items.find((item) => /transakcje/i.test(textOf(item)));
-
-    expect(link?.getAttribute('href')).toBe(`/wealth/assets/${vwce.assetId}/transactions`);
+    await openEtfTab();
+    const etfTable = within(bodyAt(1), 'app-securities-table');
+    const etfWatchlist = within(bodyAt(1), 'app-watchlist-table');
+    await vi.waitFor(() => expect(textOf(etfWatchlist)).toContain('ETF watch'));
+    expect(textOf(etfTable)).toContain('World ETF');
+    expect(textOf(etfTable)).not.toContain('CD Projekt');
+    expect(textOf(etfWatchlist)).not.toContain('Stock watch');
+    expect(
+      etfTable.compareDocumentPosition(etfWatchlist) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('shows a Rachunek column with the account name of each holding', async () => {

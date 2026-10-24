@@ -1,6 +1,4 @@
 <div class="securities-page">
-  <h1>{{ 'securities.title' | transloco }}</h1>
-
   <mat-tab-group>
     <mat-tab [label]="'securities.tabs.stocks' | transloco">
       <app-securities-table #stocks [assetClass]="stockClass" [account]="account()" />

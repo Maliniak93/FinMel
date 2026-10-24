@@ -7,7 +7,7 @@ import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { formatDate, formatMoney, formatQuantity } from '../../../shared/format';
-import { clickRowMenuItem } from '../../../../testing/archive';
+import { clickRowMenuItem, menuItemLabel, rowMenuItems } from '../../../../testing/archive';
 import { restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import { AssetFormDialog } from '../../assets/asset-form/asset-form-dialog/asset-form-dialog';
@@ -44,14 +44,17 @@ describe('WatchlistTable', () => {
     await restoreEnglish();
   });
 
-  async function setup(items: unknown[] = [watchlistItem()]): Promise<void> {
+  async function setup(
+    items: unknown[] | Response | Promise<Response> = [watchlistItem()],
+    settle = true,
+  ): Promise<void> {
     outcomes = new Map();
     dialog = {
       open: vi.fn((component: unknown) => ({ afterClosed: () => of(outcomes.get(component)) })),
     };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       if (isWatchlistList(input)) {
-        return jsonResponse(items);
+        return Array.isArray(items) ? jsonResponse(items) : items;
       }
       if (methodOf(input) === 'DELETE') {
         return new Response(null, { status: 204 });
@@ -70,6 +73,10 @@ describe('WatchlistTable', () => {
 
     fixture = TestBed.createComponent(WatchlistTable);
     fixture.componentRef.setInput('assetClass', ASSET_CLASS.Etf);
+    if (!settle) {
+      fixture.detectChanges();
+      return;
+    }
     await fixture.whenStable();
     await switchLanguage(fixture, 'pl');
   }
@@ -126,10 +133,33 @@ describe('WatchlistTable', () => {
     expect(text).toContain(formatQuantity(15));
     expect(text).toContain(money(120, 'USD'));
     expect(text).toContain(money(440.12, 'PLN'));
+    const amounts = Array.from(row.querySelectorAll('app-money'), (amount) => textOf(amount));
+    expect(amounts).toEqual(expect.arrayContaining([money(120, 'USD'), money(125, 'USD')]));
     expect(row.querySelector('[data-testid="daily-change"]')?.classList.contains('positive')).toBe(
       true,
     );
     expect(row.classList.contains('at-target')).toBe(true);
+    expect((await rowMenuItems(fixture, row)).map(menuItemLabel)).toEqual([
+      'Kup',
+      'Edytuj',
+      'Usuń',
+    ]);
+  });
+
+  it('states', async () => {
+    await setup(new Promise<Response>(() => undefined), false);
+    expect(element().querySelector('app-skeleton')).not.toBeNull();
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup(jsonResponse({ detail: 'Boom.' }, 500));
+    const error = element().querySelector('app-section-error');
+    expect(textOf(error)).toContain('Ponów');
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup([]);
+    expect(element().querySelector('app-empty-state')).not.toBeNull();
   });
 
   it('shows the empty state', async () => {

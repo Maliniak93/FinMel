@@ -995,7 +995,6 @@
     "paymentLeadDaysFailed": "Could not save the reminder lead time."
   },
   "securities": {
-    "title": "Stocks & ETFs",
     "tabs": {
       "stocks": "Stocks",
       "etfs": "ETFs"
@@ -1015,7 +1014,10 @@
     "buy": "Buy",
     "sell": "Sell",
     "dividend": "Dividend",
-    "transactions": "Transactions",
+    "subtitle": "{{ class }} · {{ qty }} pcs · {{ price }}",
+    "action": {
+      "history": "Transaction history"
+    },
     "empty": {
       "stock": "You have no stocks yet",
       "etf": "You have no ETFs yet"
@@ -1060,8 +1062,8 @@
     "loadFailed": "Failed to load precious metals.",
     "pricesLoadFailed": "Failed to load metal prices.",
     "prices": "Spot prices",
-    "perGram": "{{ price }} / g",
-    "perOunce": "{{ price }} / oz",
+    "perGramUnit": "/ g",
+    "perOunceUnit": "/ oz",
     "asOf": "as of {{ date }}",
     "weightPerPiece": "Weight per piece",
     "pieces": "Pieces",

@@ -15,15 +15,17 @@
       <div class="metals-page__price">
         <strong>{{ row.label | transloco }}</strong>
         @if (hasPrice(row.price)) {
-          <span>{{
-            'metals.perGram' | transloco: { price: formatMoney(row.price.pricePerGramPln) }
-          }}</span>
+          <span>
+            <app-money [amount]="toNumber(row.price.pricePerGramPln)" />
+            {{ 'metals.perGramUnit' | transloco }}
+          </span>
           @if (
             row.price.pricePerTroyOuncePln !== null && row.price.pricePerTroyOuncePln !== undefined
           ) {
-            <span>{{
-              'metals.perOunce' | transloco: { price: formatMoney(row.price.pricePerTroyOuncePln) }
-            }}</span>
+            <span>
+              <app-money [amount]="toNumber(row.price.pricePerTroyOuncePln)" />
+              {{ 'metals.perOunceUnit' | transloco }}
+            </span>
           }
           @if (row.price.date) {
             <span class="metals-page__price-date">{{
@@ -31,7 +33,7 @@
             }}</span>
           }
           @if (row.price.isStale) {
-            <span class="metals-page__stale">{{ 'common.stale' | transloco }}</span>
+            <app-status-chip [label]="'common.stale' | transloco" icon="schedule" tone="warning" />
           }
         } @else {
           <span>—</span>
@@ -41,29 +43,29 @@
   </section>
 
   @if (holdingsResource.error(); as loadError) {
-    <div class="metals-page__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="holdingsResource.reload()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
+    <app-section-error [message]="loadError.message" (retry)="holdingsResource.reload()" />
   } @else if (holdingsResource.isLoading() && !holdingsResource.hasValue()) {
-    <div class="metals-page__state">
-      <mat-spinner diameter="32" />
-    </div>
+    <app-skeleton [rows]="3" />
   } @else if (holdingsResource.hasValue() && holdingsResource.value().length === 0) {
-    <div class="metals-page__state">
-      <p>{{ 'metals.empty' | transloco }}</p>
-      <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+    <app-empty-state icon="toll" [message]="'metals.empty' | transloco">
+      <button action mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+        <mat-icon>add</mat-icon>
         {{ 'metals.add' | transloco }}
       </button>
-    </div>
+    </app-empty-state>
   } @else if (holdingsResource.hasValue()) {
     <table mat-table [dataSource]="holdingsResource.value()" class="metals-page__table">
       <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
         <td mat-cell *matCellDef="let holding">
           <a [routerLink]="transactionsLink(holding)">{{ holding.name }}</a>
+          @if (holding.isArchived) {
+            <app-status-chip
+              [label]="'common.archived' | transloco"
+              icon="inventory_2"
+              tone="neutral"
+            />
+          }
         </td>
       </ng-container>
 
@@ -99,12 +101,7 @@
       <ng-container matColumnDef="valueToday">
         <th mat-header-cell *matHeaderCellDef>{{ 'metals.valueToday' | transloco }}</th>
         <td mat-cell *matCellDef="let holding">
-          @let value = valueToday(holding);
-          @if (value !== null) {
-            {{ formatMoney(value) }}
-          } @else {
-            —
-          }
+          <app-money [amount]="valueToday(holding)" />
         </td>
       </ng-container>
 
@@ -147,6 +144,10 @@
               <mat-icon>do_not_disturb_on</mat-icon>
               <span>{{ 'metals.sell' | transloco }}</span>
             </button>
+            <a mat-menu-item [routerLink]="transactionsLink(holding)">
+              <mat-icon>receipt_long</mat-icon>
+              <span>{{ 'securities.action.history' | transloco }}</span>
+            </a>
           </mat-menu>
         </td>
       </ng-container>

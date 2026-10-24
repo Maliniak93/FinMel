@@ -9,7 +9,8 @@ import type { MetalPriceResponse } from '../../api/marketdata';
 import type { MetalResponse } from '../../api/portfolio';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatMoney } from '../../shared/format';
-import { clickRowMenuItem } from '../../../testing/archive';
+import { clickRowMenuItem, menuItemLabel, rowMenuItems } from '../../../testing/archive';
+import { textOf } from '../../../testing/i18n';
 import {
   goldKrugerrand,
   metalPricesGoldOnly,
@@ -38,8 +39,9 @@ describe('Metals', () => {
   });
 
   async function setup(
-    holdings: MetalResponse[] = [goldKrugerrand, silverBar],
+    holdings: MetalResponse[] | Response | Promise<Response> = [goldKrugerrand, silverBar],
     prices: MetalPriceResponse[] = metalPricesGoldOnly,
+    settle = true,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
@@ -47,7 +49,7 @@ describe('Metals', () => {
         return jsonResponse(prices);
       }
       if (url.includes('/api/portfolio/metals')) {
-        return jsonResponse(holdings);
+        return Array.isArray(holdings) ? jsonResponse(holdings) : holdings;
       }
       return jsonResponse({ detail: 'Not found.' }, 404);
     });
@@ -63,6 +65,10 @@ describe('Metals', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(Metals);
+    if (!settle) {
+      fixture.detectChanges();
+      return;
+    }
     await fixture.whenStable();
   }
 
@@ -203,4 +209,58 @@ describe('Metals', () => {
       await vi.waitFor(() => expect(holdingsCalls()).toBeGreaterThan(before));
     }
   });
+
+  it('stale price and archived holding', async () => {
+    const archivedCoin = metalResponse({
+      assetId: '44444444-eeee-4444-eeee-444444444444',
+      name: 'Archived coin',
+      isArchived: true,
+    });
+    await setup(
+      [goldKrugerrand, archivedCoin],
+      [{ ...metalPricesGoldOnly[0], isStale: true }, metalPricesGoldOnly[1]],
+    );
+
+    const goldStrip = Array.from(
+      element().querySelectorAll<HTMLElement>('.metals-page__price'),
+    ).find((strip) => textOf(strip).includes('Gold'));
+    expect(textOf(goldStrip?.querySelector('app-status-chip') ?? null)).toContain('Stale');
+
+    const archivedRow = rowFor('Archived coin');
+    expect(textOf(archivedRow.querySelector('app-status-chip'))).toContain('Archived');
+    const items = await rowMenuItems(fixture, archivedRow);
+    for (const label of [/^edit$/i, /^buy$/i, /^sell$/i]) {
+      expect(isDisabled(menuItem(items, label))).toBe(true);
+    }
+    expect(isDisabled(menuItem(items, /transaction history/i))).toBe(false);
+  });
+
+  it('states', async () => {
+    await setup(new Promise<Response>(() => undefined), metalPricesGoldOnly, false);
+    expect(element().querySelector('app-skeleton')).not.toBeNull();
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup(jsonResponse({ detail: 'Boom.' }, 500));
+    expect(textOf(element().querySelector('app-section-error'))).toContain('Retry');
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup([]);
+    const emptyState = element().querySelector('app-empty-state');
+    expect(textOf(emptyState)).toContain('No precious metals yet');
+    expect(textOf(emptyState)).toContain('Add precious metal');
+  });
 });
+
+function menuItem(items: HTMLElement[], label: RegExp): HTMLElement {
+  const item = items.find((candidate) => label.test(menuItemLabel(candidate)));
+  if (!item) {
+    throw new Error(`No menu item matching ${label}.`);
+  }
+  return item;
+}
+
+function isDisabled(item: HTMLElement): boolean {
+  return item.hasAttribute('disabled') || item.getAttribute('aria-disabled') === 'true';
+}
