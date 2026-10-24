@@ -83,8 +83,8 @@ async function openTransactions(page: Page): Promise<void> {
 
 function quantity(page: Page, value: string): Locator {
   return page
-    .locator('.transactions-page__summary')
-    .filter({ hasText: new RegExp(`Ilość\\s+${value}\\b`) });
+    .locator('.transactions-page__kpi')
+    .filter({ hasText: new RegExp(`Ilość\\s*${value}\\b`) });
 }
 
 test('transactions: edit, add and delete the transactions of a PLN stock with the quantity, value and account cash recalculated', async ({

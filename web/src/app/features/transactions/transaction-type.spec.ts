@@ -1,7 +1,31 @@
 import { ASSET_CLASS } from '../assets/asset-class';
-import { allowedTransactionTypes, TRANSACTION_TYPES } from './transaction-type';
+import {
+  allowedTransactionTypes,
+  TRANSACTION_TYPES,
+  transactionTypeIcon,
+  transactionTypeSign,
+} from './transaction-type';
 
 describe('transaction-type', () => {
+  it('icon and sign', () => {
+    expect(TRANSACTION_TYPES.map((t) => transactionTypeIcon(t.value))).toEqual([
+      'south_west',
+      'north_east',
+      'south_west',
+      'north_east',
+      'payments',
+      'payments',
+    ]);
+    expect(TRANSACTION_TYPES.map((t) => transactionTypeSign(t.value))).toEqual([
+      '+',
+      '−',
+      '+',
+      '−',
+      '',
+      '',
+    ]);
+  });
+
   it('allowedTransactionTypes limits Cash, Deposit, BankAccount and Bond to Deposit/Withdraw, a precious metal to Buy/Sell and a stock or ETF to Buy/Sell/Dividend/Interest', () => {
     const cashLike: number[] = [
       ASSET_CLASS.Cash,

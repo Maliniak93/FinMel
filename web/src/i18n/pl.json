@@ -555,6 +555,17 @@
     "title": "Transakcje",
     "titleWithName": "Transakcje — {{ name }}",
     "newTransaction": "Nowa transakcja",
+    "sell": "Sprzedaj",
+    "kpi": {
+      "value": "Wartość",
+      "quantity": "Ilość",
+      "averagePrice": "Śr. cena",
+      "profit": "Zysk/strata",
+      "dividend": "Dywidenda"
+    },
+    "column": {
+      "unitPrice": "Cena jednostkowa"
+    },
     "termDepositNotice": "Transakcjami lokaty terminowej zarządza sama lokata — edytuj lokatę, aby je zmienić.",
     "empty": "Nie zapisano jeszcze żadnych transakcji dla tego aktywa.",
     "recordFirst": "Zapisz pierwszą transakcję",
@@ -600,7 +611,6 @@
       "message": "Obie strony tego przelewu ({{ quantity }}) — tutaj i w \"{{ counterpart }}\" — zostaną trwale usunięte. Tej operacji nie można cofnąć.",
       "failed": "Nie udało się usunąć przelewu."
     },
-    "back": "Wstecz",
     "accountArchivedNotice": "Ten rachunek jest zarchiwizowany — przywróć go, aby wprowadzać zmiany.",
     "accountLoadFailed": "Nie udało się wczytać rachunku."
   },

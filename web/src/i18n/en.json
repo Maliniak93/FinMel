@@ -555,6 +555,17 @@
     "title": "Transactions",
     "titleWithName": "Transactions — {{ name }}",
     "newTransaction": "New transaction",
+    "sell": "Sell",
+    "kpi": {
+      "value": "Value",
+      "quantity": "Quantity",
+      "averagePrice": "Avg. price",
+      "profit": "Profit/loss",
+      "dividend": "Dividends"
+    },
+    "column": {
+      "unitPrice": "Unit price"
+    },
     "termDepositNotice": "A term deposit's transactions are managed by the deposit — edit the deposit to change them.",
     "empty": "No transactions recorded for this asset yet.",
     "recordFirst": "Record your first transaction",
@@ -600,7 +611,6 @@
       "message": "Both sides of this transfer of {{ quantity }} — here and in \"{{ counterpart }}\" — will be permanently deleted. This can't be undone.",
       "failed": "Failed to delete the transfer."
     },
-    "back": "Back",
     "accountArchivedNotice": "This account is archived — restore it to make changes.",
     "accountLoadFailed": "Failed to load account."
   },
