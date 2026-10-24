@@ -1,4 +1,4 @@
-import { expect, logInThroughUi, registerThroughUi, test } from './fixtures';
+import { expect, logInThroughUi, registerThroughUi, test, openSelect } from './fixtures';
 import type { Locator, Page } from '@playwright/test';
 
 // pl-PL groups only numbers from 10 000 up, with a space or a non-breaking space, and may use a true minus sign, so the patterns accept either.
@@ -28,7 +28,7 @@ async function openPage(page: Page, link: string): Promise<void> {
 }
 
 async function selectOption(page: Page, select: Locator, option: string | RegExp): Promise<void> {
-  await select.click();
+  await openSelect(select);
   await page
     .getByRole(
       'option',
@@ -268,7 +268,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
   await test.step('Krok 13: transfer 3 000 zł from the mBank page to XTB IKE offers Nest Oszczędnościowe and XTB IKE only; mBank 17 000,00 zł, XTB IKE 3 000,00 zł and "Wpłacono 3 000,00 zł" this year', async () => {
     await bankRow(page, 'mBank').getByRole('link', { name: 'mBank', exact: true }).click();
     await page.getByRole('button', { name: 'Przelew', exact: true }).click();
-    await dialog.getByRole('combobox', { name: 'Rachunek docelowy' }).click();
+    await openSelect(dialog.getByRole('combobox', { name: 'Rachunek docelowy' }));
     await expect(page.getByRole('option', { name: /^Nest Oszczędnościowe/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /^XTB IKE/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /^mBank USD/ })).toHaveCount(0);
@@ -296,11 +296,12 @@ test('bank accounts, term deposits and physical cash: money moves only between a
     await expect(
       dialog.locator('.deposit-form-dialog__funding').filter({ hasText: 'Waluta' }),
     ).toContainText('PLN');
-    await dialog.getByRole('combobox', { name: 'Zwrot na' }).click();
+    await openSelect(dialog.getByRole('combobox', { name: 'Zwrot na' }));
     await expect(page.getByRole('option', { name: 'Konto źródłowe', exact: true })).toBeVisible();
     await expect(page.getByRole('option', { name: /^Nest Oszczędnościowe/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /^mBank USD/ })).toHaveCount(0);
     await page.keyboard.press('Escape');
+    await expect(page.getByRole('listbox')).toBeHidden();
     await expect(dialog.getByRole('checkbox')).toHaveCount(0);
     await expect(dialog.getByRole('switch')).toHaveCount(0);
   });
@@ -395,7 +396,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
 
   await test.step('Krok 21: ATM withdrawal of 500 zł from mBank into Sejf PLN offers PLN bank accounts only; Sejf PLN 2 500,00 zł, mBank 6 500,00 zł', async () => {
     await openPlaceMenu(page, 'Sejf', 'PLN', 'Wypłata z bankomatu');
-    await dialog.getByRole('combobox', { name: 'Konto bankowe' }).click();
+    await openSelect(dialog.getByRole('combobox', { name: 'Konto bankowe' }));
     await expect(page.getByRole('option', { name: /^mBank \(/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /^Nest Oszczędnościowe/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /^mBank USD/ })).toHaveCount(0);
@@ -446,7 +447,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
     const buy = await openMetalDialog(page, 'Kup');
     await buy.getByLabel('Sztuki').fill('1');
     await buy.getByLabel('Kwota z faktury (PLN)').fill('1150');
-    await buy.getByRole('combobox', { name: 'Rozlicz z' }).click();
+    await openSelect(buy.getByRole('combobox', { name: 'Rozlicz z' }));
     await expect(page.getByRole('group', { name: 'Gotówka' })).toBeVisible();
     await expect(page.getByRole('group', { name: 'Konta bankowe' })).toBeVisible();
     await page.getByRole('option', { name: /^Sejf · PLN/ }).click();

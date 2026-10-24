@@ -1,5 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
-import { expect, warsawDate } from './fixtures';
+import { expect, warsawDate, openSelect } from './fixtures';
 
 const MONTH_NAMES = [
   'styczeń',
@@ -101,7 +101,7 @@ export function definition(page: Page, name: string): Locator {
 }
 
 export async function choose(page: Page, select: Locator, option: string | RegExp): Promise<void> {
-  await select.click();
+  await openSelect(select);
   await page
     .getByRole(
       'option',

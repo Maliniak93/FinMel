@@ -7,6 +7,7 @@ import {
   logInThroughUi,
   test,
   warsawDate,
+  openSelect,
 } from './fixtures';
 
 // pl-PL groups only numbers from 10 000 up, with a space or a non-breaking space, so the pattern accepts either.
@@ -35,7 +36,7 @@ async function openBuyDialog(page: Page): Promise<Locator> {
 }
 
 async function chooseOption(page: Page, select: Locator, option: RegExp): Promise<void> {
-  await select.click();
+  await openSelect(select);
   await page.getByRole('option', { name: option }).click();
 }
 
