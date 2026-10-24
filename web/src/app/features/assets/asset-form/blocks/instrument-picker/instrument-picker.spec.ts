@@ -189,9 +189,16 @@ describe('InstrumentPicker', () => {
       });
 
       component['instrumentControl'].setValue('vwce');
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await vi.waitFor(
+        () =>
+          expect(
+            fetchSpy.mock.calls.some((call: unknown[]) => (call[0] as Request).method === 'GET'),
+          ).toBe(true),
+        { timeout: 5000 },
+      );
       await fixture.whenStable();
       fixture.detectChanges();
+      await fixture.whenStable();
     }
 
     it('sends the asset class, and picking a "nowy" option posts the instrument once and selects it', async () => {
