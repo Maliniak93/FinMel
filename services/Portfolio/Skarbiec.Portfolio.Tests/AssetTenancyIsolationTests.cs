@@ -129,6 +129,28 @@ public sealed class AssetTenancyIsolationTests(SkarbiecContainersFixture contain
         Assert.Equal(2, (await owner.ListTransactionsAsync(assetId, cancellationToken)).TotalCount);
     }
 
+    [Fact]
+    public async Task Get_KpiFields_NeverExposeOtherUsersTransactions()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (_, ownerAssetId) = await owner.CreateAccountWithAssetAsync(cancellationToken);
+        await owner.RecordTransactionAsync(ownerAssetId, TransactionType.Buy, 5m, new DateOnly(2026, 1, 5), cancellationToken, unitPrice: 10m);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var (_, strangerAssetId) = await stranger.CreateAccountWithAssetAsync(cancellationToken);
+
+        var foreign = await stranger.GetAsync(AssetUri(ownerAssetId), cancellationToken);
+        var own = await stranger.GetAsync(AssetUri(strangerAssetId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, own.StatusCode);
+        var body = (await own.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!;
+        Assert.Multiple(
+            () => Assert.Equal(0m, body.UnitCount),
+            () => Assert.Equal(0m, body.CostPln ?? 0m),
+            () => Assert.Equal(0m, body.DividendPln ?? 0m));
+    }
+
     private static UpdateAssetRequest UpdatePayload() => new()
     {
         AssetClass = AssetClass.Cash,

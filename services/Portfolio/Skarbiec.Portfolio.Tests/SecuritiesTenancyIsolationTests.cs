@@ -31,4 +31,26 @@ public sealed class SecuritiesTenancyIsolationTests(SkarbiecContainersFixture co
         var body = (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
         Assert.Equal(strangerAsset, Assert.Single(body.Holdings).AssetId);
     }
+
+    [Fact]
+    public async Task List_IncludeArchived_ForeignArchivedHoldings_Absent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerAccountId = await owner.CreateAccountAsync(cancellationToken);
+        await AddQuotedHoldingAsync(owner, ownerAccountId, cancellationToken, name: "Owner's stock", ticker: "OWN");
+        await owner.ArchiveAccountAsync(ownerAccountId, cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerAccountId = await stranger.CreateAccountAsync(cancellationToken);
+        var strangerAsset = await AddQuotedHoldingAsync(stranger, strangerAccountId, cancellationToken, name: "Stranger's stock", ticker: "MINE");
+
+        var response = await stranger.GetAsync(AllSecuritiesUri(AssetClass.Stock, includeArchived: true), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
+        var row = Assert.Single(body.Holdings);
+        Assert.Equal(strangerAsset, row.AssetId);
+        Assert.False(row.IsArchived);
+    }
 }

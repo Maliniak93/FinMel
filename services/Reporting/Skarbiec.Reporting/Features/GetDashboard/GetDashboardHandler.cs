@@ -23,6 +23,7 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
                 ByAssetClass = [],
                 ByGroup = [],
                 ByAccount = [],
+                ByAsset = [],
             };
         }
 
@@ -31,7 +32,7 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
         var lines = await db.AssetValuations
             .AsNoTracking()
             .Where(l => l.Date == snapshot.Date)
-            .Select(l => new { l.AssetId, l.AccountId, l.AssetClass, l.ValuePln, l.IsStale })
+            .Select(l => new { l.AssetId, l.AccountId, l.AssetClass, l.ValuePln, l.PriceDate, l.IsStale })
             .ToListAsync(cancellationToken);
 
         var groupByAsset = await db.Positions
@@ -100,6 +101,15 @@ public sealed class GetDashboardHandler(ReportingDbContext db)
             ByAssetClass = byAssetClass,
             ByGroup = byGroup,
             ByAccount = byAccount,
+            ByAsset = lines
+                .Select(l => new DashboardAssetValue
+                {
+                    AssetId = l.AssetId,
+                    ValuePln = l.ValuePln,
+                    PriceDate = l.PriceDate,
+                    IsStale = l.IsStale,
+                })
+                .ToList(),
         };
     }
 }

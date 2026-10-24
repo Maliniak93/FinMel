@@ -151,6 +151,7 @@ describe('Dashboard', () => {
         byAssetClass: [],
         byAccount: [],
         byGroup: [],
+        byAsset: [],
       } satisfies DashboardResponse),
     );
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -455,6 +456,7 @@ describe('Dashboard', () => {
         byAssetClass: [],
         byAccount: [],
         byGroup: [],
+        byAsset: [],
       } satisfies DashboardResponse),
     );
     const element = fixture.nativeElement as HTMLElement;

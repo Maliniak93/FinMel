@@ -748,7 +748,8 @@ internal static class PortfolioApi
 
     public const string SecuritiesBaseUri = "/api/portfolio/securities";
 
-    public static string AllSecuritiesUri(AssetClass assetClass) => $"{SecuritiesBaseUri}?assetClass={assetClass}";
+    public static string AllSecuritiesUri(AssetClass assetClass, bool includeArchived = false) =>
+        $"{SecuritiesBaseUri}?assetClass={assetClass}" + (includeArchived ? "&includeArchived=true" : "");
 
     // The instrument must already be scripted in FakeInstrumentLookupClient with the same class and currency.
     public static async Task<Guid> AddMarketAssetAsync(
@@ -758,7 +759,8 @@ internal static class PortfolioApi
         AssetClass assetClass = AssetClass.Stock,
         string currency = "PLN",
         Guid? instrumentId = null,
-        string name = "Market asset")
+        string name = "Market asset",
+        Guid? groupId = null)
     {
         var request = new AddAssetRequest
         {
@@ -766,7 +768,8 @@ internal static class PortfolioApi
             AssetClass = assetClass,
             Name = name,
             Currency = currency,
-            InstrumentId = instrumentId ?? Guid.NewGuid()
+            InstrumentId = instrumentId ?? Guid.NewGuid(),
+            GroupId = groupId
         };
 
         var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);

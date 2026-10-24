@@ -35,7 +35,9 @@ public sealed class GetAssetHandler(PortfolioDbContext dbContext)
             return AssetErrors.NotFound(assetId);
         }
 
-        return row.Asset.ToResponse(
+        var response = row.Asset.ToResponse(
             row.TransactionCount, row.DepositMaturityDate, row.DepositSettled, row.FineWeightGramsPerPiece);
+
+        return await dbContext.WithKpisAsync(response, row.Asset, cancellationToken);
     }
 }

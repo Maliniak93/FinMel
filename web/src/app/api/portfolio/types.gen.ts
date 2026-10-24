@@ -113,6 +113,10 @@ export type AssetResponse = {
     depositSettled?: null | boolean;
     fineWeightGramsPerPiece?: null | number | string;
     isArchived: boolean;
+    costPln?: null | number | string;
+    averagePricePln?: null | number | string;
+    dividendPln?: null | number | string;
+    unitCount?: null | number | string;
 };
 
 export type AssetValuationMode = number;
@@ -780,6 +784,8 @@ export type SecuritiesTotalsResponse = {
 
 export type SecurityHoldingResponse = {
     assetId: string;
+    groupId: null | string;
+    isArchived: boolean;
     accountId: string;
     accountName: string;
     name: string;
@@ -2626,6 +2632,7 @@ export type GetApiPortfolioSecuritiesData = {
     path?: never;
     query: {
         assetClass: AssetClass;
+        includeArchived?: boolean;
     };
     url: '/api/portfolio/securities';
 };

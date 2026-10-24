@@ -11,7 +11,8 @@ public sealed class ListSecuritiesHandler(
 {
     private const string BaseCurrency = "PLN";
 
-    public async Task<Result<SecuritiesResponse>> HandleAsync(AssetClass assetClass, CancellationToken cancellationToken)
+    public async Task<Result<SecuritiesResponse>> HandleAsync(
+        AssetClass assetClass, bool includeArchived, CancellationToken cancellationToken)
     {
         if (assetClass is not (AssetClass.Stock or AssetClass.Etf))
         {
@@ -24,12 +25,13 @@ public sealed class ListSecuritiesHandler(
                 where asset.AssetClass == assetClass
                     && asset.ValuationMode == AssetValuationMode.Market
                     && asset.InstrumentId != null
-                    && !asset.IsArchived
-                    && !account.IsArchived
+                    && (includeArchived || (!asset.IsArchived && !account.IsArchived))
                 orderby account.Name, asset.Name
                 select new
                 {
                     AssetId = asset.Id,
+                    asset.GroupId,
+                    IsArchived = asset.IsArchived || account.IsArchived,
                     AccountId = account.Id,
                     AccountName = account.Name,
                     asset.Name,
@@ -52,24 +54,28 @@ public sealed class ListSecuritiesHandler(
 
         var holdings = assets
             .Select(a => ToHolding(
-                a.AssetId, a.AccountId, a.AccountName, a.Name, a.InstrumentId, a.Currency,
+                a.AssetId, a.GroupId, a.IsArchived, a.AccountId, a.AccountName, a.Name, a.InstrumentId, a.Currency,
                 SecurityCostBasis.Compute(transactions[a.AssetId]), quotes))
             .ToList();
+
+        var active = holdings.Where(h => !h.IsArchived).ToList();
 
         return new SecuritiesResponse
         {
             Holdings = holdings,
             Totals = new SecuritiesTotalsResponse
             {
-                ValuePln = holdings.Sum(h => h.ValuePln ?? 0m),
-                CostPln = holdings.Sum(h => h.CostPln ?? 0m),
-                UnrealizedPlPln = holdings.Sum(h => h.UnrealizedPlPln ?? 0m)
+                ValuePln = active.Sum(h => h.ValuePln ?? 0m),
+                CostPln = active.Sum(h => h.CostPln ?? 0m),
+                UnrealizedPlPln = active.Sum(h => h.UnrealizedPlPln ?? 0m)
             }
         };
     }
 
     private static SecurityHoldingResponse ToHolding(
         Guid assetId,
+        Guid? groupId,
+        bool isArchived,
         Guid accountId,
         string accountName,
         string name,
@@ -100,6 +106,8 @@ public sealed class ListSecuritiesHandler(
         var holding = new SecurityHoldingResponse
         {
             AssetId = assetId,
+            GroupId = groupId,
+            IsArchived = isArchived,
             AccountId = accountId,
             AccountName = accountName,
             Name = name,

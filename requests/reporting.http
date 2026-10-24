@@ -10,7 +10,7 @@ Content-Type: application/json
   "password": "P@ssw0rd!123"
 }
 
-### Dashboard — the user's latest snapshot (byAccount rows carry percentage of net worth; accountId null = assets outside accounts; byGroup rows likewise, groupId null = assets in no group, each with byAssetClass values summing to its valuePln)
+### Dashboard — the user's latest snapshot (byAccount rows carry percentage of net worth; accountId null = assets outside accounts; byGroup rows likewise, groupId null = assets in no group, each with byAssetClass values summing to its valuePln; byAsset has one row per asset line of the snapshot: assetId, valuePln, priceDate, isStale)
 GET {{baseUrl}}/api/reporting/dashboard
 Authorization: Bearer {{authToken}}
 

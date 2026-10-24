@@ -15,6 +15,19 @@ public sealed record DashboardResponse
     public required IReadOnlyList<DashboardAssetClassValue> ByAssetClass { get; init; }
     public required IReadOnlyList<DashboardAccountValue> ByAccount { get; init; }
     public required IReadOnlyList<DashboardGroupValue> ByGroup { get; init; }
+
+    /// <summary>One row per asset line of the latest snapshot.</summary>
+    public required IReadOnlyList<DashboardAssetValue> ByAsset { get; init; }
+}
+
+public sealed record DashboardAssetValue
+{
+    public required Guid AssetId { get; init; }
+    public required decimal ValuePln { get; init; }
+
+    /// <summary>Date of the price behind the value; null for currency-valued lines.</summary>
+    public required DateOnly? PriceDate { get; init; }
+    public required bool IsStale { get; init; }
 }
 
 public sealed record DashboardGroupValue

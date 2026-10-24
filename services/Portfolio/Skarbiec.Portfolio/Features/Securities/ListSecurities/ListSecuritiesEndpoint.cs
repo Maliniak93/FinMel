@@ -16,6 +16,6 @@ public static class ListSecuritiesEndpoint
     }
 
     private static async Task<Results<Ok<SecuritiesResponse>, ProblemHttpResult>> HandleAsync(
-        AssetClass assetClass, ListSecuritiesHandler handler, CancellationToken cancellationToken)
-        => (await handler.HandleAsync(assetClass, cancellationToken)).ToHttpResult();
+        AssetClass assetClass, ListSecuritiesHandler handler, CancellationToken cancellationToken, bool includeArchived = false)
+        => (await handler.HandleAsync(assetClass, includeArchived, cancellationToken)).ToHttpResult();
 }

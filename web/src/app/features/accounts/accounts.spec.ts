@@ -67,6 +67,7 @@ const emptyDashboard: DashboardResponse = {
   byAssetClass: [],
   byAccount: [],
   byGroup: [],
+  byAsset: [],
 };
 
 describe('Accounts', () => {
