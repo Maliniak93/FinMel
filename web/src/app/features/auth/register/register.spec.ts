@@ -2,8 +2,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
 import {
+  elementWithText,
   isTranslationIn,
   looksLikeTranslationKey,
+  messageOf,
   pickLanguageFromMenu,
   textOf,
 } from '../../../../testing/i18n';
@@ -45,6 +47,44 @@ describe('Register', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('renders the centred layout', () => {
+    const element = fixture.nativeElement as HTMLElement;
+    expect(elementWithText(element, 'Skarbiec')).toBeDefined();
+    expect(textOf(element.querySelector('h1'))).toBe('Register');
+    expect(element.querySelector('mat-label')).toBeNull();
+    expect(Array.from(element.querySelectorAll('label'), textOf)).toEqual([
+      'Display name',
+      'Email',
+      'Password',
+    ]);
+
+    const submit = element.querySelector('button[type="submit"]')!;
+    const loginLink = element.querySelector('a[href="/login"]')!;
+    expect(textOf(submit)).toBe('Register');
+    expect(textOf(loginLink)).toBe('Log in');
+    expect(submit.compareDocumentPosition(loginLink) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(
+      0,
+    );
+  });
+
+  it('disables the button while submitting', async () => {
+    let finish!: (result: unknown) => void;
+    authService.register.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    component['form'].setValue({ email: 'a@b.com', displayName: 'Ada', password: 'secretpw' });
+
+    const submitting = component['onSubmit']();
+    fixture.detectChanges();
+
+    const element = fixture.nativeElement as HTMLElement;
+    const submit = element.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+    expect(submit.disabled).toBe(true);
+    expect(submit.getAttribute('aria-busy')).toBe('true');
+    expect(element.querySelector('[role="progressbar"]')).toBeNull();
+
+    finish({ success: true });
+    await submitting;
   });
 
   it('does not submit an invalid form', async () => {
@@ -128,7 +168,7 @@ describe('Register', () => {
 
   it('shows validation messages in Polish', async () => {
     const element = fixture.nativeElement as HTMLElement;
-    const errors = () => Array.from(element.querySelectorAll('mat-error'), textOf);
+    const errors = () => Array.from(element.querySelectorAll('mat-error'), messageOf);
     const english = [
       'Display name is required.',
       'Display name is too long.',
@@ -168,7 +208,7 @@ describe('Register', () => {
   it('offers the language menu on the register page', async () => {
     await pickLanguageFromMenu(fixture, 'Polski');
 
-    const title = textOf((fixture.nativeElement as HTMLElement).querySelector('mat-card-title'));
+    const title = textOf((fixture.nativeElement as HTMLElement).querySelector('h1'));
     expect(title).not.toBe('Register');
     expect(isTranslationIn('pl', title)).toBe(true);
     expect(localStorage.getItem(LANGUAGE_STORAGE_KEY)).toBe('pl');

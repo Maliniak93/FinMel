@@ -1,41 +1,42 @@
 @mixin auth-page {
   :host {
     display: block;
-    height: 100%;
   }
 
-  .auth-page {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    padding: 24px;
-  }
-
-  .auth-page__language {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-  }
-
-  .auth-page__card {
-    width: 100%;
-    max-width: 400px;
+  .auth-page__label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    font-weight: 500;
   }
 
   .auth-page__field {
     display: block;
     width: 100%;
+    margin-bottom: 8px;
+  }
+
+  .auth-page__message {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .auth-page__message mat-icon {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
   }
 
   .auth-page__error {
-    color: var(--mat-sys-error);
     margin: 0 0 16px;
+    color: var(--mat-sys-error);
   }
 
   .auth-page__submit {
     width: 100%;
+    min-height: 44px;
   }
 
   .auth-page__switch {

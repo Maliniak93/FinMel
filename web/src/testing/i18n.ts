@@ -48,6 +48,21 @@ export function textOf(element: Element | null | undefined): string {
   return (element?.textContent ?? '').replace(/\s+/g, ' ').trim();
 }
 
+export function elementWithText(root: ParentNode, text: string): Element | undefined {
+  return Array.from(root.querySelectorAll('*')).find(
+    (candidate) => candidate.children.length === 0 && textOf(candidate) === text,
+  );
+}
+
+export function messageOf(element: Element | null | undefined): string {
+  if (!element) {
+    return '';
+  }
+  const copy = element.cloneNode(true) as Element;
+  copy.querySelectorAll('mat-icon').forEach((icon) => icon.remove());
+  return textOf(copy);
+}
+
 export async function openLanguageMenu(fixture: ComponentFixture<unknown>): Promise<HTMLElement[]> {
   const triggerElement = fixture.debugElement.query(By.directive(MatMenuTrigger));
   if (!triggerElement) {

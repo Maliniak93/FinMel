@@ -2,14 +2,13 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import { AuthService } from '../../../core/auth/auth';
-import { LanguageSwitch } from '../../../shared/language-switch/language-switch';
+import { AuthShell } from '../auth-shell/auth-shell';
 
 @Component({
   selector: 'app-login',
@@ -17,12 +16,11 @@ import { LanguageSwitch } from '../../../shared/language-switch/language-switch'
     ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
-    MatCardModule,
     MatFormFieldModule,
+    MatIconModule,
     MatInputModule,
-    MatProgressSpinnerModule,
     TranslocoPipe,
-    LanguageSwitch,
+    AuthShell,
   ],
   templateUrl: './login.html',
   styleUrl: './login.scss',
