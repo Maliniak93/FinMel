@@ -1,4 +1,4 @@
-import { Component, resource } from '@angular/core';
+import { Component, computed, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -29,4 +29,28 @@ export class CashCard {
   });
 
   protected readonly formatMoney = formatMoney;
+
+  protected readonly plnByCurrency = computed(() => {
+    const grosze = new Map<string, number | null>();
+    if (!this.cashResource.hasValue()) {
+      return grosze;
+    }
+    for (const place of this.cashResource.value().places) {
+      if (place.isArchived) {
+        continue;
+      }
+      for (const balance of place.balances) {
+        const current = grosze.get(balance.currency);
+        if (current === null) {
+          continue;
+        }
+        const next =
+          balance.valuePln === null || balance.valuePln === undefined
+            ? null
+            : (current ?? 0) + Math.round(Number(balance.valuePln) * 100);
+        grosze.set(balance.currency, next);
+      }
+    }
+    return new Map([...grosze].map(([currency, value]) => [currency, value && value / 100]));
+  });
 }

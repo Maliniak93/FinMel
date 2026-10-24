@@ -10,8 +10,12 @@
   margin-bottom: 12px;
 }
 
-.net-worth-chart__classes {
-  min-width: 0;
+.net-worth-chart__ranges {
+  --mat-button-toggle-height: 44px;
+}
+
+.net-worth-chart__filter {
+  min-height: 44px;
 }
 
 .net-worth-chart__caption {

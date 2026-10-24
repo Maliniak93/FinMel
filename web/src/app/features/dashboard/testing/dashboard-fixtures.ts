@@ -1,3 +1,4 @@
+import { OverlayContainer } from '@angular/cdk/overlay';
 import type { Type } from '@angular/core';
 import { type ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -241,4 +242,35 @@ export async function renderCard<T>(
   const fixture = TestBed.createComponent(card);
   await fixture.whenStable();
   return { fixture, fetchSpy };
+}
+
+export async function openFilterMenu(fixture: ComponentFixture<unknown>): Promise<HTMLElement[]> {
+  const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+    '.net-worth-chart__filter',
+  );
+  if (!button) {
+    throw new Error('No history filter button (.net-worth-chart__filter) is rendered.');
+  }
+  button.click();
+  fixture.detectChanges();
+  await fixture.whenStable();
+  return [
+    ...TestBed.inject(OverlayContainer)
+      .getContainerElement()
+      .querySelectorAll<HTMLElement>('.mat-mdc-menu-item'),
+  ];
+}
+
+function labelOf(element: HTMLElement): string {
+  const copy = element.cloneNode(true) as HTMLElement;
+  copy.querySelectorAll('mat-icon').forEach((icon) => icon.remove());
+  return (copy.textContent ?? '').trim();
+}
+
+export function menuItem(items: readonly HTMLElement[], label: string): HTMLElement {
+  const item = items.filter((candidate) => labelOf(candidate) === label).at(-1);
+  if (!item) {
+    throw new Error(`No filter menu item labelled "${label}".`);
+  }
+  return item;
 }

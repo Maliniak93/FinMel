@@ -79,12 +79,19 @@ async function createBondThroughApi(
   expect(created.ok()).toBeTruthy();
 }
 
-function legendItem(page: Page, label: string): Locator {
-  return page.getByRole('button', { name: new RegExp(`^${label} — `) });
+function structureRow(page: Page, label: string): Locator {
+  return page
+    .locator('.dashboard-page__structure li')
+    .filter({ has: page.getByRole('link', { name: label, exact: true }) });
 }
 
-function chip(page: Page, name: string): Locator {
-  return page.getByRole('listbox', { name: 'Klasa aktywów' }).getByRole('option', { name });
+function filterButton(page: Page): Locator {
+  return page.locator('.net-worth-chart__filter');
+}
+
+async function chooseFilter(page: Page, name: string): Promise<void> {
+  await filterButton(page).click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
 }
 
 function rangeToggle(page: Page, name: string): Locator {
@@ -98,7 +105,7 @@ function historyChart(page: Page): Locator {
     .or(page.getByText('Za mało historii, aby narysować wykres.'));
 }
 
-test('dashboard: net worth, allocation legend, asset-class chips, chart periods and the PL to EN language switch', async ({
+test('dashboard: net worth, structure list, history filter menu, chart periods and the PL to EN language switch', async ({
   page,
   request,
   user,
@@ -161,29 +168,21 @@ test('dashboard: net worth, allocation legend, asset-class chips, chart periods 
     });
   });
 
-  await test.step('Krok 3: the allocation legend shows Obligacje at 2 000,00 zł (the bond and its free cash) and Akcje at 1 000,00 zł and nothing is highlighted', async () => {
-    await expect(legendItem(page, 'Obligacje')).toContainText(pln('2 000,00'));
-    await expect(legendItem(page, 'Akcje')).toContainText(pln('1 000,00'));
-    for (const label of ['Obligacje', 'Akcje']) {
-      await expect(legendItem(page, label)).toHaveAttribute('aria-pressed', 'false');
-    }
+  await test.step('Krok 3: the structure list shows Obligacje at 2 000,00 zł (the bond and its free cash) and Akcje at 1 000,00 zł', async () => {
+    await expect(structureRow(page, 'Obligacje')).toContainText(pln('2 000,00'));
+    await expect(structureRow(page, 'Akcje')).toContainText(pln('1 000,00'));
   });
 
-  await test.step('Krok 4: the Akcje chip filters the chart and highlights Akcje while the net worth stays 3 000,00 zł', async () => {
-    await chip(page, 'Akcje').click();
-    await expect(chip(page, 'Akcje')).toHaveAttribute('aria-selected', 'true');
-    await expect(legendItem(page, 'Akcje')).toHaveAttribute('aria-pressed', 'true');
-    await expect(legendItem(page, 'Obligacje')).toHaveAttribute('aria-pressed', 'false');
+  await test.step('Krok 4: choosing Akcje in the filter menu labels the button while the net worth stays 3 000,00 zł', async () => {
+    await chooseFilter(page, 'Akcje');
+    await expect(filterButton(page)).toContainText('Akcje');
     await expect(historyChart(page)).toBeVisible();
     await expect(netWorth).toContainText(pln('3 000,00'));
   });
 
-  await test.step('Krok 5: the Wszystko chip clears the highlight', async () => {
-    await chip(page, 'Wszystko').click();
-    await expect(chip(page, 'Wszystko')).toHaveAttribute('aria-selected', 'true');
-    for (const label of ['Obligacje', 'Akcje']) {
-      await expect(legendItem(page, label)).toHaveAttribute('aria-pressed', 'false');
-    }
+  await test.step('Krok 5: choosing Wszystko clears the filter', async () => {
+    await chooseFilter(page, 'Wszystko');
+    await expect(filterButton(page)).toContainText('Wszystko');
   });
 
   await test.step('Krok 6: the 1Y range is active and the history chart is visible', async () => {

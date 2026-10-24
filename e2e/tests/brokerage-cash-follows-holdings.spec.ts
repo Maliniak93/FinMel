@@ -64,7 +64,7 @@ function exactPln(amount: string): RegExp {
 }
 
 function legendPln(amount: string): RegExp {
-  return new RegExp(`—\\s${digits(amount)}\\szł`);
+  return new RegExp(`${digits(amount)}\\szł`);
 }
 
 function pln(amount: string): RegExp {
@@ -76,7 +76,15 @@ function navigation(page: Page): Locator {
 }
 
 function legendItem(page: Page, label: string): Locator {
-  return page.getByRole('button', { name: new RegExp(`^${label} — `) });
+  return page
+    .locator('.dashboard-page__structure li')
+    .filter({ has: page.getByRole('link', { name: label, exact: true }) });
+}
+
+async function chooseHistoryFilter(page: Page, name: string): Promise<void> {
+  await page.locator('.net-worth-chart__filter').click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
+  await expect(page.locator('.net-worth-chart__filter')).toContainText(name);
 }
 
 function accountRow(page: Page, name: string): Locator {
@@ -382,13 +390,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
 
   await test.step('Krok 7: the history with the ETF class has 350 zł more than the position from the purchase date and nothing before it', async () => {
     await openDashboard(page);
-    await page
-      .getByRole('listbox', { name: 'Klasa aktywów' })
-      .getByRole('option', { name: 'ETF' })
-      .click();
-    await expect(
-      page.getByRole('listbox', { name: 'Klasa aktywów' }).getByRole('option', { name: 'ETF' }),
-    ).toHaveAttribute('aria-selected', 'true');
+    await chooseHistoryFilter(page, 'ETF');
     await expectHistoryProjected(request, token, ASSET_CLASS.etf, (points) => {
       expectAllEqual(between(points, D90, D31), 0, 'ETF before the purchase');
       expectAllEqual(between(points, D30, YESTERDAY), 8000, 'ETF from the purchase');
@@ -486,13 +488,7 @@ test('brokerage cash follows holdings: the free cash of a brokerage account coun
 
   await test.step('Krok 14: the class lines have no jumps outside the purchase and sale dates and the classes sum to the net worth every day', async () => {
     await openDashboard(page);
-    await page
-      .getByRole('listbox', { name: 'Klasa aktywów' })
-      .getByRole('option', { name: 'Gotówka' })
-      .click();
-    await expect(
-      page.getByRole('listbox', { name: 'Klasa aktywów' }).getByRole('option', { name: 'Gotówka' }),
-    ).toHaveAttribute('aria-selected', 'true');
+    await chooseHistoryFilter(page, 'Gotówka');
 
     const series: Record<string, HistoryPoint[]> = {};
     await expectProjected(

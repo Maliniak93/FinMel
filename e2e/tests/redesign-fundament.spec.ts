@@ -244,20 +244,17 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     await expect(themeButton(page)).toHaveAccessibleName(/^Motyw: systemowy/);
   });
 
-  await test.step('Krok 12: the Dashboard allocation legend has a coloured swatch and a class label for every entry', async () => {
+  await test.step('Krok 12: the Dashboard structure list has a coloured swatch and a class label for every entry', async () => {
     await expectProjected(
       async () => {
         await sidebar(page).getByRole('link', { name: 'Grupy', exact: true }).click();
         await sidebar(page).getByRole('link', { name: 'Pulpit' }).click();
       },
       async () => {
-        const items = page
-          .locator('.dashboard-page__legend')
-          .first()
-          .locator('.dashboard-page__legend-item');
+        const items = page.locator('.dashboard-page__structure-row');
         await expect(items.filter({ hasText: 'Gotówka' })).toHaveCount(1, { timeout: 3_000 });
         for (const item of await items.all()) {
-          await expect(item).toHaveText(/\S+\s—\s/);
+          await expect(item.getByRole('link')).not.toBeEmpty();
           await expect(item.locator('.dashboard-page__swatch')).not.toHaveCSS(
             'background-color',
             'rgba(0, 0, 0, 0)',

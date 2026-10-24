@@ -60,6 +60,8 @@ describe('AccountsCard', () => {
     const element = fixture.nativeElement as HTMLElement;
     const text = element.textContent ?? '';
 
+    expect(element.querySelector('h3')).not.toBeNull();
+    expect(element.querySelector('h2')).toBeNull();
     expect(text).toContain('XTB IKE');
     expect(text).toContain(formatMoney(1000));
     expect(text).toContain(formatPercent(50));

@@ -19,38 +19,31 @@
   margin-top: 8px;
 }
 
-.dashboard-page__summary {
+.dashboard-page__hero,
+.dashboard-page__pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
-.dashboard-page__value-content {
+.dashboard-page__value {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 24px;
-  height: 100%;
+  gap: 4px;
+  min-width: 0;
 }
 
-.dashboard-page__pies {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+.dashboard-page__history {
+  min-width: 0;
 }
 
 @container (min-width: 720px) {
-  .dashboard-page__value-content {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+  .dashboard-page__hero {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
   }
 
-  .dashboard-page__pies {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dashboard-page__summary {
+  .dashboard-page__pair {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -137,16 +130,6 @@
   }
 }
 
-.dashboard-page__legend-item {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
 .dashboard-page__group-detail,
 .dashboard-page__class-shares {
   margin: 0;
@@ -154,10 +137,6 @@
   list-style: none;
   font-size: 0.875rem;
   color: var(--mat-sys-on-surface-variant);
-}
-
-.dashboard-page__legend-item--dimmed {
-  opacity: 0.45;
 }
 
 .dashboard-page__change-class {
@@ -168,8 +147,43 @@
 
 .dashboard-page__swatch {
   display: inline-block;
+  flex: none;
   width: 12px;
   height: 12px;
   border-radius: 50%;
   margin-right: 8px;
+}
+
+.dashboard-page__stale-chip {
+  border: 1px dashed var(--sk-warning);
+  color: var(--sk-warning);
+}
+
+.dashboard-page__stale-note {
+  margin: 4px 0 0;
+  font-size: 0.875rem;
+  color: var(--sk-warning);
+}
+
+.dashboard-page__structure-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard-page__structure-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  min-height: 44px;
+  gap: 8px 16px;
+}
+
+.dashboard-page__structure-share {
+  min-width: 4.5rem;
+  text-align: right;
+  color: var(--mat-sys-on-surface-variant);
 }

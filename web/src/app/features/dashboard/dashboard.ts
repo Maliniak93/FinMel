@@ -17,9 +17,17 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { activeLocale } from '../../core/i18n/language';
 import { assetClassColor, groupColor } from '../../shared/colors';
-import { formatAmount, formatDate, formatMoney, formatPercent } from '../../shared/format';
+import {
+  formatAmount,
+  formatDate,
+  formatMoney,
+  formatPercent,
+  formatSignedMoney,
+} from '../../shared/format';
+import { EmptyState } from '../../shared/empty-state/empty-state';
 import { PieChart, type PieChartSegment } from '../../shared/pie-chart/pie-chart';
-import { assetClassLabel } from '../assets/asset-class';
+import { SplitBar, type SplitBarSegment } from '../../shared/split-bar/split-bar';
+import { assetClassLabel, assetClassPage } from '../assets/asset-class';
 import { GROUP_KIND } from '../groups/group-kind';
 import { CashCard } from './cash-card/cash-card';
 import { AccountsCard } from './accounts-card/accounts-card';
@@ -49,6 +57,12 @@ interface GroupCushion {
   readonly missingPln: number;
 }
 
+interface StructureRow {
+  readonly assetClass: AssetClass;
+  readonly valuePln: number;
+  readonly percentage: number;
+}
+
 interface GroupRow {
   readonly key: string;
   readonly label: string;
@@ -76,8 +90,10 @@ function toGrosze(amount: number | string): number {
     MatTooltipModule,
     RouterLink,
     TranslocoPipe,
+    EmptyState,
     NetWorthChart,
     PieChart,
+    SplitBar,
     AccountsCard,
     CashCard,
     MonthCard,
@@ -162,6 +178,8 @@ export class Dashboard {
   protected readonly formatAmount = formatAmount;
   protected readonly formatPercent = formatPercent;
   protected readonly formatDate = formatDate;
+  protected readonly formatSignedMoney = formatSignedMoney;
+  protected readonly assetClassPage = assetClassPage;
 
   protected readonly historyPoints = computed(() =>
     this.historyResource.hasValue() ? this.historyResource.value().points : [],
@@ -188,29 +206,41 @@ export class Dashboard {
     };
   });
 
-  protected readonly pieSegments = computed<PieChartSegment[]>(() => {
-    const dashboard = this.dashboardResource.value();
-    if (!dashboard) {
-      return [];
-    }
-    return dashboard.byAssetClass.map((entry) => ({
-      key: String(entry.assetClass),
-      label: assetClassLabel(entry.assetClass),
-      percentage: Number(entry.percentage),
-      color: assetClassColor(entry.assetClass),
+  protected readonly structureRows = computed<StructureRow[]>(() =>
+    this.dashboardResource.hasValue()
+      ? this.dashboardResource
+          .value()
+          .byAssetClass.filter((entry) => Number(entry.valuePln) > 0)
+          .map((entry) => ({
+            assetClass: entry.assetClass,
+            valuePln: Number(entry.valuePln),
+            percentage: Number(entry.percentage),
+          }))
+          .sort((a, b) => b.valuePln - a.valuePln)
+      : [],
+  );
+
+  protected readonly structureSegments = computed<SplitBarSegment[]>(() => {
+    activeLocale();
+    return this.structureRows().map((row) => ({
+      key: String(row.assetClass),
+      label: translate(assetClassLabel(row.assetClass)),
+      value: row.valuePln,
+      color: assetClassColor(row.assetClass),
     }));
   });
+
+  protected readonly staleCount = computed(() =>
+    this.dashboardResource.hasValue()
+      ? this.dashboardResource.value().byAsset.filter((line) => line.isStale).length
+      : 0,
+  );
 
   protected readonly classes = computed<readonly AssetClass[]>(() =>
     this.dashboardResource.hasValue()
       ? this.dashboardResource.value().byAssetClass.map((entry) => entry.assetClass)
       : [],
   );
-
-  protected readonly selectedKey = computed(() => {
-    const selected = this.assetClass();
-    return selected === null ? null : String(selected);
-  });
 
   protected readonly assetClassColor = assetClassColor;
 
@@ -333,16 +363,4 @@ export class Dashboard {
   protected readonly selectedGroupLabel = computed(
     () => this.groupOptions().find((option) => option.key === this.group())?.label ?? null,
   );
-
-  protected selectClass(assetClass: AssetClass): void {
-    this.assetClass.update((current) => (current === assetClass ? null : assetClass));
-  }
-
-  protected onSegmentClick(key: string): void {
-    this.selectClass(Number(key));
-  }
-
-  protected selectGroup(key: string): void {
-    this.group.update((current) => (current === key ? null : key));
-  }
 }

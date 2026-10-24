@@ -16,103 +16,93 @@
     @let dashboard = dashboardResource.value();
 
     @if (dashboard.asOf === null) {
-      <div class="dashboard-page__state">
-        <p>{{ 'dashboard.empty' | transloco }}</p>
-        <a mat-flat-button color="primary" routerLink="/wealth/accounts">{{
-          'dashboard.goToAccounts' | transloco
+      <app-empty-state icon="account_balance" [message]="'dashboard.empty' | transloco">
+        <a action mat-flat-button color="primary" routerLink="/wealth/accounts">{{
+          'dashboard.addAccount' | transloco
         }}</a>
-      </div>
+      </app-empty-state>
     } @else {
       <div class="dashboard-page__grid">
-        <mat-card class="dashboard-page__value">
-          <mat-card-content class="dashboard-page__value-content">
-            <div>
-              <p class="dashboard-page__kpi-label">{{ 'dashboard.netWorth' | transloco }}</p>
-              <div class="dashboard-page__net-worth-row">
-                <p class="dashboard-page__net-worth" data-testid="net-worth">
-                  {{ formatMoney(dashboard.netWorthPln) }}
-                </p>
-                @if (dashboard.isStale) {
-                  <mat-chip-set>
-                    <mat-chip [matTooltip]="'dashboard.staleTooltip' | transloco">
-                      {{ 'dashboard.stale' | transloco }}
-                    </mat-chip>
-                  </mat-chip-set>
-                }
-              </div>
-              <p class="dashboard-page__as-of">
-                {{ 'dashboard.asOf' | transloco: { date: formatDate(dashboard.asOf) } }}
+        <div class="dashboard-page__hero">
+          <section class="dashboard-page__value">
+            <p class="dashboard-page__kpi-label">{{ 'dashboard.netWorth' | transloco }}</p>
+            <div class="dashboard-page__net-worth-row">
+              <p class="dashboard-page__net-worth" data-testid="net-worth">
+                {{ formatMoney(dashboard.netWorthPln) }}
               </p>
-            </div>
-
-            <div>
-              <p class="dashboard-page__kpi-label">{{ 'dashboard.change' | transloco }}</p>
-              @if (change(); as change) {
-                <p
-                  class="dashboard-page__change"
-                  [class.dashboard-page__change--positive]="change.direction === 'positive'"
-                  [class.dashboard-page__change--negative]="change.direction === 'negative'"
-                >
-                  {{ change.sign }}{{ formatMoney(change.amount) }}
-                  @if (change.percent !== null) {
-                    ({{ change.sign }}{{ formatPercent(change.percent) }})
-                  }
-                  @let selectedClass = assetClass();
-                  @if (selectedClass !== null) {
-                    <span class="dashboard-page__change-class">{{
-                      assetClassLabel(selectedClass) | transloco
-                    }}</span>
-                  }
-                  @if (selectedGroupLabel(); as groupLabel) {
-                    <span class="dashboard-page__change-class">{{ groupLabel }}</span>
-                  }
-                  <span class="dashboard-page__change-range">{{ range() }}</span>
-                </p>
-              } @else {
-                <p class="dashboard-page__change">—</p>
+              @if (dashboard.isStale) {
+                <mat-chip-set>
+                  <mat-chip
+                    class="dashboard-page__stale-chip"
+                    [matTooltip]="'dashboard.staleTooltip' | transloco"
+                  >
+                    {{ 'dashboard.stale' | transloco }}
+                  </mat-chip>
+                </mat-chip-set>
               }
             </div>
-          </mat-card-content>
-        </mat-card>
+            <p class="dashboard-page__as-of">
+              {{ 'dashboard.asOf' | transloco: { date: formatDate(dashboard.asOf) } }}
+            </p>
 
-        <div class="dashboard-page__pies">
-          <mat-card class="dashboard-page__card">
-            <mat-card-content>
-              <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
-              <div class="dashboard-page__breakdown">
-                <app-pie-chart
-                  [segments]="pieSegments()"
-                  [selected]="selectedKey()"
-                  (segmentClick)="onSegmentClick($event)"
-                  class="dashboard-page__chart"
-                />
+            @if (change(); as change) {
+              <p
+                class="dashboard-page__change"
+                [class.dashboard-page__change--positive]="change.direction === 'positive'"
+                [class.dashboard-page__change--negative]="change.direction === 'negative'"
+              >
+                {{ formatSignedMoney(change.amount) }}
+                @if (change.percent !== null) {
+                  ({{ change.sign }}{{ formatPercent(change.percent) }})
+                }
+                @let selectedClass = assetClass();
+                @if (selectedClass !== null) {
+                  <span class="dashboard-page__change-class">{{
+                    assetClassLabel(selectedClass) | transloco
+                  }}</span>
+                }
+                @if (selectedGroupLabel(); as groupLabel) {
+                  <span class="dashboard-page__change-class">{{ groupLabel }}</span>
+                }
+                <span class="dashboard-page__change-range">{{
+                  'dashboard.changeForRange' | transloco: { range: range() }
+                }}</span>
+              </p>
+            } @else {
+              <p class="dashboard-page__change">—</p>
+            }
 
-                <ul class="dashboard-page__legend">
-                  @for (entry of dashboard.byAssetClass; track entry.assetClass) {
-                    <li>
-                      <button
-                        type="button"
-                        class="dashboard-page__legend-item"
-                        [class.dashboard-page__legend-item--dimmed]="
-                          assetClass() !== null && assetClass() !== entry.assetClass
-                        "
-                        [attr.aria-pressed]="assetClass() === entry.assetClass"
-                        (click)="selectClass(entry.assetClass)"
-                      >
-                        <span
-                          class="dashboard-page__swatch"
-                          [style.background]="assetClassColor(entry.assetClass)"
-                        ></span>
-                        {{ assetClassLabel(entry.assetClass) | transloco }} —
-                        {{ formatMoney(entry.valuePln) }} ({{ entry.percentage }}%)
-                      </button>
-                    </li>
-                  }
-                </ul>
-              </div>
-            </mat-card-content>
-          </mat-card>
+            @if (staleCount() > 0) {
+              <p class="dashboard-page__stale-note">
+                {{ 'dashboard.staleCount' | transloco: { count: staleCount() } }}
+              </p>
+            }
+          </section>
 
+          <section class="dashboard-page__history">
+            <h2 class="dashboard-page__card-title">
+              {{ 'dashboard.netWorthHistory' | transloco }}
+            </h2>
+            <app-net-worth-chart
+              [points]="historyPoints()"
+              [(range)]="range"
+              [classes]="classes()"
+              [(assetClass)]="assetClass"
+              [groups]="groupOptions()"
+              [(group)]="group"
+              [loading]="historyResource.isLoading()"
+              [loadError]="historyResource.error()?.message ?? null"
+              (retry)="historyResource.reload()"
+            />
+          </section>
+        </div>
+
+        <div class="dashboard-page__pair">
+          <app-month-card />
+          <app-upcoming-card />
+        </div>
+
+        <div class="dashboard-page__pair">
           <mat-card class="dashboard-page__card dashboard-page__group-card">
             <mat-card-content>
               <h2 class="dashboard-page__card-title">{{ 'dashboard.groups.title' | transloco }}</h2>
@@ -134,25 +124,12 @@
                 </div>
               } @else {
                 <div class="dashboard-page__breakdown">
-                  <app-pie-chart
-                    [segments]="groupSegments()"
-                    [selected]="group()"
-                    (segmentClick)="selectGroup($event)"
-                    class="dashboard-page__chart"
-                  />
+                  <app-pie-chart [segments]="groupSegments()" class="dashboard-page__chart" />
 
                   <ul class="dashboard-page__legend dashboard-page__group-legend">
                     @for (row of groupRows(); track row.key) {
                       <li>
-                        <button
-                          type="button"
-                          class="dashboard-page__legend-item"
-                          [class.dashboard-page__legend-item--dimmed]="
-                            group() !== null && group() !== row.key
-                          "
-                          [attr.aria-pressed]="group() === row.key"
-                          (click)="selectGroup(row.key)"
-                        >
+                        <span class="dashboard-page__legend-item">
                           <span
                             class="dashboard-page__swatch"
                             [style.background]="row.color"
@@ -171,7 +148,7 @@
                           } @else {
                             {{ formatMoney(row.valuePln) }}
                           }
-                        </button>
+                        </span>
                         @if (row.progress; as progress) {
                           <mat-progress-bar
                             mode="determinate"
@@ -221,32 +198,37 @@
               }
             </mat-card-content>
           </mat-card>
+
+          <mat-card class="dashboard-page__card dashboard-page__structure">
+            <mat-card-content>
+              <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
+              <app-split-bar [segments]="structureSegments()" />
+              <ul class="dashboard-page__structure-list">
+                @for (row of structureRows(); track row.assetClass) {
+                  <li class="dashboard-page__structure-row">
+                    <span
+                      class="dashboard-page__swatch"
+                      [style.background]="assetClassColor(row.assetClass)"
+                    ></span>
+                    <a [routerLink]="assetClassPage(row.assetClass)">{{
+                      assetClassLabel(row.assetClass) | transloco
+                    }}</a>
+                    <span class="dashboard-page__structure-value">{{
+                      formatMoney(row.valuePln)
+                    }}</span>
+                    <span class="dashboard-page__structure-share">{{
+                      formatPercent(row.percentage)
+                    }}</span>
+                  </li>
+                }
+              </ul>
+            </mat-card-content>
+          </mat-card>
         </div>
 
-        <mat-card class="dashboard-page__card dashboard-page__chart-card">
-          <mat-card-content>
-            <h2 class="dashboard-page__card-title">
-              {{ 'dashboard.netWorthHistory' | transloco }}
-            </h2>
-            <app-net-worth-chart
-              [points]="historyPoints()"
-              [(range)]="range"
-              [classes]="classes()"
-              [(assetClass)]="assetClass"
-              [groups]="groupOptions()"
-              [(group)]="group"
-              [loading]="historyResource.isLoading()"
-              [loadError]="historyResource.error()?.message ?? null"
-              (retry)="historyResource.reload()"
-            />
-          </mat-card-content>
-        </mat-card>
-
-        <div class="dashboard-page__summary">
+        <div class="dashboard-page__pair">
           <app-accounts-card />
           <app-cash-card />
-          <app-month-card />
-          <app-upcoming-card />
         </div>
       </div>
     }

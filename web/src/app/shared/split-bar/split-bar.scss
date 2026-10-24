@@ -1,0 +1,15 @@
+:host {
+  display: block;
+}
+
+.split-bar {
+  display: flex;
+  gap: 2px;
+  height: 16px;
+}
+
+.split-bar__segment {
+  flex: 1 1 0;
+  min-width: 3px;
+  border-radius: 2px;
+}

@@ -13,6 +13,7 @@ import type { NetWorthHistoryResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
+import { menuItem, openFilterMenu } from '../testing/dashboard-fixtures';
 import { NetWorthChart } from './net-worth-chart';
 
 function normalised(text: string): string {
@@ -229,7 +230,7 @@ describe('NetWorthChart', () => {
     expect(textsOf(element, 'mat-button-toggle')).toEqual(['1M', '1Y', 'YTD', 'MAX']);
   });
 
-  it('group chips', async () => {
+  it('filter menu picks one value at a time', async () => {
     await TestBed.configureTestingModule({
       imports: [NetWorthChart],
       providers: [provideI18nTesting()],
@@ -244,27 +245,51 @@ describe('NetWorthChart', () => {
     ]);
     await fixture.whenStable();
     const element = fixture.nativeElement as HTMLElement;
-    const groupChips = () =>
-      textsOf(element, 'mat-chip-listbox.net-worth-chart__groups mat-chip-option');
-    const selected = () =>
-      textsOf(
-        element,
-        'mat-chip-listbox.net-worth-chart__groups mat-chip-option button[aria-selected="true"]',
-      );
+    const chart = fixture.componentInstance;
+    const label = () => textOf(element.querySelector('.net-worth-chart__filter'));
 
-    expect(groupChips()).toEqual(['All', 'Emerytura', 'Bez grupy']);
-    expect(selected()).toEqual(['All']);
+    expect(element.querySelector('mat-chip-listbox')).toBeNull();
+    expect(label()).toContain('All');
+    const items = await openFilterMenu(fixture);
+    expect(items.map((item) => textOf(item))).toEqual([
+      'All',
+      'ETF',
+      'Stock',
+      'Cash',
+      'Emerytura',
+      'Bez grupy',
+    ]);
 
-    const chip = [
-      ...element.querySelectorAll<HTMLButtonElement>(
-        'mat-chip-listbox.net-worth-chart__groups mat-chip-option button[role="option"]',
-      ),
-    ].find((button) => textOf(button) === 'Emerytura') as HTMLButtonElement;
-    chip.click();
+    menuItem(items, 'ETF').click();
     await fixture.whenStable();
+    expect(chart.assetClass()).toBe(ASSET_CLASS.Etf);
+    expect(chart.group()).toBeNull();
+    expect(label()).toContain('ETF');
 
-    expect(fixture.componentInstance.group()).toBe('g-1');
-    expect(fixture.componentInstance.assetClass()).toBeNull();
-    expect(selected()).toEqual(['Emerytura']);
+    menuItem(await openFilterMenu(fixture), 'Emerytura').click();
+    await fixture.whenStable();
+    expect(chart.group()).toBe('g-1');
+    expect(chart.assetClass()).toBeNull();
+    expect(label()).toContain('Emerytura');
+
+    menuItem(await openFilterMenu(fixture), 'Bez grupy').click();
+    await fixture.whenStable();
+    expect(chart.group()).toBe('ungrouped');
+
+    menuItem(await openFilterMenu(fixture), 'All').click();
+    await fixture.whenStable();
+    expect(chart.group()).toBeNull();
+    expect(chart.assetClass()).toBeNull();
+    expect(label()).toContain('All');
+  });
+
+  it('shows not enough history', async () => {
+    const element = await setup([{ date: '2026-08-01', netWorthPln: 10000 }], '1Y', CLASSES);
+
+    expect(textOf(element.querySelector('.net-worth-chart__empty'))).toBe(
+      'Not enough history to chart yet.',
+    );
+    expect(element.querySelector('mat-button-toggle-group')).not.toBeNull();
+    expect(element.querySelector('.net-worth-chart__filter')).not.toBeNull();
   });
 });
