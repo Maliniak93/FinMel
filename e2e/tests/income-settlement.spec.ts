@@ -6,6 +6,7 @@ import {
   test,
   warsawDate,
   type Credentials,
+  openSelect,
 } from './fixtures';
 import {
   COMPANY,
@@ -235,7 +236,7 @@ test('income settlement: settle, skip, edit and undo occurrences with the cash d
     const row = occurrence(page, WIFE, '2026-09-10');
     const dialog = await openSettle(page, row, 'settle-occurrence');
     await fillSettlement(dialog, { amount: '6500', date: '2026-09-10' });
-    await dialog.getByRole('combobox', { name: 'Konto' }).click();
+    await openSelect(dialog.getByRole('combobox', { name: 'Konto' }));
     await expect(page.getByRole('option', { name: /^Konto firmowe/ })).toBeVisible();
     await expect(page.getByRole('option', { name: /Revolut EUR/ })).toHaveCount(0);
     await page.getByRole('option', { name: /^Konto firmowe/ }).click();

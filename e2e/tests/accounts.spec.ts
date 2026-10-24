@@ -1,4 +1,4 @@
-import { expect, test, warsawDate } from './fixtures';
+import { expect, test, warsawDate, openSelect } from './fixtures';
 import type { Locator, Page } from '@playwright/test';
 
 const ACCOUNT = 'IKE Bossa';
@@ -15,7 +15,7 @@ function bar(contributed: string, limit: string): RegExp {
 }
 
 async function selectOption(page: Page, select: Locator, option: string): Promise<void> {
-  await select.click();
+  await openSelect(select);
   await page.getByRole('option', { name: option, exact: true }).click();
 }
 

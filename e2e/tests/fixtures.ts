@@ -1,4 +1,16 @@
-import { expect, test as base, type APIRequestContext, type Page } from '@playwright/test';
+import {
+  expect,
+  test as base,
+  type APIRequestContext,
+  type Locator,
+  type Page,
+} from '@playwright/test';
+
+// The unfloated label and its required marker can sit over the middle of a select, so the click lands on the arrow instead.
+export async function openSelect(select: Locator): Promise<void> {
+  const box = await select.boundingBox();
+  await select.click({ position: { x: Math.max(box!.width - 24, 1), y: box!.height / 2 } });
+}
 
 export const STUB_URL = 'http://localhost:18081';
 

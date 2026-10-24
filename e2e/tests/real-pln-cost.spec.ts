@@ -1,4 +1,4 @@
-import { expect, logInThroughUi, registerThroughUi, test } from './fixtures';
+import { expect, logInThroughUi, registerThroughUi, test, openSelect } from './fixtures';
 import type { Locator, Page } from '@playwright/test';
 
 // pl-PL groups only numbers from 10 000 up, with a space or a non-breaking space, and may use a true minus sign, so the patterns accept either.
@@ -32,7 +32,7 @@ async function openVwceTransactions(page: Page): Promise<void> {
 }
 
 async function selectOption(page: Page, select: Locator, option: string): Promise<void> {
-  await select.click();
+  await openSelect(select);
   await page.getByRole('option', { name: option, exact: true }).click();
 }
 

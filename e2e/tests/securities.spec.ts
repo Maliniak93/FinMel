@@ -7,6 +7,7 @@ import {
   logInThroughUi,
   test,
   warsawDate,
+  openSelect,
 } from './fixtures';
 
 // pl-PL groups only numbers from 10 000 up, with a space or a non-breaking space, so the pattern accepts either.
@@ -88,7 +89,7 @@ test('securities: buy and sell a PLN stock and buy from the watchlist on /securi
   await test.step('Krok 1: the add dialog offers CDR.WA for "CDR" on the XTB account', async () => {
     await holdings(page).getByRole('button', { name: 'Dodaj' }).first().click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('combobox', { name: 'Rachunek' }).click();
+    await openSelect(dialog.getByRole('combobox', { name: 'Rachunek' }));
     await page.getByRole('option', { name: ACCOUNT }).click();
     await pickInstrument(page, dialog, 'CDR', 'CDR.WA');
   });

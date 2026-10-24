@@ -6,6 +6,7 @@ import {
   logInThroughUi,
   test,
   warsawDate,
+  openSelect,
 } from './fixtures';
 import {
   ASSET_CLASS,
@@ -132,7 +133,7 @@ async function createAccountThroughUi(page: Page, name: string, type: string): P
     .click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('Nazwa').fill(name);
-  await dialog.getByRole('combobox', { name: 'Typ' }).click();
+  await openSelect(dialog.getByRole('combobox', { name: 'Typ' }));
   await page.getByRole('option', { name: type, exact: true }).click();
   await dialog.getByRole('button', { name: 'Utwórz' }).click();
   await expect(dialog).toBeHidden();

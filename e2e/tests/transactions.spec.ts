@@ -7,6 +7,7 @@ import {
   logInThroughUi,
   test,
   warsawDate,
+  openSelect,
 } from './fixtures';
 
 function pln(amount: string): RegExp {
@@ -141,7 +142,7 @@ test('transactions: edit, add and delete the transactions of a PLN stock with th
   await test.step('Krok 4: selling 2 at 100,00 zł gives two transactions and quantity 10', async () => {
     await openTransactions(page);
     await page.getByRole('button', { name: 'Nowa transakcja' }).click();
-    await dialog.getByRole('combobox', { name: 'Typ' }).click();
+    await openSelect(dialog.getByRole('combobox', { name: 'Typ' }));
     await page.getByRole('option', { name: 'Sprzedaż', exact: true }).click();
     await dialog.getByLabel(/^Ilość/).fill('2');
     await dialog.getByLabel(/^Cena jednostkowa/).fill('100');

@@ -6,6 +6,7 @@ import {
   test,
   warsawDate,
   type Credentials,
+  openSelect,
 } from './fixtures';
 import { expectProjected } from './projection';
 
@@ -48,7 +49,7 @@ async function openPage(page: Page, link: string): Promise<void> {
 }
 
 async function selectOption(page: Page, select: Locator, option: string | RegExp): Promise<void> {
-  await select.click();
+  await openSelect(select);
   await page
     .getByRole(
       'option',
