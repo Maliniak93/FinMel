@@ -4,16 +4,6 @@
   margin: 16px 0;
 }
 
-.securities-table__state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 48px 16px;
-  text-align: center;
-}
-
 .securities-table__table {
   width: 100%;
 }
@@ -22,16 +12,16 @@
   opacity: 0.7;
 }
 
+.securities-table__name {
+  color: inherit;
+}
+
+.securities-table__percent {
+  margin-inline-start: 4px;
+}
+
 .securities-table__actions {
   text-align: end;
-}
-
-.securities-table__gain.positive {
-  color: light-dark(#2e7d32, #81c784);
-}
-
-.securities-table__gain.negative {
-  color: var(--mat-sys-error);
 }
 
 .securities-table__filter {

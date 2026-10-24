@@ -33,12 +33,19 @@ function watchlist(page: Page): Locator {
 }
 
 function row(table: Locator, ticker: string): Locator {
-  return table.getByRole('row').filter({ hasText: ticker });
+  const names: Record<string, string> = {
+    'CDR.WA': 'CD Projekt',
+    'PKO.WA': 'Powszechna Kasa Oszczednosci',
+  };
+  const alternatives = [ticker, names[ticker]]
+    .filter((value): value is string => !!value)
+    .map((value) => value.replace('.', '\\.'));
+  return table.getByRole('row').filter({ hasText: new RegExp(alternatives.join('|')) });
 }
 
 async function openSecurities(page: Page): Promise<void> {
   await wealthTab(page, 'Akcje i ETF');
-  await expect(page.getByRole('heading', { name: 'Akcje i ETF', level: 1 })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /^Akcje i ETF/, selected: true })).toBeVisible();
 }
 
 async function expectAccountCash(page: Page, amount: string): Promise<void> {
@@ -121,7 +128,7 @@ test('securities: buy and sell a PLN stock and buy from the watchlist on /securi
       await expect(cdr.locator('.mat-column-value')).toContainText(pln('1 000,00'), {
         timeout: 3_000,
       });
-      await expect(cdr.getByTestId('gain')).toContainText(pln('0,00'), { timeout: 3_000 });
+      await expect(cdr.locator('.mat-column-gain')).toContainText(pln('0,00'), { timeout: 3_000 });
     }).toPass({ timeout: 90_000, intervals: [2_000, 3_000, 5_000] });
   });
 

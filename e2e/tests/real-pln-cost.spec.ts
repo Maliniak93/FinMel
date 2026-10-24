@@ -9,6 +9,7 @@ function pln(amount: string): RegExp {
 }
 
 const ACCOUNT = 'XTB';
+const VWCE_PATTERN = /VWCE\.DE|Vanguard FTSE All-World/;
 
 function navigation(page: Page): Locator {
   return page.locator('mat-sidenav');
@@ -17,7 +18,7 @@ function navigation(page: Page): Locator {
 async function openEtfRow(page: Page): Promise<Locator> {
   await wealthTab(page, 'Akcje i ETF');
   await page.getByRole('tab', { name: 'ETF', exact: true }).click();
-  return page.getByRole('row').filter({ hasText: 'VWCE.DE' });
+  return page.getByRole('row').filter({ hasText: VWCE_PATTERN });
 }
 
 async function openVwceMenu(page: Page, item: string): Promise<void> {
@@ -27,7 +28,7 @@ async function openVwceMenu(page: Page, item: string): Promise<void> {
 }
 
 async function openVwceTransactions(page: Page): Promise<void> {
-  await openVwceMenu(page, 'Transakcje');
+  await openVwceMenu(page, 'Historia transakcji');
   await expect(page.getByRole('heading', { name: /Transakcje — / })).toBeVisible();
 }
 
@@ -134,7 +135,7 @@ test('real PLN cost: the PLN really paid drives cost basis, P/L and account cash
     await expect(dialog).toContainText('432,00 PLN / szt. · kurs 4,3200');
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
-    const row = page.getByRole('row').filter({ hasText: 'VWCE.DE' });
+    const row = page.getByRole('row').filter({ hasText: VWCE_PATTERN });
     await expect(row.locator('.mat-column-quantity')).toHaveText(/^\s*10\s*$/);
   });
 

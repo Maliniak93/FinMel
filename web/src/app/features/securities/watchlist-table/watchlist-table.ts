@@ -3,7 +3,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -18,7 +17,12 @@ import {
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
+import { Money } from '../../../shared/money/money';
+import { SectionError } from '../../../shared/section-error/section-error';
+import { Skeleton } from '../../../shared/skeleton/skeleton';
+import { StatusChip } from '../../../shared/status-chip/status-chip';
 import {
   AssetFormDialog,
   type AssetFormDialogData,
@@ -42,12 +46,16 @@ import {
 @Component({
   selector: 'app-watchlist-table',
   imports: [
+    EmptyState,
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
-    MatProgressSpinnerModule,
     MatTableModule,
     MatTooltipModule,
+    Money,
+    SectionError,
+    Skeleton,
+    StatusChip,
     TranslocoPipe,
   ],
   templateUrl: './watchlist-table.html',
@@ -99,6 +107,10 @@ export class WatchlistTable {
   protected unavailableLabel(item: WatchlistItemResponse): string | null {
     const reason = item.priceUnavailableReason;
     return reason === null ? null : (PRICE_UNAVAILABLE_REASON_LABELS[reason] ?? null);
+  }
+
+  protected toNumber(value: number | string | null | undefined): number | null {
+    return value === null || value === undefined ? null : Number(value);
   }
 
   protected sign(value: number | string | null): 'positive' | 'negative' | '' {

@@ -3,9 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
@@ -16,7 +14,13 @@ import {
   type TransactionType,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
+import { fromDateOnly } from '../../../shared/date-only';
+import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
+import { Money } from '../../../shared/money/money';
+import { SectionError } from '../../../shared/section-error/section-error';
+import { Skeleton } from '../../../shared/skeleton/skeleton';
+import { StatusChip } from '../../../shared/status-chip/status-chip';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import {
   AssetFormDialog,
@@ -39,16 +43,21 @@ export const PRICE_UNAVAILABLE_REASON_LABELS: readonly string[] = [
   'securities.priceUnavailable.marketDataUnavailable',
 ];
 
+const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
 @Component({
   selector: 'app-securities-table',
   imports: [
+    EmptyState,
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
-    MatProgressSpinnerModule,
     MatTableModule,
-    MatTooltipModule,
+    Money,
     RouterLink,
+    SectionError,
+    Skeleton,
+    StatusChip,
     TranslocoPipe,
   ],
   templateUrl: './securities-table.html',
@@ -113,8 +122,27 @@ export class SecuritiesTable {
   protected readonly sellType = TRANSACTION_TYPE_SELL;
   protected readonly dividendType = TRANSACTION_TYPE_DIVIDEND;
 
-  protected instrumentLabel(holding: SecurityHoldingResponse): string {
-    return [holding.ticker, holding.exchange].filter(Boolean).join(' · ');
+  protected readonly classKey = computed(() =>
+    this.assetClass() === ASSET_CLASS.Etf ? 'securities.tabs.etfs' : 'securities.tabs.stocks',
+  );
+
+  protected subtitleParams(
+    holding: SecurityHoldingResponse,
+    className: string,
+  ): { class: string; qty: string; price: string } {
+    return {
+      class: className,
+      qty: formatQuantity(holding.quantity),
+      price: holding.lastPrice === null ? '—' : formatMoney(holding.lastPrice, holding.currency),
+    };
+  }
+
+  protected toNumber(value: number | string | null | undefined): number | null {
+    return value === null || value === undefined ? null : Number(value);
+  }
+
+  protected isStale(date: string): boolean {
+    return Date.now() - fromDateOnly(date).getTime() > STALE_AFTER_MS;
   }
 
   protected unavailableLabel(holding: SecurityHoldingResponse): string | null {
@@ -124,18 +152,13 @@ export class SecuritiesTable {
 
   protected gainAmount(
     holding: SecurityHoldingResponse,
-  ): { value: number | string; currency: string } | null {
+  ): { value: number; currency: string } | null {
     if (holding.unrealizedPlPln !== null) {
-      return { value: holding.unrealizedPlPln, currency: 'PLN' };
+      return { value: Number(holding.unrealizedPlPln), currency: 'PLN' };
     }
     return holding.unrealizedPl === null
       ? null
-      : { value: holding.unrealizedPl, currency: holding.currency };
-  }
-
-  protected gainSign(value: number | string): 'positive' | 'negative' | '' {
-    const amount = Number(value);
-    return amount > 0 ? 'positive' : amount < 0 ? 'negative' : '';
+      : { value: Number(holding.unrealizedPl), currency: holding.currency };
   }
 
   protected transactionsLink(holding: SecurityHoldingResponse): string[] {

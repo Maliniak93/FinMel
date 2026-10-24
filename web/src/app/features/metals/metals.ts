@@ -3,7 +3,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
@@ -15,7 +14,12 @@ import {
   type TransactionType,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
-import { formatDate, formatMoney, formatQuantity } from '../../shared/format';
+import { EmptyState } from '../../shared/empty-state/empty-state';
+import { formatDate, formatQuantity } from '../../shared/format';
+import { Money } from '../../shared/money/money';
+import { SectionError } from '../../shared/section-error/section-error';
+import { Skeleton } from '../../shared/skeleton/skeleton';
+import { StatusChip } from '../../shared/status-chip/status-chip';
 import { ASSET_CLASS } from '../assets/asset-class';
 import {
   TransactionFormDialog,
@@ -28,12 +32,16 @@ import { MetalFormDialog, type MetalFormDialogData } from './metal-form-dialog/m
 @Component({
   selector: 'app-metals',
   imports: [
+    EmptyState,
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
-    MatProgressSpinnerModule,
     MatTableModule,
+    Money,
     RouterLink,
+    SectionError,
+    Skeleton,
+    StatusChip,
     TranslocoPipe,
   ],
   templateUrl: './metals.html',
@@ -93,11 +101,14 @@ export class Metals {
 
   protected readonly metalLabel = metalLabel;
   protected readonly wholeTroyOunces = wholeTroyOunces;
-  protected readonly formatMoney = formatMoney;
   protected readonly formatQuantity = formatQuantity;
   protected readonly formatDate = formatDate;
   protected readonly buyType = TRANSACTION_TYPE_BUY;
   protected readonly sellType = TRANSACTION_TYPE_SELL;
+
+  protected toNumber(value: number | string | null | undefined): number | null {
+    return value === null || value === undefined ? null : Number(value);
+  }
 
   protected hasPrice(
     price: MetalPriceResponse | undefined,

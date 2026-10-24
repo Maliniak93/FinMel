@@ -995,7 +995,6 @@
     "paymentLeadDaysFailed": "Nie udało się zapisać wyprzedzenia przypomnień."
   },
   "securities": {
-    "title": "Akcje i ETF",
     "tabs": {
       "stocks": "Akcje",
       "etfs": "ETF"
@@ -1015,7 +1014,10 @@
     "buy": "Kup",
     "sell": "Sprzedaj",
     "dividend": "Dywidenda",
-    "transactions": "Transakcje",
+    "subtitle": "{{ class }} · {{ qty }} szt. · {{ price }}",
+    "action": {
+      "history": "Historia transakcji"
+    },
     "empty": {
       "stock": "Nie masz jeszcze akcji",
       "etf": "Nie masz jeszcze ETF-ów"
@@ -1060,8 +1062,8 @@
     "loadFailed": "Nie udało się wczytać metali szlachetnych.",
     "pricesLoadFailed": "Nie udało się wczytać cen metali.",
     "prices": "Ceny spot",
-    "perGram": "{{ price }} / g",
-    "perOunce": "{{ price }} / oz",
+    "perGramUnit": "/ g",
+    "perOunceUnit": "/ oz",
     "asOf": "z dnia {{ date }}",
     "weightPerPiece": "Waga sztuki",
     "pieces": "Sztuki",

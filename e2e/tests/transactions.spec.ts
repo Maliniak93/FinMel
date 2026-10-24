@@ -69,13 +69,13 @@ async function expectAccountCash(page: Page, amount: string): Promise<void> {
 
 async function openTransactions(page: Page): Promise<void> {
   await wealthTab(page, 'Akcje i ETF');
-  await expect(page.getByRole('heading', { name: 'Akcje i ETF', level: 1 })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /^Akcje i ETF/, selected: true })).toBeVisible();
   await holdings(page)
     .getByRole('row')
     .filter({ hasText: TICKER })
     .getByRole('button', { name: /^Akcje dla:/ })
     .click();
-  await page.getByRole('menuitem', { name: 'Transakcje', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Historia transakcji', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: `Transakcje — ${TICKER}`, level: 1 }),
   ).toBeVisible();
