@@ -283,7 +283,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
     await dialog.getByRole('button', { name: 'Przelej' }).click();
     await expect(dialog).toBeHidden();
     await expect(
-      page.locator('.account-detail__totals > div').filter({ hasText: 'Saldo' }),
+      page.getByTestId('summary-strip').locator('div').filter({ hasText: 'Saldo' }),
     ).toContainText(pln('17 000,00'));
 
     await openPage(page, 'Rachunki inwestycyjne');

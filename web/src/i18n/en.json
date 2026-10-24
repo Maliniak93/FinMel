@@ -1185,7 +1185,6 @@
     }
   },
   "bankAccounts": {
-    "title": "Bank accounts",
     "add": "Add account",
     "addFirst": "Add your first bank account",
     "empty": "You don't have any bank accounts yet.",
@@ -1198,7 +1197,6 @@
     "balance": "Balance",
     "interestCredited": "Interest credited",
     "interestDue": "Interest due",
-    "back": "Back to bank accounts",
     "hasOpenDeposit": "An open deposit will return to this account",
     "interest": {
       "settle": "Settle interest",
@@ -1229,11 +1227,17 @@
     }
   },
   "accounts": {
-    "title": "Investment accounts",
     "showArchived": "Show archived",
     "newAccount": "New account",
     "empty": "You don't have any accounts yet.",
-    "createFirst": "Create your first account",
+    "summary": {
+      "total": "Total",
+      "cash": "Free cash",
+      "securities": "Securities"
+    },
+    "breadcrumb": {
+      "back": "Wealth · {{ tab }}"
+    },
     "type": "Type",
     "wrapper": "Tax wrapper",
     "value": "Value",
@@ -1248,7 +1252,6 @@
       "total": "Total"
     },
     "detail": {
-      "back": "Back to accounts",
       "holdings": "Holdings",
       "noHoldings": "This account holds no assets yet.",
       "cashHistory": "Cash history",
@@ -1304,8 +1307,10 @@
       "fixedHint": "The type, tax wrapper and currency can't be changed after the account is created."
     },
     "contribution": {
-      "withLimit": "Contributed {{ contributed }} / {{ limit }} PLN in {{ year }}",
-      "noLimit": "Contributed {{ contributed }} PLN in {{ year }}",
+      "label": "Contribution limit",
+      "status": "Paid {{ paid }} / {{ limit }} PLN in {{ year }} · {{ left }} PLN left",
+      "exceeded": "Paid {{ paid }} / {{ limit }} PLN in {{ year }} · limit exceeded",
+      "noLimit": "Paid {{ paid }} PLN in {{ year }}",
       "action": "Contribution limit",
       "year": "Year",
       "amount": "Limit (PLN)",

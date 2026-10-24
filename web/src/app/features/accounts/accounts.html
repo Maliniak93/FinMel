@@ -1,7 +1,14 @@
 <div class="accounts-page">
-  <div class="accounts-page__header">
-    <h1>{{ 'accounts.title' | transloco }}</h1>
-    <div class="accounts-page__header-actions">
+  @if (accountsResource.error(); as loadError) {
+    <app-section-error [message]="loadError.message" (retry)="accountsResource.reload()" />
+  } @else if (accountsResource.isLoading() && !accountsResource.hasValue()) {
+    <app-skeleton [rows]="4" />
+  } @else if (accountsResource.hasValue()) {
+    @if (visibleAccounts().length > 0) {
+      <app-summary-strip [items]="summary()" />
+    }
+
+    <div class="accounts-page__toolbar">
       <mat-slide-toggle
         [checked]="includeArchived()"
         (change)="includeArchived.set($event.checked)"
@@ -13,130 +20,127 @@
         {{ 'accounts.newAccount' | transloco }}
       </button>
     </div>
-  </div>
 
-  @if (accountsResource.error(); as loadError) {
-    <div class="accounts-page__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="accountsResource.reload()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
-  } @else if (accountsResource.isLoading() && !accountsResource.hasValue()) {
-    <div class="accounts-page__state">
-      <mat-spinner diameter="32" />
-    </div>
-  } @else if (accountsResource.hasValue() && visibleAccounts().length === 0) {
-    <div class="accounts-page__state">
-      <p>{{ 'accounts.empty' | transloco }}</p>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        {{ 'accounts.createFirst' | transloco }}
-      </button>
-    </div>
-  } @else if (accountsResource.hasValue()) {
-    <table mat-table [dataSource]="visibleAccounts()" class="accounts-page__table">
-      <ng-container matColumnDef="name">
-        <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          <a [routerLink]="['/wealth/accounts', account.id]">{{ account.name }}</a>
-          @if (account.contribution; as contribution) {
-            <app-contribution-bar [contribution]="contribution" />
-          }
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="type">
-        <th mat-header-cell *matHeaderCellDef>{{ 'accounts.type' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">{{ accountTypeLabel(account.type) | transloco }}</td>
-      </ng-container>
-
-      <ng-container matColumnDef="wrapper">
-        <th mat-header-cell *matHeaderCellDef>{{ 'accounts.wrapper' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          {{ taxWrapperLabel(account.wrapper) | transloco }}
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="cash">
-        <th mat-header-cell *matHeaderCellDef>{{ 'accounts.balances.cash' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">{{ formatMoney(account.cashBalance) }}</td>
-      </ng-container>
-
-      <ng-container matColumnDef="securities">
-        <th mat-header-cell *matHeaderCellDef>{{ 'accounts.balances.securities' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          @let securities = securitiesOf(account);
-          @if (securities !== null) {
-            {{ formatMoney(securities) }}
-          } @else {
-            —
-          }
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="value">
-        <th mat-header-cell *matHeaderCellDef>{{ 'accounts.value' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          @if (valueEntryFor(account.id); as entry) {
-            {{ formatMoney(entry.valuePln) }}
-          } @else {
-            <span
-              class="accounts-page__value-placeholder"
-              [matTooltip]="'accounts.noValuationYet' | transloco"
-              >—</span
-            >
-          }
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="status">
-        <th mat-header-cell *matHeaderCellDef>{{ 'common.status' | transloco }}</th>
-        <td mat-cell *matCellDef="let account">
-          @if (account.isArchived) {
-            <mat-chip-set>
-              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
-            </mat-chip-set>
-          }
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="actions">
-        <th mat-header-cell *matHeaderCellDef></th>
-        <td mat-cell *matCellDef="let account">
-          <button
-            mat-icon-button
-            type="button"
-            [matMenuTriggerFor]="menu"
-            [attr.aria-label]="'common.actionsFor' | transloco: { name: account.name }"
-          >
-            <mat-icon>more_vert</mat-icon>
-          </button>
-          <mat-menu #menu="matMenu">
-            <button mat-menu-item type="button" (click)="openEditDialog(account)">
-              <mat-icon>edit</mat-icon>
-              <span>{{ 'common.edit' | transloco }}</span>
-            </button>
+    @if (visibleAccounts().length === 0) {
+      <app-empty-state icon="account_balance" [message]="'accounts.empty' | transloco">
+        <button action mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+          <mat-icon>add</mat-icon>
+          {{ 'accounts.newAccount' | transloco }}
+        </button>
+      </app-empty-state>
+    } @else {
+      <table mat-table [dataSource]="visibleAccounts()" class="accounts-page__table">
+        <ng-container matColumnDef="name">
+          <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">
+            <a class="accounts-page__name" [routerLink]="['/wealth/accounts', account.id]">{{
+              account.name
+            }}</a>
             @if (account.isArchived) {
-              <button mat-menu-item type="button" (click)="restore(account)">
-                <mat-icon>unarchive</mat-icon>
-                <span>{{ 'common.restore' | transloco }}</span>
-              </button>
-            } @else {
-              <button mat-menu-item type="button" (click)="archive(account)">
-                <mat-icon>archive</mat-icon>
-                <span>{{ 'common.archive' | transloco }}</span>
-              </button>
+              <app-status-chip
+                [label]="'common.archived' | transloco"
+                icon="inventory_2"
+                tone="neutral"
+              />
             }
-            <button mat-menu-item type="button" (click)="remove(account)">
-              <mat-icon>delete</mat-icon>
-              <span>{{ 'common.delete' | transloco }}</span>
-            </button>
-          </mat-menu>
-        </td>
-      </ng-container>
+            @if (account.contribution; as contribution) {
+              <app-contribution-bar [contribution]="contribution" />
+            }
+          </td>
+        </ng-container>
 
-      <tr mat-header-row *matHeaderRowDef="displayedColumns()"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns()"></tr>
-    </table>
+        <ng-container matColumnDef="type">
+          <th mat-header-cell *matHeaderCellDef>{{ 'accounts.type' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">
+            {{ accountTypeLabel(account.type) | transloco }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="wrapper">
+          <th mat-header-cell *matHeaderCellDef>{{ 'accounts.wrapper' | transloco }}</th>
+          <td mat-cell *matCellDef="let account">
+            {{ taxWrapperLabel(account.wrapper) | transloco }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="cash">
+          <th mat-header-cell *matHeaderCellDef class="accounts-page__num">
+            {{ 'accounts.balances.cash' | transloco }}
+          </th>
+          <td mat-cell *matCellDef="let account" class="accounts-page__num">
+            <app-money [amount]="toNumber(account.cashBalance)" />
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="securities">
+          <th mat-header-cell *matHeaderCellDef class="accounts-page__num">
+            {{ 'accounts.balances.securities' | transloco }}
+          </th>
+          <td mat-cell *matCellDef="let account" class="accounts-page__num">
+            <app-money [amount]="securitiesOf(account)" />
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="value">
+          <th mat-header-cell *matHeaderCellDef class="accounts-page__num">
+            {{ 'accounts.value' | transloco }}
+          </th>
+          <td mat-cell *matCellDef="let account" class="accounts-page__num">
+            @if (valueEntryFor(account.id); as entry) {
+              <app-money [amount]="toNumber(entry.valuePln)" />
+            } @else {
+              <span
+                class="accounts-page__value-placeholder"
+                [matTooltip]="'accounts.noValuationYet' | transloco"
+                >—</span
+              >
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let account">
+            <button
+              mat-icon-button
+              type="button"
+              [matMenuTriggerFor]="menu"
+              [attr.aria-label]="'common.actionsFor' | transloco: { name: account.name }"
+            >
+              <mat-icon>more_vert</mat-icon>
+            </button>
+            <mat-menu #menu="matMenu">
+              <button mat-menu-item type="button" (click)="openEditDialog(account)">
+                <mat-icon>edit</mat-icon>
+                <span>{{ 'common.edit' | transloco }}</span>
+              </button>
+              @if (account.isArchived) {
+                <button mat-menu-item type="button" (click)="restore(account)">
+                  <mat-icon>unarchive</mat-icon>
+                  <span>{{ 'common.restore' | transloco }}</span>
+                </button>
+              } @else {
+                <button mat-menu-item type="button" (click)="archive(account)">
+                  <mat-icon>archive</mat-icon>
+                  <span>{{ 'common.archive' | transloco }}</span>
+                </button>
+              }
+              <button mat-menu-item type="button" (click)="remove(account)">
+                <mat-icon>delete</mat-icon>
+                <span>{{ 'common.delete' | transloco }}</span>
+              </button>
+            </mat-menu>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: displayedColumns"
+          [class.accounts-page__row--archived]="row.isArchived"
+          [attr.data-archived]="row.isArchived ? 'true' : null"
+        ></tr>
+      </table>
+    }
   }
 </div>

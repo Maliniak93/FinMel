@@ -88,14 +88,16 @@ describe('Accounts', () => {
   });
 
   async function setup(
-    accountsResponse: Response,
+    accountsResponse: Response | Promise<Response>,
     dashboardResponse: Response = jsonResponse(emptyDashboard),
+    settle = true,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
-      return (
-        url.includes('/api/reporting/dashboard') ? dashboardResponse : accountsResponse
-      ).clone();
+      if (url.includes('/api/reporting/dashboard')) {
+        return dashboardResponse.clone();
+      }
+      return accountsResponse instanceof Promise ? accountsResponse : accountsResponse.clone();
     });
     dialog = { open: vi.fn() };
     snackBar = { open: vi.fn() };
@@ -112,7 +114,10 @@ describe('Accounts', () => {
 
     fixture = TestBed.createComponent(Accounts);
     component = fixture.componentInstance;
-    await fixture.whenStable();
+    if (settle) {
+      await fixture.whenStable();
+    }
+    fixture.detectChanges();
   }
 
   function pageText(): string {
@@ -137,12 +142,85 @@ describe('Accounts', () => {
     expect(pageText()).toContain('Obligacje IKE');
   });
 
-  it('titles the page Investment accounts', async () => {
-    await setup(jsonResponse([brokerage]));
+  it('summary strip and columns', async () => {
+    const dashboard: DashboardResponse = {
+      ...emptyDashboard,
+      netWorthPln: 5000,
+      asOf: '2026-08-10',
+      byAccount: [
+        {
+          accountId: brokerage.id,
+          valuePln: 5000,
+          percentage: 100,
+          snapshotDate: '2026-08-10',
+          isStale: false,
+        },
+      ],
+    };
+    await setup(jsonResponse([brokerage, archived]), jsonResponse(dashboard));
+    const element = fixture.nativeElement as HTMLElement;
+    const strip = element.querySelector<HTMLElement>('[data-testid="summary-strip"]');
 
-    expect((fixture.nativeElement as HTMLElement).querySelector('h1')?.textContent).toContain(
-      'Investment accounts',
+    expect(element.querySelector('h1')).toBeNull();
+    expect(strip).not.toBeNull();
+    const stripText = (strip!.textContent ?? '').replace(/\s+/g, ' ');
+    expect(stripText).toContain('Total');
+    expect(stripText).toContain('Free cash');
+    expect(stripText).toContain('Securities');
+    expect(stripText).toContain(formatMoney(5000).replace(/\s+/g, ' '));
+    expect(stripText).toContain(formatMoney(2000).replace(/\s+/g, ' '));
+    expect(stripText).toContain(formatMoney(3000).replace(/\s+/g, ' '));
+
+    await switchLanguage(fixture, 'pl');
+    const headers = Array.from(element.querySelectorAll('th'), (th) =>
+      (th.textContent ?? '').trim(),
     );
+    expect(headers.slice(0, 6)).toEqual([
+      'Nazwa',
+      'Typ',
+      'Opakowanie podatkowe',
+      'Wolne środki',
+      'Papiery',
+      'Wartość',
+    ]);
+  });
+
+  it('archived rows', async () => {
+    await setup(jsonResponse([brokerage, archived]));
+    component['includeArchived'].set(true);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const element = fixture.nativeElement as HTMLElement;
+
+    const archivedRow = element.querySelector<HTMLElement>('tr[data-archived="true"]');
+    expect(archivedRow?.textContent).toContain('Old broker');
+    expect(archivedRow?.querySelector('app-status-chip')?.textContent).toContain('Archived');
+    expect(element.querySelectorAll('tr[data-archived="true"]').length).toBe(1);
+
+    await switchLanguage(fixture, 'pl');
+    expect(archivedRow?.querySelector('app-status-chip')?.textContent).toContain('Zarchiwizowany');
+  });
+
+  it('states', async () => {
+    await setup(new Promise<Response>(() => undefined), jsonResponse(emptyDashboard), false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-skeleton')).not.toBeNull();
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup(jsonResponse({ detail: 'Boom.' }, 500));
+    const errorBlock = (fixture.nativeElement as HTMLElement).querySelector('app-section-error');
+    expect(errorBlock).not.toBeNull();
+    expect(errorBlock?.textContent).toContain('Retry');
+    await switchLanguage(fixture, 'pl');
+    expect(errorBlock?.textContent).toContain('Ponów');
+    fetchSpy.mockRestore();
+    await restoreEnglish();
+    TestBed.resetTestingModule();
+
+    await setup(jsonResponse([]));
+    const empty = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(empty).not.toBeNull();
+    expect(empty?.querySelector('button')?.textContent).toContain('New account');
   });
 
   it('shows the empty state when only bank accounts exist', async () => {

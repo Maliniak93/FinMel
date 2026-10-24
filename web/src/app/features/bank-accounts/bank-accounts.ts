@@ -4,7 +4,6 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
@@ -24,7 +23,12 @@ import {
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { formatMoney, formatMonth, formatPercent } from '../../shared/format';
+import { EmptyState } from '../../shared/empty-state/empty-state';
+import { formatMonth, formatPercent } from '../../shared/format';
+import { Money } from '../../shared/money/money';
+import { SectionError } from '../../shared/section-error/section-error';
+import { Skeleton } from '../../shared/skeleton/skeleton';
+import { StatusChip } from '../../shared/status-chip/status-chip';
 import { AccountFormDialog } from '../accounts/account-form-dialog/account-form-dialog';
 import { AccountTransferDialog } from '../accounts/account-transfer-dialog/account-transfer-dialog';
 import { ACCOUNT_TYPE, BANK_VARIANTS, bankVariantLabel } from '../accounts/account-type';
@@ -39,14 +43,18 @@ type VariantFilter = BankVariant | typeof ALL_VARIANTS;
 @Component({
   selector: 'app-bank-accounts',
   imports: [
+    EmptyState,
     MatButtonModule,
     MatChipsModule,
     MatIconModule,
     MatMenuModule,
-    MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
+    Money,
+    SectionError,
+    Skeleton,
+    StatusChip,
     RouterLink,
     TranslocoPipe,
   ],
@@ -103,7 +111,7 @@ export class BankAccounts {
       );
   });
 
-  protected readonly formatMoney = formatMoney;
+  protected readonly toNumber = Number;
   protected readonly formatPercent = formatPercent;
   protected readonly bankVariantLabel = bankVariantLabel;
 

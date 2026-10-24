@@ -252,6 +252,25 @@ describe('AccountDetail', () => {
     expect(text()).toContain('Wolne środki');
   });
 
+  it('breadcrumb and summary', async () => {
+    await setup();
+    let crumb = root().querySelector<HTMLAnchorElement>('[data-testid="breadcrumb"]');
+    expect(crumb?.getAttribute('href')).toBe('/wealth/accounts');
+    expect(crumb?.textContent).toContain('Wealth · Investment accounts');
+    expect(root().querySelector('[data-testid="summary-strip"]')).not.toBeNull();
+    expect(root().querySelector('dl.account-detail__totals')).toBeNull();
+    expect(root().querySelector('h1')?.textContent).toContain('XTB IKE');
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup({ type: 2, wrapper: 0, currency: 'PLN', bank: bankTerms() });
+    crumb = root().querySelector<HTMLAnchorElement>('[data-testid="breadcrumb"]');
+    expect(crumb?.getAttribute('href')).toBe('/wealth/bank');
+    expect(crumb?.textContent).toContain('Wealth · Bank accounts');
+    expect(root().querySelector('[data-testid="summary-strip"]')).not.toBeNull();
+    expect(root().querySelector('dl.account-detail__totals')).toBeNull();
+  });
+
   it('lists the deposits a bank account funds or receives and links to the deposits page', async () => {
     await setup({ type: 2, wrapper: 0, currency: 'PLN', bank: bankTerms() });
 

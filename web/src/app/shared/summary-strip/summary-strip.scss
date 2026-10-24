@@ -1,0 +1,26 @@
+:host {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.summary-strip__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 40px;
+  margin: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  background-color: var(--mat-sys-surface-container-low);
+}
+
+.summary-strip__label {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+}
+
+.summary-strip__value {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.3;
+}

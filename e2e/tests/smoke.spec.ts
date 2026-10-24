@@ -21,7 +21,7 @@ test('smoke: register, log in, open an account, deposit and see the balance', as
 
   await test.step('create a Brokerage / Regular account', async () => {
     await wealthTab(page, 'Rachunki inwestycyjne');
-    await page.getByRole('button', { name: 'Utwórz pierwszy rachunek' }).click();
+    await page.getByRole('button', { name: 'Nowy rachunek' }).first().click();
 
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Nazwa').fill(accountName);

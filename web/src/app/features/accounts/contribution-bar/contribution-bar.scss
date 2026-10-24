@@ -1,12 +1,59 @@
 .contribution-bar {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: 200px;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  --contribution-color: var(--sk-accent-stroke);
 }
 
-.contribution-bar--exceeded span {
-  color: var(--mat-sys-error);
+.contribution-bar[data-state='warning'] {
+  --contribution-color: var(--sk-warning);
+}
+
+.contribution-bar[data-state='error'] {
+  --contribution-color: var(--sk-negative);
+}
+
+.contribution-bar__track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background-color: var(--sk-neutral-container);
+  overflow: hidden;
+}
+
+.contribution-bar__fill {
+  height: 100%;
+  background-color: var(--contribution-color);
+}
+
+.contribution-bar__marker {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--mat-sys-on-surface-variant);
+}
+
+.contribution-bar__text {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.contribution-bar__icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+  color: var(--contribution-color);
+}
+
+.contribution-bar--exceeded .contribution-bar__text span {
+  color: var(--sk-negative);
   font-weight: 500;
 }

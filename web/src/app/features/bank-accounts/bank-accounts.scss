@@ -1,34 +1,26 @@
-.bank-accounts__header {
+.bank-accounts__toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 16px;
-}
-
-.bank-accounts__header-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
 }
 
 .bank-accounts__variants {
   margin-bottom: 16px;
 }
 
-.bank-accounts__state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 48px 16px;
-  text-align: center;
-}
-
 .bank-accounts__table {
   width: 100%;
+}
+
+.bank-accounts__num {
+  text-align: right;
+}
+
+.bank-accounts__row--archived {
+  opacity: 0.72;
 }
 
 .bank-accounts__no-data {

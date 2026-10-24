@@ -1,37 +1,44 @@
 <div class="account-detail">
-  <a [routerLink]="isBank() ? '/wealth/bank' : '/wealth/accounts'" class="account-detail__back">
+  <a
+    data-testid="breadcrumb"
+    class="account-detail__back"
+    [routerLink]="isBank() ? '/wealth/bank' : '/wealth/accounts'"
+  >
     <mat-icon>arrow_back</mat-icon>
-    {{ (isBank() ? 'bankAccounts.back' : 'accounts.detail.back') | transloco }}
+    {{
+      'accounts.breadcrumb.back'
+        | transloco
+          : { tab: (isBank() ? 'shell.nav.bankAccounts' : 'shell.nav.accounts') | transloco }
+    }}
   </a>
 
   @if (accountResource.error(); as loadError) {
-    <div class="account-detail__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="accountResource.reload()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
+    <app-section-error [message]="loadError.message" (retry)="accountResource.reload()" />
   } @else if (accountResource.hasValue()) {
     @let account = accountResource.value();
     <div class="account-detail__header">
       <div>
-        <h1>{{ account.name }}</h1>
+        <h1 class="account-detail__title">{{ account.name }}</h1>
         <div class="account-detail__meta">
-          <span>{{ accountTypeLabel(account.type) | transloco }}</span>
+          <app-status-chip
+            [label]="accountTypeLabel(account.type) | transloco"
+            icon="account_balance"
+          />
           @if (account.bank; as bank) {
-            <span>{{ bankVariantLabel(bank.variant) | transloco }}</span>
+            <app-status-chip [label]="bankVariantLabel(bank.variant) | transloco" icon="savings" />
             @if (bank.bankName) {
-              <span>{{ bank.bankName }}</span>
+              <app-status-chip [label]="bank.bankName" icon="apartment" />
             }
-            <span>{{ account.currency }}</span>
-            <span>{{ formatPercent(bank.annualInterestRatePercent) }}</span>
+            <app-status-chip [label]="account.currency" icon="payments" />
+            <app-status-chip
+              [label]="formatPercent(bank.annualInterestRatePercent)"
+              icon="percent"
+            />
           } @else {
-            <span>{{ taxWrapperLabel(account.wrapper) | transloco }}</span>
+            <app-status-chip [label]="taxWrapperLabel(account.wrapper) | transloco" icon="shield" />
           }
           @if (account.isArchived) {
-            <mat-chip-set>
-              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
-            </mat-chip-set>
+            <app-status-chip [label]="'common.archived' | transloco" icon="inventory_2" />
           }
         </div>
       </div>
@@ -128,55 +135,14 @@
       </div>
     }
 
-    <dl class="account-detail__totals">
-      <div>
-        <dt>
-          {{ (account.bank ? 'bankAccounts.balance' : 'accounts.balances.cash') | transloco }}
-        </dt>
-        <dd data-testid="account-cash">{{ formatMoney(account.cashBalance, account.currency) }}</dd>
-      </div>
-      @if (account.bank; as bank) {
-        <div>
-          <dt>{{ 'bankAccounts.interestCredited' | transloco }}</dt>
-          <dd>{{ formatMoney(bank.interestCreditedNet, account.currency) }}</dd>
-        </div>
-      } @else {
-        <div>
-          <dt>{{ 'accounts.balances.securities' | transloco }}</dt>
-          <dd>
-            @if (totals()?.securities !== null && totals()?.securities !== undefined) {
-              {{ formatMoney(totals()!.securities!) }}
-            } @else {
-              —
-            }
-          </dd>
-        </div>
-      }
-      <div>
-        <dt>{{ 'accounts.balances.total' | transloco }}</dt>
-        <dd>
-          @if (totals()?.total !== null && totals()?.total !== undefined) {
-            {{ formatMoney(totals()!.total!) }}
-          } @else {
-            —
-          }
-        </dd>
-      </div>
-    </dl>
+    <app-summary-strip [items]="summary()" />
 
     @if (!account.bank) {
       <h2>{{ 'accounts.detail.holdings' | transloco }}</h2>
       @if (holdingsResource.error(); as holdingsError) {
-        <div class="account-detail__state" role="alert">
-          <p>{{ holdingsError.message }}</p>
-          <button mat-button type="button" (click)="holdingsResource.reload()">
-            {{ 'common.retry' | transloco }}
-          </button>
-        </div>
+        <app-section-error [message]="holdingsError.message" (retry)="holdingsResource.reload()" />
       } @else if (holdingsResource.isLoading() && !holdingsResource.hasValue()) {
-        <div class="account-detail__state">
-          <mat-spinner diameter="24" />
-        </div>
+        <app-skeleton [rows]="2" />
       } @else if (holdingsResource.hasValue() && holdingsResource.value().length === 0) {
         <p class="account-detail__empty">{{ 'accounts.detail.noHoldings' | transloco }}</p>
       } @else if (holdingsResource.hasValue()) {
@@ -204,16 +170,9 @@
     @if (account.bank) {
       <h2>{{ 'accounts.detail.deposits' | transloco }}</h2>
       @if (depositsResource.error(); as depositsError) {
-        <div class="account-detail__state" role="alert">
-          <p>{{ depositsError.message }}</p>
-          <button mat-button type="button" (click)="depositsResource.reload()">
-            {{ 'common.retry' | transloco }}
-          </button>
-        </div>
+        <app-section-error [message]="depositsError.message" (retry)="depositsResource.reload()" />
       } @else if (depositsResource.isLoading() && !depositsResource.hasValue()) {
-        <div class="account-detail__state">
-          <mat-spinner diameter="24" />
-        </div>
+        <app-skeleton [rows]="2" />
       } @else if (depositsResource.hasValue() && depositsResource.value().length === 0) {
         <p class="account-detail__empty">{{ 'accounts.detail.noDeposits' | transloco }}</p>
       } @else if (depositsResource.hasValue()) {
@@ -245,16 +204,9 @@
 
     <h2>{{ 'accounts.detail.cashHistory' | transloco }}</h2>
     @if (historyResource.error(); as historyError) {
-      <div class="account-detail__state" role="alert">
-        <p>{{ historyError.message }}</p>
-        <button mat-button type="button" (click)="historyResource.reload()">
-          {{ 'common.retry' | transloco }}
-        </button>
-      </div>
+      <app-section-error [message]="historyError.message" (retry)="historyResource.reload()" />
     } @else if (historyResource.isLoading() && !historyResource.hasValue()) {
-      <div class="account-detail__state">
-        <mat-spinner diameter="24" />
-      </div>
+      <app-skeleton [rows]="2" />
     } @else if (historyResource.hasValue()) {
       @let page = historyResource.value();
       @if (page.items.length === 0) {
@@ -347,8 +299,6 @@
       }
     }
   } @else {
-    <div class="account-detail__state">
-      <mat-spinner diameter="32" />
-    </div>
+    <app-skeleton [rows]="4" />
   }
 </div>
