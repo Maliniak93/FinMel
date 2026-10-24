@@ -1,13 +1,13 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
@@ -17,12 +17,20 @@ import {
   getApiPortfolioCashPlaces,
   postApiPortfolioCashPlacesByIdArchive,
   postApiPortfolioCashPlacesByIdRestore,
+  type AssetGroupResponse,
   type CashBalanceResponse,
   type CashPlaceResponse,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { groupColor } from '../../shared/colors';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { EmptyState } from '../../shared/empty-state/empty-state';
 import { formatMoney } from '../../shared/format';
+import { GroupList } from '../../shared/group-select/group-list';
+import { Money } from '../../shared/money/money';
+import { SectionError } from '../../shared/section-error/section-error';
+import { Skeleton } from '../../shared/skeleton/skeleton';
+import { StatusChip } from '../../shared/status-chip/status-chip';
 import { CashOperationDialog } from '../accounts/cash-operation-dialog/cash-operation-dialog';
 import {
   CashBankTransferDialog,
@@ -46,13 +54,18 @@ const CONFLICT_MESSAGES: Record<string, string> = {
   selector: 'app-cash',
   imports: [
     MatButtonModule,
+    EmptyState,
     MatCardModule,
-    MatChipsModule,
+    MatDividerModule,
     MatIconModule,
     MatMenuModule,
-    MatProgressSpinnerModule,
     MatSlideToggleModule,
+    MatTooltipModule,
+    Money,
     RouterLink,
+    SectionError,
+    Skeleton,
+    StatusChip,
     TranslocoPipe,
   ],
   templateUrl: './cash.html',
@@ -61,6 +74,7 @@ const CONFLICT_MESSAGES: Record<string, string> = {
 export class Cash {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly groupList = inject(GroupList);
 
   protected readonly includeArchived = signal(false);
 
@@ -82,7 +96,34 @@ export class Cash {
       : [],
   );
 
+  protected readonly fxTooltip = computed(() => {
+    if (!this.placesResource.hasValue()) {
+      return '';
+    }
+    const cash = this.placesResource.value();
+    const missing = cash.places
+      .flatMap((place) => place.balances)
+      .find((balance) => balance.currency !== 'PLN' && balance.valuePln == null);
+    if (!missing) {
+      return '';
+    }
+    const total = cash.totals.find((t) => t.currency === missing.currency);
+    return translate('cash.fxTooltip', {
+      currency: missing.currency,
+      amount: formatMoney(total?.balance ?? missing.balance, missing.currency),
+    });
+  });
+
   protected readonly formatMoney = formatMoney;
+  protected readonly groupColor = groupColor;
+
+  protected num(value: string | number | null | undefined): number | null {
+    return value === null || value === undefined ? null : Number(value);
+  }
+
+  protected groupOf(groupId: string | null | undefined): AssetGroupResponse | undefined {
+    return groupId ? this.groupList.groups().find((group) => group.id === groupId) : undefined;
+  }
 
   protected transactionsLink(balance: CashBalanceResponse): string[] {
     return ['/wealth/assets', balance.cashAssetId, 'transactions'];

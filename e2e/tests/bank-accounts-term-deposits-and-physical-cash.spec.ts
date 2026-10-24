@@ -390,9 +390,10 @@ test('bank accounts, term deposits and physical cash: money moves only between a
     await expect(placeBalance(page, 'Sejf', 'USD')).toContainText(usd('300,00'));
     await expect(async () => {
       await page.reload();
-      await expect(
-        placeBalance(page, 'Sejf', 'USD').locator('.cash-place__amount-pln'),
-      ).toContainText(pln('1 200,00'), { timeout: 3_000 });
+      await expect(placeBalance(page, 'Sejf', 'USD').locator('.cash-place__amount')).toContainText(
+        pln('1 200,00'),
+        { timeout: 3_000 },
+      );
       await expect(cashPlace(page, 'Sejf').locator('.cash-place__value')).toContainText(
         pln('3 200,00'),
         { timeout: 3_000 },
