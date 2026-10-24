@@ -7,7 +7,7 @@ export interface AssetDeadline {
   amount: number | string;
   currency: string;
   status: number;
-  link: '/deposits' | '/bonds';
+  link: '/wealth/deposits' | '/wealth/bonds';
 }
 
 export function assetDeadlines(
@@ -28,7 +28,7 @@ export function assetDeadlines(
         amount: deposit.projection.finalAmount,
         currency: deposit.currency,
         status: Number(deposit.status),
-        link: '/deposits',
+        link: '/wealth/deposits',
       });
     }
   }
@@ -42,7 +42,7 @@ export function assetDeadlines(
         amount: bond.bookValue,
         currency: 'PLN',
         status: Number(bond.status),
-        link: '/bonds',
+        link: '/wealth/bonds',
       });
     }
   }

@@ -261,7 +261,7 @@ describe('AccountDetail', () => {
     expect(request).toBeDefined();
     expect(new URL(request!).searchParams.get('accountId')).toBe(accountId);
     expect(text()).toContain('Autumn deposit');
-    expect(root().querySelector('a[href="/deposits"]')).not.toBeNull();
+    expect(root().querySelector('a[href="/wealth/deposits"]')).not.toBeNull();
   });
 
   it('does not look for deposits on a brokerage account', async () => {
@@ -274,7 +274,7 @@ describe('AccountDetail', () => {
     await setup();
 
     const link = root().querySelector<HTMLAnchorElement>(
-      `a[href="/assets/${etfAssetId}/transactions?from=accounts"]`,
+      `a[href="/wealth/assets/${etfAssetId}/transactions"]`,
     );
     expect(link?.textContent).toContain('World ETF');
   });

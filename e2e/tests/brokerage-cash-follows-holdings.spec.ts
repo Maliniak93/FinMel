@@ -7,6 +7,7 @@ import {
   test,
   warsawDate,
   openSelect,
+  wealthTab,
 } from './fixtures';
 import {
   ASSET_CLASS,
@@ -90,7 +91,7 @@ async function openDashboard(page: Page): Promise<void> {
 }
 
 async function openAccounts(page: Page): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Rachunki inwestycyjne', exact: true }).click();
+  await wealthTab(page, 'Rachunki inwestycyjne');
   await expect(
     page.getByRole('heading', { name: 'Rachunki inwestycyjne', level: 1 }),
   ).toBeVisible();

@@ -124,14 +124,14 @@ describe('Metals', () => {
     expect(silver).not.toContain('PLN');
   });
 
-  it('links each holding to its transactions with the metals origin', async () => {
+  it('links each holding to its transactions', async () => {
     await setup();
 
     const link = rowFor(goldKrugerrand.name).querySelector<HTMLAnchorElement>(
       'a[href*="/transactions"]',
     );
     expect(link?.getAttribute('href')).toBe(
-      `/assets/${goldKrugerrand.assetId}/transactions?from=metals`,
+      `/wealth/assets/${goldKrugerrand.assetId}/transactions`,
     );
   });
 

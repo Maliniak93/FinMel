@@ -26,34 +26,68 @@ export const routes: Routes = [
         loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.Dashboard),
       },
       {
-        path: 'accounts',
-        loadComponent: () => import('./features/accounts/accounts').then((m) => m.Accounts),
-      },
-      {
-        path: 'accounts/:id',
-        canActivate: [accountTypeGuard],
-        loadComponent: () =>
-          import('./features/accounts/account-detail/account-detail').then((m) => m.AccountDetail),
-      },
-      {
-        path: 'bank-accounts/:id',
-        canActivate: [accountTypeGuard],
-        loadComponent: () =>
-          import('./features/accounts/account-detail/account-detail').then((m) => m.AccountDetail),
-      },
-      {
-        path: 'bank-accounts',
-        loadComponent: () =>
-          import('./features/bank-accounts/bank-accounts').then((m) => m.BankAccounts),
-      },
-      {
-        path: 'assets/:assetId/transactions',
-        loadComponent: () =>
-          import('./features/transactions/transactions').then((m) => m.Transactions),
-      },
-      {
-        path: 'cash',
-        loadComponent: () => import('./features/cash/cash').then((m) => m.Cash),
+        path: 'wealth',
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./features/wealth/wealth-layout').then((m) => m.WealthLayout),
+            children: [
+              { path: '', pathMatch: 'full', redirectTo: 'accounts' },
+              {
+                path: 'accounts',
+                loadComponent: () => import('./features/accounts/accounts').then((m) => m.Accounts),
+              },
+              {
+                path: 'bank',
+                loadComponent: () =>
+                  import('./features/bank-accounts/bank-accounts').then((m) => m.BankAccounts),
+              },
+              {
+                path: 'cash',
+                loadComponent: () => import('./features/cash/cash').then((m) => m.Cash),
+              },
+              {
+                path: 'deposits',
+                loadComponent: () => import('./features/deposits/deposits').then((m) => m.Deposits),
+              },
+              {
+                path: 'bonds',
+                loadComponent: () => import('./features/bonds/bonds').then((m) => m.Bonds),
+              },
+              {
+                path: 'securities',
+                loadComponent: () =>
+                  import('./features/securities/securities').then((m) => m.Securities),
+              },
+              {
+                path: 'metals',
+                loadComponent: () => import('./features/metals/metals').then((m) => m.Metals),
+              },
+            ],
+          },
+          {
+            path: 'accounts/:id',
+            canActivate: [accountTypeGuard],
+            loadComponent: () =>
+              import('./features/accounts/account-detail/account-detail').then(
+                (m) => m.AccountDetail,
+              ),
+          },
+          {
+            path: 'bank/:id',
+            canActivate: [accountTypeGuard],
+            loadComponent: () =>
+              import('./features/accounts/account-detail/account-detail').then(
+                (m) => m.AccountDetail,
+              ),
+          },
+          {
+            path: 'assets/:assetId/transactions',
+            loadComponent: () =>
+              import('./features/transactions/transactions').then((m) => m.Transactions),
+          },
+        ],
       },
       {
         path: 'groups',
@@ -62,22 +96,6 @@ export const routes: Routes = [
       {
         path: 'planning',
         loadComponent: () => import('./features/planning/planning').then((m) => m.Planning),
-      },
-      {
-        path: 'securities',
-        loadComponent: () => import('./features/securities/securities').then((m) => m.Securities),
-      },
-      {
-        path: 'deposits',
-        loadComponent: () => import('./features/deposits/deposits').then((m) => m.Deposits),
-      },
-      {
-        path: 'bonds',
-        loadComponent: () => import('./features/bonds/bonds').then((m) => m.Bonds),
-      },
-      {
-        path: 'metals',
-        loadComponent: () => import('./features/metals/metals').then((m) => m.Metals),
       },
       {
         path: 'settings',

@@ -1,4 +1,3 @@
-import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { provideRouter, Router } from '@angular/router';
@@ -26,15 +25,6 @@ type LayoutName = 'full' | 'rail' | 'bottom';
 
 const WIDTHS: Record<LayoutName, number> = { full: 1280, rail: 1000, bottom: 600 };
 const LAYOUTS: LayoutName[] = ['full', 'rail', 'bottom'];
-const ASSET_PATHS = [
-  'accounts',
-  'bank-accounts',
-  'cash',
-  'deposits',
-  'bonds',
-  'securities',
-  'metals',
-];
 
 function todoItem(name: string): Record<string, unknown> {
   return {
@@ -91,12 +81,6 @@ function buttonByLabel(scope: ParentNode, label: string, exact = true): HTMLButt
       return exact ? value === label : value.startsWith(label);
     }) ?? null
   );
-}
-
-function moreButton(element: HTMLElement): HTMLButtonElement {
-  return Array.from(
-    element.querySelectorAll<HTMLButtonElement>('[data-testid="bottom-nav"] button'),
-  ).find((button) => textOf(button).includes('More'))!;
 }
 
 function linkHrefs(scope: ParentNode): (string | null)[] {
@@ -165,21 +149,14 @@ describe('Shell full layout', () => {
     expect(element.querySelector('[class*="toolbar"]')).toBeNull();
     expect(element.querySelector('[data-testid="bottom-nav"]')).toBeNull();
 
-    const sequence = labelsOf(element, '[data-testid="nav-section"], [data-testid="nav-list"] a');
-    expect(sequence).toEqual([
-      'Overview',
+    expect(element.querySelector('[data-testid="nav-section"]')).toBeNull();
+    expect(labelsOf(element, '[data-testid="nav-list"] a')).toEqual([
       'Dashboard',
-      'Planning',
       'Wealth',
-      'Investment accounts',
-      'Bank accounts',
-      'Cash',
-      'Deposits',
-      'Bonds',
-      'Stocks & ETFs',
-      'Precious metals',
+      'Planning',
       'Groups',
     ]);
+    expect(element.textContent).not.toContain('More');
 
     const pinned = element.querySelector<HTMLElement>('[data-testid="nav-pinned"]')!;
     const footer = element.querySelector<HTMLElement>('[data-testid="nav-footer"]')!;
@@ -191,19 +168,6 @@ describe('Shell full layout', () => {
     expect(buttonByLabel(footer, 'Log out')).not.toBeNull();
     const language = buttonByLabel(footer, 'Language')!;
     expect(textOf(language)).toBe('EN');
-  });
-
-  it('keeps the section kickers out of the focus order', async () => {
-    const element = root(await mount('full'));
-    const kickers = Array.from(
-      element.querySelectorAll<HTMLElement>('[data-testid="nav-section"]'),
-    );
-
-    expect(kickers).toHaveLength(2);
-    for (const kicker of kickers) {
-      expect(kicker.closest('a, button')).toBeNull();
-      expect(kicker.querySelector('a, button, [tabindex]')).toBeNull();
-    }
   });
 });
 
@@ -220,45 +184,21 @@ describe('Shell rail layout', () => {
     );
     expect(links.map((a) => a.getAttribute('href'))).toEqual([
       '/dashboard',
+      '/wealth',
       '/planning',
-      '/accounts',
-      '/bank-accounts',
-      '/cash',
-      '/deposits',
-      '/bonds',
-      '/securities',
-      '/metals',
       '/groups',
     ]);
     expect(links.map((a) => a.getAttribute('aria-label'))).toEqual([
       'Dashboard',
+      'Wealth',
       'Planning',
-      'Investment accounts',
-      'Bank accounts',
-      'Cash',
-      'Deposits',
-      'Bonds',
-      'Stocks & ETFs',
-      'Precious metals',
-      'Groups',
-    ]);
-    expect(labelsOf(element, 'mat-sidenav [data-testid="nav-list"] a')).toEqual([
-      'Dashboard',
-      'Planning',
-      'Accounts',
-      'Banks',
-      'Cash',
-      'Deposits',
-      'Bonds',
-      'Stocks & ETFs',
-      'Metals',
       'Groups',
     ]);
 
     const pinned = element.querySelector<HTMLElement>('[data-testid="nav-pinned"]')!;
     expect(linkHrefs(pinned)).toEqual(['/settings']);
     expect(pinned.querySelector('a')!.getAttribute('aria-label')).toBe('Settings');
-    expect(element.querySelectorAll('mat-sidenav a')).toHaveLength(11);
+    expect(element.querySelectorAll('mat-sidenav a')).toHaveLength(5);
 
     const footer = element.querySelector<HTMLElement>('[data-testid="nav-footer"]')!;
     expect(footer.querySelectorAll('button')).toHaveLength(3);
@@ -284,51 +224,9 @@ describe('Shell bottom layout', () => {
     const bottom = element.querySelector<HTMLElement>('[data-testid="bottom-nav"]')!;
     expect(bottom.tagName).toBe('NAV');
     expect(bottom.getAttribute('aria-label')).toBe('Main navigation');
-    expect(labelsOf(bottom, 'a, button')).toEqual(['Dashboard', 'Planning', 'Groups', 'More']);
-    expect(linkHrefs(bottom)).toEqual(['/dashboard', '/planning', '/groups']);
-  });
-});
-
-describe('Shell more sheet', () => {
-  function sheet(): HTMLElement | null {
-    return TestBed.inject(OverlayContainer)
-      .getContainerElement()
-      .querySelector<HTMLElement>('mat-bottom-sheet-container');
-  }
-
-  it('opens a Wealth sheet with the seven asset links, navigates and closes on choice', async () => {
-    const fixture = await mount('bottom');
-    const element = root(fixture);
-
-    moreButton(element).click();
-    await settle(fixture);
-
-    const opened = sheet()!;
-    expect(opened).not.toBeNull();
-    expect(textOf(opened)).toContain('Wealth');
-    expect(linkHrefs(opened)).toEqual(ASSET_PATHS.map((path) => `/${path}`));
-
-    const bonds = Array.from(opened.querySelectorAll('a')).find(
-      (a) => a.getAttribute('href') === '/bonds',
-    )!;
-    bonds.click();
-    await settle(fixture);
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    await settle(fixture);
-
-    expect(TestBed.inject(Router).url).toBe('/bonds');
-    expect(sheet()).toBeNull();
-    const more = moreButton(element);
-    expect(more.getAttribute('aria-current')).toBe('page');
-    expect(more.classList.contains('shell__nav-link--active')).toBe(true);
-  });
-
-  it('does not highlight More on a route outside the seven', async () => {
-    const fixture = await mount('bottom');
-    await TestBed.inject(Router).navigateByUrl('/dashboard');
-    await settle(fixture);
-
-    expect(moreButton(root(fixture)).hasAttribute('aria-current')).toBe(false);
+    expect(labelsOf(bottom, 'a, button')).toEqual(['Dashboard', 'Wealth', 'Planning', 'Groups']);
+    expect(linkHrefs(bottom)).toEqual(['/dashboard', '/wealth', '/planning', '/groups']);
+    expect(bottom.querySelector('button')).toBeNull();
   });
 });
 
@@ -338,10 +236,6 @@ describe.each(LAYOUTS)('Shell active item (%s layout)', (layout) => {
   beforeEach(async () => {
     fixture = await mount(layout);
   });
-
-  function expectedFor(path: string): string | null {
-    return layout === 'bottom' && ASSET_PATHS.includes(path) ? null : `/${path}`;
-  }
 
   async function activeHrefs(url: string): Promise<(string | null)[]> {
     await TestBed.inject(Router).navigateByUrl(url);
@@ -358,20 +252,13 @@ describe.each(LAYOUTS)('Shell active item (%s layout)', (layout) => {
     return byClass;
   }
 
-  it('highlights the origin item on the transactions route', async () => {
-    expect(await activeHrefs('/assets/a1/transactions?from=cash')).toEqual([expectedFor('cash')]);
-    expect(await activeHrefs('/assets/a1/transactions?from=metals')).toEqual([
-      expectedFor('metals'),
-    ]);
-    expect(await activeHrefs('/assets/a1/transactions?from=accounts')).toEqual([
-      expectedFor('accounts'),
-    ]);
-    expect(await activeHrefs('/assets/a1/transactions')).toEqual([]);
-    expect(await activeHrefs('/assets/a1/transactions?from=nowhere')).toEqual([]);
-  });
-
-  it('keeps highlighting Rachunki on account detail', async () => {
-    expect(await activeHrefs('/accounts/acc-1')).toEqual([expectedFor('accounts')]);
+  it('Majątek active on /wealth, a tab, a detail and a transactions route', async () => {
+    expect(await activeHrefs('/wealth')).toEqual(['/wealth']);
+    expect(await activeHrefs('/wealth/cash')).toEqual(['/wealth']);
+    expect(await activeHrefs('/wealth/accounts/acc-1')).toEqual(['/wealth']);
+    expect(await activeHrefs('/wealth/bank/acc-1')).toEqual(['/wealth']);
+    expect(await activeHrefs('/wealth/assets/a1/transactions')).toEqual(['/wealth']);
+    expect(await activeHrefs('/planning')).toEqual(['/planning']);
   });
 
   it('highlights Dashboard on its route', async () => {
@@ -437,7 +324,7 @@ describe.each(LAYOUTS)('Shell actions (%s layout)', (layout) => {
       const names = Array.from(element.querySelectorAll('mat-sidenav a'), (a) =>
         (a.getAttribute('aria-label') ?? textOf(a.querySelector('.shell__nav-label'))).trim(),
       );
-      expect(names).toContain('Rachunki inwestycyjne');
+      expect(names).toContain('Majątek');
       expect(names).toContain('Ustawienia');
     }
   });

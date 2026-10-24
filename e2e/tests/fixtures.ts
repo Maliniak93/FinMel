@@ -12,6 +12,21 @@ export async function openSelect(select: Locator): Promise<void> {
   await select.click({ position: { x: Math.max(box!.width - 24, 1), y: box!.height / 2 } });
 }
 
+export const WEALTH_TABS: readonly string[] = [
+  'Rachunki inwestycyjne',
+  'Konta bankowe',
+  'Gotówka',
+  'Lokaty',
+  'Obligacje',
+  'Akcje i ETF',
+  'Metale szlachetne',
+];
+
+export async function wealthTab(page: Page, name: string): Promise<void> {
+  await page.getByRole('link', { name: 'Majątek', exact: true }).click();
+  await page.getByRole('tab', { name, exact: true }).click();
+}
+
 export const STUB_URL = 'http://localhost:18081';
 
 export interface Credentials {

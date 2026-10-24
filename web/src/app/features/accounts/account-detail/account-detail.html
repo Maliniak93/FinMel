@@ -1,5 +1,5 @@
 <div class="account-detail">
-  <a [routerLink]="isBank() ? '/bank-accounts' : '/accounts'" class="account-detail__back">
+  <a [routerLink]="isBank() ? '/wealth/bank' : '/wealth/accounts'" class="account-detail__back">
     <mat-icon>arrow_back</mat-icon>
     {{ (isBank() ? 'bankAccounts.back' : 'accounts.detail.back') | transloco }}
   </a>
@@ -184,11 +184,9 @@
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
             <td mat-cell *matCellDef="let holding">
-              <a
-                [routerLink]="['/assets', holding.id, 'transactions']"
-                [queryParams]="{ from: 'accounts' }"
-                >{{ holding.name }}</a
-              >
+              <a [routerLink]="['/wealth/assets', holding.id, 'transactions']">{{
+                holding.name
+              }}</a>
             </td>
           </ng-container>
 
@@ -223,7 +221,7 @@
           <ng-container matColumnDef="name">
             <th mat-header-cell *matHeaderCellDef>{{ 'common.name' | transloco }}</th>
             <td mat-cell *matCellDef="let deposit">
-              <a routerLink="/deposits">{{ deposit.name }}</a>
+              <a routerLink="/wealth/deposits">{{ deposit.name }}</a>
             </td>
           </ng-container>
 

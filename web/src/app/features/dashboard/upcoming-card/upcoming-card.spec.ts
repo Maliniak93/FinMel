@@ -59,9 +59,9 @@ describe('UpcomingCard', () => {
     expect(text).toContain('Upcoming bond');
     expect(text).toContain(formatDate(soonBond.maturityDate));
     expect(text).toContain(formatMoney(5000, 'PLN'));
-    expect(element.querySelector('a[href="/deposits"]')).not.toBeNull();
-    expect(element.querySelector('a[href="/bonds"]')).not.toBeNull();
-    expect(element.querySelector('a[href="/bank-accounts"]')).not.toBeNull();
+    expect(element.querySelector('a[href="/wealth/deposits"]')).not.toBeNull();
+    expect(element.querySelector('a[href="/wealth/bonds"]')).not.toBeNull();
+    expect(element.querySelector('a[href="/wealth/bank"]')).not.toBeNull();
   });
 
   it('empty', async () => {

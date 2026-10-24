@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { expect, test, openSelect } from './fixtures';
+import { expect, test, openSelect, wealthTab } from './fixtures';
 import { expectProjected } from './projection';
 
 const TEN_THOUSAND_PLN = /10\s000,00\szł/;
@@ -97,7 +97,7 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  await test.step('Krok 4: after logging in the Dashboard shows a 232 px sidebar with sections, an active marker and Settings above the footer, and no top bar', async () => {
+  await test.step('Krok 4: after logging in the Dashboard shows a 232 px sidebar with four entries, an active marker and Settings above the footer, and no top bar', async () => {
     await page.getByLabel('E-mail').fill(user.email);
     await page.getByLabel('Hasło').fill(user.password);
     await page.getByRole('button', { name: 'Zaloguj się' }).click();
@@ -107,7 +107,12 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     await expect(sidebar(page)).toBeVisible();
     expect((await sidebar(page).boundingBox())!.width).toBe(232);
     await expect(page.getByTestId('top-bar')).toHaveCount(0);
-    await expect(page.getByTestId('nav-section')).toHaveText([/Przegląd/, /Majątek/]);
+    await expect(page.getByTestId('nav-list').locator('.shell__nav-label')).toHaveText([
+      /^Pulpit$/,
+      /^Majątek$/,
+      /^Planowanie$/,
+      /^Grupy$/,
+    ]);
     await expect(sidebar(page).getByRole('link', { name: 'Pulpit' })).toHaveAttribute(
       'aria-current',
       'page',
@@ -161,18 +166,18 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     const footer = page.getByTestId('nav-footer');
     await footer.getByRole('button', { name: 'Język' }).click();
     await page.getByRole('menuitemradio', { name: 'English' }).click();
-    await expect(page.getByTestId('nav-section')).toHaveText([/Overview/, /Wealth/]);
+    await expect(sidebar(page).getByRole('link', { name: 'Wealth' })).toBeVisible();
     await expect(sidebar(page).getByRole('link', { name: 'Dashboard' })).toBeVisible();
     await expect(footer.getByRole('button', { name: 'Language' })).toHaveText('EN');
 
     await footer.getByRole('button', { name: 'Language' }).click();
     await page.getByRole('menuitemradio', { name: 'Polski' }).click();
-    await expect(page.getByTestId('nav-section')).toHaveText([/Przegląd/, /Majątek/]);
+    await expect(sidebar(page).getByRole('link', { name: 'Majątek' })).toBeVisible();
     await expect(footer.getByRole('button', { name: 'Język' })).toHaveText('PL');
   });
 
   await test.step('Krok 9: create the XTB account and deposit 10 000 zł, shown as 10 000,00 zł', async () => {
-    await sidebar(page).getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
+    await wealthTab(page, 'Rachunki inwestycyjne');
     await page.getByRole('button', { name: 'Utwórz pierwszy rachunek' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Nazwa').fill('XTB');
@@ -185,12 +190,12 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
 
-    await sidebar(page).getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
+    await wealthTab(page, 'Rachunki inwestycyjne');
     await expect(page.getByRole('row', { name: /XTB/ })).toContainText(TEN_THOUSAND_PLN);
   });
 
   await test.step('Krok 10: the Revolut EUR bank account shows 420,00 EUR with the code and no euro sign', async () => {
-    await sidebar(page).getByRole('link', { name: 'Konta bankowe', exact: true }).click();
+    await wealthTab(page, 'Konta bankowe');
     await page.getByRole('button', { name: 'Dodaj konto', exact: true }).first().click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Nazwa').fill('Revolut EUR');
@@ -262,16 +267,16 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     );
   });
 
-  await test.step('Krok 13: at about 1000 px the sidebar is a 72 px rail with icons and short labels, a scrolling list and pinned Settings, theme, language and log out', async () => {
+  await test.step('Krok 13: at about 1000 px the sidebar is a 72 px rail with four icons and labels, a scrolling list and pinned Settings, theme, language and log out', async () => {
     await page.setViewportSize(RAIL);
     await expect.poll(async () => (await sidebar(page).boundingBox())?.width).toBe(72);
     const links = page.getByTestId('nav-list').locator('.shell__nav-link');
-    await expect(links).toHaveCount(10);
+    await expect(links).toHaveCount(4);
     for (const link of await links.all()) {
       await expect(link.locator('mat-icon')).toBeVisible();
       await expect(link.locator('.shell__nav-label')).not.toBeEmpty();
     }
-    await expect(links.nth(2).locator('.shell__nav-label')).toHaveText('Rachunki');
+    await expect(links.nth(1).locator('.shell__nav-label')).toHaveText('Majątek');
     await expect(page.getByTestId('nav-list')).toHaveCSS('overflow-y', 'auto');
 
     const pinned = page.getByTestId('nav-pinned');
@@ -287,9 +292,11 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     const bottom = page.getByTestId('bottom-nav');
     await expect(bottom).toBeVisible();
     await expect(bottom.getByRole('link', { name: 'Pulpit' })).toBeVisible();
+    await expect(bottom.getByRole('link', { name: 'Majątek' })).toBeVisible();
     await expect(bottom.getByRole('link', { name: 'Planowanie' })).toBeVisible();
     await expect(bottom.getByRole('link', { name: 'Grupy' })).toBeVisible();
-    await expect(bottom.getByRole('button', { name: 'Więcej' })).toBeVisible();
+    await expect(bottom.getByRole('link')).toHaveCount(4);
+    await expect(bottom.getByRole('button')).toHaveCount(0);
 
     const top = page.getByTestId('top-bar');
     await expect(top).toBeVisible();
@@ -301,17 +308,11 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     expect((await top.boundingBox())!.height).toBeLessThan(72);
   });
 
-  await test.step('Krok 15: "Więcej" opens the Majątek sheet with seven asset types and Lokaty closes it and highlights "Więcej"', async () => {
-    await page.getByTestId('bottom-nav').getByRole('button', { name: 'Więcej' }).click();
-    const sheet = page.locator('mat-bottom-sheet-container');
-    await expect(sheet.getByRole('heading', { name: 'Majątek' })).toBeVisible();
-    await expect(sheet.getByRole('link')).toHaveCount(7);
-    await sheet.getByRole('link', { name: 'Lokaty' }).click();
-    await expect(sheet).toBeHidden();
-    await expect(page).toHaveURL(/\/deposits$/);
-    await expect(
-      page.getByTestId('bottom-nav').getByRole('button', { name: 'Więcej' }),
-    ).toHaveAttribute('aria-current', 'page');
+  await test.step('Krok 15: Majątek in the bottom navigation opens the investment accounts tab and is highlighted', async () => {
+    const majatek = page.getByTestId('bottom-nav').getByRole('link', { name: 'Majątek' });
+    await majatek.click();
+    await expect(page).toHaveURL(/\/wealth\/accounts$/);
+    await expect(majatek).toHaveAttribute('aria-current', 'page');
   });
 
   await test.step('Krok 16: Settings has a page header with "Synchronizuj teraz" and a grey skeleton while the status loads', async () => {
@@ -334,7 +335,7 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
 
   await test.step('Krok 17: removing XTB asks for confirmation with focus on "Anuluj", a destructive confirm button, and Enter does not delete', async () => {
     await page.setViewportSize(WIDE);
-    await sidebar(page).getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
+    await wealthTab(page, 'Rachunki inwestycyjne');
     const row = page.getByRole('row', { name: /XTB/ });
     await row.getByRole('button', { name: 'Akcje dla: XTB', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Usuń', exact: true }).click();

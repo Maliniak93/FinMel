@@ -26,13 +26,13 @@ export function assetClassLabel(value: AssetClass): string {
 }
 
 const ASSET_CLASS_PAGES: Record<number, string> = {
-  [ASSET_CLASS.Cash]: '/cash',
-  [ASSET_CLASS.Deposit]: '/deposits',
-  [ASSET_CLASS.Stock]: '/securities',
-  [ASSET_CLASS.Etf]: '/securities',
-  [ASSET_CLASS.Bond]: '/bonds',
-  [ASSET_CLASS.PreciousMetal]: '/metals',
-  [ASSET_CLASS.BankAccount]: '/bank-accounts',
+  [ASSET_CLASS.Cash]: '/wealth/cash',
+  [ASSET_CLASS.Deposit]: '/wealth/deposits',
+  [ASSET_CLASS.Stock]: '/wealth/securities',
+  [ASSET_CLASS.Etf]: '/wealth/securities',
+  [ASSET_CLASS.Bond]: '/wealth/bonds',
+  [ASSET_CLASS.PreciousMetal]: '/wealth/metals',
+  [ASSET_CLASS.BankAccount]: '/wealth/bank',
 };
 
 export function assetClassPage(value: AssetClass): string {

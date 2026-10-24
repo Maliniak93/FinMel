@@ -44,18 +44,9 @@
       "settings": "Ustawienia",
       "accounts": "Rachunki inwestycyjne",
       "bankAccounts": "Konta bankowe",
-      "groups": "Grupy"
-    },
-    "navSection": {
-      "overview": "Przegląd",
+      "groups": "Grupy",
       "wealth": "Majątek"
     },
-    "navShort": {
-      "accounts": "Rachunki",
-      "bankAccounts": "Konta",
-      "metals": "Metale"
-    },
-    "more": "Więcej",
     "mainNavigation": "Nawigacja główna",
     "logOut": "Wyloguj",
     "theme": {
@@ -63,6 +54,9 @@
       "light": "Motyw: jasny — kliknij, aby wybrać ciemny",
       "dark": "Motyw: ciemny — kliknij, aby wybrać systemowy"
     }
+  },
+  "wealth": {
+    "tabsLabel": "Typy majątku"
   },
   "auth": {
     "email": "E-mail",

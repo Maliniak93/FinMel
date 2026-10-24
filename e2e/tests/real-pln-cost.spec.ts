@@ -1,4 +1,4 @@
-import { expect, logInThroughUi, registerThroughUi, test, openSelect } from './fixtures';
+import { expect, logInThroughUi, registerThroughUi, test, openSelect, wealthTab } from './fixtures';
 import type { Locator, Page } from '@playwright/test';
 
 // pl-PL groups only numbers from 10 000 up, with a space or a non-breaking space, and may use a true minus sign, so the patterns accept either.
@@ -15,8 +15,8 @@ function navigation(page: Page): Locator {
 }
 
 async function openEtfRow(page: Page): Promise<Locator> {
-  await navigation(page).getByRole('link', { name: 'Akcje i ETF' }).click();
-  await page.getByRole('tab', { name: 'ETF' }).click();
+  await wealthTab(page, 'Akcje i ETF');
+  await page.getByRole('tab', { name: 'ETF', exact: true }).click();
   return page.getByRole('row').filter({ hasText: 'VWCE.DE' });
 }
 
@@ -37,7 +37,7 @@ async function selectOption(page: Page, select: Locator, option: string): Promis
 }
 
 async function expectAccountCash(page: Page, amount: string): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
+  await wealthTab(page, 'Rachunki inwestycyjne');
   await page.getByRole('link', { name: ACCOUNT, exact: true }).click();
   const cash = page
     .locator('.account-detail__totals > div')
@@ -86,7 +86,7 @@ test('real PLN cost: the PLN really paid drives cost basis, P/L and account cash
   });
 
   await test.step('Krok 2: new Brokerage / Regular account XTB with 0,00 PLN cash', async () => {
-    await sidebar.getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
+    await wealthTab(page, 'Rachunki inwestycyjne');
     await page.getByRole('button', { name: 'Utwórz pierwszy rachunek' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Nazwa').fill(ACCOUNT);
@@ -106,8 +106,8 @@ test('real PLN cost: the PLN really paid drives cost basis, P/L and account cash
   });
 
   await test.step('Krok 4: add VWCE.DE with a first buy, the payment currency defaults to EUR', async () => {
-    await sidebar.getByRole('link', { name: 'Akcje i ETF' }).click();
-    await page.getByRole('tab', { name: 'ETF' }).click();
+    await wealthTab(page, 'Akcje i ETF');
+    await page.getByRole('tab', { name: 'ETF', exact: true }).click();
     await page.getByRole('button', { name: 'Dodaj', exact: true }).first().click();
     const dialog = page.getByRole('dialog');
     await selectOption(page, dialog.getByRole('combobox', { name: 'Rachunek' }), ACCOUNT);
@@ -273,7 +273,7 @@ test('real PLN cost: the PLN really paid drives cost basis, P/L and account cash
   });
 
   await test.step('Krok 23: a PLN instrument (CDR.WA) offers no payment currency choice', async () => {
-    await sidebar.getByRole('link', { name: 'Akcje i ETF' }).click();
+    await wealthTab(page, 'Akcje i ETF');
     await page.getByRole('tab', { name: 'Akcje', exact: true }).click();
     await page.getByRole('button', { name: 'Dodaj', exact: true }).first().click();
     await selectOption(page, dialog.getByRole('combobox', { name: 'Rachunek' }), ACCOUNT);

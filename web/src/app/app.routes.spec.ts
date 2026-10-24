@@ -1,12 +1,16 @@
+import { Type } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
 import { App } from './app';
 import { routes } from './app.routes';
 import { AuthService } from './core/auth/auth';
 import { Login } from './features/auth/login/login';
+import { BankAccounts } from './features/bank-accounts/bank-accounts';
+import { Securities } from './features/securities/securities';
+import { WealthLayout } from './features/wealth/wealth-layout';
 import { Bonds } from './features/bonds/bonds';
 import { Cash } from './features/cash/cash';
 import { Dashboard } from './features/dashboard/dashboard';
@@ -40,12 +44,31 @@ describe('app routing (authenticated)', () => {
     expect(harness.fixture.debugElement.query(By.directive(Dashboard))).toBeTruthy();
   });
 
-  it('renders Accounts at /accounts', async () => {
-    await harness.navigateByUrl('/accounts', Shell);
+  it('wealth routes: every type renders inside the layout at /wealth/<tab>', async () => {
+    const tabs: [string, Type<unknown>][] = [
+      ['accounts', Accounts],
+      ['bank', BankAccounts],
+      ['cash', Cash],
+      ['deposits', Deposits],
+      ['bonds', Bonds],
+      ['securities', Securities],
+      ['metals', Metals],
+    ];
+    for (const [path, component] of tabs) {
+      await harness.navigateByUrl(`/wealth/${path}`, Shell);
+      const element = harness.fixture.debugElement;
+      expect(element.query(By.directive(WealthLayout)), path).toBeTruthy();
+      expect(element.query(By.directive(component)), path).toBeTruthy();
+    }
+  });
+
+  it('wealth routes: /wealth redirects to the accounts tab', async () => {
+    await harness.navigateByUrl('/wealth', Shell);
+    expect(TestBed.inject(Router).url).toBe('/wealth/accounts');
     expect(harness.fixture.debugElement.query(By.directive(Accounts))).toBeTruthy();
   });
 
-  it('renders AccountDetail at bank-accounts/:id', async () => {
+  it('wealth routes: detail pages render without the tab bar', async () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
     const bankId = '11111111-1111-1111-1111-111111111111';
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -65,30 +88,26 @@ describe('app routing (authenticated)', () => {
         ),
     );
 
-    await harness.navigateByUrl(`/bank-accounts/${bankId}`, Shell);
+    await harness.navigateByUrl(`/wealth/bank/${bankId}`, Shell);
     fetchSpy.mockRestore();
 
-    expect(harness.fixture.debugElement.query(By.directive(AccountDetail))).toBeTruthy();
+    const element = harness.fixture.debugElement;
+    expect(element.query(By.directive(AccountDetail))).toBeTruthy();
+    expect(element.query(By.directive(WealthLayout))).toBeNull();
   });
 
-  it('renders Cash at /cash', async () => {
-    await harness.navigateByUrl('/cash', Shell);
-    expect(harness.fixture.debugElement.query(By.directive(Cash))).toBeTruthy();
-  });
-
-  it('renders Deposits at /deposits', async () => {
-    await harness.navigateByUrl('/deposits', Shell);
-    expect(harness.fixture.debugElement.query(By.directive(Deposits))).toBeTruthy();
-  });
-
-  it('renders Bonds at /bonds', async () => {
-    await harness.navigateByUrl('/bonds', Shell);
-    expect(harness.fixture.debugElement.query(By.directive(Bonds))).toBeTruthy();
-  });
-
-  it('renders Metals at /metals', async () => {
-    await harness.navigateByUrl('/metals', Shell);
-    expect(harness.fixture.debugElement.query(By.directive(Metals))).toBeTruthy();
+  it('old routes are gone: old addresses and an unknown wealth tab show the 404 page', async () => {
+    const oldPaths = [
+      'accounts',
+      'bank-accounts/11111111-1111-1111-1111-111111111111',
+      'cash',
+      'assets/a1/transactions',
+    ];
+    for (const url of [...oldPaths.map((path) => `/${path}`), '/wealth/xyz']) {
+      await harness.navigateByUrl(url, Shell);
+      expect(harness.fixture.debugElement.query(By.directive(NotFound)), url).toBeTruthy();
+      expect(TestBed.inject(Router).url, url).toBe(url);
+    }
   });
 
   it('renders Settings at /settings', async () => {

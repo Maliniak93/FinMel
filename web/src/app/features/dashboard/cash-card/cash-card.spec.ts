@@ -27,7 +27,7 @@ describe('CashCard', () => {
     expect(text).toContain(formatMoney(1234.5, 'PLN'));
     expect(text).toContain(formatMoney(200, 'EUR'));
     expect(element.querySelector('.cash-card__total')?.textContent).toContain(formatMoney(1634.5));
-    expect(element.querySelector('a[href="/cash"]')).not.toBeNull();
+    expect(element.querySelector('a[href="/wealth/cash"]')).not.toBeNull();
   });
 
   it('empty', async () => {

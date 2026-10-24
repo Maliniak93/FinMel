@@ -196,8 +196,8 @@ describe('Accounts', () => {
     await setup(jsonResponse([brokerage, bonds]));
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(element.querySelector(`a[href="/accounts/${brokerage.id}"]`)).not.toBeNull();
-    expect(element.querySelector(`a[href="/accounts/${bonds.id}"]`)).not.toBeNull();
+    expect(element.querySelector(`a[href="/wealth/accounts/${brokerage.id}"]`)).not.toBeNull();
+    expect(element.querySelector(`a[href="/wealth/accounts/${bonds.id}"]`)).not.toBeNull();
   });
 
   it('shows the cash from the account and the securities as the total minus the cash', async () => {

@@ -1,4 +1,4 @@
-import { expect, logInThroughApi, logInThroughUi, test } from './fixtures';
+import { expect, logInThroughApi, logInThroughUi, test, wealthTab } from './fixtures';
 import {
   COMPANY,
   MBANK,
@@ -313,10 +313,7 @@ test('recurring incomes: define incomes, read any month of /planning, change the
   });
 
   await test.step('Krok 18: archiving Konto firmowe works and listopad 2026 still counts Wypłata with an archived-account warning', async () => {
-    await page
-      .locator('mat-sidenav')
-      .getByRole('link', { name: 'Konta bankowe', exact: true })
-      .click();
+    await wealthTab(page, 'Konta bankowe');
     await page.getByRole('button', { name: `Akcje dla: ${COMPANY}`, exact: true }).click();
     await page.getByRole('menuitem', { name: 'Archiwizuj', exact: true }).click();
     const dialog = page.getByRole('dialog');

@@ -122,7 +122,7 @@ export class Metals {
   }
 
   protected transactionsLink(holding: MetalResponse): string[] {
-    return ['/assets', holding.assetId, 'transactions'];
+    return ['/wealth/assets', holding.assetId, 'transactions'];
   }
 
   protected openAddDialog(): void {

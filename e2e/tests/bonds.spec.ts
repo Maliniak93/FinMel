@@ -8,6 +8,7 @@ import {
   test,
   warsawDate,
   openSelect,
+  wealthTab,
 } from './fixtures';
 
 // pl-PL groups only numbers from 10 000 up, with a space or a non-breaking space, so the pattern accepts either.
@@ -19,10 +20,6 @@ const ACCOUNT = 'Obligacje PKO';
 const SERIES = 'OTS0127';
 const ACCOUNT_TYPE_BONDS = 1;
 const WRAPPER_REGULAR = 0;
-
-function navigation(page: Page): Locator {
-  return page.locator('mat-sidenav');
-}
 
 function bondRow(page: Page): Locator {
   return page.getByRole('row').filter({ hasText: SERIES });
@@ -61,7 +58,7 @@ async function fillOtsBond(page: Page, dialog: Locator, count: string): Promise<
 }
 
 async function expectAccountCash(page: Page, amount: string): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Rachunki inwestycyjne', exact: true }).click();
+  await wealthTab(page, 'Rachunki inwestycyjne');
   await page.getByRole('link', { name: ACCOUNT, exact: true }).click();
   await expect(page.getByTestId('account-cash')).toContainText(pln(amount));
 }
@@ -82,7 +79,7 @@ test('treasury bonds: buy, value and redeem early on /bonds', async ({ page, req
 
   await page.goto('/login');
   await logInThroughUi(page, user);
-  await navigation(page).getByRole('link', { name: 'Obligacje', exact: true }).click();
+  await wealthTab(page, 'Obligacje');
 
   await test.step('Krok 1: the purchase dialog for Obligacje PKO shows the account cash 5 000,00 zł', async () => {
     const dialog = await openBuyDialog(page);
@@ -114,7 +111,7 @@ test('treasury bonds: buy, value and redeem early on /bonds', async ({ page, req
   });
 
   await test.step('Krok 5: buying 50 more bonds today is refused for lack of funds and the list stays at 10', async () => {
-    await navigation(page).getByRole('link', { name: 'Obligacje', exact: true }).click();
+    await wealthTab(page, 'Obligacje');
     const dialog = await openBuyDialog(page);
     await chooseOption(page, dialog.getByRole('combobox', { name: 'Rachunek' }), /Obligacje PKO/);
     await fillOtsBond(page, dialog, '50');

@@ -33,8 +33,8 @@ function account(type: number): AccountResponse {
   };
 }
 
-function runGuard(path: 'accounts/:id' | 'bank-accounts/:id') {
-  const url = path.replace(':id', ACCOUNT_ID);
+function runGuard(path: 'accounts/:id' | 'bank/:id') {
+  const url = `wealth/${path.replace(':id', ACCOUNT_ID)}`;
   const route = {
     params: { id: ACCOUNT_ID },
     paramMap: convertToParamMap({ id: ACCOUNT_ID }),
@@ -65,15 +65,15 @@ describe('accountTypeGuard', () => {
 
     const result = await runGuard('accounts/:id');
 
-    expect(result).toEqual(TestBed.inject(Router).createUrlTree(['/bank-accounts', ACCOUNT_ID]));
+    expect(result).toEqual(TestBed.inject(Router).createUrlTree(['/wealth/bank', ACCOUNT_ID]));
   });
 
-  it('redirects a non-Bank account from bank-accounts/:id', async () => {
+  it('redirects a non-Bank account from bank/:id', async () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse(account(1)));
 
-    const result = await runGuard('bank-accounts/:id');
+    const result = await runGuard('bank/:id');
 
-    expect(result).toEqual(TestBed.inject(Router).createUrlTree(['/accounts', ACCOUNT_ID]));
+    expect(result).toEqual(TestBed.inject(Router).createUrlTree(['/wealth/accounts', ACCOUNT_ID]));
   });
 
   it('keeps a non-Bank account on accounts/:id', async () => {
@@ -88,6 +88,6 @@ describe('accountTypeGuard', () => {
       .mockResolvedValue(jsonResponse({ title: 'Not found', status: 404 }, 404));
 
     expect(await runGuard('accounts/:id')).toBe(true);
-    expect(await runGuard('bank-accounts/:id')).toBe(true);
+    expect(await runGuard('bank/:id')).toBe(true);
   });
 });

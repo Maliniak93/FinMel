@@ -9,9 +9,7 @@
     [attr.aria-label]="rail ? (link.label | transloco) : null"
   >
     <mat-icon class="shell__nav-icon">{{ link.icon }}</mat-icon>
-    <span class="shell__nav-label">{{
-      (rail && link.shortLabel ? link.shortLabel : link.label) | transloco
-    }}</span>
+    <span class="shell__nav-label">{{ link.label | transloco }}</span>
     @if (link.path === 'planning' && planningState.todoCount() > 0) {
       <span
         class="shell__badge"
@@ -57,19 +55,8 @@
           <div class="shell__brand">Skarbiec</div>
         }
         <div class="shell__nav-list" data-testid="nav-list">
-          @if (layout() === 'full') {
-            @for (section of navSections; track section.label) {
-              <div class="shell__nav-section" data-testid="nav-section">
-                {{ section.label | transloco }}
-              </div>
-              @for (link of section.links; track link.path) {
-                <ng-container *ngTemplateOutlet="navItem; context: { $implicit: link }" />
-              }
-            }
-          } @else {
-            @for (link of allLinks; track link.path) {
-              <ng-container *ngTemplateOutlet="navItem; context: { $implicit: link }" />
-            }
+          @for (link of navLinks; track link.path) {
+            <ng-container *ngTemplateOutlet="navItem; context: { $implicit: link }" />
           }
         </div>
         <div class="shell__nav-pinned" data-testid="nav-pinned">
@@ -115,19 +102,9 @@
         data-testid="bottom-nav"
         [attr.aria-label]="'shell.mainNavigation' | transloco"
       >
-        @for (link of bottomLinks; track link.path) {
+        @for (link of navLinks; track link.path) {
           <ng-container *ngTemplateOutlet="navItem; context: { $implicit: link }" />
         }
-        <button
-          type="button"
-          class="shell__nav-link"
-          [class.shell__nav-link--active]="moreActive()"
-          [attr.aria-current]="moreActive() ? 'page' : null"
-          (click)="openMore()"
-        >
-          <mat-icon class="shell__nav-icon">more_horiz</mat-icon>
-          <span class="shell__nav-label">{{ 'shell.more' | transloco }}</span>
-        </button>
       </nav>
     }
   </mat-sidenav-content>
