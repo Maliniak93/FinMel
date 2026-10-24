@@ -23,8 +23,10 @@ export const WEALTH_TABS: readonly string[] = [
 ];
 
 export async function wealthTab(page: Page, name: string): Promise<void> {
-  await page.getByRole('link', { name: 'Majątek', exact: true }).click();
-  await page.getByRole('tab', { name: new RegExp(`^${name}(\\s|$)`) }).click();
+  await page.getByTestId('nav-list').getByRole('link', { name: 'Majątek', exact: true }).click();
+  // The tab bar scrolls at 1280 px, so a pointer click on an edge tab can land on the scroll shift and be lost.
+  await page.getByRole('tab', { name: new RegExp(`^${name}(\\s|$)`) }).focus();
+  await page.keyboard.press('Enter');
 }
 
 export const STUB_URL = 'http://localhost:18081';

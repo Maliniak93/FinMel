@@ -294,10 +294,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
 
   await test.step('Krok 14: a new deposit from mBank has a read-only PLN currency, "Zwrot na" offers the source account and Nest Oszczędnościowe without mBank USD, and no tax-exemption switch', async () => {
     await openPage(page, 'Lokaty');
-    await page
-      .getByRole('button', { name: /^(Dodaj lokatę|Dodaj pierwszą lokatę)$/ })
-      .first()
-      .click();
+    await page.getByRole('button', { name: 'Nowa lokata', exact: true }).first().click();
     await selectOption(page, dialog.getByRole('combobox', { name: 'Z konta' }), /^mBank \(/);
     await expect(
       dialog.locator('.deposit-form-dialog__funding').filter({ hasText: 'Waluta' }),
@@ -331,13 +328,13 @@ test('bank accounts, term deposits and physical cash: money moves only between a
     await expect(row.locator('.mat-column-maturityDate')).toContainText(/1\spaź\s2026/);
     await expect(row.locator('.mat-column-netInterest')).toContainText(pln('122,49'));
     await expect(row.locator('.mat-column-finalAmount')).toContainText(pln('10 122,49'));
-    await expect(row.locator('.mat-column-status')).toContainText('Zapadła');
+    await expect(row.locator('.mat-column-status')).toContainText(/Zapada\s1\spaź\s2026/);
     await expectBankBalance(page, 'mBank', pln('7 000,00'));
   });
 
   await test.step('Krok 16: a new deposit of 8 000 zł from mBank with today date shows "Brak środków na koncie" and saves nothing', async () => {
     await openPage(page, 'Lokaty');
-    await page.getByRole('button', { name: 'Dodaj lokatę', exact: true }).click();
+    await page.getByRole('button', { name: 'Nowa lokata', exact: true }).first().click();
     await dialog.getByLabel('Nazwa').fill('Lokata za duża');
     await selectOption(page, dialog.getByRole('combobox', { name: 'Z konta' }), /^mBank \(/);
     await dialog.getByLabel('Kapitał').fill('8000');
@@ -353,9 +350,7 @@ test('bank accounts, term deposits and physical cash: money moves only between a
   });
 
   await test.step('Krok 17: settling the matured deposit with payout to Nest Oszczędnościowe gives status Wypłacona and Nest Oszczędnościowe 20 156,89 zł', async () => {
-    await page
-      .getByRole('button', { name: `Rozlicz zapadalność lokaty ${FIXED_DEPOSIT}`, exact: true })
-      .click();
+    await openRowMenu(page, depositRow(page, FIXED_DEPOSIT), FIXED_DEPOSIT, 'Rozlicz zapadalność');
     await expect(dialog.getByLabel('Odsetki brutto')).not.toHaveValue('');
     await dialog.getByRole('checkbox', { name: 'Wypłać na konto Nest Oszczędnościowe' }).check();
     await dialog.getByRole('button', { name: 'Rozlicz', exact: true }).click();
