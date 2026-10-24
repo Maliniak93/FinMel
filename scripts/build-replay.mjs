@@ -1,18 +1,14 @@
 #!/usr/bin/env node
 // Usage: node scripts/build-replay.mjs <issue> [--history <dir>] [--json]
 //   <issue>    spec issue number whose newest build-feature run is replayed
-//   --history  Claude Code history folder of the project (default: derived from the repo path, like run-cost.mjs)
+//   --history  Claude Code history folder of the project (default: derived from the repo path by claude-history.mjs)
 //   --json     print the findReplay result as JSON instead of the summary
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
+import { HISTORY } from "./claude-history.mjs";
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
-// Claude Code names the history folder after the path with every non-alphanumeric character as "-".
-export const HISTORY = path.join(CONFIG_DIR, "projects", REPO_ROOT.replace(/[^A-Za-z0-9]/g, "-"));
 const REPLAY_MARKER = /^const REPLAY = .* \/\/ @replay$/m;
 const WORKFLOW = "build-feature";
 
@@ -76,6 +72,45 @@ function transcriptArgs(history, session, issue, cache) {
   }
   cache.set(session, found);
   return found;
+}
+
+// Issue numbers whose `<n>.resume.js` the transcript passed to a Workflow call.
+export function resumeIssuesIn(transcript) {
+  const found = new Set();
+  let text;
+  try {
+    text = readFileSync(transcript, "utf8");
+  } catch {
+    return found;
+  }
+  for (const line of text.split("\n")) {
+    if (!line.includes('"Workflow"') || !line.includes(".resume.js")) continue;
+    let entry;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const content = entry?.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const block of content) {
+      if (block?.type !== "tool_use" || block.name !== "Workflow") continue;
+      const script = block.input?.scriptPath;
+      const named = typeof script === "string" ? /(\d+)\.resume\.js$/.exec(script) : null;
+      if (named) found.add(Number(named[1]));
+    }
+  }
+  return found;
+}
+
+// Session id (transcript file name without `.jsonl`) -> issue numbers it ran from a `<n>.resume.js`.
+export function sessionsHoldingResume(transcripts) {
+  const sessions = new Map();
+  for (const file of transcripts) {
+    const issues = resumeIssuesIn(file);
+    if (issues.size) sessions.set(path.basename(file, ".jsonl"), issues);
+  }
+  return sessions;
 }
 
 function readJournal(file) {

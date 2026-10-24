@@ -8,14 +8,9 @@
 //   --sessions main sessions by first slash command and non-workflow subagents modified since --since, instead of build runs
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { HISTORY } from "./claude-history.mjs";
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const CONFIG_DIR = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
-// Claude Code names the history folder after the path with every non-alphanumeric character as "-".
-const HISTORY = path.join(CONFIG_DIR, "projects", REPO_ROOT.replace(/[^A-Za-z0-9]/g, "-"));
 // USD per million tokens at list price. The haiku-5-5-long tier applies above 100k prompt tokens per request.
 const PRICES = {
   opus: { input: 4, output: 20, cacheRead: 0.2 },

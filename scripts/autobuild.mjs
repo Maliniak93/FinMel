@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Usage: node scripts/autobuild.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run]
-//   <n>               build only that epic or standalone issue (manual or not); without it the whole build queue, item by item
+// Usage: node scripts/autobuild.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--no-clean] [--dry-run]
+//   <n>              build only that epic or standalone issue (manual or not); without it the whole build queue, item by item
 //   --items N|all     take the first N queue items (default all)
 //   --include-manual  also take an In progress item that is not marked autobuild (default --skip-manual)
 //   --start           keep the PC awake from launch but start the work (preflight included) at that time: now, in MIN minutes or at the next HH:MM; the stop file ends the wait
@@ -9,6 +9,7 @@
 //   --on-limit        a build that hits the Claude usage limit: sleep (default; suspend under 1 h, hibernate from 1 h, awake up to 15 min or without wake timers), wait (awake) or exit (ends the run with reason `limit`)
 //   --max-wait HOURS  a reset further away than this ends the run with `limit-too-far` (default 12)
 //   --shutdown        ask with a 10 min Tak/Nie popup when the run ends, then shut down (default; no answer shuts down); --no-shutdown does not
+//   --no-clean        skip the cleaning of old generated files (`clean.mjs --apply`, one log line per category) that otherwise runs after the start wait, before the preflight
 //   --dry-run         print the plan, the start time and what would happen per part; no preflight script, builds, merges, comments or shutdown
 //   in a terminal (stdin and stdout a TTY) a start wizard asks every setting no flag answered, shows a summary and the equivalent command and asks `Start? [T/n]`; n exits 0, Ctrl+C 130, nothing starts
 //   node scripts/autobuild.mjs --stop   creates the one stop file; the running driver stops before the next build
@@ -37,6 +38,7 @@ import { closeUnlessClosed, createTimeoutBudget, limitFromStreamEvent, mergeUnle
 import { CI_FIX_MARKER, CI_POLICY_LINE, driveCi, partLine, runCiFix, summaryPartLine } from "./autobuild-ci.mjs";
 import { activityLabel, createActivityTracker, short } from "./autobuild-activity.mjs";
 import { postRunVerify } from "./autobuild-verify.mjs";
+import { cleanAtStart } from "./autobuild-clean.mjs";
 import { collectEpicFiles, measureAfterEpic } from "./autobuild-timings.mjs";
 import { awaitReady, buildWithResume, finishShutdown, fixWithResume, handleLimit, rearmGuard } from "./autobuild-limit.mjs";
 import { BUILD_LIMIT_MS, buildThroughHangs, createAwakeClock, createHangDetector, createHangPolicy, hangLabel, liveWork, summaryLines } from "./autobuild-watch.mjs";
@@ -704,7 +706,7 @@ function assertWindowOpen(ctx) {
 
 function resumeCommand(ctx) {
   const { flags } = ctx;
-  const args = [flags.only, flags.items && `--items ${flags.items}`, flags["include-manual"] && "--include-manual", flags["skip-manual"] && "--skip-manual", flags["max-tasks"] !== undefined && `--max-tasks ${flags["max-tasks"]}`, flags.until && `--until ${flags.until}`, flags["on-limit"] && `--on-limit ${flags["on-limit"]}`, flags["max-wait"] && `--max-wait ${flags["max-wait"]}`, flags.shutdown && "--shutdown", flags["no-shutdown"] && "--no-shutdown"];
+  const args = [flags.only, flags.items && `--items ${flags.items}`, flags["include-manual"] && "--include-manual", flags["skip-manual"] && "--skip-manual", flags["max-tasks"] !== undefined && `--max-tasks ${flags["max-tasks"]}`, flags.until && `--until ${flags.until}`, flags["on-limit"] && `--on-limit ${flags["on-limit"]}`, flags["max-wait"] && `--max-wait ${flags["max-wait"]}`, flags.shutdown && "--shutdown", flags["no-shutdown"] && "--no-shutdown", flags["no-clean"] && "--no-clean"];
   return ["node scripts/autobuild.mjs", ...args.filter((a) => a !== undefined && a !== false)].join(" ");
 }
 
@@ -1236,6 +1238,7 @@ try {
     say(CI_POLICY_LINE);
   }
   ctx.claude = resolveClaude();
+  cleanAtStart({ flags, dryRun: ctx.dryRun, say });
   if (!ctx.dryRun) runPreflight();
   const { cards, plan } = readPlan(flags);
   if (!plan.length) await finishRun("done", "kolejka pusta", { ...ctx, started: false });
