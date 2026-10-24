@@ -566,6 +566,22 @@ describe('Dashboard', () => {
     expect(summary.querySelector('app-cash-card')).not.toBeNull();
   });
 
+  it('the cash and accounts cards link to wealth addresses', async () => {
+    await setup(jsonResponse(dashboard), historyWithChange(250, 25), {
+      accounts: jsonResponse([accountResponse({ name: 'Retirement' })]),
+      cash: jsonResponse(cashPlacesResponse([{ currency: 'PLN', balance: 1000 }])),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('app-cash-card a[href="/wealth/cash"]')).not.toBeNull();
+    const accountHrefs = Array.from(
+      element.querySelectorAll('app-accounts-card a'),
+      (a) => a.getAttribute('href') ?? '',
+    );
+    expect(accountHrefs.some((href) => href.startsWith('/wealth/accounts/'))).toBe(true);
+    expect(accountHrefs.every((href) => !/^\/(accounts|bank-accounts)\b/.test(href))).toBe(true);
+  });
+
   describe('groups', () => {
     const groupCard = '.dashboard-page__group-card';
 

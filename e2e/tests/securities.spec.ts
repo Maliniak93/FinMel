@@ -8,6 +8,7 @@ import {
   test,
   warsawDate,
   openSelect,
+  wealthTab,
 } from './fixtures';
 
 // pl-PL groups only numbers from 10 000 up, with a space or a non-breaking space, so the pattern accepts either.
@@ -36,12 +37,12 @@ function row(table: Locator, ticker: string): Locator {
 }
 
 async function openSecurities(page: Page): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Akcje i ETF', exact: true }).click();
+  await wealthTab(page, 'Akcje i ETF');
   await expect(page.getByRole('heading', { name: 'Akcje i ETF', level: 1 })).toBeVisible();
 }
 
 async function expectAccountCash(page: Page, amount: string): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Rachunki inwestycyjne', exact: true }).click();
+  await wealthTab(page, 'Rachunki inwestycyjne');
   await page.getByRole('link', { name: ACCOUNT, exact: true }).click();
   await expect(page.getByTestId('account-cash')).toContainText(pln(amount));
 }

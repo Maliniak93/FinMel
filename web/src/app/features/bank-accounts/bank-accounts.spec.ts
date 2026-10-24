@@ -176,8 +176,8 @@ describe('BankAccounts', () => {
     await setup();
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(element.querySelector(`a[href="/bank-accounts/${mBank.id}"]`)).not.toBeNull();
-    expect(element.querySelector(`a[href="/bank-accounts/${nest.id}"]`)).not.toBeNull();
+    expect(element.querySelector(`a[href="/wealth/bank/${mBank.id}"]`)).not.toBeNull();
+    expect(element.querySelector(`a[href="/wealth/bank/${nest.id}"]`)).not.toBeNull();
   });
 
   it('opens the create dialog preset to Bank and reloads after a save', async () => {

@@ -1,4 +1,4 @@
-import { expect, test, warsawDate, openSelect } from './fixtures';
+import { expect, test, warsawDate, openSelect, wealthTab } from './fixtures';
 import type { Locator, Page } from '@playwright/test';
 
 const ACCOUNT = 'IKE Bossa';
@@ -46,10 +46,7 @@ test('accounts: an IKE account with a contribution limit, deposits, withdrawals,
   }
 
   await test.step('Krok 1: the IKE Bossa brokerage account with the IKE wrapper is on the list with 0,00 zł', async () => {
-    await page
-      .locator('mat-sidenav')
-      .getByRole('link', { name: 'Rachunki inwestycyjne', exact: true })
-      .click();
+    await wealthTab(page, 'Rachunki inwestycyjne');
     await page
       .getByRole('button', { name: /^(Nowy rachunek|Utwórz pierwszy rachunek)$/ })
       .first()

@@ -11,7 +11,7 @@ export const accountTypeGuard: CanActivateFn = async (route) => {
     return true;
   }
 
-  const onBankRoute = route.routeConfig?.path?.startsWith('bank-accounts') ?? false;
+  const onBankRoute = route.routeConfig?.path?.startsWith('bank/') ?? false;
 
   try {
     const result = await getApiPortfolioAccountsById({ path: { id } });
@@ -22,7 +22,7 @@ export const accountTypeGuard: CanActivateFn = async (route) => {
     if (isBank === onBankRoute) {
       return true;
     }
-    return router.createUrlTree([onBankRoute ? '/accounts' : '/bank-accounts', id]);
+    return router.createUrlTree([onBankRoute ? '/wealth/accounts' : '/wealth/bank', id]);
   } catch {
     return true;
   }

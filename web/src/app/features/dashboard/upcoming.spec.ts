@@ -47,6 +47,11 @@ describe('upcomingItems', () => {
     expect(items.every((item) => item.actionNeeded)).toBe(true);
     expect(items.find((item) => item.name === 'Interest bond')?.count).toBe(2);
     expect(items.find((item) => item.name === 'Savings interest')?.count).toBe(3);
+    expect(items.find((item) => item.name === 'Interest bond')?.link).toBe('/wealth/bonds');
+    expect(items.find((item) => item.name === 'Savings interest')?.link).toBe('/wealth/bank');
+    expect(
+      items.filter((item) => item.kind !== 'bankInterestDue' && item.link === '/wealth/deposits'),
+    ).not.toHaveLength(0);
   });
 
   it('skips archived', () => {
@@ -164,7 +169,7 @@ describe('upcomingItems', () => {
     ]);
   });
 
-  it('lists a bank account with interest due, linking to /bank-accounts', () => {
+  it('lists a bank account with interest due, linking to /wealth/bank', () => {
     const items = upcomingItems(
       [],
       [],
@@ -181,7 +186,7 @@ describe('upcomingItems', () => {
       kind: 'bankInterestDue',
       actionNeeded: true,
       count: 2,
-      link: '/bank-accounts',
+      link: '/wealth/bank',
     });
   });
 });

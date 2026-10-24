@@ -1,5 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
-import { expect, logInThroughApi, logInThroughUi, test } from './fixtures';
+import { expect, logInThroughApi, logInThroughUi, test, wealthTab } from './fixtures';
 import {
   addIncome,
   choose,
@@ -118,10 +118,7 @@ async function openOneOffExpenseDialog(page: Page): Promise<Locator> {
 }
 
 async function openBankAccount(page: Page, name: string): Promise<void> {
-  await page
-    .locator('mat-sidenav')
-    .getByRole('link', { name: 'Konta bankowe', exact: true })
-    .click();
+  await wealthTab(page, 'Konta bankowe');
   await page.getByRole('link', { name, exact: true }).click();
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
 }
@@ -404,10 +401,7 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
   });
 
   await test.step('Krok 20: deleting the account mBank is refused because incomes point at it', async () => {
-    await page
-      .locator('mat-sidenav')
-      .getByRole('link', { name: 'Konta bankowe', exact: true })
-      .click();
+    await wealthTab(page, 'Konta bankowe');
     await page.getByRole('button', { name: `Akcje dla: ${BANK}`, exact: true }).click();
     await page.getByRole('menuitem', { name: 'Usuń', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Usuń', exact: true }).click();

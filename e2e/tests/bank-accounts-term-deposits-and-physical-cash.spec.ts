@@ -1,4 +1,12 @@
-import { expect, logInThroughUi, registerThroughUi, test, openSelect } from './fixtures';
+import {
+  expect,
+  logInThroughUi,
+  registerThroughUi,
+  test,
+  openSelect,
+  WEALTH_TABS,
+  wealthTab,
+} from './fixtures';
 import type { Locator, Page } from '@playwright/test';
 
 // pl-PL groups only numbers from 10 000 up, with a space or a non-breaking space, and may use a true minus sign, so the patterns accept either.
@@ -24,6 +32,10 @@ function navigation(page: Page): Locator {
 }
 
 async function openPage(page: Page, link: string): Promise<void> {
+  if (WEALTH_TABS.includes(link)) {
+    await wealthTab(page, link);
+    return;
+  }
   await navigation(page).getByRole('link', { name: link, exact: true }).click();
 }
 
@@ -129,17 +141,11 @@ test('bank accounts, term deposits and physical cash: money moves only between a
   await registerThroughUi(page, user);
   await logInThroughUi(page, user);
 
-  await test.step('Krok 1: the menu lists Pulpit, Planowanie, Rachunki inwestycyjne, Konta bankowe, Gotówka, Lokaty, Obligacje, Akcje i ETF, Metale, Grupy, Ustawienia in that order', async () => {
+  await test.step('Krok 1: the menu lists Pulpit, Majątek, Planowanie, Grupy, Ustawienia in that order', async () => {
     await expect(navigation(page).locator('.shell__nav-label')).toHaveText([
       /^Pulpit$/,
+      /^Majątek$/,
       /^Planowanie$/,
-      /^Rachunki inwestycyjne$/,
-      /^Konta bankowe$/,
-      /^Gotówka$/,
-      /^Lokaty$/,
-      /^Obligacje$/,
-      /^Akcje i ETF$/,
-      /^Metale/,
       /^Grupy$/,
       /^Ustawienia$/,
     ]);
@@ -524,6 +530,6 @@ test('bank accounts, term deposits and physical cash: money moves only between a
       .filter({ hasText: 'Odsetki na koncie bankowym do rozliczenia' });
     await expect(item).toBeVisible();
     await item.getByRole('link', { name: 'Nest Oszczędnościowe', exact: true }).click();
-    await expect(page).toHaveURL(/\/bank-accounts$/);
+    await expect(page).toHaveURL(/\/wealth\/bank$/);
   });
 });

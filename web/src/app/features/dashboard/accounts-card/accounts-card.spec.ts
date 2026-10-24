@@ -78,15 +78,15 @@ describe('AccountsCard', () => {
     });
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(element.querySelector(`a[href="/accounts/${BROKERAGE_ID}"]`)?.textContent).toContain(
-      'XTB IKE',
-    );
-    expect(element.querySelector(`a[href="/accounts/${BONDS_ID}"]`)?.textContent).toContain(
+    expect(
+      element.querySelector(`a[href="/wealth/accounts/${BROKERAGE_ID}"]`)?.textContent,
+    ).toContain('XTB IKE');
+    expect(element.querySelector(`a[href="/wealth/accounts/${BONDS_ID}"]`)?.textContent).toContain(
       'Obligacje IKE',
     );
   });
 
-  it('links a Bank account to bank-accounts/:id', async () => {
+  it('links a Bank account to wealth/bank/:id', async () => {
     const bankId = '55555555-5555-5555-5555-555555555555';
     const { fixture } = await renderCard(AccountsCard, {
       accounts: jsonResponse([
@@ -103,12 +103,12 @@ describe('AccountsCard', () => {
     });
     const element = fixture.nativeElement as HTMLElement;
 
-    expect(element.querySelector(`a[href="/bank-accounts/${bankId}"]`)?.textContent).toContain(
+    expect(element.querySelector(`a[href="/wealth/bank/${bankId}"]`)?.textContent).toContain(
       'mBank',
     );
-    expect(element.querySelector(`a[href="/accounts/${BROKERAGE_ID}"]`)?.textContent).toContain(
-      'XTB IKE',
-    );
+    expect(
+      element.querySelector(`a[href="/wealth/accounts/${BROKERAGE_ID}"]`)?.textContent,
+    ).toContain('XTB IKE');
   });
 
   it('shows the Poza rachunkami row in Polish', async () => {

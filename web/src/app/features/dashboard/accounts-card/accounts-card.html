@@ -22,7 +22,7 @@
             @if (row.id !== null) {
               <a
                 class="accounts-card__name"
-                [routerLink]="[row.isBank ? '/bank-accounts' : '/accounts', row.id]"
+                [routerLink]="[row.isBank ? '/wealth/bank' : '/wealth/accounts', row.id]"
                 >{{ row.name }}</a
               >
             } @else {

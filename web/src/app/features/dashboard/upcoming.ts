@@ -22,7 +22,7 @@ export interface UpcomingItem {
   count: number | null;
   amount: number | string | null;
   currency: string;
-  link: '/deposits' | '/bonds' | '/bank-accounts';
+  link: '/wealth/deposits' | '/wealth/bonds' | '/wealth/bank';
 }
 
 function isActive(item: { isArchived: boolean }): boolean {
@@ -67,7 +67,7 @@ export function upcomingItems(
         count: null,
         amount: deposit.projection.finalAmount,
         currency: deposit.currency,
-        link: '/deposits',
+        link: '/wealth/deposits',
       });
     }
   }
@@ -78,7 +78,7 @@ export function upcomingItems(
       name: bond.name,
       amount: bond.bookValue,
       currency: 'PLN',
-      link: '/bonds',
+      link: '/wealth/bonds',
     } as const;
     if (status === BOND_STATUS.Matured) {
       items.push({
@@ -135,7 +135,7 @@ export function upcomingItems(
         count: Number(account.bank.duePeriodCount),
         amount: null,
         currency: account.currency,
-        link: '/bank-accounts',
+        link: '/wealth/bank',
       });
     }
   }

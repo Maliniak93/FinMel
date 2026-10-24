@@ -8,6 +8,7 @@ import {
   test,
   warsawDate,
   openSelect,
+  wealthTab,
 } from './fixtures';
 
 function pln(amount: string): RegExp {
@@ -20,10 +21,6 @@ const ACCOUNT_TYPE_BROKERAGE = 0;
 const WRAPPER_REGULAR = 0;
 const ASSET_CLASS_STOCK = 2;
 const TYPE_BUY = 0;
-
-function navigation(page: Page): Locator {
-  return page.locator('mat-sidenav');
-}
 
 function holdings(page: Page): Locator {
   return page.locator('app-securities-table').first();
@@ -65,13 +62,13 @@ async function createStockThroughApi(
 }
 
 async function expectAccountCash(page: Page, amount: string): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Rachunki inwestycyjne', exact: true }).click();
+  await wealthTab(page, 'Rachunki inwestycyjne');
   await page.getByRole('link', { name: ACCOUNT, exact: true }).click();
   await expect(page.getByTestId('account-cash')).toContainText(pln(amount));
 }
 
 async function openTransactions(page: Page): Promise<void> {
-  await navigation(page).getByRole('link', { name: 'Akcje i ETF', exact: true }).click();
+  await wealthTab(page, 'Akcje i ETF');
   await expect(page.getByRole('heading', { name: 'Akcje i ETF', level: 1 })).toBeVisible();
   await holdings(page)
     .getByRole('row')

@@ -7,6 +7,7 @@ import {
   warsawDate,
   type Credentials,
   openSelect,
+  wealthTab,
 } from './fixtures';
 import {
   COMPANY,
@@ -116,10 +117,7 @@ async function saveSettlement(dialog: Locator): Promise<void> {
 }
 
 async function openBankAccount(page: Page, name: string): Promise<void> {
-  await page
-    .locator('mat-sidenav')
-    .getByRole('link', { name: 'Konta bankowe', exact: true })
-    .click();
+  await wealthTab(page, 'Konta bankowe');
   await page.getByRole('link', { name, exact: true }).click();
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
 }
@@ -447,10 +445,7 @@ test('income settlement: settle, skip, edit and undo occurrences with the cash d
   });
 
   await test.step('Krok 19: deleting the account mBank ROR is refused', async () => {
-    await page
-      .locator('mat-sidenav')
-      .getByRole('link', { name: 'Konta bankowe', exact: true })
-      .click();
+    await wealthTab(page, 'Konta bankowe');
     await page.getByRole('button', { name: `Akcje dla: ${MBANK}`, exact: true }).click();
     await page.getByRole('menuitem', { name: 'Usuń', exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Usuń', exact: true }).click();

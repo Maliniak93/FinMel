@@ -1,4 +1,4 @@
-import { expect, logInThroughUi, registerThroughUi, test } from './fixtures';
+import { expect, logInThroughUi, registerThroughUi, test, wealthTab } from './fixtures';
 
 // A grouping space and a non-breaking space between the digits and "zł" depend on the ICU build, so \s matches either.
 const TEN_THOUSAND_PLN = /10\s000,00\szł/;
@@ -20,7 +20,7 @@ test('smoke: register, log in, open an account, deposit and see the balance', as
   });
 
   await test.step('create a Brokerage / Regular account', async () => {
-    await navigation.getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
+    await wealthTab(page, 'Rachunki inwestycyjne');
     await page.getByRole('button', { name: 'Utwórz pierwszy rachunek' }).click();
 
     const dialog = page.getByRole('dialog');
@@ -41,7 +41,7 @@ test('smoke: register, log in, open an account, deposit and see the balance', as
   });
 
   await test.step('the accounts list shows the balance', async () => {
-    await navigation.getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
+    await wealthTab(page, 'Rachunki inwestycyjne');
     await expect(page.getByRole('row', { name: new RegExp(accountName) })).toContainText(
       TEN_THOUSAND_PLN,
     );
@@ -50,7 +50,7 @@ test('smoke: register, log in, open an account, deposit and see the balance', as
   await test.step('the dashboard net worth reaches the deposit', async () => {
     // The dashboard loads once and the deposit reaches Reporting through an event, so each attempt opens it afresh.
     await expect(async () => {
-      await navigation.getByRole('link', { name: 'Rachunki inwestycyjne' }).click();
+      await wealthTab(page, 'Rachunki inwestycyjne');
       await navigation.getByRole('link', { name: 'Pulpit' }).click();
       await expect(page.getByTestId('net-worth')).toContainText(TEN_THOUSAND_PLN, {
         timeout: 3_000,

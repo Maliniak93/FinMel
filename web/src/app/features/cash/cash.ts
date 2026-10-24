@@ -85,7 +85,7 @@ export class Cash {
   protected readonly formatMoney = formatMoney;
 
   protected transactionsLink(balance: CashBalanceResponse): string[] {
-    return ['/assets', balance.cashAssetId, 'transactions'];
+    return ['/wealth/assets', balance.cashAssetId, 'transactions'];
   }
 
   protected openCreateDialog(): void {

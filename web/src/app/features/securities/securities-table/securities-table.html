@@ -1,7 +1,7 @@
 @if (account()) {
   <p class="securities-table__filter">
     {{ 'accounts.filteredNotice' | transloco }}
-    <a routerLink="/securities">{{ 'accounts.showAll' | transloco }}</a>
+    <a routerLink="/wealth/securities">{{ 'accounts.showAll' | transloco }}</a>
   </p>
 }
 
@@ -167,11 +167,7 @@
             <mat-icon>paid</mat-icon>
             <span>{{ 'securities.dividend' | transloco }}</span>
           </button>
-          <a
-            mat-menu-item
-            [routerLink]="transactionsLink(holding)"
-            [queryParams]="{ from: 'securities' }"
-          >
+          <a mat-menu-item [routerLink]="transactionsLink(holding)">
             <mat-icon>receipt_long</mat-icon>
             <span>{{ 'securities.transactions' | transloco }}</span>
           </a>

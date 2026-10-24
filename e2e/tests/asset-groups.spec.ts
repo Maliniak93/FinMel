@@ -7,6 +7,8 @@ import {
   warsawDate,
   type Credentials,
   openSelect,
+  WEALTH_TABS,
+  wealthTab,
 } from './fixtures';
 import { expectProjected } from './projection';
 
@@ -45,6 +47,10 @@ function navigation(page: Page): Locator {
 }
 
 async function openPage(page: Page, link: string): Promise<void> {
+  if (WEALTH_TABS.includes(link)) {
+    await wealthTab(page, link);
+    return;
+  }
   await navigation(page).getByRole('link', { name: link, exact: true }).click();
 }
 
@@ -173,7 +179,7 @@ async function openBuyStockDialog(
 ): Promise<Locator> {
   await openPage(page, 'Akcje i ETF');
   if (tab) {
-    await page.getByRole('tab', { name: tab }).click();
+    await page.getByRole('tab', { name: tab, exact: true }).click();
   }
   await page.getByRole('button', { name: 'Dodaj', exact: true }).first().click();
   const dialog = page.getByRole('dialog');

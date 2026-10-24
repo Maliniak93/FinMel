@@ -136,14 +136,14 @@ describe('Transactions', () => {
   });
 
   it.each([
-    [0, '/cash'],
-    [1, '/deposits'],
-    [2, '/securities'],
-    [3, '/securities'],
-    [4, '/bonds'],
-    [6, '/metals'],
-    [9, '/bank-accounts'],
-  ])('links back to the class page of an asset of class %i', async (assetClass, path) => {
+    [0, '/wealth/cash'],
+    [1, '/wealth/deposits'],
+    [2, '/wealth/securities'],
+    [3, '/wealth/securities'],
+    [4, '/wealth/bonds'],
+    [6, '/wealth/metals'],
+    [9, '/wealth/bank'],
+  ])('back link: an asset of class %i links to its wealth tab', async (assetClass, path) => {
     await setup(jsonResponse(pagedResponse([transaction])), jsonResponse({ ...asset, assetClass }));
 
     const back = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(

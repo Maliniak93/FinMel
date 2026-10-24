@@ -139,7 +139,7 @@ export class SecuritiesTable {
   }
 
   protected transactionsLink(holding: SecurityHoldingResponse): string[] {
-    return ['/assets', holding.assetId, 'transactions'];
+    return ['/wealth/assets', holding.assetId, 'transactions'];
   }
 
   reload(): void {

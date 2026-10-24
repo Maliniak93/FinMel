@@ -44,18 +44,9 @@
       "settings": "Settings",
       "accounts": "Investment accounts",
       "bankAccounts": "Bank accounts",
-      "groups": "Groups"
-    },
-    "navSection": {
-      "overview": "Overview",
+      "groups": "Groups",
       "wealth": "Wealth"
     },
-    "navShort": {
-      "accounts": "Accounts",
-      "bankAccounts": "Banks",
-      "metals": "Metals"
-    },
-    "more": "More",
     "mainNavigation": "Main navigation",
     "logOut": "Log out",
     "theme": {
@@ -63,6 +54,9 @@
       "light": "Theme: Light — click for Dark",
       "dark": "Theme: Dark — click for System"
     }
+  },
+  "wealth": {
+    "tabsLabel": "Asset types"
   },
   "auth": {
     "email": "Email",

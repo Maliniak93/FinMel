@@ -1,0 +1,23 @@
+<h1 class="wealth__title">{{ 'shell.nav.wealth' | transloco }}</h1>
+
+<nav
+  mat-tab-nav-bar
+  class="wealth__tabs"
+  [tabPanel]="tabPanel"
+  [attr.aria-label]="'wealth.tabsLabel' | transloco"
+>
+  @for (tab of tabs; track tab.path) {
+    <a
+      mat-tab-link
+      #rla="routerLinkActive"
+      routerLinkActive
+      [routerLink]="'/wealth/' + tab.path"
+      [active]="rla.isActive"
+      >{{ tab.label | transloco }}</a
+    >
+  }
+</nav>
+
+<mat-tab-nav-panel #tabPanel>
+  <router-outlet />
+</mat-tab-nav-panel>
