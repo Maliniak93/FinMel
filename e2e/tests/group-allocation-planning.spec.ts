@@ -154,7 +154,7 @@ async function expectCushionOnDashboard(page: Page, level: string): Promise<void
       const text = page.getByTestId('cushion-level');
       await expect(text).toContainText(pln(level), { timeout: 2_000 });
       await expect(text).toContainText(pln('12 000,00'), { timeout: 2_000 });
-      await expect(text).toContainText(/Brakuje:\s1\s?500,00\szł/, { timeout: 2_000 });
+      await expect(text).toContainText(/brakuje\s1\s?500,00\szł/, { timeout: 2_000 });
     },
     { timeout: 60_000 },
   );
@@ -503,7 +503,7 @@ test('group allocation planning: groups with kind, class allocation and contribu
         await expect(page.getByTestId('cushion-level')).toContainText(pln('10 500,00'), {
           timeout: 2_000,
         });
-        await expect(page.getByTestId('cushion-level')).toContainText(/Brakuje:\s1\s?500,00\szł/, {
+        await expect(page.getByTestId('cushion-level')).toContainText(/brakuje\s1\s?500,00\szł/, {
           timeout: 2_000,
         });
       },

@@ -99,7 +99,14 @@
 
         <div class="dashboard-page__pair">
           <app-month-card />
-          <app-upcoming-card />
+          <section class="dashboard-page__todo">
+            <header class="dashboard-page__todo-head">
+              <h2 class="dashboard-page__card-title">{{ 'dashboard.todo.heading' | transloco }}</h2>
+              <a routerLink="/planning">{{ 'dashboard.todo.planning' | transloco }}</a>
+            </header>
+            <app-todo-card />
+            <app-upcoming-card />
+          </section>
         </div>
 
         <div class="dashboard-page__pair">
@@ -107,12 +114,10 @@
             <mat-card-content>
               <h2 class="dashboard-page__card-title">{{ 'dashboard.groups.title' | transloco }}</h2>
               @if (groupsResource.error(); as groupsError) {
-                <div class="dashboard-page__state" role="alert">
-                  <p>{{ groupsError.message }}</p>
-                  <button mat-button type="button" (click)="groupsResource.reload()">
-                    {{ 'common.retry' | transloco }}
-                  </button>
-                </div>
+                <app-section-error
+                  [message]="groupsError.message"
+                  (retry)="groupsResource.reload()"
+                />
               } @else if (groupsResource.isLoading() && !groupsResource.hasValue()) {
                 <div class="dashboard-page__state">
                   <mat-spinner diameter="32" />
@@ -123,41 +128,53 @@
                   <a mat-button routerLink="/groups">{{ 'dashboard.groups.link' | transloco }}</a>
                 </div>
               } @else {
-                <div class="dashboard-page__breakdown">
-                  <app-pie-chart [segments]="groupSegments()" class="dashboard-page__chart" />
-
-                  <ul class="dashboard-page__legend dashboard-page__group-legend">
-                    @for (row of groupRows(); track row.key) {
-                      <li>
-                        <span class="dashboard-page__legend-item">
-                          <span
-                            class="dashboard-page__swatch"
-                            [style.background]="row.color"
-                          ></span>
-                          {{ row.label }} —
-                          @if (row.progress; as progress) {
+                <ul class="dashboard-page__group-rows">
+                  @for (row of groupRows(); track row.key) {
+                    <li class="dashboard-page__group-row" data-testid="group-row">
+                      <span
+                        class="dashboard-page__swatch"
+                        data-testid="group-dot"
+                        [style.background-color]="row.color"
+                      ></span>
+                      <span class="dashboard-page__group-head">
+                        <a class="dashboard-page__group-name" routerLink="/groups">{{
+                          row.label
+                        }}</a>
+                        @if (row.isCushionKind) {
+                          <span class="dashboard-page__tag">
+                            {{ 'dashboard.groups.cushionTag' | transloco }}</span
+                          >
+                        }
+                      </span>
+                      <span class="dashboard-page__group-value">
+                        {{ formatMoney(row.valuePln) }}</span
+                      >
+                      @if (!row.isUngrouped) {
+                        <span class="dashboard-page__group-share">
+                          {{ formatPercent(row.percentage) }}</span
+                        >
+                      }
+                      @if (row.progress; as progress) {
+                        <app-goal-progress
+                          class="dashboard-page__group-progress"
+                          [ratio]="progress.bar / 100"
+                          [fill]="row.color"
+                          [tone]="progress.percent >= 100 ? 'done' : 'default'"
+                        />
+                      }
+                      @if (row.cushion; as cushion) {
+                        <p class="dashboard-page__group-detail" data-testid="cushion-level">
+                          @if (cushion.missingPln > 0) {
                             {{
-                              'dashboard.groups.progress'
+                              'dashboard.groups.cushionMissing'
                                 | transloco
                                   : {
-                                      value: formatAmount(row.valuePln),
-                                      target: formatMoney(row.targetPln ?? 0),
-                                      percent: progress.percent,
+                                      value: formatMoney(cushion.valuePln),
+                                      target: formatMoney(cushion.targetPln),
+                                      missing: formatMoney(cushion.missingPln),
                                     }
                             }}
                           } @else {
-                            {{ formatMoney(row.valuePln) }}
-                          }
-                        </span>
-                        @if (row.progress; as progress) {
-                          <mat-progress-bar
-                            mode="determinate"
-                            [value]="progress.bar"
-                            [attr.aria-label]="row.label"
-                          />
-                        }
-                        @if (row.cushion; as cushion) {
-                          <p class="dashboard-page__group-detail" data-testid="cushion-level">
                             {{
                               'dashboard.groups.cushionLevel'
                                 | transloco
@@ -166,35 +183,37 @@
                                       target: formatMoney(cushion.targetPln),
                                     }
                             }}
-                            @if (cushion.missingPln > 0) {
+                          }
+                        </p>
+                      }
+                      @if (row.classShares.length > 0) {
+                        <ul class="dashboard-page__class-shares" data-testid="group-class-shares">
+                          @for (share of row.classShares; track share.assetClass) {
+                            <li>
                               {{
-                                'dashboard.groups.cushionMissing'
-                                  | transloco: { amount: formatMoney(cushion.missingPln) }
+                                'dashboard.groups.classShare'
+                                  | transloco
+                                    : {
+                                        class: share.label | transloco,
+                                        current: formatPercent(share.currentPercent),
+                                        target: formatPercent(share.targetPercent),
+                                      }
                               }}
-                            }
-                          </p>
-                        }
-                        @if (row.classShares.length > 0) {
-                          <ul class="dashboard-page__class-shares" data-testid="group-class-shares">
-                            @for (share of row.classShares; track share.assetClass) {
-                              <li>
-                                {{
-                                  'dashboard.groups.classShare'
-                                    | transloco
-                                      : {
-                                          class: share.label | transloco,
-                                          current: formatPercent(share.currentPercent),
-                                          target: formatPercent(share.targetPercent),
-                                        }
-                                }}
-                              </li>
-                            }
-                          </ul>
-                        }
-                      </li>
-                    }
-                  </ul>
-                </div>
+                            </li>
+                          }
+                        </ul>
+                      }
+                      @if (row.isUngrouped) {
+                        <p class="dashboard-page__group-detail">
+                          {{
+                            'dashboard.groups.ofWealth'
+                              | transloco: { percent: formatPercent(row.percentage) }
+                          }}
+                        </p>
+                      }
+                    </li>
+                  }
+                </ul>
               }
             </mat-card-content>
           </mat-card>

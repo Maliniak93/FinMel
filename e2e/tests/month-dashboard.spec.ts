@@ -173,7 +173,7 @@ function monthCard(page: Page): Locator {
 }
 
 function todoItems(page: Page): Locator {
-  return page.getByTestId('month-card-todo-item');
+  return page.getByTestId('todo-card-item');
 }
 
 function exactPln(amount: string): RegExp {
@@ -244,7 +244,7 @@ async function openDashboard(page: Page): Promise<void> {
   );
   await page.goto('/dashboard');
   await todo;
-  await expect(monthCard(page).getByRole('heading', { name: 'Ten miesiąc' })).toBeVisible();
+  await expect(monthCard(page).getByRole('heading', { name: /· plan$/ })).toBeVisible();
 }
 
 async function expectCard(
@@ -252,19 +252,15 @@ async function expectCard(
   figures: { plan: string; forecast: string; settled: string },
 ): Promise<void> {
   const card = monthCard(page);
-  await expect(card.getByTestId('month-card-plan').locator('dd')).toHaveText(
-    exactPln(figures.plan),
-  );
-  await expect(card.getByTestId('month-card-forecast').locator('dd')).toHaveText(
-    exactPln(figures.forecast),
-  );
+  await expect(card.getByTestId('month-card-free')).toContainText(pln(figures.plan));
+  await expect(card.getByTestId('month-card-forecast')).toContainText(pln(figures.forecast));
   await expect(card.getByTestId('month-card-settled')).toHaveText(
     `Wpływy załatwione: ${figures.settled}`,
   );
 }
 
 async function expectAllDone(page: Page): Promise<void> {
-  await expect(monthCard(page).getByTestId('month-card-empty')).toHaveText('Wszystko załatwione');
+  await expect(page.getByTestId('todo-card-empty')).toHaveText('Wszystko załatwione');
   await expect(todoItems(page)).toHaveCount(0);
 }
 
@@ -391,7 +387,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     expect(depositAmount).not.toBe('');
     const card = monthCard(page);
     await expect(card.getByTestId('month-card-setup')).toHaveText('Zaplanuj miesiąc');
-    await expect(card.getByTestId('month-card-plan')).toHaveCount(0);
+    await expect(card.getByTestId('month-card-free')).toHaveCount(0);
     await expect(card.getByTestId('month-card-settled')).toHaveCount(0);
   });
 
@@ -630,11 +626,11 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     });
     await expect(badge(page)).toHaveText('1');
     await openDashboard(page);
-    await expect(todoItems(page)).toHaveText([
-      new RegExp(
-        `^${CHECKUP} — ${dateInText(CHECKUP_DATE).source} \\(za 5 dni\\), ${pln('400,00').source}$`,
-      ),
-    ]);
+    await expect(todoItems(page)).toHaveCount(1);
+    await expect(todoItems(page).first()).toContainText(CHECKUP);
+    await expect(todoItems(page).first()).toContainText(dateInText(CHECKUP_DATE));
+    await expect(todoItems(page).first()).toContainText('za 5 dni · wydatek');
+    await expect(todoItems(page).first()).toContainText(pln('400,00'));
   });
 
   await test.step('Krok 17: the lead time 3 days hides the item and the counter, 0 days keeps them hidden and 7 days brings them back', async () => {
@@ -693,11 +689,11 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     await page.getByRole('button', { name: 'Język' }).click();
     await page.getByRole('menuitemradio', { name: 'English' }).click();
     const card = monthCard(page);
-    await expect(card.getByRole('heading', { name: 'This month' })).toBeVisible();
+    await expect(card.getByRole('heading', { name: /· plan$/ })).toBeVisible();
     await expect(card.getByTestId('month-card-settled')).toHaveText('Incomes settled: 3 of 3');
     await expect(todoItems(page)).toHaveCount(1);
     await expect(todoItems(page).first()).toContainText(CHECKUP);
-    await expect(todoItems(page).first()).toContainText('in 5 d');
+    await expect(todoItems(page).first()).toContainText('in 5 days · expense');
 
     await navigation(page)
       .getByRole('link', { name: /^(Planowanie|Planning)/ })

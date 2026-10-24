@@ -3,12 +3,7 @@
     <h2 class="upcoming-card__title">{{ 'dashboard.upcoming.title' | transloco }}</h2>
 
     @if (loadError(); as error) {
-      <div class="upcoming-card__state" role="alert">
-        <p>{{ error.message }}</p>
-        <button mat-button type="button" (click)="reload()">
-          {{ 'common.retry' | transloco }}
-        </button>
-      </div>
+      <app-section-error [message]="error.message" (retry)="reload()" />
     } @else if (loading() && !ready()) {
       <div class="upcoming-card__state">
         <mat-spinner diameter="24" />

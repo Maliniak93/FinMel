@@ -236,7 +236,7 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     );
     await page.goto('/dashboard');
     await todo;
-    const item = page.locator('app-month-card').getByTestId('month-card-todo-item');
+    const item = page.locator('app-todo-card').getByTestId('todo-card-item');
     await expect(item.filter({ hasText: REFUND })).toHaveCount(1);
     await expect(item.filter({ hasText: REFUND })).toContainText(pln('2 500,00'));
   });

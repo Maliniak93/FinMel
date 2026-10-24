@@ -1,0 +1,48 @@
+<mat-card class="todo-card">
+  <mat-card-content>
+    <h2 class="todo-card__title">{{ 'dashboard.todo.title' | transloco }}</h2>
+
+    @if (planningState.todoError(); as error) {
+      <app-section-error [message]="error.message" (retry)="planningState.reloadTodo()" />
+    } @else if (!planningState.todoLoaded()) {
+      <div class="todo-card__state">
+        <mat-spinner diameter="24" />
+      </div>
+    } @else if (rowCount() === 0) {
+      <p class="todo-card__empty" data-testid="todo-card-empty">
+        {{ 'dashboard.todo.empty' | transloco }}
+      </p>
+    } @else {
+      <ul class="todo-card__list">
+        @for (row of visibleRows(); track $index) {
+          <li class="todo-card__row" data-testid="todo-card-item">
+            <span class="todo-card__name">{{ row.name }}</span>
+            <span class="todo-card__meta">
+              @if (row.overdue) {
+                {{ 'dashboard.todo.overdue' | transloco: { date: row.date, days: row.days } }}
+              } @else {
+                {{ 'dashboard.todo.payment' | transloco: { date: row.date, days: row.days } }}
+              }
+            </span>
+            <span class="todo-card__amount">{{ row.amount }}</span>
+            @if (row.overdue) {
+              <a
+                mat-flat-button
+                class="todo-card__settle"
+                routerLink="/planning"
+                [queryParams]="{ month: row.month }"
+                fragment="do-rozliczenia"
+                >{{ 'dashboard.todo.settle' | transloco }}</a
+              >
+            }
+          </li>
+        }
+      </ul>
+      @if (canExpand()) {
+        <button mat-button type="button" data-testid="todo-card-show-all" (click)="showAll()">
+          {{ 'dashboard.todo.showAll' | transloco }}
+        </button>
+      }
+    }
+  </mat-card-content>
+</mat-card>
