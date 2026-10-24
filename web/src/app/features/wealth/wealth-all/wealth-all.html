@@ -1,0 +1,189 @@
+<header class="wealth-all__header">
+  <div class="wealth-all__summary">
+    <div class="wealth-all__total sk-num" data-testid="total">
+      <app-money [amount]="data.total()" />
+    </div>
+    @if (data.asOf(); as asOf) {
+      <div class="wealth-all__as-of">
+        {{ 'wealth.asOf' | transloco: { date: formatDate(asOf) } }}
+      </div>
+    }
+  </div>
+  <button mat-flat-button type="button" [matMenuTriggerFor]="newAssetMenu">
+    <mat-icon>add</mat-icon>
+    {{ 'assets.newAsset' | transloco }}
+  </button>
+</header>
+
+<mat-menu #newAssetMenu="matMenu">
+  @for (entry of newAssetEntries; track entry.labelKey) {
+    <button mat-menu-item type="button" (click)="entry.open()">
+      {{ entry.labelKey | transloco }}
+    </button>
+  }
+</mat-menu>
+
+@if (data.loading()) {
+  <app-skeleton [rows]="6" />
+} @else {
+  <div class="wealth-all__filters">
+    <mat-form-field appearance="outline" class="wealth-all__search" subscriptSizing="dynamic">
+      <mat-label>{{ 'wealth.search' | transloco }}</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input matInput type="search" [value]="search()" (input)="onSearch($event)" />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="wealth-all__group" subscriptSizing="dynamic">
+      <mat-select
+        [value]="groupFilter()"
+        [aria-label]="'wealth.column.group' | transloco"
+        (selectionChange)="groupFilter.set($event.value)"
+      >
+        <mat-select-trigger>
+          {{
+            'wealth.groupFilter'
+              | transloco
+                : {
+                    name: selectedGroup().key
+                      ? (selectedGroup().key | transloco)
+                      : selectedGroup().name,
+                  }
+          }}
+        </mat-select-trigger>
+        <mat-option value="all">{{ 'wealth.groupAll' | transloco }}</mat-option>
+        @for (group of groups(); track group.id) {
+          <mat-option [value]="group.id">{{ group.name }}</mat-option>
+        }
+        <mat-option value="none">{{ 'wealth.groupNone' | transloco }}</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-slide-toggle
+      class="wealth-all__archived"
+      [checked]="data.showArchived()"
+      (change)="data.showArchived.set($event.checked)"
+    >
+      {{ 'assetArchive.showArchived' | transloco }}
+    </mat-slide-toggle>
+  </div>
+
+  @if (data.failed()) {
+    <app-section-error [message]="'wealth.error' | transloco" (retry)="data.retryFailed()" />
+  }
+
+  @if (data.rows().length === 0) {
+    @if (!data.failed()) {
+      <app-empty-state icon="account_balance_wallet" [message]="'wealth.empty.all' | transloco">
+        <button action mat-flat-button type="button" [matMenuTriggerFor]="newAssetMenu">
+          <mat-icon>add</mat-icon>
+          {{ 'assets.newAsset' | transloco }}
+        </button>
+      </app-empty-state>
+    }
+  } @else if (sections().length === 0) {
+    <app-empty-state icon="search_off" [message]="'wealth.empty.filter' | transloco">
+      <button action mat-flat-button type="button" [matMenuTriggerFor]="newAssetMenu">
+        <mat-icon>add</mat-icon>
+        {{ 'assets.newAsset' | transloco }}
+      </button>
+    </app-empty-state>
+  } @else {
+    <table class="wealth-all__table">
+      <thead>
+        <tr>
+          <th scope="col">{{ 'wealth.column.name' | transloco }}</th>
+          <th scope="col">{{ 'wealth.column.place' | transloco }}</th>
+          <th scope="col">{{ 'wealth.column.group' | transloco }}</th>
+          <th scope="col">{{ 'wealth.column.status' | transloco }}</th>
+          <th scope="col" class="wealth-all__num">{{ 'wealth.column.value' | transloco }}</th>
+          <th scope="col"></th>
+        </tr>
+      </thead>
+      @for (section of sections(); track section.type) {
+        <tbody [attr.data-section]="section.type">
+          <tr class="wealth-all__section">
+            <th scope="colgroup" colspan="5">
+              <span class="wealth-all__swatch" [style.background-color]="section.color"></span>
+              <span class="wealth-all__section-name">{{ section.labelKey | transloco }}</span>
+              <a class="wealth-all__section-link" [routerLink]="section.link">{{
+                'wealth.open' | transloco
+              }}</a>
+            </th>
+            <th scope="colgroup" class="wealth-all__num">
+              <app-money [amount]="section.sum" />
+            </th>
+          </tr>
+          @for (row of section.rows; track row.id) {
+            <tr class="wealth-all__row" [class.wealth-all__row--archived]="row.isArchived">
+              <td>
+                <a class="wealth-all__name" [routerLink]="row.link">{{ row.name }}</a>
+                @if (row.isArchived) {
+                  <span class="wealth-all__tag">{{ 'common.archived' | transloco }}</span>
+                }
+                @if (row.subtitle; as subtitle) {
+                  <div class="wealth-all__subtitle">
+                    {{ subtitle.key ? (subtitle.key | transloco: subtitle.params) : subtitle.text }}
+                  </div>
+                }
+              </td>
+              <td>{{ row.accountLabel }}</td>
+              <td>
+                @if (groupOf(row); as group) {
+                  <span
+                    class="wealth-all__swatch"
+                    [style.background-color]="groupColor(group.color)"
+                  ></span>
+                  {{ group.name }}
+                }
+              </td>
+              <td>
+                @for (flag of row.flags; track flag) {
+                  <app-status-chip
+                    [label]="
+                      flagViews[flag].labelKey | transloco: { date: formatDate(row.maturityDate) }
+                    "
+                    [icon]="flagViews[flag].icon"
+                    [tone]="flagViews[flag].tone"
+                  />
+                }
+              </td>
+              <td class="wealth-all__num">
+                <app-money [amount]="row.valuePln" />
+                @if (row.change; as change) {
+                  <div class="wealth-all__change">
+                    <app-money kind="change" [amount]="change.amountPln" />
+                    @if (change.percent !== null) {
+                      <span class="sk-num">({{ formatPercent(change.percent) }})</span>
+                    }
+                  </div>
+                }
+              </td>
+              <td class="wealth-all__actions">
+                <button
+                  mat-icon-button
+                  type="button"
+                  [matMenuTriggerFor]="rowMenu"
+                  [attr.aria-label]="'wealth.rowActions' | transloco: { name: row.name }"
+                >
+                  <mat-icon>more_vert</mat-icon>
+                </button>
+                <mat-menu #rowMenu="matMenu">
+                  <a mat-menu-item [routerLink]="row.link">
+                    <mat-icon>open_in_new</mat-icon>
+                    {{ 'wealth.action.open' | transloco }}
+                  </a>
+                  @if (row.historyLink; as history) {
+                    <a mat-menu-item [routerLink]="history">
+                      <mat-icon>history</mat-icon>
+                      {{ 'wealth.action.history' | transloco }}
+                    </a>
+                  }
+                </mat-menu>
+              </td>
+            </tr>
+          }
+        </tbody>
+      }
+    </table>
+  }
+}

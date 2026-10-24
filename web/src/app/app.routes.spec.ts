@@ -10,6 +10,7 @@ import { AuthService } from './core/auth/auth';
 import { Login } from './features/auth/login/login';
 import { BankAccounts } from './features/bank-accounts/bank-accounts';
 import { Securities } from './features/securities/securities';
+import { WealthAll } from './features/wealth/wealth-all/wealth-all';
 import { WealthLayout } from './features/wealth/wealth-layout';
 import { Bonds } from './features/bonds/bonds';
 import { Cash } from './features/cash/cash';
@@ -62,10 +63,11 @@ describe('app routing (authenticated)', () => {
     }
   });
 
-  it('wealth routes: /wealth redirects to the accounts tab', async () => {
+  it('wealth routes: /wealth renders the All view inside the layout', async () => {
     await harness.navigateByUrl('/wealth', Shell);
-    expect(TestBed.inject(Router).url).toBe('/wealth/accounts');
-    expect(harness.fixture.debugElement.query(By.directive(Accounts))).toBeTruthy();
+    expect(TestBed.inject(Router).url).toBe('/wealth');
+    expect(harness.fixture.debugElement.query(By.directive(WealthLayout))).toBeTruthy();
+    expect(harness.fixture.debugElement.query(By.directive(WealthAll))).toBeTruthy();
   });
 
   it('wealth routes: detail pages render without the tab bar', async () => {

@@ -56,7 +56,56 @@
     }
   },
   "wealth": {
-    "tabsLabel": "Asset types"
+    "tabsLabel": "Asset types",
+    "search": "Search",
+    "groupFilter": "Group: {{ name }}",
+    "groupAll": "All",
+    "groupNone": "No group",
+    "open": "open →",
+    "asOf": "As of {{ date }}",
+    "accountsCount": {
+      "one": "{{ count }} account",
+      "few": "{{ count }} accounts",
+      "many": "{{ count }} accounts",
+      "other": "{{ count }} accounts"
+    },
+    "column": {
+      "name": "Name",
+      "place": "Account or place",
+      "group": "Group",
+      "status": "Status",
+      "value": "Value"
+    },
+    "rowActions": "Actions for: {{ name }}",
+    "action": {
+      "open": "Open",
+      "history": "Transaction history"
+    },
+    "empty": {
+      "all": "You have no assets yet.",
+      "filter": "Nothing matches the filters."
+    },
+    "status": {
+      "maturity": "Matures {{ date }}",
+      "interestDue": "Interest to settle"
+    },
+    "newAsset": {
+      "account": "Investment account",
+      "bank": "Bank account",
+      "cashPlace": "Cash place",
+      "deposit": "Deposit",
+      "bond": "Bond",
+      "stock": "Stock",
+      "etf": "ETF",
+      "metal": "Precious metal"
+    },
+    "subtitle": {
+      "deposit": "{{ rate }} · until {{ date }}",
+      "bond": "{{ series }} · {{ count }} pcs",
+      "gold": "Gold · {{ pieces }} pcs · {{ grams }} g",
+      "silver": "Silver · {{ pieces }} pcs · {{ grams }} g"
+    },
+    "error": "Could not load your assets."
   },
   "auth": {
     "email": "Email",

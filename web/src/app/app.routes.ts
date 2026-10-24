@@ -33,7 +33,12 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/wealth/wealth-layout').then((m) => m.WealthLayout),
             children: [
-              { path: '', pathMatch: 'full', redirectTo: 'accounts' },
+              {
+                path: '',
+                pathMatch: 'full',
+                loadComponent: () =>
+                  import('./features/wealth/wealth-all/wealth-all').then((m) => m.WealthAll),
+              },
               {
                 path: 'accounts',
                 loadComponent: () => import('./features/accounts/accounts').then((m) => m.Accounts),
