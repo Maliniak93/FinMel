@@ -308,10 +308,10 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     expect((await top.boundingBox())!.height).toBeLessThan(72);
   });
 
-  await test.step('Krok 15: Majątek in the bottom navigation opens the investment accounts tab and is highlighted', async () => {
+  await test.step('Krok 15: Majątek in the bottom navigation opens the All view and is highlighted', async () => {
     const majatek = page.getByTestId('bottom-nav').getByRole('link', { name: 'Majątek' });
     await majatek.click();
-    await expect(page).toHaveURL(/\/wealth\/accounts$/);
+    await expect(page).toHaveURL(/\/wealth$/);
     await expect(majatek).toHaveAttribute('aria-current', 'page');
   });
 

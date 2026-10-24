@@ -24,7 +24,7 @@ export const WEALTH_TABS: readonly string[] = [
 
 export async function wealthTab(page: Page, name: string): Promise<void> {
   await page.getByRole('link', { name: 'Majątek', exact: true }).click();
-  await page.getByRole('tab', { name, exact: true }).click();
+  await page.getByRole('tab', { name: new RegExp(`^${name}(\\s|$)`) }).click();
 }
 
 export const STUB_URL = 'http://localhost:18081';

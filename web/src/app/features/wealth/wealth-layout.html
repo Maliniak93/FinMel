@@ -11,10 +11,23 @@
       mat-tab-link
       #rla="routerLinkActive"
       routerLinkActive
-      [routerLink]="'/wealth/' + tab.path"
+      [routerLinkActiveOptions]="{ exact: tab.type === null }"
+      [routerLink]="tab.path ? '/wealth/' + tab.path : '/wealth'"
       [active]="rla.isActive"
-      >{{ tab.label | transloco }}</a
     >
+      <span class="wealth__tab">
+        <span class="wealth__tab-label">{{ tab.label | transloco }}</span>
+        @if (tab.type === 'accounts') {
+          @if (data.accountsLoaded()) {
+            <span class="wealth__tab-caption sk-num">{{
+              accountsCountKey() | transloco: { count: data.accountsCount() }
+            }}</span>
+          }
+        } @else if (tab.type) {
+          <span class="wealth__tab-caption sk-num">{{ sumCaption(tab.type) }}</span>
+        }
+      </span>
+    </a>
   }
 </nav>
 

@@ -56,7 +56,56 @@
     }
   },
   "wealth": {
-    "tabsLabel": "Typy majątku"
+    "tabsLabel": "Typy majątku",
+    "search": "Szukaj",
+    "groupFilter": "Grupa: {{ name }}",
+    "groupAll": "Wszystkie",
+    "groupNone": "Bez grupy",
+    "open": "otwórz →",
+    "asOf": "Stan na {{ date }}",
+    "accountsCount": {
+      "one": "{{ count }} rachunek",
+      "few": "{{ count }} rachunki",
+      "many": "{{ count }} rachunków",
+      "other": "{{ count }} rachunku"
+    },
+    "column": {
+      "name": "Nazwa",
+      "place": "Rachunek lub miejsce",
+      "group": "Grupa",
+      "status": "Status",
+      "value": "Wartość"
+    },
+    "rowActions": "Akcje dla: {{ name }}",
+    "action": {
+      "open": "Otwórz",
+      "history": "Historia transakcji"
+    },
+    "empty": {
+      "all": "Nie masz jeszcze żadnego majątku.",
+      "filter": "Nic nie pasuje do filtrów."
+    },
+    "status": {
+      "maturity": "Zapada {{ date }}",
+      "interestDue": "Odsetki do rozliczenia"
+    },
+    "newAsset": {
+      "account": "Rachunek inwestycyjny",
+      "bank": "Konto bankowe",
+      "cashPlace": "Miejsce gotówki",
+      "deposit": "Lokata",
+      "bond": "Obligacja",
+      "stock": "Akcja",
+      "etf": "ETF",
+      "metal": "Metal szlachetny"
+    },
+    "subtitle": {
+      "deposit": "{{ rate }} · do {{ date }}",
+      "bond": "{{ series }} · {{ count }} szt.",
+      "gold": "Złoto · {{ pieces }} szt. · {{ grams }} g",
+      "silver": "Srebro · {{ pieces }} szt. · {{ grams }} g"
+    },
+    "error": "Nie udało się wczytać majątku."
   },
   "auth": {
     "email": "E-mail",
