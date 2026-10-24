@@ -1,11 +1,13 @@
-import { Component, computed, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, computed, input, model, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatChipListbox, MatChipsModule } from '@angular/material/chips';
+import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import type { AssetClass, NetWorthHistoryPoint } from '../../../api/reporting';
+import { SectionError } from '../../../shared/section-error/section-error';
 import { fromDateOnly } from '../../../shared/date-only';
 import { assetClassColor } from '../../../shared/colors';
 import { assetClassLabel } from '../../assets/asset-class';
@@ -18,7 +20,6 @@ import {
 import { niceTicks, xTickUnit, xTicks, type ChartRange } from './chart-scale';
 
 const RANGES: readonly ChartRange[] = ['1M', '1Y', 'YTD', 'MAX'];
-const ALL_CLASSES = 'all';
 
 const WIDTH = 640;
 const HEIGHT = 280;
@@ -45,8 +46,10 @@ interface ChartPoint {
   imports: [
     MatButtonModule,
     MatButtonToggleModule,
-    MatChipsModule,
+    MatIconModule,
+    MatMenuModule,
     MatProgressSpinnerModule,
+    SectionError,
     TranslocoPipe,
   ],
   templateUrl: './net-worth-chart.html',
@@ -63,11 +66,7 @@ export class NetWorthChart {
   readonly loadError = input<string | null>(null);
   readonly retry = output<void>();
 
-  private readonly classBox = viewChild<MatChipListbox>('classBox');
-  private readonly groupBox = viewChild<MatChipListbox>('groupBox');
-
   protected readonly ranges = RANGES;
-  protected readonly allClasses = ALL_CLASSES;
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly assetClassColor = assetClassColor;
   protected readonly width = WIDTH;
@@ -156,23 +155,19 @@ export class NetWorthChart {
     return chart && index !== null ? chart.coordinates[index] : null;
   });
 
-  protected onClassChange(value: AssetClass | typeof ALL_CLASSES | undefined): void {
-    const next = typeof value === 'number' ? value : null;
-    this.assetClass.set(next);
-    const listbox = this.classBox();
-    if (next === null && listbox) {
-      // The All chip cannot be deselected: reselect it when the user clicked it while selected.
-      listbox.value = ALL_CLASSES;
-    }
+  protected selectAll(): void {
+    this.assetClass.set(null);
+    this.group.set(null);
   }
 
-  protected onGroupChange(value: string | undefined): void {
-    const next = typeof value === 'string' && value !== ALL_CLASSES ? value : null;
-    this.group.set(next);
-    const listbox = this.groupBox();
-    if (next === null && listbox) {
-      listbox.value = ALL_CLASSES;
-    }
+  protected selectClass(assetClass: AssetClass): void {
+    this.assetClass.set(assetClass);
+    this.group.set(null);
+  }
+
+  protected selectGroup(key: string): void {
+    this.group.set(key);
+    this.assetClass.set(null);
   }
 
   protected tooltipAlignment(point: ChartPoint): 'start' | 'center' | 'end' {

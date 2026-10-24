@@ -17,10 +17,10 @@ import {
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import type { DashboardResponse, NetWorthHistoryResponse } from '../../api/reporting';
-import { ASSET_CLASS, assetClassLabel } from '../assets/asset-class';
+import { ASSET_CLASS } from '../assets/asset-class';
 import { Dashboard } from './dashboard';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatDate, formatMoney, formatPercent } from '../../shared/format';
+import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
 import {
   type ApiRoute,
   type Responder,
@@ -34,6 +34,8 @@ import {
   CUSHION_GROUP_ID,
   jsonResponse,
   lastHistoryParams,
+  menuItem,
+  openFilterMenu,
   mockApi,
   accountResponse,
   requestUrl,
@@ -102,24 +104,6 @@ describe('Dashboard', () => {
     expect(text).toContain('Stale');
   });
 
-  it('builds pie segments from the asset-class breakdown', async () => {
-    await setup(jsonResponse(dashboard));
-    expect(component['pieSegments']()).toEqual([
-      {
-        key: String(ASSET_CLASS.Cash),
-        label: assetClassLabel(ASSET_CLASS.Cash),
-        percentage: 33.33,
-        color: 'var(--sk-c-cash)',
-      },
-      {
-        key: String(ASSET_CLASS.Stock),
-        label: assetClassLabel(ASSET_CLASS.Stock),
-        percentage: 66.67,
-        color: 'var(--sk-c-stock)',
-      },
-    ]);
-  });
-
   it('gives the BankAccount class a colour and the label "Konta bankowe"', async () => {
     await setup(
       jsonResponse({
@@ -131,11 +115,16 @@ describe('Dashboard', () => {
       } satisfies DashboardResponse),
     );
 
-    const [cash, bank] = component['pieSegments']();
+    const segments = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+      '.dashboard-page__structure .split-bar__segment',
+    );
+    const colors = [...segments].map((segment) => segment.style.backgroundColor);
 
-    expect(bank.label).toBe(assetClassLabel(ASSET_CLASS.BankAccount));
-    expect(bank.color).toBeTruthy();
-    expect(bank.color).not.toBe(cash.color);
+    expect(segments).toHaveLength(2);
+    expect(colors[0]).toBeTruthy();
+    expect(colors[1]).toBeTruthy();
+    expect(colors[0]).not.toBe(colors[1]);
+    expect(component['structureSegments']()[1].label).toBe('Bank accounts');
 
     await switchLanguage(fixture, 'pl');
 
@@ -183,17 +172,177 @@ describe('Dashboard', () => {
   }
 
   it('shows the change for the selected range', async () => {
-    await setup(jsonResponse(dashboard), historyWithChange(250, 25));
+    await setup(jsonResponse(dashboard), (url) =>
+      url.includes('range=YTD') ? historyWithChange(250, 25) : historyWithChange(40, 4),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    expect(lastHistoryParams(fetchSpy).get('range')).toBe('1Y');
 
-    const change = (fixture.nativeElement as HTMLElement).querySelector(
-      '.dashboard-page__change',
-    ) as HTMLElement;
+    const ytdToggle = [...element.querySelectorAll('mat-button-toggle button')].find(
+      (button) => button.textContent?.trim() === 'YTD',
+    ) as HTMLButtonElement;
+    ytdToggle.click();
+    await fixture.whenStable();
 
-    expect(change.textContent).toContain(formatMoney(250));
+    const change = element.querySelector('.dashboard-page__change') as HTMLElement;
+    expect(lastHistoryParams(fetchSpy).get('range')).toBe('YTD');
+    expect(normalised(change.textContent ?? '')).toContain(normalised(formatSignedMoney(250)));
     expect(change.textContent).toContain(formatPercent(25));
-    expect(change.textContent).toContain('1Y');
     expect(change.classList).toContain('dashboard-page__change--positive');
     expect(change.classList).not.toContain('dashboard-page__change--negative');
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(normalised(change.textContent ?? '')).toContain('zmiana za YTD');
+  });
+
+  it('shows how many valuations are stale', async () => {
+    const line = (assetId: string, isStale: boolean) => ({
+      assetId,
+      valuePln: 100,
+      priceDate: '2026-07-01',
+      isStale,
+    });
+    await setup(
+      jsonResponse({
+        ...dashboard,
+        isStale: true,
+        byAsset: [line('a1', true), line('a2', true), line('a3', false)],
+      } satisfies DashboardResponse),
+    );
+    await switchLanguage(fixture, 'pl');
+    const text = normalised((fixture.nativeElement as HTMLElement).textContent ?? '');
+
+    expect(text).toContain('Nieaktualne');
+    expect(text).toContain('Wycena 2 pozycji od dawna się nie odświeżyła');
+  });
+
+  it('hides the stale note when no valuation is stale', async () => {
+    await setup(
+      jsonResponse({
+        ...dashboard,
+        byAsset: [{ assetId: 'a1', valuePln: 100, priceDate: '2026-08-08', isStale: false }],
+      } satisfies DashboardResponse),
+    );
+    await switchLanguage(fixture, 'pl');
+    const text = normalised((fixture.nativeElement as HTMLElement).textContent ?? '');
+
+    expect(text).not.toContain('Nieaktualne');
+    expect(text).not.toContain('od dawna się nie odświeżyła');
+  });
+
+  it('shows one empty state without a valuation', async () => {
+    await setup(
+      jsonResponse({
+        netWorthPln: 0,
+        asOf: null,
+        isStale: false,
+        byAssetClass: [],
+        byAccount: [],
+        byGroup: [],
+        byAsset: [],
+      } satisfies DashboardResponse),
+    );
+    await switchLanguage(fixture, 'pl');
+    const element = fixture.nativeElement as HTMLElement;
+    const states = element.querySelectorAll('app-empty-state');
+
+    expect(states).toHaveLength(1);
+    expect(textOf(states[0].querySelector('a[href="/wealth/accounts"]'))).toBe('Dodaj rachunek');
+    for (const selector of [
+      '.dashboard-page__value',
+      '.dashboard-page__hero',
+      'app-net-worth-chart',
+      '.dashboard-page__structure',
+      '.dashboard-page__group-card',
+      'app-accounts-card',
+      'app-cash-card',
+      'app-month-card',
+      'app-upcoming-card',
+    ]) {
+      expect(element.querySelector(selector), selector).toBeNull();
+    }
+  });
+
+  it('a failed history does not replace the page', async () => {
+    let calls = 0;
+    await setup(jsonResponse(dashboardWithClasses), () => {
+      calls++;
+      return calls === 1
+        ? jsonResponse({ detail: 'History unavailable.' }, 503)
+        : historyWithChange(250, 25);
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const slot = element.querySelector('app-net-worth-chart app-section-error') as HTMLElement;
+
+    expect(textOf(slot)).toContain('History unavailable.');
+    expect(element.querySelectorAll('app-section-error')).toHaveLength(1);
+    expect(element.querySelector('.dashboard-page__value')).not.toBeNull();
+    expect(element.querySelector('.dashboard-page__structure')).not.toBeNull();
+    expect(element.querySelector('app-accounts-card')).not.toBeNull();
+    expect(element.querySelector('app-cash-card')).not.toBeNull();
+
+    (slot.querySelector('button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+
+    expect(element.querySelector('app-section-error')).toBeNull();
+    expect(changeText()).toContain(normalised(formatMoney(250)));
+  });
+
+  it('renders the structure bar and class links', async () => {
+    await setup(jsonResponse(dashboardWithClasses));
+    await switchLanguage(fixture, 'pl');
+    const structure = (fixture.nativeElement as HTMLElement).querySelector(
+      '.dashboard-page__structure',
+    ) as HTMLElement;
+
+    expect(structure.textContent).toContain('Struktura majątku');
+    expect(structure.querySelector('app-pie-chart')).toBeNull();
+    expect(structure.querySelectorAll('app-split-bar')).toHaveLength(1);
+    expect(structure.querySelectorAll('app-split-bar .split-bar__segment')).toHaveLength(3);
+
+    const rows = [...structure.querySelectorAll('li')];
+    expect(rows).toHaveLength(3);
+    const expected = [
+      { href: '/wealth/securities', value: 6000, share: 40 },
+      { href: '/wealth/cash', value: 5000, share: 33.33 },
+      { href: '/wealth/securities', value: 4000, share: 26.67 },
+    ];
+    expected.forEach((row, index) => {
+      const text = normalised(rows[index].textContent ?? '');
+      expect(rows[index].querySelector(`a[href="${row.href}"]`)).not.toBeNull();
+      expect(text).toContain(normalised(formatMoney(row.value)));
+      expect(text).toContain(normalised(formatPercent(row.share)));
+    });
+    expect(textsOf(structure, 'li a')).toEqual(['Akcje', 'Gotówka', 'ETF']);
+  });
+
+  it('stacks the sections on a narrow container', async () => {
+    await setup(jsonResponse(dashboardWithGroups()), undefined, { groups: jsonResponse(groups) });
+    const element = fixture.nativeElement as HTMLElement;
+
+    const order = [
+      '.dashboard-page__hero',
+      'app-month-card',
+      'app-upcoming-card',
+      '.dashboard-page__group-card',
+      '.dashboard-page__structure',
+      'app-accounts-card',
+      'app-cash-card',
+    ];
+    const nodes = order.map((selector) => element.querySelector(selector));
+    nodes.forEach((node, index) => expect(node, order[index]).not.toBeNull());
+    expect([...element.querySelectorAll(order.join(', '))]).toEqual(nodes);
+
+    // jsdom cannot evaluate container queries, so read the component's compiled stylesheet.
+    const css =
+      [...document.querySelectorAll('style')]
+        .map((style) => style.textContent ?? '')
+        .find((text) => text.includes('.dashboard-page__hero')) ?? '';
+    const split = css.indexOf('@container (min-width: 720px)');
+    expect(split).toBeGreaterThan(-1);
+    expect(css.slice(split)).toMatch(/\.dashboard-page__hero[^{]*\{[^}]*5fr/);
+    expect(css.slice(0, split)).not.toMatch(/\.dashboard-page__hero[^{]*\{[^}]*5fr/);
   });
 
   it('styles a negative change as negative', async () => {
@@ -226,195 +375,6 @@ describe('Dashboard', () => {
     expect(historyUrls.at(-1)).toContain('range=1M');
     expect(changeText()).toContain(normalised(formatMoney(40)));
     expect(changeText()).toContain('1M');
-  });
-
-  it('surfaces a history load failure in the chart and retries it', async () => {
-    let calls = 0;
-    await setup(jsonResponse(dashboard), () => {
-      calls++;
-      return calls === 1
-        ? jsonResponse({ detail: 'History unavailable.' }, 503)
-        : historyWithChange(250, 25);
-    });
-    const element = fixture.nativeElement as HTMLElement;
-
-    expect(textOf(element.querySelector('.net-worth-chart__state p'))).toBe('History unavailable.');
-
-    (element.querySelector('.net-worth-chart__state button') as HTMLButtonElement).click();
-    await fixture.whenStable();
-
-    expect(element.querySelector('.net-worth-chart__state')).toBeNull();
-    expect(changeText()).toContain(normalised(formatMoney(250)));
-  });
-
-  function chipOption(element: HTMLElement, label: string): HTMLButtonElement {
-    const option = [
-      ...element.querySelectorAll<HTMLButtonElement>('mat-chip-option button[role="option"]'),
-    ].find((button) => textOf(button) === label);
-    if (!option) {
-      throw new Error(`No class chip labelled "${label}".`);
-    }
-    return option;
-  }
-
-  function selectedChips(element: HTMLElement): string[] {
-    return textsOf(element, 'mat-chip-option button[aria-selected="true"]');
-  }
-
-  function legendButtons(element: HTMLElement): HTMLButtonElement[] {
-    return [...element.querySelectorAll<HTMLButtonElement>('.dashboard-page__legend button')];
-  }
-
-  function legendPressed(element: HTMLElement): boolean[] {
-    return legendButtons(element).map((button) => button.getAttribute('aria-pressed') === 'true');
-  }
-
-  function legendDimmed(element: HTMLElement): boolean[] {
-    return legendButtons(element).map((button) =>
-      button.classList.contains('dashboard-page__legend-item--dimmed'),
-    );
-  }
-
-  function pieCircles(element: HTMLElement): SVGElement[] {
-    return [...element.querySelectorAll<SVGElement>('app-pie-chart circle')];
-  }
-
-  function clickSvg(element: SVGElement): void {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  }
-
-  it('renders class chips in legend order with All selected', async () => {
-    await setup(jsonResponse(dashboardWithClasses));
-    const element = fixture.nativeElement as HTMLElement;
-
-    expect(textsOf(element, 'mat-chip-option')).toEqual(['All', 'ETF', 'Stock', 'Cash']);
-    expect(selectedChips(element)).toEqual(['All']);
-    expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
-  });
-
-  it('filtering by a class requests its series and labels the change', async () => {
-    await setup(jsonResponse(dashboardWithClasses), (url) =>
-      url.includes('assetClass=3') ? historyWithChange(40, 4) : historyWithChange(250, 25),
-    );
-    const element = fixture.nativeElement as HTMLElement;
-    const segmentsBefore = component['pieSegments']();
-
-    chipOption(element, 'ETF').click();
-    await fixture.whenStable();
-
-    expect(lastHistoryParams(fetchSpy).get('assetClass')).toBe('3');
-    expect(changeText()).toContain(normalised(formatMoney(40)));
-
-    const changeElement = element.querySelector('.dashboard-page__value .dashboard-page__change');
-    const classLabel = changeElement?.querySelector('.dashboard-page__change-class');
-    const rangeLabel = changeElement?.querySelector('.dashboard-page__change-range');
-    expect(classLabel).toBeTruthy();
-    expect(rangeLabel).toBeTruthy();
-    expect(textOf(classLabel)).toBe('ETF');
-    expect(textOf(rangeLabel)).toBe('1Y');
-    expect(
-      (classLabel as Element).compareDocumentPosition(rangeLabel as Element) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-
-    expect(textOf(element.querySelector('.dashboard-page__net-worth'))).toBe(
-      normalised(formatMoney(15000)),
-    );
-    expect(component['pieSegments']()).toEqual(segmentsBefore);
-  });
-
-  it('switching the range keeps the class filter', async () => {
-    await setup(jsonResponse(dashboardWithClasses), historyWithChange(250, 25));
-    const element = fixture.nativeElement as HTMLElement;
-
-    chipOption(element, 'ETF').click();
-    await fixture.whenStable();
-
-    const monthToggle = [...element.querySelectorAll('mat-button-toggle button')].find(
-      (button) => button.textContent?.trim() === '1M',
-    ) as HTMLButtonElement;
-    monthToggle.click();
-    await fixture.whenStable();
-
-    const params = lastHistoryParams(fetchSpy);
-    expect(params.get('range')).toBe('1M');
-    expect(params.get('assetClass')).toBe('3');
-    expect(selectedChips(element)).toEqual(['ETF']);
-  });
-
-  it('the legend toggles the class filter', async () => {
-    await setup(jsonResponse(dashboardWithClasses));
-    const element = fixture.nativeElement as HTMLElement;
-
-    expect(legendButtons(element).map((button) => button.getAttribute('type'))).toEqual([
-      'button',
-      'button',
-      'button',
-    ]);
-    expect(legendPressed(element)).toEqual([false, false, false]);
-
-    legendButtons(element)[0].click();
-    await fixture.whenStable();
-
-    expect(selectedChips(element)).toEqual(['ETF']);
-    expect(legendPressed(element)).toEqual([true, false, false]);
-    expect(legendDimmed(element)).toEqual([false, true, true]);
-
-    legendButtons(element)[0].click();
-    await fixture.whenStable();
-
-    expect(selectedChips(element)).toEqual(['All']);
-    expect(legendPressed(element)).toEqual([false, false, false]);
-    expect(legendDimmed(element)).toEqual([false, false, false]);
-  });
-
-  it('deselecting the class chip returns to All', async () => {
-    await setup(jsonResponse(dashboardWithClasses), historyWithChange(250, 25));
-    const element = fixture.nativeElement as HTMLElement;
-
-    chipOption(element, 'ETF').click();
-    await fixture.whenStable();
-    chipOption(element, 'ETF').click();
-    await fixture.whenStable();
-
-    expect(selectedChips(element)).toEqual(['All']);
-    expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
-    expect(legendPressed(element)).toEqual([false, false, false]);
-  });
-
-  it('a donut segment click toggles the class filter', async () => {
-    await setup(jsonResponse(dashboardWithClasses), historyWithChange(250, 25));
-    const element = fixture.nativeElement as HTMLElement;
-
-    clickSvg(pieCircles(element)[0]);
-    await fixture.whenStable();
-
-    expect(selectedChips(element)).toEqual(['ETF']);
-    expect(lastHistoryParams(fetchSpy).get('assetClass')).toBe('3');
-
-    clickSvg(pieCircles(element)[0]);
-    await fixture.whenStable();
-
-    expect(selectedChips(element)).toEqual(['All']);
-    expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
-  });
-
-  it('renders the class filter in Polish', async () => {
-    await setup(jsonResponse(dashboardWithClasses), historyWithChange(250, 25));
-    const element = fixture.nativeElement as HTMLElement;
-    chipOption(element, 'ETF').click();
-    await fixture.whenStable();
-
-    const english = textsOf(element, 'mat-chip-option');
-    expect(english).toEqual(['All', 'ETF', 'Stock', 'Cash']);
-
-    await switchLanguage(fixture, 'pl');
-
-    const polish = textsOf(element, 'mat-chip-option');
-    expect(polish).toEqual(['Wszystko', 'ETF', 'Akcje', 'Gotówka']);
-    expect(polishProblems(english, polish, ['ETF'])).toEqual([]);
-    expect(textsOf(element, '.dashboard-page__value .dashboard-page__kpi-label')[1]).toBe('Zmiana');
-    expect(textOf(element.querySelector('.dashboard-page__change-class'))).toBe('ETF');
   });
 
   it('renders in Polish', async () => {
@@ -462,12 +422,12 @@ describe('Dashboard', () => {
     const element = fixture.nativeElement as HTMLElement;
     const texts = () => [
       textOf(element.querySelector('h1')),
-      textOf(element.querySelector('.dashboard-page__state p')),
-      textOf(element.querySelector('.dashboard-page__state a')),
+      textOf(element.querySelector('app-empty-state p')),
+      textOf(element.querySelector('app-empty-state a')),
     ];
 
     const english = texts();
-    expect(english).toEqual(['Dashboard', "You haven't entered any wealth yet.", 'Go to accounts']);
+    expect(english).toEqual(['Dashboard', "You haven't entered any wealth yet.", 'Add account']);
 
     await switchLanguage(fixture, 'pl');
 
@@ -514,30 +474,6 @@ describe('Dashboard', () => {
     expect(textOf(value.querySelector('.dashboard-page__change'))).toBe('—');
   });
 
-  it('orders the cards value, allocation, chart, accounts, cash, upcoming', async () => {
-    await setup(jsonResponse(dashboard));
-    const element = fixture.nativeElement as HTMLElement;
-
-    const expected = [
-      element.querySelector('.dashboard-page__value'),
-      element.querySelector('app-pie-chart'),
-      element.querySelector('app-net-worth-chart'),
-      element.querySelector('app-accounts-card'),
-      element.querySelector('app-cash-card'),
-      element.querySelector('app-upcoming-card'),
-    ];
-    const ordered = [
-      ...element.querySelectorAll(
-        '.dashboard-page__value, app-pie-chart, app-net-worth-chart, app-accounts-card, app-cash-card, app-upcoming-card',
-      ),
-    ];
-
-    expect(ordered).toHaveLength(6);
-    expected.forEach((node, index) => expect(ordered[index]).toBe(node));
-    expect(element.querySelectorAll('mat-button-toggle-group')).toHaveLength(1);
-    expect(element.querySelector('app-net-worth-chart mat-button-toggle-group')).not.toBeNull();
-  });
-
   it('a failing card does not break the dashboard', async () => {
     await setup(jsonResponse(dashboard), historyWithChange(250, 25), {
       bonds: jsonResponse({ detail: 'Bonds unavailable.' }, 503),
@@ -550,20 +486,10 @@ describe('Dashboard', () => {
     expect(upcoming.textContent).toContain('Bonds unavailable.');
     expect(upcoming.querySelector('button')).not.toBeNull();
     expect(element.querySelector('.dashboard-page__value')).not.toBeNull();
-    expect(element.querySelector('app-pie-chart')).not.toBeNull();
+    expect(element.querySelector('app-split-bar')).not.toBeNull();
     expect(element.querySelector('app-net-worth-chart')).not.toBeNull();
     expect(element.querySelector('app-accounts-card')?.textContent).toContain('Retirement');
     expect(element.querySelector('app-cash-card')?.textContent).toContain(formatMoney(1000, 'PLN'));
-  });
-
-  it('the summary grid holds the accounts and cash cards', async () => {
-    await setup(jsonResponse(dashboard), historyWithChange(250, 25));
-    const summary = (fixture.nativeElement as HTMLElement).querySelector(
-      '.dashboard-page__summary',
-    ) as HTMLElement;
-
-    expect(summary.querySelector('app-accounts-card')).not.toBeNull();
-    expect(summary.querySelector('app-cash-card')).not.toBeNull();
   });
 
   it('the cash and accounts cards link to wealth addresses', async () => {
@@ -589,37 +515,20 @@ describe('Dashboard', () => {
       return [...element.querySelectorAll<SVGElement>(`${groupCard} app-pie-chart circle`)];
     }
 
-    function groupLegend(element: HTMLElement): HTMLButtonElement[] {
+    function groupLegend(element: HTMLElement): HTMLElement[] {
       return [
-        ...element.querySelectorAll<HTMLButtonElement>('.dashboard-page__group-legend button'),
+        ...element.querySelectorAll<HTMLElement>(
+          '.dashboard-page__group-legend .dashboard-page__legend-item',
+        ),
       ];
     }
 
-    function groupLegendRow(element: HTMLElement, name: string): HTMLButtonElement {
+    function groupLegendRow(element: HTMLElement, name: string): HTMLElement {
       const row = groupLegend(element).find((button) => textOf(button).includes(name));
       if (!row) {
         throw new Error(`No group legend row for "${name}".`);
       }
       return row;
-    }
-
-    function groupChip(element: HTMLElement, label: string): HTMLButtonElement {
-      const chip = [
-        ...element.querySelectorAll<HTMLButtonElement>(
-          'mat-chip-listbox.net-worth-chart__groups mat-chip-option button[role="option"]',
-        ),
-      ].find((button) => textOf(button) === label);
-      if (!chip) {
-        throw new Error(`No group chip labelled "${label}".`);
-      }
-      return chip;
-    }
-
-    function selectedGroupChips(element: HTMLElement): string[] {
-      return textsOf(
-        element,
-        'mat-chip-listbox.net-worth-chart__groups mat-chip-option button[aria-selected="true"]',
-      );
     }
 
     function clickSvg(target: SVGElement): void {
@@ -636,7 +545,7 @@ describe('Dashboard', () => {
       });
       const element = fixture.nativeElement as HTMLElement;
 
-      expect(element.querySelectorAll('app-pie-chart')).toHaveLength(2);
+      expect(element.querySelectorAll('app-pie-chart')).toHaveLength(1);
       const strokes = groupCircles(element).map((circle) => circle.getAttribute('style') ?? '');
       expect(strokes).toHaveLength(4);
       ['var(--sk-g-blue)', 'var(--sk-g-green)', 'var(--sk-g-orange)', 'var(--sk-g-none)'].forEach(
@@ -781,7 +690,7 @@ describe('Dashboard', () => {
       ).toBe(true);
     });
 
-    it('sends group and class filters', async () => {
+    it('sends the filter from the menu', async () => {
       await setup(
         jsonResponse({
           ...dashboardWithGroups(),
@@ -791,49 +700,62 @@ describe('Dashboard', () => {
         { groups: jsonResponse(groups) },
       );
       const element = fixture.nativeElement as HTMLElement;
+      const filterButton = () => textOf(element.querySelector('.net-worth-chart__filter'));
       expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
-      expect(lastHistoryParams(fetchSpy).has('ungrouped')).toBe(false);
+      expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
 
-      groupChip(element, 'Emerytura').click();
+      menuItem(await openFilterMenu(fixture), 'ETF').click();
+      await fixture.whenStable();
+      expect(lastHistoryParams(fetchSpy).get('assetClass')).toBe('3');
+      expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
+      expect(filterButton()).toContain('ETF');
+
+      menuItem(await openFilterMenu(fixture), 'Emerytura').click();
       await fixture.whenStable();
       expect(lastHistoryParams(fetchSpy).get('groupId')).toBe(RETIREMENT_GROUP_ID);
       expect(lastHistoryParams(fetchSpy).has('assetClass')).toBe(false);
+      expect(filterButton()).toContain('Emerytura');
 
-      chipOption(element, 'ETF').click();
+      menuItem(await openFilterMenu(fixture), 'No group').click();
       await fixture.whenStable();
-      const both = lastHistoryParams(fetchSpy);
-      expect(both.get('groupId')).toBe(RETIREMENT_GROUP_ID);
-      expect(both.get('assetClass')).toBe('3');
+      expect(lastHistoryParams(fetchSpy).get('ungrouped')).toBe('true');
+      expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
 
-      groupChip(element, 'No group').click();
+      menuItem(await openFilterMenu(fixture), 'All').click();
       await fixture.whenStable();
-      const ungrouped = lastHistoryParams(fetchSpy);
-      expect(ungrouped.get('ungrouped')).toBe('true');
-      expect(ungrouped.has('groupId')).toBe(false);
+      const cleared = lastHistoryParams(fetchSpy);
+      expect(cleared.has('assetClass')).toBe(false);
+      expect(cleared.has('groupId')).toBe(false);
+      expect(cleared.has('ungrouped')).toBe(false);
+      expect(filterButton()).toContain('All');
     });
 
-    it('selects the group filter from the legend', async () => {
+    it('group rows do not filter the history', async () => {
       await setup(jsonResponse(dashboardWithGroups()), undefined, {
         groups: jsonResponse(groups),
       });
       const element = fixture.nativeElement as HTMLElement;
+      const before = fetchSpy.mock.calls.length;
 
-      groupLegendRow(element, 'Emerytura').click();
+      for (const row of element.querySelectorAll<HTMLElement>(
+        '.dashboard-page__group-legend .dashboard-page__legend-item, .dashboard-page__group-legend li',
+      )) {
+        row.click();
+      }
+      for (const circle of groupCircles(element)) {
+        clickSvg(circle);
+      }
       await fixture.whenStable();
-      expect(lastHistoryParams(fetchSpy).get('groupId')).toBe(RETIREMENT_GROUP_ID);
-      expect(selectedGroupChips(element)).toEqual(['Emerytura']);
 
-      groupLegendRow(element, 'Emerytura').click();
-      await fixture.whenStable();
-      expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
-
-      clickSvg(groupCircles(element)[1]);
-      await fixture.whenStable();
-      expect(lastHistoryParams(fetchSpy).get('groupId')).toBe(INVESTMENTS_GROUP_ID);
-
-      groupLegendRow(element, 'No group').click();
-      await fixture.whenStable();
-      expect(lastHistoryParams(fetchSpy).get('ungrouped')).toBe('true');
+      const params = lastHistoryParams(fetchSpy);
+      expect(params.has('groupId')).toBe(false);
+      expect(params.has('ungrouped')).toBe(false);
+      expect(
+        fetchSpy.mock.calls
+          .slice(before)
+          .some(([input]: [unknown]) => requestUrl(input).includes('/net-worth-history')),
+      ).toBe(false);
+      expect(textOf(element.querySelector('.net-worth-chart__filter'))).toContain('All');
     });
 
     it('resets a deleted group filter', async () => {
@@ -843,7 +765,7 @@ describe('Dashboard', () => {
       });
       const element = fixture.nativeElement as HTMLElement;
 
-      groupLegendRow(element, 'Emerytura').click();
+      menuItem(await openFilterMenu(fixture), 'Emerytura').click();
       await fixture.whenStable();
       expect(lastHistoryParams(fetchSpy).get('groupId')).toBe(RETIREMENT_GROUP_ID);
 
@@ -852,32 +774,7 @@ describe('Dashboard', () => {
       await fixture.whenStable();
 
       expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
-      expect(selectedGroupChips(element)).toEqual(['All']);
-    });
-
-    it('stacks the pies on a narrow container', async () => {
-      await setup(jsonResponse(dashboardWithGroups()), undefined, {
-        groups: jsonResponse(groups),
-      });
-      const element = fixture.nativeElement as HTMLElement;
-
-      expect(
-        element.querySelectorAll(
-          '.dashboard-page__pies > * app-pie-chart, .dashboard-page__pies > app-pie-chart',
-        ),
-      ).toHaveLength(2);
-      // jsdom cannot evaluate container queries, so read the component's compiled stylesheet.
-      const css =
-        [...document.querySelectorAll('style')]
-          .map((style) => style.textContent ?? '')
-          .find((text) => text.includes('.dashboard-page__pies')) ?? '';
-      const split = css.indexOf('@container (min-width: 720px)');
-      expect(split).toBeGreaterThan(-1);
-      expect(css.slice(split)).toMatch(
-        /\.dashboard-page__pies[^{]*\{[^}]*grid-template-columns:\s*repeat\(2/,
-      );
-      expect(css.slice(0, split)).toMatch(/\.dashboard-page__pies[^{]*\{/);
-      expect(css.slice(0, split)).not.toMatch(/\.dashboard-page__pies[^{]*\{[^}]*repeat\(2/);
+      expect(textOf(element.querySelector('.net-worth-chart__filter'))).toContain('All');
     });
   });
 });

@@ -39,7 +39,7 @@ function legendName(label: string, value: string, target?: { amount: string; per
   const body = target
     ? `${num(value)}\\s/\\s${num(target.amount)}\\szł\\s\\(${target.percent}%\\)`
     : `${num(value)}\\szł`;
-  return new RegExp(`^${label} — ${body}`);
+  return new RegExp(`^\\s*${label} — ${body}`);
 }
 
 function navigation(page: Page): Locator {
@@ -86,16 +86,22 @@ function groupLegend(page: Page): Locator {
   return page.locator('.dashboard-page__group-legend');
 }
 
+function groupLegendEntry(page: Page, text: RegExp): Locator {
+  return groupLegend(page).locator('.dashboard-page__legend-item').filter({ hasText: text });
+}
+
 function groupLegendItem(page: Page, label: string): Locator {
-  return groupLegend(page).getByRole('button', { name: new RegExp(`^${label} — `) });
+  return groupLegendEntry(page, new RegExp(`^\\s*${label} — `));
 }
 
-function groupChip(page: Page, name: string): Locator {
-  return page.getByRole('listbox', { name: 'Grupa', exact: true }).getByRole('option', { name });
+function filterButton(page: Page): Locator {
+  return page.locator('.net-worth-chart__filter');
 }
 
-function classChip(page: Page, name: string): Locator {
-  return page.getByRole('listbox', { name: 'Klasa aktywów' }).getByRole('option', { name });
+async function chooseFilter(page: Page, name: string): Promise<void> {
+  await filterButton(page).click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
+  await expect(filterButton(page)).toContainText(name);
 }
 
 function rangeToggle(page: Page, name: string): Locator {
@@ -245,7 +251,7 @@ async function expectDashboard(
         });
       }
       for (const entry of expected.groups) {
-        await expect(groupLegend(page).getByRole('button', { name: entry })).toBeVisible({
+        await expect(groupLegendEntry(page, entry)).toBeVisible({
           timeout: 2_000,
         });
       }
@@ -270,17 +276,15 @@ async function expectFilteredChart(
     async () => {
       await dashboardRefetch(page);
       if (filter.assetClass) {
-        await classChip(page, filter.assetClass).click();
+        await chooseFilter(page, filter.assetClass);
       }
       if (filter.group) {
-        await groupChip(page, filter.group).click();
+        await chooseFilter(page, filter.group);
       }
     },
     async () => {
       if (filter.group) {
-        await expect(groupChip(page, filter.group)).toHaveAttribute('aria-selected', 'true', {
-          timeout: 2_000,
-        });
+        await expect(filterButton(page)).toContainText(filter.group, { timeout: 2_000 });
         await expect(page.locator('.net-worth-chart__caption')).toContainText(filter.group, {
           timeout: 2_000,
         });
@@ -656,19 +660,15 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await rangeToggle(page, '1Y').click();
   });
 
-  await test.step('Krok 15: ETF in Emerytura starts at the VWCE.DE purchase, the class and group filters give their own series', async () => {
-    await classChip(page, 'ETF').click();
-    await expect(historyImage(page)).toHaveAccessibleName(/od\s0,00\szł\sdo\s4\s?250,00\szł/);
-    await groupChip(page, 'Wszystko').click();
+  await test.step('Krok 15: the class filter and the group filter, one at a time, give their own series', async () => {
+    await chooseFilter(page, 'ETF');
     await expect(historyImage(page)).toHaveAccessibleName(/do\s48\s?000,00\szł/);
-    await classChip(page, 'Wszystko').click();
-    await groupChip(page, 'Emerytura').click();
+    await chooseFilter(page, 'Emerytura');
     await expect(historyImage(page)).toHaveAccessibleName(/do\s33\s?450,00\szł/);
   });
 
   await test.step('Krok 16: the group filter Bez grupy draws the assets without a group', async () => {
-    await groupChip(page, 'Bez grupy').click();
-    await expect(groupChip(page, 'Bez grupy')).toHaveAttribute('aria-selected', 'true');
+    await chooseFilter(page, 'Bez grupy');
     await expect(page.locator('.net-worth-chart__caption')).toContainText('Bez grupy');
     await expect(historyChart(page)).toBeVisible();
   });
@@ -709,8 +709,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
   });
 
   await test.step('Krok 19: deleting Inwestycje warns about its 5 assets and sends them to Bez grupy', async () => {
-    await expect(groupChip(page, 'Wszystko')).toBeVisible();
-    await groupChip(page, 'Inwestycje').click();
+    await chooseFilter(page, 'Inwestycje');
     await openPage(page, 'Grupy');
     await groupRow(page, 'Inwestycje').getByTestId('delete-group').click();
     await expect(dialog).toContainText('ma aktywa: 5');
@@ -727,7 +726,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
         legendName('Poduszka', '33 000,00', { amount: '30 000,00', percent: 110 }),
       ],
     });
-    await expect(groupChip(page, 'Wszystko')).toHaveAttribute('aria-selected', 'true');
+    await expect(filterButton(page)).toContainText('Wszystko');
 
     await openPage(page, 'Rachunki inwestycyjne');
     await page.getByRole('button', { name: 'Akcje dla: Broker', exact: true }).click();

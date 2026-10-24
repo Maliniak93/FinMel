@@ -441,7 +441,9 @@
   "dashboard": {
     "title": "Dashboard",
     "netWorth": "Net worth",
-    "change": "Change",
+    "changeForRange": "· change for {{ range }}",
+    "staleCount": "The valuation of {{ count }} holdings hasn't refreshed in a while",
+    "addAccount": "Add account",
     "allocation": "Allocation",
     "groups": {
       "title": "By group",
@@ -480,7 +482,6 @@
         "bankInterestDue": "Bank interest due, months: {{ count }}"
       }
     },
-    "goToAccounts": "Go to accounts",
     "accounts": {
       "title": "Accounts",
       "empty": "No active accounts with a value yet.",
@@ -505,7 +506,6 @@
   },
   "netWorthChart": {
     "rangeLabel": "Chart range",
-    "classFilter": "Asset class",
     "allClasses": "All",
     "chartLabelForClass": "Net worth history chart for {{ class }}, {{ range }}: from {{ from }} to {{ to }}",
     "chartLabel": "Net worth history chart, {{ range }}: from {{ from }} to {{ to }}",

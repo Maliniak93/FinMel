@@ -1,0 +1,9 @@
+<div class="split-bar" role="img" [attr.aria-label]="description()">
+  @for (segment of segments(); track segment.key) {
+    <span
+      class="split-bar__segment"
+      [style.flex-grow]="segment.value"
+      [style.background-color]="segment.color"
+    ></span>
+  }
+</div>

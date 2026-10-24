@@ -1,8 +1,8 @@
 <mat-card class="cash-card">
   <mat-card-content>
-    <h2 class="cash-card__title">
+    <h3 class="cash-card__title">
       <a routerLink="/wealth/cash">{{ 'dashboard.cash.title' | transloco }}</a>
-    </h2>
+    </h3>
 
     @if (cashResource.error(); as loadError) {
       <div class="cash-card__state" role="alert">
@@ -22,20 +22,26 @@
       } @else {
         <ul class="cash-card__list">
           @for (total of cash.totals; track total.currency) {
+            @let equivalent = plnByCurrency().get(total.currency);
             <li class="cash-card__row">
               <span>{{ total.currency }}</span>
-              <span class="cash-card__balance">{{
-                formatMoney(total.balance, total.currency)
-              }}</span>
+              <span class="cash-card__amounts">
+                <span class="cash-card__balance">{{
+                  formatMoney(total.balance, total.currency)
+                }}</span>
+                @if (total.currency !== 'PLN' && equivalent !== null && equivalent !== undefined) {
+                  <span class="cash-card__equivalent">≈ {{ formatMoney(equivalent) }}</span>
+                }
+              </span>
+            </li>
+          }
+          @if (cash.totalValuePln !== null && cash.totalValuePln !== undefined) {
+            <li class="cash-card__row cash-card__total">
+              <span>{{ 'dashboard.cash.total' | transloco }}</span>
+              <span class="cash-card__balance">{{ formatMoney(cash.totalValuePln) }}</span>
             </li>
           }
         </ul>
-        @if (cash.totalValuePln !== null && cash.totalValuePln !== undefined) {
-          <p class="cash-card__total">
-            <span>{{ 'dashboard.cash.total' | transloco }}</span>
-            <span class="cash-card__balance">{{ formatMoney(cash.totalValuePln) }}</span>
-          </p>
-        }
       }
     }
   </mat-card-content>

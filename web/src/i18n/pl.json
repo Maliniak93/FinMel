@@ -441,7 +441,9 @@
   "dashboard": {
     "title": "Pulpit",
     "netWorth": "Wartość majątku",
-    "change": "Zmiana",
+    "changeForRange": "· zmiana za {{ range }}",
+    "staleCount": "Wycena {{ count }} pozycji od dawna się nie odświeżyła",
+    "addAccount": "Dodaj rachunek",
     "allocation": "Struktura majątku",
     "groups": {
       "title": "Wg grup",
@@ -480,7 +482,6 @@
         "bankInterestDue": "Odsetki na koncie bankowym do rozliczenia, miesiące: {{ count }}"
       }
     },
-    "goToAccounts": "Przejdź do rachunków",
     "accounts": {
       "title": "Rachunki",
       "empty": "Brak aktywnych rachunków z wartością.",
@@ -505,7 +506,6 @@
   },
   "netWorthChart": {
     "rangeLabel": "Zakres wykresu",
-    "classFilter": "Klasa aktywów",
     "allClasses": "Wszystko",
     "chartLabelForClass": "Wykres historii wartości, {{ class }}, {{ range }}: od {{ from }} do {{ to }}",
     "chartLabel": "Wykres historii wartości majątku, {{ range }}: od {{ from }} do {{ to }}",

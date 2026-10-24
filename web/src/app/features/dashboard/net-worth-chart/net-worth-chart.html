@@ -11,52 +11,58 @@
       }
     </mat-button-toggle-group>
 
-    @if (classes().length > 0) {
-      <mat-chip-listbox
-        #classBox
-        class="net-worth-chart__classes"
-        hideSingleSelectionIndicator
-        [value]="assetClass() ?? allClasses"
-        (change)="onClassChange($event.value)"
-        [attr.aria-label]="'netWorthChart.classFilter' | transloco"
+    @if (classes().length > 0 || groups().length > 0) {
+      <button
+        mat-stroked-button
+        type="button"
+        class="net-worth-chart__filter"
+        [matMenuTriggerFor]="filterMenu"
       >
-        <mat-chip-option [value]="allClasses">{{
-          'netWorthChart.allClasses' | transloco
-        }}</mat-chip-option>
+        @let selectedClass = assetClass();
+        @if (selectedClass !== null) {
+          {{ assetClassLabel(selectedClass) | transloco }}
+        } @else if (groupLabel(); as selectedGroup) {
+          {{ selectedGroup }}
+        } @else {
+          {{ 'netWorthChart.allClasses' | transloco }}
+        }
+        <mat-icon iconPositionEnd>arrow_drop_down</mat-icon>
+      </button>
+      <mat-menu #filterMenu="matMenu">
+        <button
+          mat-menu-item
+          type="button"
+          [attr.aria-current]="assetClass() === null && group() === null"
+          (click)="selectAll()"
+        >
+          {{ 'netWorthChart.allClasses' | transloco }}
+        </button>
         @for (option of classes(); track option) {
-          <mat-chip-option [value]="option">{{
-            assetClassLabel(option) | transloco
-          }}</mat-chip-option>
+          <button
+            mat-menu-item
+            type="button"
+            [attr.aria-current]="assetClass() === option"
+            (click)="selectClass(option)"
+          >
+            {{ assetClassLabel(option) | transloco }}
+          </button>
         }
-      </mat-chip-listbox>
-    }
-
-    @if (groups().length > 0) {
-      <mat-chip-listbox
-        #groupBox
-        class="net-worth-chart__groups"
-        hideSingleSelectionIndicator
-        [value]="group() ?? allClasses"
-        (change)="onGroupChange($event.value)"
-        [attr.aria-label]="'dashboard.groups.filter' | transloco"
-      >
-        <mat-chip-option [value]="allClasses">{{
-          'netWorthChart.allClasses' | transloco
-        }}</mat-chip-option>
         @for (option of groups(); track option.key) {
-          <mat-chip-option [value]="option.key">{{ option.label }}</mat-chip-option>
+          <button
+            mat-menu-item
+            type="button"
+            [attr.aria-current]="group() === option.key"
+            (click)="selectGroup(option.key)"
+          >
+            {{ option.label }}
+          </button>
         }
-      </mat-chip-listbox>
+      </mat-menu>
     }
   </div>
 
   @if (loadError(); as message) {
-    <div class="net-worth-chart__state" role="alert">
-      <p>{{ message }}</p>
-      <button mat-button type="button" (click)="retry.emit()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
+    <app-section-error [message]="message" (retry)="retry.emit()" />
   } @else if (loading()) {
     <div class="net-worth-chart__state">
       <mat-spinner diameter="32" />
