@@ -1,7 +1,47 @@
 <div class="cash-page">
-  <div class="cash-page__header">
-    <h1>{{ 'cash.title' | transloco }}</h1>
-    <div class="cash-page__header-actions">
+  @if (placesResource.error(); as loadError) {
+    <app-section-error [message]="loadError.message" (retry)="placesResource.reload()" />
+  } @else if (placesResource.isLoading() && !placesResource.hasValue()) {
+    <app-skeleton [rows]="4" />
+  } @else if (placesResource.hasValue()) {
+    @let cash = placesResource.value();
+
+    @if (visiblePlaces().length > 0) {
+      <section class="cash-page__totals">
+        <div class="cash-page__total-main">
+          <span class="cash-page__total-label">{{ 'cash.total' | transloco }}</span>
+          @if (cash.totalValuePln !== null && cash.totalValuePln !== undefined) {
+            <app-money class="cash-page__total-value" [amount]="num(cash.totalValuePln)" />
+          }
+          @if (cash.fxUnavailable) {
+            <span [matTooltip]="fxTooltip()">
+              <app-status-chip
+                [label]="'cash.fxUnavailable' | transloco"
+                icon="warning"
+                tone="warning"
+                [uncertain]="true"
+              />
+            </span>
+          }
+        </div>
+        <ul class="cash-page__total-list">
+          @for (total of cash.totals; track total.currency) {
+            <li class="cash-page__total">
+              {{
+                'cash.totalLine'
+                  | transloco
+                    : {
+                        currency: total.currency,
+                        amount: formatMoney(total.balance, total.currency),
+                      }
+              }}
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    <div class="cash-page__toolbar">
       <mat-slide-toggle
         [checked]="includeArchived()"
         (change)="includeArchived.set($event.checked)"
@@ -13,179 +53,162 @@
         {{ 'cash.add' | transloco }}
       </button>
     </div>
-  </div>
 
-  @if (placesResource.error(); as loadError) {
-    <div class="cash-page__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="placesResource.reload()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
-  } @else if (placesResource.isLoading() && !placesResource.hasValue()) {
-    <div class="cash-page__state">
-      <mat-spinner diameter="32" />
-    </div>
-  } @else if (placesResource.hasValue() && visiblePlaces().length === 0) {
-    <div class="cash-page__state">
-      <p>{{ 'cash.empty' | transloco }}</p>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        {{ 'cash.add' | transloco }}
-      </button>
-    </div>
-  } @else if (placesResource.hasValue()) {
-    @let cash = placesResource.value();
-
-    <section class="cash-page__totals">
-      <h2>{{ 'cash.totals' | transloco }}</h2>
-      <ul>
-        @for (total of cash.totals; track total.currency) {
-          <li class="cash-page__total">
-            {{
-              'cash.totalLine'
-                | transloco
-                  : { currency: total.currency, amount: formatMoney(total.balance, total.currency) }
-            }}
-          </li>
-        }
-      </ul>
-      @if (cash.totalValuePln !== null && cash.totalValuePln !== undefined) {
-        <p class="cash-page__total-value">
-          {{ 'cash.totalValue' | transloco: { amount: formatMoney(cash.totalValuePln) } }}
-        </p>
-      }
-      @if (cash.fxUnavailable) {
-        <p class="cash-page__fx-unavailable">{{ 'cash.fxUnavailable' | transloco }}</p>
-      }
-    </section>
-
-    @for (place of visiblePlaces(); track place.id) {
-      <mat-card class="cash-place" [class.cash-place--archived]="place.isArchived">
-        <mat-card-header class="cash-place__header">
-          <h2 class="cash-place__name">{{ place.name }}</h2>
-          @if (place.isArchived) {
-            <mat-chip-set>
-              <mat-chip>{{ 'common.archived' | transloco }}</mat-chip>
-            </mat-chip-set>
-          }
-          @if (place.valuePln !== null && place.valuePln !== undefined) {
-            <span class="cash-place__value">{{ formatMoney(place.valuePln) }}</span>
-          }
-          <button
-            mat-icon-button
-            type="button"
-            class="cash-place__menu"
-            [matMenuTriggerFor]="placeMenu"
-            [attr.aria-label]="'common.actionsFor' | transloco: { name: place.name }"
-          >
-            <mat-icon>more_vert</mat-icon>
-          </button>
-          <mat-menu #placeMenu="matMenu">
-            <button mat-menu-item type="button" (click)="openRenameDialog(place)">
-              <mat-icon>edit</mat-icon>
-              <span>{{ 'cash.rename' | transloco }}</span>
-            </button>
-            <button
-              mat-menu-item
-              type="button"
-              [disabled]="place.isArchived"
-              (click)="openAddCurrencyDialog(place)"
-            >
-              <mat-icon>add</mat-icon>
-              <span>{{ 'cash.addCurrency' | transloco }}</span>
-            </button>
-            @if (place.isArchived) {
-              <button mat-menu-item type="button" (click)="restore(place)">
-                <mat-icon>unarchive</mat-icon>
-                <span>{{ 'common.restore' | transloco }}</span>
+    @if (visiblePlaces().length === 0) {
+      <app-empty-state icon="payments" [message]="'cash.empty' | transloco">
+        <button action mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+          <mat-icon>add</mat-icon>
+          {{ 'cash.add' | transloco }}
+        </button>
+      </app-empty-state>
+    } @else {
+      <div class="cash-page__grid">
+        @for (place of visiblePlaces(); track place.id) {
+          <mat-card class="cash-place" [class.cash-place--archived]="place.isArchived">
+            <mat-card-header class="cash-place__header">
+              <h2 class="cash-place__name">{{ place.name }}</h2>
+              @if (place.isArchived) {
+                <app-status-chip
+                  [label]="'common.archived' | transloco"
+                  icon="inventory_2"
+                  tone="neutral"
+                />
+              }
+              @if (place.valuePln !== null && place.valuePln !== undefined) {
+                <app-money class="cash-place__value" [amount]="num(place.valuePln)" />
+              }
+              <button
+                mat-icon-button
+                type="button"
+                class="cash-place__menu"
+                [matMenuTriggerFor]="placeMenu"
+                [attr.aria-label]="'common.actionsFor' | transloco: { name: place.name }"
+              >
+                <mat-icon>more_vert</mat-icon>
               </button>
-            } @else {
-              <button mat-menu-item type="button" (click)="archive(place)">
-                <mat-icon>archive</mat-icon>
-                <span>{{ 'common.archive' | transloco }}</span>
-              </button>
-            }
-            <button mat-menu-item type="button" (click)="remove(place)">
-              <mat-icon>delete</mat-icon>
-              <span>{{ 'common.delete' | transloco }}</span>
-            </button>
-          </mat-menu>
-        </mat-card-header>
-
-        <mat-card-content>
-          <ul class="cash-place__balances">
-            @for (balance of place.balances; track balance.cashAssetId) {
-              <li class="cash-place__balance">
-                <span class="cash-place__currency">{{ balance.currency }}</span>
-                <span class="cash-place__amount">{{
-                  formatMoney(balance.balance, balance.currency)
-                }}</span>
-                <span class="cash-place__amount-pln">
-                  @if (balance.currency !== 'PLN') {
-                    @if (balance.valuePln !== null && balance.valuePln !== undefined) {
-                      {{ formatMoney(balance.valuePln) }}
-                    } @else {
-                      —
-                    }
-                  }
-                </span>
-                <button
-                  mat-icon-button
-                  type="button"
-                  [matMenuTriggerFor]="balanceMenu"
-                  [attr.aria-label]="
-                    'common.actionsFor' | transloco: { name: place.name + ' · ' + balance.currency }
-                  "
-                >
-                  <mat-icon>more_vert</mat-icon>
+              <mat-menu #placeMenu="matMenu">
+                <button mat-menu-item type="button" (click)="openRenameDialog(place)">
+                  <mat-icon>edit</mat-icon>
+                  <span>{{ 'cash.rename' | transloco }}</span>
                 </button>
-                <mat-menu #balanceMenu="matMenu">
-                  <button
-                    mat-menu-item
-                    type="button"
-                    [disabled]="place.isArchived"
-                    (click)="openOperationDialog(balance, 'deposit')"
-                  >
-                    <mat-icon>add_circle</mat-icon>
-                    <span>{{ 'cash.deposit' | transloco }}</span>
+                <button
+                  mat-menu-item
+                  type="button"
+                  [disabled]="place.isArchived"
+                  (click)="openAddCurrencyDialog(place)"
+                >
+                  <mat-icon>add</mat-icon>
+                  <span>{{ 'cash.addCurrency' | transloco }}</span>
+                </button>
+                @if (place.isArchived) {
+                  <button mat-menu-item type="button" (click)="restore(place)">
+                    <mat-icon>unarchive</mat-icon>
+                    <span>{{ 'common.restore' | transloco }}</span>
                   </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    [disabled]="place.isArchived"
-                    (click)="openOperationDialog(balance, 'withdraw')"
-                  >
-                    <mat-icon>do_not_disturb_on</mat-icon>
-                    <span>{{ 'cash.withdraw' | transloco }}</span>
+                } @else {
+                  <button mat-menu-item type="button" (click)="archive(place)">
+                    <mat-icon>archive</mat-icon>
+                    <span>{{ 'common.archive' | transloco }}</span>
                   </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    [disabled]="place.isArchived"
-                    (click)="openBankTransferDialog(place, balance, 'atm')"
-                  >
-                    <mat-icon>atm</mat-icon>
-                    <span>{{ 'cash.atmWithdrawal' | transloco }}</span>
-                  </button>
-                  <button
-                    mat-menu-item
-                    type="button"
-                    [disabled]="place.isArchived"
-                    (click)="openBankTransferDialog(place, balance, 'bankDeposit')"
-                  >
-                    <mat-icon>account_balance</mat-icon>
-                    <span>{{ 'cash.bankDeposit' | transloco }}</span>
-                  </button>
-                  <a mat-menu-item [routerLink]="transactionsLink(balance)">
-                    <mat-icon>history</mat-icon>
-                    <span>{{ 'cash.history' | transloco }}</span>
-                  </a>
-                </mat-menu>
-              </li>
-            }
-          </ul>
-        </mat-card-content>
-      </mat-card>
+                }
+                <button mat-menu-item type="button" (click)="remove(place)">
+                  <mat-icon>delete</mat-icon>
+                  <span>{{ 'common.delete' | transloco }}</span>
+                </button>
+              </mat-menu>
+            </mat-card-header>
+
+            <mat-card-content>
+              @if (groupOf(place.groupId); as group) {
+                <p class="cash-place__group">
+                  <span
+                    class="cash-place__group-dot"
+                    [style.background-color]="groupColor(group.color)"
+                  ></span>
+                  {{ 'cash.defaultGroup' | transloco: { name: group.name } }}
+                </p>
+              }
+              <ul class="cash-place__balances">
+                @for (balance of place.balances; track balance.cashAssetId) {
+                  <li class="cash-place__balance">
+                    <span class="cash-place__currency">{{ balance.currency }}</span>
+                    <app-money
+                      class="cash-place__amount"
+                      [amount]="num(balance.balance)"
+                      [currency]="balance.currency"
+                      [estimatePln]="num(balance.valuePln)"
+                    />
+                    @if (balance.currency !== 'PLN' && num(balance.valuePln) === null) {
+                      <app-status-chip
+                        [label]="'cash.fxUnavailable' | transloco"
+                        icon="warning"
+                        tone="warning"
+                        [uncertain]="true"
+                      />
+                    }
+                    <button
+                      mat-icon-button
+                      type="button"
+                      class="cash-place__balance-menu"
+                      [matMenuTriggerFor]="balanceMenu"
+                      [attr.aria-label]="
+                        'common.actionsFor'
+                          | transloco: { name: place.name + ' · ' + balance.currency }
+                      "
+                    >
+                      <mat-icon>more_vert</mat-icon>
+                    </button>
+                    <mat-menu #balanceMenu="matMenu">
+                      <button
+                        mat-menu-item
+                        type="button"
+                        [disabled]="place.isArchived"
+                        (click)="openOperationDialog(balance, 'deposit')"
+                      >
+                        <mat-icon>add_circle</mat-icon>
+                        <span>{{ 'cash.deposit' | transloco }}</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        type="button"
+                        [disabled]="place.isArchived"
+                        (click)="openOperationDialog(balance, 'withdraw')"
+                      >
+                        <mat-icon>do_not_disturb_on</mat-icon>
+                        <span>{{ 'cash.withdraw' | transloco }}</span>
+                      </button>
+                      <mat-divider />
+                      <button
+                        mat-menu-item
+                        type="button"
+                        [disabled]="place.isArchived"
+                        (click)="openBankTransferDialog(place, balance, 'atm')"
+                      >
+                        <mat-icon>atm</mat-icon>
+                        <span>{{ 'cash.atmWithdrawal' | transloco }}</span>
+                      </button>
+                      <button
+                        mat-menu-item
+                        type="button"
+                        [disabled]="place.isArchived"
+                        (click)="openBankTransferDialog(place, balance, 'bankDeposit')"
+                      >
+                        <mat-icon>account_balance</mat-icon>
+                        <span>{{ 'cash.bankDeposit' | transloco }}</span>
+                      </button>
+                      <mat-divider />
+                      <a mat-menu-item [routerLink]="transactionsLink(balance)">
+                        <mat-icon>history</mat-icon>
+                        <span>{{ 'cash.history' | transloco }}</span>
+                      </a>
+                    </mat-menu>
+                  </li>
+                }
+              </ul>
+            </mat-card-content>
+          </mat-card>
+        }
+      </div>
     }
   }
 </div>
