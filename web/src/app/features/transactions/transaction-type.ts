@@ -73,6 +73,22 @@ export function transactionTypeLabel(value: TransactionType): string {
   );
 }
 
+export function transactionTypeIcon(value: TransactionType): string {
+  const type = Number(value);
+  if (type === DIVIDEND || type === INTEREST) {
+    return 'payments';
+  }
+  return type === SELL || type === WITHDRAW ? 'north_east' : 'south_west';
+}
+
+export function transactionTypeSign(value: TransactionType): string {
+  const type = Number(value);
+  if (type === DIVIDEND || type === INTEREST) {
+    return '';
+  }
+  return type === SELL || type === WITHDRAW ? '−' : '+';
+}
+
 export function isPricedTransactionType(value: TransactionType): boolean {
   const type = Number(value);
   return type === BUY || type === SELL;

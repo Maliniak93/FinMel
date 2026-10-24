@@ -18,6 +18,7 @@ import {
   TRANSLATIONS,
 } from '../../../testing/i18n';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
+import { client as reportingClient } from '../../api/reporting/client.gen';
 import type {
   AssetResponse,
   PagedResponseOfTransactionResponse,
@@ -92,6 +93,7 @@ describe('Transactions', () => {
 
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+    reportingClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
   afterEach(async () => {
@@ -99,15 +101,49 @@ describe('Transactions', () => {
     await restoreEnglish();
   });
 
+  interface SetupExtras {
+    byAsset?: { assetId: string; valuePln: number; priceDate: string | null; isStale: boolean }[];
+    groups?: { id: string; name: string; color: string }[];
+    pending?: boolean;
+  }
+
   async function setup(
-    transactionsResponse: Response,
+    transactionsResponse: Response | Promise<Response>,
     assetResponse = jsonResponse(asset),
     accountResponse = jsonResponse(account),
+    extras: SetupExtras = {},
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = requestUrl(input);
+      const path = new URL(url).pathname;
       if (url.includes('/transactions')) {
         return transactionsResponse;
+      }
+      switch (path) {
+        case '/api/reporting/dashboard':
+          return jsonResponse({
+            netWorthPln: 0,
+            asOf: '2026-10-20',
+            isStale: false,
+            byAssetClass: [],
+            byAccount: [],
+            byGroup: [],
+            byAsset: extras.byAsset ?? [],
+          });
+        case '/api/portfolio/asset-groups':
+          return jsonResponse(extras.groups ?? []);
+        case '/api/portfolio/accounts':
+          return jsonResponse([account]);
+        case '/api/portfolio/securities':
+          return jsonResponse({
+            holdings: [],
+            totals: { valuePln: 0, costPln: 0, unrealizedPlPln: 0 },
+          });
+        case '/api/portfolio/cash-places':
+        case '/api/portfolio/deposits':
+        case '/api/portfolio/bonds':
+        case '/api/portfolio/metals':
+          return jsonResponse([]);
       }
       return url.includes('/assets') ? assetResponse : accountResponse.clone();
     });
@@ -127,7 +163,36 @@ describe('Transactions', () => {
     fixture = TestBed.createComponent(Transactions);
     fixture.componentRef.setInput('assetId', assetId);
     component = fixture.componentInstance;
+    if (extras.pending) {
+      fixture.detectChanges();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      fixture.detectChanges();
+      return;
+    }
     await fixture.whenStable();
+  }
+
+  function kpis(): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const term of Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('dl dt'),
+    )) {
+      const parent = term.parentElement!;
+      const definition =
+        parent.tagName === 'DL' ? term.nextElementSibling : parent.querySelector('dd');
+      result[(term.textContent ?? '').trim()] = (definition?.textContent ?? '').replace(/\s/g, '');
+    }
+    return result;
+  }
+
+  function pageText(): string {
+    return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+  }
+
+  function buttonWith(text: string): HTMLButtonElement | undefined {
+    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+      (button) => (button.textContent ?? '').includes(text),
+    );
   }
 
   it('should create', async () => {
@@ -147,9 +212,9 @@ describe('Transactions', () => {
     await setup(jsonResponse(pagedResponse([transaction])), jsonResponse({ ...asset, assetClass }));
 
     const back = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
-      'a.transactions-page__back',
+      `a[href="${path}"]`,
     );
-    expect(back?.getAttribute('href')).toBe(path);
+    expect(back).not.toBeNull();
   });
 
   it('loads the asset and its transactions into their resources', async () => {
@@ -333,8 +398,7 @@ describe('Transactions', () => {
     const headers = Array.from(element.querySelectorAll('thead th'), (th) =>
       (th.textContent ?? '').trim(),
     ).filter((text) => text.length > 0 && !text.startsWith('Fee'));
-    expect(headers).toEqual(['Date', 'Type', 'Quantity', 'Currency', 'Value (PLN)']);
-    expect(headers).not.toContain('Unit price');
+    expect(headers).toEqual(['Date', 'Type', 'Quantity', 'Unit price', 'Currency', 'Value (PLN)']);
 
     const rows = Array.from(element.querySelectorAll('tbody tr.mat-mdc-row'));
     expect(rows.length).toBe(2);
@@ -342,12 +406,278 @@ describe('Transactions', () => {
       Array.from(row.querySelectorAll('td'), (td) => (td.textContent ?? '').replace(/\s/g, ''));
 
     const pricedCells = cellTexts(rows[0]);
-    expect(pricedCells[3]).toBe('EUR');
-    expect(pricedCells[4]).toBe('PLN4,300.00');
+    expect(pricedCells[4]).toBe('EUR');
+    expect(pricedCells[5]).toBe('PLN4,300.00');
 
     const unpricedCells = cellTexts(rows[1]);
-    expect(unpricedCells[3]).toBe('EUR');
-    expect(unpricedCells[4]).toBe('—');
+    expect(unpricedCells[4]).toBe('EUR');
+    expect(unpricedCells[5]).toBe('—');
+  });
+
+  describe('asset page', () => {
+    const stock: AssetResponse = {
+      ...asset,
+      assetClass: 2,
+      valuationMode: 0,
+      quantity: 10,
+      unitCount: 10,
+      costPln: 10000,
+      averagePricePln: 1000,
+      dividendPln: 150,
+    };
+    const stockLine = {
+      assetId,
+      valuePln: 12500,
+      priceDate: null,
+      isStale: false,
+    };
+
+    it('KPI tiles for a stock', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(stock), undefined, {
+        byAsset: [stockLine],
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const tiles = kpis();
+      expect(Object.keys(tiles)).toEqual([
+        'Value',
+        'Quantity',
+        'Avg. price',
+        'Profit/loss',
+        'Dividends',
+      ]);
+      expect(tiles['Value']).toContain('PLN12,500.00');
+      expect(tiles['Quantity']).toBe('10');
+      expect(tiles['Avg. price']).toBe('PLN1,000.00');
+      expect(tiles['Profit/loss']).toContain('+PLN2,500.00');
+      expect(tiles['Profit/loss']).toContain('25');
+      expect(tiles['Dividends']).toBe('PLN150.00');
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('dl .money--positive'),
+      ).not.toBeNull();
+    });
+
+    it.each([
+      ['metal', 6, { unitCount: 3, averagePricePln: 500, costPln: 1000 }, 1800, '3', '+PLN800.00'],
+      ['bond', 4, { unitCount: 5, averagePricePln: 100, costPln: 500 }, 520, '5', '+PLN20.00'],
+    ])(
+      'KPI tiles per class: %s has no dividend',
+      async (_name, assetClass, fields, value, quantity, profit) => {
+        await setup(
+          jsonResponse(pagedResponse([])),
+          jsonResponse({ ...stock, assetClass, ...fields, dividendPln: null }),
+          undefined,
+          { byAsset: [{ ...stockLine, valuePln: value }] },
+        );
+        fixture.detectChanges();
+        await fixture.whenStable();
+
+        const tiles = kpis();
+        expect(tiles['Quantity']).toBe(quantity);
+        expect(tiles['Avg. price']).toContain(`PLN${fields.averagePricePln}.00`);
+        expect(tiles['Profit/loss']).toContain(profit);
+        expect(tiles['Dividends']).toBe('—');
+      },
+    );
+
+    it.each([
+      ['Cash', 0],
+      ['Deposit', 1],
+      ['BankAccount', 9],
+    ])('KPI tiles per class: %s shows balance and dashes', async (_name, assetClass) => {
+      await setup(
+        jsonResponse(pagedResponse([])),
+        jsonResponse({
+          ...stock,
+          assetClass,
+          valuationMode: 2,
+          currency: 'EUR',
+          quantity: 250.5,
+          unitCount: null,
+          costPln: null,
+          averagePricePln: null,
+          dividendPln: null,
+        }),
+        undefined,
+        { byAsset: [{ ...stockLine, valuePln: 1000 }] },
+      );
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const tiles = kpis();
+      expect(tiles['Value']).toContain('PLN1,000.00');
+      expect(tiles['Quantity']).toContain('EUR');
+      expect(tiles['Quantity']).toContain('250.50');
+      expect(tiles['Avg. price']).toBe('—');
+      expect(tiles['Profit/loss']).toBe('—');
+      expect(tiles['Dividends']).toBe('—');
+    });
+
+    it('missing value', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(stock), undefined, {
+        byAsset: [],
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const tiles = kpis();
+      expect(tiles['Value']).toBe('—');
+      expect(tiles['Profit/loss']).toBe('—');
+      expect(tiles['Quantity']).toBe('10');
+    });
+
+    it('breadcrumb and subtitle', async () => {
+      await setup(
+        jsonResponse(pagedResponse([transaction])),
+        jsonResponse({ ...stock, groupId: 'g1' }),
+        undefined,
+        { byAsset: [stockLine], groups: [{ id: 'g1', name: 'Long term', color: 'blue' }] },
+      );
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const element = fixture.nativeElement as HTMLElement;
+      const home = element.querySelector<HTMLAnchorElement>('a[href="/wealth"]');
+      const tab = element.querySelector<HTMLAnchorElement>('a[href="/wealth/securities"]');
+      expect(home?.textContent).toContain('Wealth');
+      expect(tab?.textContent).toContain('Stock');
+      expect(textOf(element.querySelector('h1'))).toBe('Transactions — Apple');
+      expect(pageText()).toContain('Retirement');
+      expect(pageText()).toContain('Long term');
+    });
+
+    it('breadcrumb and subtitle omit the account and group when the asset has none', async () => {
+      await setup(
+        jsonResponse(pagedResponse([transaction])),
+        jsonResponse({ ...stock, accountId: null, groupId: null }),
+        undefined,
+        { groups: [{ id: 'g1', name: 'Long term', color: 'blue' }] },
+      );
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(pageText()).not.toContain('Retirement');
+      expect(pageText()).not.toContain('Long term');
+    });
+
+    it('rows', async () => {
+      const row = (type: number, id: string, extra: Partial<TransactionResponse> = {}) =>
+        ({ ...transaction, id, type, quantity: 10, ...extra }) as TransactionResponse;
+      await setup(
+        jsonResponse(
+          pagedResponse([
+            row(0, 'a0000000-0000-0000-0000-000000000000'),
+            row(1, 'a1000000-0000-0000-0000-000000000000'),
+            row(2, 'a2000000-0000-0000-0000-000000000000'),
+            row(3, 'a3000000-0000-0000-0000-000000000000'),
+            row(4, 'a4000000-0000-0000-0000-000000000000'),
+            row(5, 'a5000000-0000-0000-0000-000000000000', { valuePln: null }),
+          ]),
+        ),
+        jsonResponse(stock),
+        undefined,
+        { byAsset: [stockLine] },
+      );
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const rows = Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('tbody tr.mat-mdc-row'),
+      );
+      const icon = (r: Element) =>
+        (r.querySelector('td.mat-column-type mat-icon')?.textContent ?? '').trim();
+      const quantity = (r: Element) =>
+        (r.querySelector('td.mat-column-quantity')?.textContent ?? '').replace(/\s/g, '');
+
+      expect(rows.map(icon)).toEqual([
+        'south_west',
+        'north_east',
+        'south_west',
+        'north_east',
+        'payments',
+        'payments',
+      ]);
+      expect(quantity(rows[0])).toBe('+10');
+      expect(quantity(rows[1])).toBe('−10');
+      expect(quantity(rows[2])).toBe('+10');
+      expect(quantity(rows[3])).toBe('−10');
+      expect(rows[0].querySelector('td.mat-column-unitPrice')?.textContent).toContain('100');
+      expect(
+        (rows[5].querySelector('td.mat-column-value')?.textContent ?? '').replace(/\s/g, ''),
+      ).toBe('—');
+    });
+
+    it('sell button opens the dialog with type Sell', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(stock), undefined, {
+        byAsset: [stockLine],
+      });
+      dialog.open.mockReturnValue({ afterClosed: () => of(false) });
+
+      const sell = buttonWith('Sell');
+      expect(sell).toBeDefined();
+      sell!.click();
+
+      expect(dialog.open).toHaveBeenCalledTimes(1);
+      expect(dialog.open.mock.calls[0][0]).toBe(TransactionFormDialog);
+      expect(dialog.open.mock.calls[0][1].data).toEqual(
+        expect.objectContaining({ assetId, type: 1 }),
+      );
+    });
+
+    it('sell button is absent for a class that does not allow Sell', async () => {
+      await setup(
+        jsonResponse(pagedResponse([transaction])),
+        jsonResponse({ ...stock, assetClass: 0, valuationMode: 2, currency: 'PLN' }),
+      );
+
+      expect(buttonWith('New transaction')).toBeDefined();
+      expect(buttonWith('Sell')).toBeUndefined();
+    });
+
+    it('sell button is absent on a read-only page', async () => {
+      await setup(
+        jsonResponse(pagedResponse([transaction])),
+        jsonResponse({ ...stock, isArchived: true }),
+      );
+
+      expect(buttonWith('Sell')).toBeUndefined();
+    });
+
+    it('states: loading shows a skeleton', async () => {
+      await setup(new Promise<Response>(() => undefined), jsonResponse(stock), undefined, {
+        pending: true,
+      });
+
+      expect((fixture.nativeElement as HTMLElement).querySelector('app-skeleton')).not.toBeNull();
+    });
+
+    it('states: an error shows an error block whose retry reloads', async () => {
+      await setup(jsonResponse({ detail: 'Service unavailable.' }, 503), jsonResponse(stock));
+
+      const element = fixture.nativeElement as HTMLElement;
+      const error = element.querySelector('app-section-error');
+      expect(error?.textContent).toContain('Service unavailable.');
+      const retry = error?.querySelector('button');
+      expect(retry?.textContent).toContain('Retry');
+      const callsBefore = fetchSpy.mock.calls.length;
+      fetchSpy.mockImplementation(async () => jsonResponse({ detail: 'again' }, 503));
+
+      retry!.click();
+      await fixture.whenStable();
+
+      expect(fetchSpy.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
+    it('states: no transactions shows an empty state with the first-transaction button', async () => {
+      await setup(jsonResponse(pagedResponse([])), jsonResponse(stock));
+
+      const empty = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+      expect(empty).not.toBeNull();
+      expect(empty?.querySelector('button')?.textContent).toContain(
+        'Record your first transaction',
+      );
+    });
   });
 
   describe('archived account is read-only', () => {
@@ -958,22 +1288,18 @@ describe('Transactions', () => {
       await setup(jsonResponse(pagedResponse([transaction])));
       const element = fixture.nativeElement as HTMLElement;
       const texts = async () => [
-        ...labelsOf(element, 'a.transactions-page__back'),
-        ...labelsOf(element, '.transactions-page__header > button'),
         ...labelsOf(element, 'th:not(:empty)'),
         ...labelsOf(element, 'td.mat-column-type'),
         ...(await menuItems()),
       ];
       const heading = () => textOf(element.querySelector('h1'));
-      const summary = () => textOf(element.querySelector('.transactions-page__summary'));
 
       const english = await texts();
       expect(english).toEqual([
-        'Back',
-        'New transaction',
         'Date',
         'Type',
         'Quantity',
+        'Unit price',
         'Currency',
         'Value (PLN)',
         'Fee (PLN)',
@@ -982,14 +1308,22 @@ describe('Transactions', () => {
         'Delete',
       ]);
       expect(heading()).toBe('Transactions — Apple');
-      expect(summary()).toContain('Quantity');
+      expect(buttonWith('Sell')).toBeDefined();
 
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(english, await texts())).toEqual([]);
       expect(heading()).not.toContain('Transactions');
       expect(heading()).toContain('Apple');
-      expect(summary()).not.toContain('Quantity');
+      expect(Object.keys(kpis())).toHaveLength(5);
+      expect(
+        polishProblems(
+          ['Value', 'Quantity', 'Avg. price', 'Profit/loss', 'Dividends'],
+          Object.keys(kpis()),
+        ),
+      ).toEqual([]);
+      expect(buttonWith('Sell')).toBeUndefined();
+      expect(buttonWith('Sprzedaj')).toBeDefined();
     });
 
     it('labels the row actions button with the type and date in Polish', async () => {
@@ -1034,16 +1368,10 @@ describe('Transactions', () => {
     it('renders the empty state in Polish', async () => {
       await setup(jsonResponse(pagedResponse([])));
       const element = fixture.nativeElement as HTMLElement;
-      const texts = () => [
-        ...labelsOf(element, '.transactions-page__state p'),
-        ...labelsOf(element, '.transactions-page__state button'),
-      ];
+      const texts = () => labelsOf(element, 'app-empty-state button');
 
       const english = texts();
-      expect(english).toEqual([
-        'No transactions recorded for this asset yet.',
-        'Record your first transaction',
-      ]);
+      expect(english).toEqual(['Record your first transaction']);
 
       await switchLanguage(fixture, 'pl');
 
@@ -1092,16 +1420,14 @@ describe('Transactions', () => {
     it('renders the load-failure retry button in Polish', async () => {
       await setup(jsonResponse({ detail: 'Service unavailable.' }, 503));
       const element = fixture.nativeElement as HTMLElement;
-      const retry = () => labelsOf(element, '.transactions-page__state button');
+      const retry = () => labelsOf(element, 'app-section-error button');
 
       expect(retry()).toEqual(['Retry']);
 
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(['Retry'], retry())).toEqual([]);
-      expect(textOf(element.querySelector('.transactions-page__state p'))).toBe(
-        'Service unavailable.',
-      );
+      expect(textOf(element.querySelector('app-section-error'))).toContain('Service unavailable.');
     });
 
     it('asks to delete in Polish, naming the type and quantity in the message', async () => {

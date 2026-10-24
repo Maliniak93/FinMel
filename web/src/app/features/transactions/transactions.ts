@@ -4,7 +4,6 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatPaginatorModule, type PageEvent } from '@angular/material/paginator';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -19,34 +18,68 @@ import {
   getApiPortfolioAssetsByAssetIdTransactions,
   type TransactionResponse,
 } from '../../api/portfolio';
+import { getApiReportingDashboard } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { groupColor } from '../../shared/colors';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { formatDate, formatMoney, formatMonth, formatQuantity } from '../../shared/format';
+import { EmptyState } from '../../shared/empty-state/empty-state';
+import {
+  formatDate,
+  formatMoney,
+  formatMonth,
+  formatPercent,
+  formatQuantity,
+} from '../../shared/format';
+import { GroupList } from '../../shared/group-select/group-list';
+import { Money } from '../../shared/money/money';
+import { SectionError } from '../../shared/section-error/section-error';
+import { Skeleton } from '../../shared/skeleton/skeleton';
 import { ASSET_CLASS, assetClassLabel, assetClassPage } from '../assets/asset-class';
 import {
   TransactionFormDialog,
   type TransactionFormDialogData,
 } from './transaction-form-dialog/transaction-form-dialog';
 import {
+  allowedTransactionTypes,
   isSecurityAssetClass,
   isSecurityTransactionType,
+  TRANSACTION_TYPE_SELL,
+  transactionTypeIcon,
   transactionTypeLabel,
+  transactionTypeSign,
 } from './transaction-type';
 import { transferLabel } from './transfer-direction';
 
 const DEFAULT_PAGE_SIZE = 20;
+const MONEY_ASSET_CLASSES: readonly number[] = [
+  ASSET_CLASS.Cash,
+  ASSET_CLASS.Deposit,
+  ASSET_CLASS.BankAccount,
+];
+
+interface KpiProfit {
+  amountPln: number;
+  percent: number | null;
+}
+
+function toNumber(value: number | string | null | undefined): number | null {
+  return value === null || value === undefined ? null : Number(value);
+}
 
 // MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
 @Component({
   selector: 'app-transactions',
   imports: [
+    EmptyState,
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
     MatPaginatorModule,
-    MatProgressSpinnerModule,
     MatTableModule,
+    Money,
     RouterLink,
+    SectionError,
+    Skeleton,
     TranslocoPipe,
   ],
   templateUrl: './transactions.html',
@@ -55,6 +88,7 @@ const DEFAULT_PAGE_SIZE = 20;
 export class Transactions {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly groupList = inject(GroupList);
 
   readonly assetId = input.required<string>();
 
@@ -95,6 +129,90 @@ export class Transactions {
       return result.data;
     },
   });
+
+  private readonly dashboardResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiReportingDashboard({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(readProblemDetails(result.error).detail ?? translate('wealth.error'));
+      }
+      return result.data;
+    },
+  });
+
+  private readonly valueLine = computed(() =>
+    this.dashboardResource.hasValue()
+      ? this.dashboardResource.value().byAsset.find((line) => line.assetId === this.assetId())
+      : undefined,
+  );
+
+  protected readonly valuePln = computed(() => toNumber(this.valueLine()?.valuePln));
+
+  protected readonly valueStale = computed(() => this.valueLine()?.isStale ?? false);
+
+  private readonly isMoneyAsset = computed(
+    () =>
+      this.assetResource.hasValue() &&
+      MONEY_ASSET_CLASSES.includes(Number(this.assetResource.value().assetClass)),
+  );
+
+  protected readonly quantityKpi = computed(() => {
+    if (!this.assetResource.hasValue()) {
+      return null;
+    }
+    const asset = this.assetResource.value();
+    if (this.isMoneyAsset()) {
+      return { amount: Number(asset.quantity), currency: asset.currency, text: null };
+    }
+    const unitCount = toNumber(asset.unitCount);
+    return {
+      amount: null,
+      currency: asset.currency,
+      text: unitCount === null ? null : formatQuantity(unitCount),
+    };
+  });
+
+  protected readonly averagePricePln = computed(() =>
+    this.assetResource.hasValue() ? toNumber(this.assetResource.value().averagePricePln) : null,
+  );
+
+  protected readonly dividendPln = computed(() =>
+    this.assetResource.hasValue() ? toNumber(this.assetResource.value().dividendPln) : null,
+  );
+
+  protected readonly profit = computed<KpiProfit | null>(() => {
+    const value = this.valuePln();
+    const cost = this.assetResource.hasValue()
+      ? toNumber(this.assetResource.value().costPln)
+      : null;
+    if (value === null || cost === null) {
+      return null;
+    }
+    const gainGrosze = Math.round(value * 100) - Math.round(cost * 100);
+    const costGrosze = Math.round(cost * 100);
+    return {
+      amountPln: gainGrosze / 100,
+      percent: costGrosze > 0 ? Math.round((gainGrosze / costGrosze) * 10000) / 100 : null,
+    };
+  });
+
+  protected readonly accountName = computed(() =>
+    this.accountResource.hasValue() ? this.accountResource.value().name : null,
+  );
+
+  protected readonly group = computed(() => {
+    const groupId = this.assetResource.hasValue() ? this.assetResource.value().groupId : null;
+    return groupId ? this.groupList.groups().find((group) => group.id === groupId) : undefined;
+  });
+
+  protected readonly canSell = computed(
+    () =>
+      this.assetResource.hasValue() &&
+      !this.isReadOnly() &&
+      allowedTransactionTypes(this.assetResource.value().assetClass).some(
+        (type) => Number(type.value) === Number(TRANSACTION_TYPE_SELL),
+      ),
+  );
 
   protected readonly isArchived = computed(
     () => this.accountResource.hasValue() && this.accountResource.value().isArchived,
@@ -146,6 +264,7 @@ export class Transactions {
     'date',
     'type',
     'quantity',
+    'unitPrice',
     'currency',
     'value',
     ...(this.isSecurity() ? ['fee'] : []),
@@ -175,6 +294,12 @@ export class Transactions {
 
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly transactionTypeLabel = transactionTypeLabel;
+  protected readonly transactionTypeIcon = transactionTypeIcon;
+  protected readonly transactionTypeSign = transactionTypeSign;
+  protected readonly formatPercent = formatPercent;
+  protected readonly groupColor = groupColor;
+  protected readonly sellType = TRANSACTION_TYPE_SELL;
+  protected readonly separator = '·';
   protected readonly transferLabel = transferLabel;
   protected readonly formatMoney = formatMoney;
   protected readonly formatQuantity = formatQuantity;
@@ -209,11 +334,12 @@ export class Transactions {
     };
   }
 
-  protected openCreateDialog(): void {
-    const data = this.dialogData();
-    if (!data) {
+  protected openCreateDialog(type?: TransactionFormDialogData['type']): void {
+    const base = this.dialogData();
+    if (!base) {
       return;
     }
+    const data = type === undefined ? base : { ...base, type };
     const ref = this.dialog.open(TransactionFormDialog, { width: '480px', data });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {
       if (saved) {
