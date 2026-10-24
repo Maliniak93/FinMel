@@ -161,6 +161,37 @@ describe('Bonds page, my bonds tab', () => {
 
     expect(rows()).toHaveLength(1);
     expect(textOf(rowFor('Coi in regular'))).toContain('Obligacje zwykle');
+    expect(
+      Array.from(
+        (fixture.nativeElement as HTMLElement).querySelectorAll('app-status-chip'),
+        (chip) => textOf(chip),
+      ).some((chip) => chip.includes('Pokaż wszystkie')),
+    ).toBe(true);
+  });
+
+  it('subtabs', async () => {
+    await setup([activeBond, maturedBond]);
+    await switchLanguage(fixture, 'pl');
+
+    expect(rows()).toHaveLength(2);
+    expect(textOf(rowFor(activeBond.name))).toContain('EDO1036');
+
+    tabs()[1].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    await vi.waitFor(() =>
+      expect(rows().some((row) => textOf(row).includes('EDO1036'))).toBe(true),
+    );
+    expect(tabs()[1].getAttribute('aria-selected')).toBe('true');
+
+    tabs()[0].click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(tabs()[0].getAttribute('aria-selected')).toBe('true');
+    expect(rows()).toHaveLength(2);
+    expect(textOf(rowFor(activeBond.name))).toContain('EDO1036');
   });
 
   it('opens on "Moje obligacje", placed before "Aktualna oferta"', async () => {
@@ -589,6 +620,16 @@ describe('Bonds page, interest settlement', () => {
     ).find((candidate) => textOf(candidate).includes(label));
   }
 
+  function rowFor(name: string): HTMLElement {
+    const row = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('tbody tr.mat-mdc-row'),
+    ).find((candidate) => textOf(candidate).includes(name));
+    if (!row) {
+      throw new Error(`No row for '${name}'.`);
+    }
+    return row;
+  }
+
   function bondListCalls(): number {
     return fetchSpy.mock.calls.filter(
       (call: unknown[]) =>
@@ -677,7 +718,9 @@ describe('Bonds page, interest settlement', () => {
     expect(first).not.toBeNull();
     expect(second).not.toBeNull();
     expect(textOf(first)).not.toContain('Cofnij');
-    expect(textOf(second)).toContain('Cofnij');
+    expect(textOf(second)).not.toContain('Cofnij');
+    const menu = await rowMenuItems(fixture, rowFor(settledRorBond.name));
+    expect(menu.map(menuItemLabel)).toContain('Cofnij');
   });
 
   it('"Cofnij" asks for confirmation, then deletes the latest settlement and reloads', async () => {
@@ -685,12 +728,7 @@ describe('Bonds page, interest settlement', () => {
     await expand(settledRorBond);
     const callsBefore = bondListCalls();
 
-    const undo = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
-        '[data-testid="period-row-2"] button',
-      ),
-    ).find((candidate) => textOf(candidate).includes('Cofnij'))!;
-    undo.click();
+    await clickRowMenuItem(fixture, rowFor(settledRorBond.name), /^Cofnij$/);
     await fixture.whenStable();
 
     expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());

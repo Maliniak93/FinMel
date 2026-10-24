@@ -284,7 +284,6 @@
     },
     "my": {
       "add": "Buy bonds",
-      "addFirst": "Record your first bond purchase",
       "empty": "No bonds yet.",
       "loadFailed": "Failed to load bonds.",
       "series": "Series",
@@ -307,7 +306,7 @@
     },
     "status": {
       "active": "Active",
-      "interestDue": "Interest due",
+      "interestDue": "Interest to settle",
       "matured": "Matured",
       "redeemed": "Redeemed"
     },
@@ -1090,10 +1089,12 @@
     }
   },
   "deposits": {
-    "title": "Deposits",
     "add": "Add deposit",
     "empty": "You don't have any term deposits yet.",
-    "addFirst": "Add your first deposit",
+    "status": {
+      "maturity": "Matures {{ date }}"
+    },
+    "subtitle": "{{ rate }}% · Matures {{ date }}",
     "bank": "Bank",
     "source": "Source",
     "returnTo": "Return to",
@@ -1104,10 +1105,8 @@
     "netProfit": "Net profit",
     "finalAmount": "Final amount",
     "settleMaturity": "Settle maturity",
-    "settleMaturityOf": "Settle maturity of {{ name }}",
     "payOutAction": "Pay out",
     "rollOver": "Roll over",
-    "actionsForThis": "Actions for this deposit",
     "loadFailed": "Failed to load deposits.",
     "delete": {
       "title": "Delete this deposit?",
@@ -1197,7 +1196,7 @@
     "allVariants": "All",
     "balance": "Balance",
     "interestCredited": "Interest credited",
-    "interestDue": "Interest due",
+    "interestDue": "Interest to settle",
     "hasOpenDeposit": "An open deposit will return to this account",
     "interest": {
       "settle": "Settle interest",

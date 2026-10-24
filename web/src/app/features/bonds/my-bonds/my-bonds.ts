@@ -1,10 +1,9 @@
 import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
@@ -23,7 +22,12 @@ import {
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
+import { Money } from '../../../shared/money/money';
+import { SectionError } from '../../../shared/section-error/section-error';
+import { Skeleton } from '../../../shared/skeleton/skeleton';
+import { StatusChip, type StatusChipTone } from '../../../shared/status-chip/status-chip';
 import { taxWrapperLabel } from '../../accounts/account-type';
 import {
   BondPurchaseDialog,
@@ -68,6 +72,13 @@ const BOND_STATUS_LABELS: Record<number, string> = {
   [BOND_STATUS.Redeemed]: 'bonds.status.redeemed',
 };
 
+const BOND_STATUS_ICONS: Record<number, string> = {
+  [BOND_STATUS.Active]: 'schedule',
+  [BOND_STATUS.InterestDue]: 'pending_actions',
+  [BOND_STATUS.Matured]: 'event_available',
+  [BOND_STATUS.Redeemed]: 'task_alt',
+};
+
 const BOND_PERIOD_STATE_LABELS: Record<number, string> = {
   [BOND_PERIOD_STATE.Upcoming]: 'bonds.periods.state.upcoming',
   [BOND_PERIOD_STATE.Due]: 'bonds.periods.state.due',
@@ -88,15 +99,19 @@ function sumInGrosze(amounts: readonly (number | string)[]): number {
 @Component({
   selector: 'app-my-bonds',
   imports: [
+    EmptyState,
     MatButtonModule,
-    MatChipsModule,
+    MatDividerModule,
     MatIconModule,
     MatMenuModule,
-    MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatTableModule,
     MatTooltipModule,
+    Money,
     RouterLink,
+    SectionError,
+    Skeleton,
+    StatusChip,
     TranslocoPipe,
   ],
   templateUrl: './my-bonds.html',
@@ -218,8 +233,16 @@ export class MyBonds {
     return BOND_STATUS_LABELS[Number(bond.status)] ?? '';
   }
 
-  protected needsAttention(bond: BondResponse): boolean {
-    return Number(bond.status) !== BOND_STATUS.Active && !isRedeemed(bond);
+  protected statusIcon(bond: BondResponse): string {
+    return BOND_STATUS_ICONS[Number(bond.status)] ?? 'schedule';
+  }
+
+  protected statusTone(bond: BondResponse): StatusChipTone {
+    return Number(bond.status) !== BOND_STATUS.Active && !isRedeemed(bond) ? 'warning' : 'neutral';
+  }
+
+  protected toNumber(amount: number | string): number {
+    return Number(amount);
   }
 
   protected periodStateLabel(period: BondPeriodResponse): string {
@@ -233,12 +256,8 @@ export class MyBonds {
     return usesTermsRate(bond, period.index) ? bond.firstPeriodRatePercent : null;
   }
 
-  protected canUndo(bond: BondResponse, period: BondPeriodResponse): boolean {
-    return (
-      !!period.settlement &&
-      period.settlement.settlementId === bond.lastSettlement?.settlementId &&
-      !bond.isArchived
-    );
+  protected canUndo(bond: BondResponse): boolean {
+    return this.lastSettledPeriod(bond) !== undefined && !bond.isArchived;
   }
 
   protected toggleExpanded(bond: BondResponse): void {
@@ -294,12 +313,10 @@ export class MyBonds {
     this.reloadWhenSaved(this.dialog.open(SettleAllBondsDialog, { width: '720px', data }));
   }
 
-  protected async undoLastSettlement(
-    bond: BondResponse,
-    period: BondPeriodResponse,
-  ): Promise<void> {
+  protected async undoLastSettlement(bond: BondResponse): Promise<void> {
     const settlement = bond.lastSettlement;
-    if (!settlement) {
+    const period = this.lastSettledPeriod(bond);
+    if (!settlement || !period) {
       return;
     }
 
@@ -338,6 +355,13 @@ export class MyBonds {
     }
 
     this.bondsResource.reload();
+  }
+
+  private lastSettledPeriod(bond: BondResponse): BondPeriodResponse | undefined {
+    const settlementId = bond.lastSettlement?.settlementId;
+    return settlementId === undefined
+      ? undefined
+      : bond.periods.find((period) => period.settlement?.settlementId === settlementId);
   }
 
   protected openCreateDialog(): void {

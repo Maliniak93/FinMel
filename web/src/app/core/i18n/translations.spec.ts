@@ -38,6 +38,22 @@ describe('translation files', () => {
     }
   });
 
+  it('en and pl define the Majątek lokaty and obligacje list copy', () => {
+    const copy: Record<string, { en: string; pl: string }> = {
+      'deposits.status.maturity': { en: 'Matures {{ date }}', pl: 'Zapada {{ date }}' },
+      'deposits.subtitle': {
+        en: '{{ rate }}% · Matures {{ date }}',
+        pl: '{{ rate }} % · Zapadalność {{ date }}',
+      },
+      'bonds.status.interestDue': { en: 'Interest to settle', pl: 'Odsetki do rozliczenia' },
+    };
+
+    for (const [key, values] of Object.entries(copy)) {
+      expect(TRANSLATIONS.en[key], `en ${key}`).toBe(values.en);
+      expect(TRANSLATIONS.pl[key], `pl ${key}`).toBe(values.pl);
+    }
+  });
+
   it('en and pl use the same interpolation parameters for every key', () => {
     const mismatched = Object.keys(TRANSLATIONS.en).filter((key) => {
       const en = TRANSLATIONS.en[key];

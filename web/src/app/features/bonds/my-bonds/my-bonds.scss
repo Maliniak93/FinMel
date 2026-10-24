@@ -7,16 +7,6 @@
   margin: 16px 0;
 }
 
-.my-bonds__state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 48px 16px;
-  text-align: center;
-}
-
 .my-bonds__table {
   width: 100%;
 }
@@ -34,11 +24,6 @@
   opacity: 0.7;
 }
 
-.my-bonds__chip--attention {
-  --mat-chip-elevated-container-color: var(--mat-sys-error-container);
-  --mat-chip-label-text-color: var(--mat-sys-on-error-container);
-}
-
 .my-bonds__periods {
   width: 100%;
   border-collapse: collapse;
@@ -53,4 +38,13 @@
 
 .my-bonds__filter {
   margin-inline-end: auto;
+}
+
+.my-bonds__row--archived {
+  opacity: 0.72;
+}
+
+.my-bonds__delete {
+  --mat-menu-item-label-text-color: var(--mat-sys-error);
+  --mat-menu-item-icon-color: var(--mat-sys-error);
 }

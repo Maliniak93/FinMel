@@ -1,4 +1,5 @@
 <span class="status-chip status-chip--{{ tone() }}" [class.status-chip--uncertain]="uncertain()">
   <mat-icon class="status-chip__icon" aria-hidden="true">{{ icon() }}</mat-icon>
   <span class="status-chip__label">{{ label() }}</span>
+  <ng-content />
 </span>

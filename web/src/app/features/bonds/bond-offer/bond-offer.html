@@ -1,18 +1,9 @@
 @if (offerResource.error(); as loadError) {
-  <div class="bond-offer__state" role="alert">
-    <p>{{ loadError.message }}</p>
-    <button mat-button type="button" (click)="offerResource.reload()">
-      {{ 'common.retry' | transloco }}
-    </button>
-  </div>
+  <app-section-error [message]="loadError.message" (retry)="offerResource.reload()" />
 } @else if (offerResource.isLoading() && !offerResource.hasValue()) {
-  <div class="bond-offer__state">
-    <mat-spinner diameter="32" />
-  </div>
+  <app-skeleton [rows]="4" />
 } @else if (offerResource.hasValue() && offerResource.value().length === 0) {
-  <div class="bond-offer__state">
-    <p>{{ 'bonds.offer.empty' | transloco }}</p>
-  </div>
+  <app-empty-state icon="workspace_premium" [message]="'bonds.offer.empty' | transloco" />
 } @else if (offerResource.hasValue()) {
   <table mat-table [dataSource]="offerResource.value()" class="bond-offer__table">
     <ng-container matColumnDef="code">

@@ -1,14 +1,12 @@
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 import { firstValueFrom } from 'rxjs';
 
@@ -20,7 +18,12 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { confirmSetAssetArchived } from '../../shared/asset-archive';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { formatDate, formatMoney, formatPercent } from '../../shared/format';
+import { EmptyState } from '../../shared/empty-state/empty-state';
+import { formatDate, formatPercent, formatPercentNumber } from '../../shared/format';
+import { Money } from '../../shared/money/money';
+import { SectionError } from '../../shared/section-error/section-error';
+import { Skeleton } from '../../shared/skeleton/skeleton';
+import { StatusChip, type StatusChipTone } from '../../shared/status-chip/status-chip';
 import {
   DepositFormDialog,
   type DepositFormDialogData,
@@ -43,13 +46,16 @@ import {
   selector: 'app-deposits',
   imports: [
     MatButtonModule,
-    MatChipsModule,
+    EmptyState,
+    MatDividerModule,
     MatIconModule,
     MatMenuModule,
-    MatProgressSpinnerModule,
     MatSlideToggleModule,
     MatTableModule,
-    MatTooltipModule,
+    Money,
+    SectionError,
+    Skeleton,
+    StatusChip,
     TranslocoPipe,
   ],
   templateUrl: './deposits.html',
@@ -96,10 +102,25 @@ export class Deposits {
       : [],
   );
 
-  protected readonly formatMoney = formatMoney;
   protected readonly formatPercent = formatPercent;
+  protected readonly formatPercentNumber = formatPercentNumber;
   protected readonly formatDate = formatDate;
   protected readonly depositStatusLabel = depositStatusLabel;
+
+  protected toNumber(amount: number | string): number {
+    return Number(amount);
+  }
+
+  protected statusIcon(deposit: DepositResponse): string {
+    if (this.isPaidOut(deposit)) {
+      return 'output';
+    }
+    return this.isSettled(deposit) ? 'task_alt' : 'schedule';
+  }
+
+  protected statusTone(deposit: DepositResponse): StatusChipTone {
+    return this.isSettled(deposit) ? 'positive' : 'neutral';
+  }
 
   protected isDue(deposit: DepositResponse): boolean {
     return Number(deposit.status) === DEPOSIT_STATUS.Due;
