@@ -3,10 +3,10 @@ import { createInterface } from "node:readline/promises";
 import { planFrom, startAt, windowEnd } from "./autobuild-queue.mjs";
 import { itemTag } from "./queue.mjs";
 
-const BOOLEAN_FLAGS = new Set(["dry-run", "shutdown", "no-shutdown", "include-manual", "skip-manual", "stop"]);
+const BOOLEAN_FLAGS = new Set(["dry-run", "shutdown", "no-shutdown", "no-clean", "include-manual", "skip-manual", "stop"]);
 const KNOWN_FLAGS = new Set([...BOOLEAN_FLAGS, "max-tasks", "items", "start", "until", "on-limit", "max-wait", "sleep-test", "hibernate-test"]);
-const USAGE = "usage: autobuild.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--dry-run] | --stop | --sleep-test MIN | --hibernate-test MIN";
-const COMMAND_ORDER = ["items", "include-manual", "skip-manual", "on-limit", "max-wait", "shutdown", "no-shutdown", "start", "until", "max-tasks", "dry-run"];
+const USAGE = "usage: autobuild.mjs [<n>] [--items N|all] [--include-manual|--skip-manual] [--start now|MIN|HH:MM] [--until HH:MM] [--max-tasks N] [--on-limit sleep|wait|exit] [--max-wait HOURS] [--shutdown|--no-shutdown] [--no-clean] [--dry-run] | --stop | --sleep-test MIN | --hibernate-test MIN";
+const COMMAND_ORDER = ["items", "include-manual", "skip-manual", "on-limit", "max-wait", "shutdown", "no-shutdown", "no-clean", "start", "until", "max-tasks", "dry-run"];
 const LIMIT_MODES = { a: "sleep", b: "wait", c: "exit" };
 const LIMIT_LABELS = { sleep: "sleep and wake after the reset", wait: "wait awake", exit: "end the run" };
 
@@ -125,6 +125,9 @@ export function questions(flags, ctx) {
   if (flags.shutdown === undefined && flags["no-shutdown"] === undefined) {
     list.push(confirmQuestion("shutdown", "Shut the PC down after the run?", { shutdown: true }, { "no-shutdown": true }));
   }
+  if (!flags["no-clean"]) {
+    list.push(confirmQuestion("clean", "Delete old generated files (sessions, Playwright output, closed-ticket files, logs) before the run?", {}, { "no-clean": true }));
+  }
   if (flags.start === undefined) {
     list.push(timeQuestion("start", "Start: now, in N minutes or at HH:MM [now]: ", "now", (text) => startAt(text, ctx.now)));
   }
@@ -210,6 +213,7 @@ export function summary(flags, ctx) {
   lines.push(`  Claude limit: ${LIMIT_LABELS[mode]}${wait}`);
   lines.push(`  wake timers: ${ctx.power?.works ? "on" : `off - ${ctx.power?.hint ?? "not read"}`}`);
   lines.push(`  shutdown after the run: ${flags["no-shutdown"] ? "no" : "yes"}`);
+  lines.push(`  clean old generated files first: ${flags["no-clean"] ? "no" : "yes"}`);
   const start = startAt(flags.start, now);
   lines.push(`  start: ${stamp(start)}${flags.start === undefined || flags.start === "now" ? " (now)" : ""}`);
   lines.push(`  window end: ${flags.until === undefined ? "none" : stamp(windowEnd(flags.until, start))}`);

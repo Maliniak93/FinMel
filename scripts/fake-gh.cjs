@@ -169,6 +169,19 @@ function graphql() {
     log({ kind: "items", query, variables });
     return out(JSON.stringify({ data: { user: { projectV2: { items: itemsPage(query, variables) } } } }));
   }
+  if (/issueOrPullRequest\(number:/.test(query)) {
+    log({ kind: "issueStates", query });
+    if (state.failIssueStates) {
+      fs.writeSync(2, "HTTP 502: Bad Gateway");
+      process.exit(1);
+    }
+    const repository = {};
+    for (const m of query.matchAll(/(\w+):\s*issueOrPullRequest\(number:\s*(\d+)\)/g)) {
+      const i = issues[Number(m[2])];
+      repository[m[1]] = i ? { __typename: "Issue", state: i.state, stateReason: i.stateReason ?? null, closedAt: i.closedAt ?? null } : null;
+    }
+    return out(JSON.stringify({ data: { repository } }));
+  }
   if (/issue\(number: \$number\)/.test(query)) {
     log({ kind: "issueQuery", number: variables.number });
     return out(JSON.stringify({ data: { repository: { issue: issueNode(Number(variables.number)) } } }));

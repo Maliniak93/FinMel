@@ -35,14 +35,23 @@ function scripted(lines) {
 
 test("each flag removes its question", () => {
   const all = ids(questions({}, tty({ plan: [manualItem, plainItem] })));
-  for (const id of ["items", "manual", "on-limit", "shutdown", "start", "until"]) assert.ok(all.includes(id), id);
+  for (const id of ["items", "manual", "on-limit", "shutdown", "clean", "start", "until"]) assert.ok(all.includes(id), id);
 
-  const some = ids(questions({ items: "2", "on-limit": "wait", "no-shutdown": true }, tty({ plan: [manualItem, plainItem] })));
-  for (const id of ["items", "on-limit", "shutdown"]) assert.ok(!some.includes(id), `${id} should be skipped`);
+  const some = ids(questions({ items: "2", "on-limit": "wait", "no-shutdown": true, "no-clean": true }, tty({ plan: [manualItem, plainItem] })));
+  for (const id of ["items", "on-limit", "shutdown", "clean"]) assert.ok(!some.includes(id), `${id} should be skipped`);
   for (const id of ["start", "until"]) assert.ok(some.includes(id), `${id} should remain`);
 
   const positional = ids(questions({ only: 400 }, tty({ plan: [plainItem] })));
   assert.ok(!positional.includes("items"));
+});
+
+test("clean question defaults to cleaning and declining adds --no-clean", () => {
+  const clean = questions({}, tty()).find((q) => q.id === "clean");
+  assert.equal(clean.default, "t");
+  assert.deepEqual(clean.parse("t").flags, {});
+  assert.deepEqual(clean.parse("n").flags, { "no-clean": true });
+  assert.ok(clean.parse("?").error);
+  assert.match(summary({ items: "all" }, tty()), /clean old generated files first: yes/);
 });
 
 test("no tty asks nothing", async () => {
@@ -81,7 +90,7 @@ test("manual question only with manual items", () => {
 });
 
 test("summary and command round trip", () => {
-  const answers = { items: "2", "skip-manual": true, "on-limit": "sleep", "max-wait": "12", shutdown: true, start: "23:00", until: "07:00" };
+  const answers = { items: "2", "skip-manual": true, "on-limit": "sleep", "max-wait": "12", shutdown: true, "no-clean": true, start: "23:00", until: "07:00" };
   const text = summary(answers, tty());
   const windowLine = text.split(/\r?\n/).find((l) => l.includes("2026-10-19") && l.includes("07:00"));
   assert.ok(windowLine, "window end shown as the next day's 07:00");
@@ -124,12 +133,12 @@ test("summary shows priority", () => {
 
 test("declined wizard starts nothing", async () => {
   const flags = { items: "all", "on-limit": "wait", "max-wait": "12", shutdown: true, start: "now" };
-  const declined = scripted(["", "n"]);
+  const declined = scripted(["", "", "n"]);
   const result = await runWizard(flags, tty(), declined.io);
   assert.equal(result.run, false);
   assert.ok(declined.written().includes("Start?"));
 
-  const accepted = scripted(["", ""]);
+  const accepted = scripted(["", "", ""]);
   const go = await runWizard(flags, tty(), accepted.io);
   assert.equal(go.run, true);
   assert.equal(go.flags.items, "all");
