@@ -1,13 +1,15 @@
 import { Component, inject, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import { getApiMarketdataBondSeries, type BondSeriesListItem } from '../../../api/marketdata';
 import { readProblemDetails } from '../../../core/auth/problem-details';
+import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatMoney, formatPercent } from '../../../shared/format';
+import { SectionError } from '../../../shared/section-error/section-error';
+import { Skeleton } from '../../../shared/skeleton/skeleton';
 import {
   BondPurchaseDialog,
   type BondPurchaseDialogData,
@@ -21,7 +23,7 @@ interface FollowingRateLabel {
 
 @Component({
   selector: 'app-bond-offer',
-  imports: [MatButtonModule, MatProgressSpinnerModule, MatTableModule, TranslocoPipe],
+  imports: [EmptyState, MatButtonModule, MatTableModule, SectionError, Skeleton, TranslocoPipe],
   templateUrl: './bond-offer.html',
   styleUrl: './bond-offer.scss',
 })

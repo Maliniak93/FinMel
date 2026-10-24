@@ -57,34 +57,48 @@ describe('Bonds page, current offer tab', () => {
     await restoreEnglish();
   });
 
-  async function setup(series: unknown[]): Promise<void> {
-    fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation(async (input) =>
-        requestUrl(input).includes('/api/marketdata/bond-series')
-          ? jsonResponse(series)
-          : requestUrl(input).includes('/api/portfolio/bonds')
-            ? jsonResponse([])
-            : jsonResponse({ detail: 'Not found.' }, 404),
-      );
+  async function setup(series: unknown[] | 'pending' | 'failed'): Promise<void> {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (requestUrl(input).includes('/api/portfolio/bonds')) {
+        return jsonResponse([]);
+      }
+      if (!requestUrl(input).includes('/api/marketdata/bond-series')) {
+        return jsonResponse({ detail: 'Not found.' }, 404);
+      }
+      if (series === 'pending') {
+        return new Promise<Response>(() => undefined);
+      }
+      if (series === 'failed') {
+        return jsonResponse({ detail: 'Service unavailable.' }, 503);
+      }
+      return jsonResponse(series);
+    });
     await TestBed.configureTestingModule({
       imports: [Bonds],
       providers: [provideI18nTesting()],
     }).compileComponents();
     fixture = TestBed.createComponent(Bonds);
-    await fixture.whenStable();
-    await switchLanguage(fixture, 'pl');
-    const offerTab = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('[role="tab"]'),
-    ).find((tab) => textOf(tab).includes('Aktualna oferta'));
-    offerTab!.click();
+    if (series !== 'pending') {
+      await fixture.whenStable();
+    }
+    if (series === 'pending') {
+      fixture.detectChanges();
+    } else {
+      await switchLanguage(fixture, 'pl');
+    }
+    const offerTab = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+      '[role="tab"]',
+    )[1];
+    offerTab.click();
     fixture.detectChanges();
     // The tab body attaches its content after the switch animation, so wait for it before the resource settles.
     await vi.waitFor(() =>
       expect((fixture.nativeElement as HTMLElement).querySelector('app-bond-offer')).not.toBeNull(),
     );
     fixture.detectChanges();
-    await fixture.whenStable();
+    if (series !== 'pending') {
+      await fixture.whenStable();
+    }
   }
 
   function rows(): HTMLElement[] {
@@ -133,12 +147,22 @@ describe('Bonds page, current offer tab', () => {
     });
   });
 
-  it('shows the empty state when the catalog has no series', async () => {
-    await setup([]);
-
+  it('states', async () => {
+    await setup('pending');
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-skeleton')).not.toBeNull();
     expect(rows()).toHaveLength(0);
-    expect(textOf(fixture.nativeElement)).toContain(
-      'Brak danych z MF — obligację można wprowadzić ręcznie',
-    );
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup('failed');
+    const errorBlock = (fixture.nativeElement as HTMLElement).querySelector('app-section-error');
+    expect(textOf(errorBlock)).toContain('Ponów');
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup([]);
+    const empty = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(textOf(empty)).toContain('Brak danych z MF — obligację można wprowadzić ręcznie');
+    expect(rows()).toHaveLength(0);
   });
 });

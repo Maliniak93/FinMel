@@ -4,7 +4,6 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatMenuTrigger } from '@angular/material/menu';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { MatTooltip } from '@angular/material/tooltip';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
@@ -66,7 +65,9 @@ describe('Deposits', () => {
     await restoreEnglish();
   });
 
-  async function setup(deposits: DepositResponse[] = [activeDeposit, dueDeposit]): Promise<void> {
+  async function setup(
+    deposits: DepositResponse[] | 'pending' | 'failed' = [activeDeposit, dueDeposit],
+  ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const request = input as Request;
       if (request.method === 'DELETE') {
@@ -75,9 +76,16 @@ describe('Deposits', () => {
       if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(request.url)) {
         return jsonResponse({});
       }
-      return requestUrl(input).includes('/api/portfolio/deposits')
-        ? jsonResponse(deposits)
-        : jsonResponse({ detail: 'Not found.' }, 404);
+      if (!requestUrl(input).includes('/api/portfolio/deposits')) {
+        return jsonResponse({ detail: 'Not found.' }, 404);
+      }
+      if (deposits === 'pending') {
+        return new Promise<Response>(() => undefined);
+      }
+      if (deposits === 'failed') {
+        return jsonResponse({ detail: 'Service unavailable.' }, 503);
+      }
+      return jsonResponse(deposits);
     });
     dialog = { open: vi.fn() };
     snackBar = { open: vi.fn() };
@@ -94,13 +102,30 @@ describe('Deposits', () => {
 
     fixture = TestBed.createComponent(Deposits);
     component = fixture.componentInstance;
-    await fixture.whenStable();
+    if (deposits !== 'pending') {
+      await fixture.whenStable();
+    }
+    fixture.detectChanges();
   }
 
   function rows(): HTMLElement[] {
     return Array.from(
       (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('tbody tr.mat-mdc-row'),
     );
+  }
+
+  async function clickAction(row: HTMLElement, label: RegExp): Promise<void> {
+    await clickRowMenuItem(fixture, row, label);
+  }
+
+  function closeMenus(): void {
+    TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
+  }
+
+  async function offers(row: HTMLElement, label: RegExp): Promise<boolean> {
+    const labels = await menuItemLabels(row);
+    closeMenus();
+    return labels.some((item) => label.test(item));
   }
 
   function rowFor(name: string): HTMLElement {
@@ -115,14 +140,6 @@ describe('Deposits', () => {
     return fetchSpy.mock.calls.filter((call: unknown[]) =>
       requestUrl(call[0]).includes('/api/portfolio/deposits'),
     ).length;
-  }
-
-  function settleButton(row: HTMLElement): HTMLButtonElement | undefined {
-    return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
-      (button) =>
-        /settle/i.test(button.getAttribute('mattooltip') ?? '') ||
-        /settle/i.test(button.getAttribute('aria-label') ?? ''),
-    );
   }
 
   async function menuItemLabels(row: HTMLElement): Promise<string[]> {
@@ -141,11 +158,11 @@ describe('Deposits', () => {
     );
   }
 
-  it('is titled "Deposits" and shows only the term deposits, with no tabs', async () => {
+  it('shows only the term deposits, with no page title and no tabs', async () => {
     await setup();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('h1')?.textContent).toContain('Deposits');
+    expect(element.querySelector('h1')).toBeNull();
     expect(element.querySelectorAll('[role="tab"]')).toHaveLength(0);
     expect(rows()).toHaveLength(2);
     expect(
@@ -168,7 +185,7 @@ describe('Deposits', () => {
       expect(text).toContain(formatDate(`${deposit.maturityDate}T00:00:00`, 'mediumDate', 'en-US'));
       expect(text).toContain(formatDate(`${deposit.startDate}T00:00:00`, 'mediumDate', 'en-US'));
     }
-    expect(rowFor('Running deposit').textContent).toMatch(/5[.,]5\s*%/);
+    expect(rowFor('Running deposit').textContent).toMatch(/5[.,]5\s*%\s*·\s*Matures/);
   });
 
   it('shows the source and the return account of each deposit in their own columns', async () => {
@@ -193,15 +210,38 @@ describe('Deposits', () => {
     expect(rowFor('Running deposit').textContent).toContain(mBankAccount.name);
   });
 
-  it('the Due row carries the "Due" chip and the Active row does not', async () => {
-    await setup();
+  it('status chips and archived rows', async () => {
+    await setup([activeDeposit, dueDeposit, settledDeposit, paidOutDeposit, archivedDueDeposit]);
+    await showArchivedToggle(fixture);
 
-    const dueChip = rowFor('Matured deposit').querySelector(
-      'mat-chip, mat-chip-option, .mat-mdc-chip',
+    const dueRow = rowFor('Matured deposit');
+    const dueChip = dueRow.querySelector('app-status-chip');
+    expect(dueChip?.textContent).toContain(
+      formatDate(`${dueDeposit.maturityDate}T00:00:00`, 'mediumDate', 'en-US'),
     );
-    expect(dueChip?.textContent).toContain('Due');
-    expect(rowFor('Running deposit').textContent).not.toContain('Due');
-    expect(rowFor('Running deposit').textContent).toContain('Active');
+    expect(dueChip?.textContent).toContain('Matures');
+    expect(dueChip?.querySelector('mat-icon')?.textContent?.trim()).toBe('calendar_clock');
+    expect(rowFor('Running deposit').querySelector('app-status-chip')?.textContent).toContain(
+      'Active',
+    );
+    expect(rowFor('Settled deposit').querySelector('app-status-chip')?.textContent).toContain(
+      'Settled',
+    );
+    expect(rowFor('Paid-out deposit').querySelector('app-status-chip')?.textContent).toContain(
+      'Paid out',
+    );
+
+    const archivedRow = rowFor(archivedDueDeposit.name);
+    const archivedChip = Array.from(archivedRow.querySelectorAll('app-status-chip')).find((chip) =>
+      (chip.textContent ?? '').includes('Archived'),
+    );
+    expect(archivedChip?.querySelector('mat-icon')?.textContent?.trim()).toBe('archive');
+    expect(archivedRow.getAttribute('data-archived')).toBe('true');
+    expect(dueRow.getAttribute('data-archived')).toBeNull();
+
+    for (const row of [dueRow, archivedRow, rowFor('Running deposit')]) {
+      expect(row.querySelectorAll('app-money')).toHaveLength(3);
+    }
   });
 
   it('Add opens the deposit form for a new deposit and reloads after a save', async () => {
@@ -268,19 +308,28 @@ describe('Deposits', () => {
     ).toBe(false);
   });
 
-  it('only the Due row carries the settle button', async () => {
-    await setup([activeDeposit, dueDeposit, settledDeposit]);
+  it('row menu', async () => {
+    await setup([activeDeposit, dueDeposit, settledDeposit, paidOutDeposit]);
 
-    expect(settleButton(rowFor('Matured deposit'))).toBeDefined();
-    expect(settleButton(rowFor('Running deposit'))).toBeUndefined();
-    expect(settleButton(rowFor('Settled deposit'))).toBeUndefined();
+    const due = await menuItemLabels(rowFor('Matured deposit'));
+    expect(due).toEqual(['Settle maturity', 'Roll over', 'Edit', 'Archive', 'Delete']);
+    closeMenus();
+    const settled = await menuItemLabels(rowFor('Settled deposit'));
+    expect(settled).toEqual(['Pay out', 'Roll over', 'Archive', 'Delete']);
+    closeMenus();
+    const running = await menuItemLabels(rowFor('Running deposit'));
+    expect(running).toEqual(['Edit', 'Archive', 'Delete']);
+    closeMenus();
+    const paidOut = await menuItemLabels(rowFor('Paid-out deposit'));
+    expect(paidOut).toEqual(['Archive', 'Delete']);
+    closeMenus();
   });
 
   it('the Settled row shows the "Settled" chip and the settled final amount', async () => {
     await setup([activeDeposit, dueDeposit, settledDeposit]);
 
     const row = rowFor('Settled deposit');
-    const chip = row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip');
+    const chip = row.querySelector('app-status-chip');
     expect(chip?.textContent).toContain('Settled');
     expect(row.textContent).not.toContain('Due');
     expect(row.textContent).toContain(
@@ -314,7 +363,7 @@ describe('Deposits', () => {
     dialog.open.mockReturnValue({ afterClosed: () => of(true) });
     const listCallsBefore = depositListCalls();
 
-    settleButton(rowFor('Matured deposit'))!.click();
+    await clickAction(rowFor('Matured deposit'), /settle maturity/i);
     await fixture.whenStable();
 
     expect(dialog.open).toHaveBeenCalledWith(
@@ -329,7 +378,7 @@ describe('Deposits', () => {
     dialog.open.mockReturnValue({ afterClosed: () => of(false) });
     const listCallsBefore = depositListCalls();
 
-    settleButton(rowFor('Matured deposit'))!.click();
+    await clickAction(rowFor('Matured deposit'), /settle maturity/i);
     await fixture.whenStable();
 
     expect(dialog.open).toHaveBeenCalledWith(SettleDepositDialog, expect.anything());
@@ -337,37 +386,15 @@ describe('Deposits', () => {
   });
 
   describe('payout', () => {
-    function transferButton(row: HTMLElement): HTMLButtonElement | undefined {
-      return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
-        (button) =>
-          /pay out/i.test(button.getAttribute('mattooltip') ?? '') ||
-          /pay out/i.test(button.getAttribute('aria-label') ?? ''),
-      );
-    }
-
     const allStatuses = [activeDeposit, dueDeposit, settledDeposit, paidOutDeposit];
 
-    it('only the Settled row carries the "Pay out" button', async () => {
+    it('only the Settled row offers "Pay out" in its menu', async () => {
       await setup(allStatuses);
 
-      expect(transferButton(rowFor('Settled deposit'))).toBeDefined();
-      expect(transferButton(rowFor('Paid-out deposit'))).toBeUndefined();
-      expect(transferButton(rowFor('Matured deposit'))).toBeUndefined();
-      expect(transferButton(rowFor('Running deposit'))).toBeUndefined();
-    });
-
-    it('the payout button of a Settled row is labelled "Pay out" and shows the output icon', async () => {
-      await setup(allStatuses);
-
-      const button = transferButton(rowFor('Settled deposit'))!;
-
-      expect(button.getAttribute('aria-label')).toBe('Pay out');
-      expect(button.querySelector('mat-icon')?.textContent?.trim()).toBe('output');
-      expect(
-        Array.from(rowFor('Settled deposit').querySelectorAll('button')).some((candidate) =>
-          /transfer to cash/i.test(candidate.getAttribute('aria-label') ?? ''),
-        ),
-      ).toBe(false);
+      expect(await offers(rowFor('Settled deposit'), /pay out/i)).toBe(true);
+      expect(await offers(rowFor('Paid-out deposit'), /pay out/i)).toBe(false);
+      expect(await offers(rowFor('Matured deposit'), /pay out/i)).toBe(false);
+      expect(await offers(rowFor('Running deposit'), /pay out/i)).toBe(false);
     });
 
     it('a PaidOut row shows the name of a bank account destination', async () => {
@@ -375,32 +402,28 @@ describe('Deposits', () => {
 
       const row = rowFor('Deposit paid into a bank account');
 
-      expect(row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip')?.textContent).toContain(
-        'Paid out',
-      );
+      expect(row.querySelector('app-status-chip')?.textContent).toContain('Paid out');
       expect(row.textContent).toContain(formatDate('2026-04-20T00:00:00', 'mediumDate', 'en-US'));
       expect(row.textContent).toContain(nestAccount.name);
-      expect(transferButton(row)).toBeUndefined();
+      expect(await offers(row, /pay out/i)).toBe(false);
     });
 
     it('the PaidOut row shows the "Paid out" chip, the payout date and the destination', async () => {
       await setup(allStatuses);
 
       const row = rowFor('Paid-out deposit');
-      const chip = row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip');
+      const chip = row.querySelector('app-status-chip');
       expect(chip?.textContent).toContain('Paid out');
       expect(row.textContent).toContain(formatDate('2026-04-20T00:00:00', 'mediumDate', 'en-US'));
       expect(row.textContent).toContain(paidOutDepositDestinationName);
-      expect(settleButton(row)).toBeUndefined();
+      expect(await offers(row, /settle maturity/i)).toBe(false);
     });
 
     it('a PaidOut row without an account name shows "—" for it', async () => {
       await setup([paidOutDepositWithoutAccountName]);
 
       const row = rowFor('Payout without a name');
-      expect(row.querySelector('mat-chip, mat-chip-option, .mat-mdc-chip')?.textContent).toContain(
-        'Paid out',
-      );
+      expect(row.querySelector('app-status-chip')?.textContent).toContain('Paid out');
       expect(row.textContent).toContain(formatDate('2026-04-20T00:00:00', 'mediumDate', 'en-US'));
       expect(row.textContent).toContain('—');
     });
@@ -419,7 +442,7 @@ describe('Deposits', () => {
       dialog.open.mockReturnValue({ afterClosed: () => of(true) });
       const listCallsBefore = depositListCalls();
 
-      transferButton(rowFor('Settled deposit'))!.click();
+      await clickAction(rowFor('Settled deposit'), /pay out/i);
       await fixture.whenStable();
 
       expect(dialog.open).toHaveBeenCalledWith(
@@ -434,7 +457,7 @@ describe('Deposits', () => {
       dialog.open.mockReturnValue({ afterClosed: () => of(false) });
       const listCallsBefore = depositListCalls();
 
-      transferButton(rowFor('Settled deposit'))!.click();
+      await clickAction(rowFor('Settled deposit'), /pay out/i);
       await fixture.whenStable();
 
       expect(dialog.open).toHaveBeenCalledWith(PayOutDepositDialog, expect.anything());
@@ -443,31 +466,15 @@ describe('Deposits', () => {
   });
 
   describe('roll over', () => {
-    function rollOverButton(row: HTMLElement): HTMLButtonElement | undefined {
-      return Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find(
-        (button) =>
-          /roll over/i.test(button.getAttribute('mattooltip') ?? '') ||
-          /roll over/i.test(button.getAttribute('aria-label') ?? ''),
-      );
-    }
-
     const allStatuses = [activeDeposit, dueDeposit, settledDeposit, paidOutDeposit];
 
-    it('only the Due and Settled rows carry the "Roll over" button', async () => {
+    it('only the Due and Settled rows offer "Roll over" in their menu', async () => {
       await setup(allStatuses);
 
-      expect(rollOverButton(rowFor('Matured deposit'))).toBeDefined();
-      expect(rollOverButton(rowFor('Settled deposit'))).toBeDefined();
-      expect(rollOverButton(rowFor('Running deposit'))).toBeUndefined();
-      expect(rollOverButton(rowFor('Paid-out deposit'))).toBeUndefined();
-      expect(settleButton(rowFor('Matured deposit'))).toBeDefined();
-    });
-
-    it('the button shows the autorenew icon', async () => {
-      await setup([dueDeposit]);
-
-      const button = rollOverButton(rowFor('Matured deposit'));
-      expect(button?.querySelector('mat-icon')?.textContent?.trim()).toBe('autorenew');
+      expect(await offers(rowFor('Matured deposit'), /roll over/i)).toBe(true);
+      expect(await offers(rowFor('Settled deposit'), /roll over/i)).toBe(true);
+      expect(await offers(rowFor('Running deposit'), /roll over/i)).toBe(false);
+      expect(await offers(rowFor('Paid-out deposit'), /roll over/i)).toBe(false);
     });
 
     it.each([
@@ -480,7 +487,7 @@ describe('Deposits', () => {
         dialog.open.mockReturnValue({ afterClosed: () => of(true) });
         const listCallsBefore = depositListCalls();
 
-        rollOverButton(rowFor(name))!.click();
+        await clickAction(rowFor(name), /roll over/i);
         await fixture.whenStable();
 
         expect(dialog.open).toHaveBeenCalledWith(
@@ -496,7 +503,7 @@ describe('Deposits', () => {
       dialog.open.mockReturnValue({ afterClosed: () => of(false) });
       const listCallsBefore = depositListCalls();
 
-      rollOverButton(rowFor('Matured deposit'))!.click();
+      await clickAction(rowFor('Matured deposit'), /roll over/i);
       await fixture.whenStable();
 
       expect(dialog.open).toHaveBeenCalledWith(RollOverDepositDialog, expect.anything());
@@ -529,11 +536,7 @@ describe('Deposits', () => {
       await showArchived();
 
       expect(rows()).toHaveLength(2);
-      const chip = rowFor(archivedDueDeposit.name).querySelector(
-        'mat-chip, mat-chip-option, .mat-mdc-chip',
-      );
       expect(rowFor(archivedDueDeposit.name).textContent).toContain('Archived');
-      expect(chip).not.toBeNull();
       expect(rowFor('Running deposit').textContent).not.toContain('Archived');
     });
 
@@ -599,22 +602,10 @@ describe('Deposits', () => {
       await showArchived();
 
       for (const deposit of [archivedDueDeposit, archivedSettledDeposit]) {
-        const row = rowFor(deposit.name);
-        const labels = await menuItemLabels(row);
+        const labels = await menuItemLabels(rowFor(deposit.name));
 
-        expect(labels.some((label) => /restore/i.test(label))).toBe(true);
-        expect(labels.some((label) => /delete/i.test(label))).toBe(true);
-        expect(labels.some((label) => /edit/i.test(label))).toBe(false);
-        expect(labels.some((label) => /\barchive\b/i.test(label))).toBe(false);
-        expect(settleButton(row)).toBeUndefined();
-        expect(
-          Array.from(row.querySelectorAll<HTMLButtonElement>('button')).some(
-            (button) =>
-              /pay out/i.test(button.getAttribute('mattooltip') ?? '') ||
-              /pay out/i.test(button.getAttribute('aria-label') ?? ''),
-          ),
-        ).toBe(false);
-        TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
+        expect(labels).toEqual(['Restore', 'Delete']);
+        closeMenus();
       }
     });
 
@@ -628,26 +619,29 @@ describe('Deposits', () => {
     });
   });
 
-  it('shows an empty state with an Add button when there are no deposits', async () => {
-    await setup([]);
-
+  it('states', async () => {
+    await setup('pending');
+    const element = fixture.nativeElement as HTMLElement;
+    expect(element.querySelector('app-skeleton')).not.toBeNull();
     expect(rows()).toHaveLength(0);
-    const buttons = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('button'),
-      (button) => button.textContent ?? '',
-    );
-    expect(buttons.some((text) => /add/i.test(text))).toBe(true);
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+
+    await setup('failed');
+    const errorBlock = (fixture.nativeElement as HTMLElement).querySelector('app-section-error');
+    expect(errorBlock?.textContent).toContain('Retry');
+    fetchSpy.mockRestore();
+    await restoreEnglish();
+    TestBed.resetTestingModule();
+
+    await setup([]);
+    const empty = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
+    expect(empty).not.toBeNull();
+    expect(empty?.querySelector('button')?.textContent).toMatch(/add/i);
   });
 
   describe('in Polish', () => {
     const cognates = ['Bank', 'Start', 'Status'];
-
-    function actionTooltips(): string[] {
-      return fixture.debugElement
-        .queryAll(By.css('td.mat-column-actions button'))
-        .map((button) => button.injector.get(MatTooltip, null)?.message ?? '')
-        .filter((message) => message !== '');
-    }
 
     async function menuItems(): Promise<string[]> {
       const trigger = fixture.debugElement
@@ -670,16 +664,13 @@ describe('Deposits', () => {
       await setup([dueDeposit, settledDeposit]);
       const element = fixture.nativeElement as HTMLElement;
       const texts = async () => [
-        ...labelsOf(element, 'h1'),
         ...labelsOf(element, '.deposits-page__header > button'),
         ...labelsOf(element, 'th:not(:empty)'),
-        ...actionTooltips(),
         ...(await menuItems()),
       ];
 
       const english = await texts();
       expect(english).toEqual([
-        'Deposits',
         'Add deposit',
         'Name',
         'Bank',
@@ -694,8 +685,6 @@ describe('Deposits', () => {
         'Status',
         'Settle maturity',
         'Roll over',
-        'Pay out',
-        'Roll over',
         'Edit',
         'Archive',
         'Delete',
@@ -704,6 +693,7 @@ describe('Deposits', () => {
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(english, await texts(), cognates)).toEqual([]);
+      expect(labelsOf(element, '.deposits-page__header > button')).toEqual(['Nowa lokata']);
     });
 
     it("renders the rows' accessible names in Polish", async () => {
@@ -712,14 +702,7 @@ describe('Deposits', () => {
       const labels = () => attributesOf(element, 'td.mat-column-actions button', 'aria-label');
 
       const english = labels();
-      expect(english).toEqual([
-        'Settle maturity of Matured deposit',
-        'Roll over',
-        'Actions for this deposit',
-        'Pay out',
-        'Roll over',
-        'Actions for this deposit',
-      ]);
+      expect(english).toEqual(['Actions for: Matured deposit', 'Actions for: Settled deposit']);
 
       await switchLanguage(fixture, 'pl');
 
@@ -731,34 +714,30 @@ describe('Deposits', () => {
       await setup([]);
       const element = fixture.nativeElement as HTMLElement;
       const texts = () => [
-        ...labelsOf(element, '.deposits-page__state p'),
-        ...labelsOf(element, '.deposits-page__state button'),
+        ...labelsOf(element, 'app-empty-state p'),
+        ...labelsOf(element, 'app-empty-state button'),
       ];
 
       const english = texts();
-      expect(english).toEqual(["You don't have any term deposits yet.", 'Add your first deposit']);
+      expect(english).toEqual(["You don't have any term deposits yet.", 'Add deposit']);
 
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(english, texts())).toEqual([]);
+      expect(texts()[1]).toBe('Nowa lokata');
     });
 
     it('renders the load-failure retry button in Polish', async () => {
-      await setup([]);
-      fetchSpy.mockImplementation(async () =>
-        jsonResponse({ detail: 'Service unavailable.' }, 503),
-      );
-      component['depositsResource'].reload();
-      await fixture.whenStable();
+      await setup('failed');
       const element = fixture.nativeElement as HTMLElement;
-      const retry = () => labelsOf(element, '.deposits-page__state button');
+      const retry = () => labelsOf(element, 'app-section-error button');
 
       expect(retry()).toEqual(['Retry']);
 
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(['Retry'], retry())).toEqual([]);
-      expect(textOf(element.querySelector('.deposits-page__state p'))).toBe('Service unavailable.');
+      expect(textOf(element.querySelector('app-section-error'))).toContain('Service unavailable.');
     });
 
     it('asks to delete in Polish, with the deposit name in the message', async () => {

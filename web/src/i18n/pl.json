@@ -284,7 +284,6 @@
     },
     "my": {
       "add": "Kup obligacje",
-      "addFirst": "Zapisz pierwszy zakup obligacji",
       "empty": "Nie masz jeszcze obligacji.",
       "loadFailed": "Nie udało się wczytać obligacji.",
       "series": "Seria",
@@ -1090,10 +1089,12 @@
     }
   },
   "deposits": {
-    "title": "Lokaty",
-    "add": "Dodaj lokatę",
+    "add": "Nowa lokata",
     "empty": "Nie masz jeszcze żadnych lokat terminowych.",
-    "addFirst": "Dodaj pierwszą lokatę",
+    "status": {
+      "maturity": "Zapada {{ date }}"
+    },
+    "subtitle": "{{ rate }} % · Zapadalność {{ date }}",
     "bank": "Bank",
     "source": "Źródło",
     "returnTo": "Zwrot na",
@@ -1104,10 +1105,8 @@
     "netProfit": "Zysk netto",
     "finalAmount": "Kwota końcowa",
     "settleMaturity": "Rozlicz zapadalność",
-    "settleMaturityOf": "Rozlicz zapadalność lokaty {{ name }}",
     "payOutAction": "Wypłać",
     "rollOver": "Przedłuż lokatę",
-    "actionsForThis": "Akcje dla tej lokaty",
     "loadFailed": "Nie udało się wczytać lokat.",
     "delete": {
       "title": "Usunąć tę lokatę?",
