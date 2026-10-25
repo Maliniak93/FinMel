@@ -750,6 +750,10 @@
       "allocationPercent": "Share (%)",
       "allocationAdd": "Add class",
       "allocationSum": "Sum: {{ sum }}% of 100%",
+      "allocationMissing": "{{ pp }} pp missing",
+      "allocationExcess": "{{ pp }} pp too much",
+      "paletteCaption": "Selected: {{ color }} · crossed-out colours are already used by another group",
+      "colorTaken": "This colour is already used by another group",
       "allocationDuplicate": "Each class can appear only once."
     },
     "errors": {
@@ -763,6 +767,7 @@
     "delete": {
       "title": "Delete this group?",
       "message": "Group \"{{ name }}\" has {{ count }} assets. Its history moves to \"Ungrouped\", and its assets and the account and place defaults return to \"Ungrouped\".",
+      "messageEmpty": "Group \"{{ name }}\" has no assets. Its history moves to \"Ungrouped\".",
       "failed": "Failed to delete the group."
     },
     "assets": {

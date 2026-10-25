@@ -11,6 +11,8 @@ import {
   Validators,
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,8 +31,9 @@ import {
   readProblemDetails,
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
-import { GROUP_COLOR_KEYS, groupColor } from '../../../shared/colors';
+import { GROUP_COLOR_KEYS, assetClassColor, groupColor } from '../../../shared/colors';
 import { formatPercentNumber } from '../../../shared/format';
+import { GroupKindMarker } from '../../../shared/group-kind-marker/group-kind-marker';
 import { ASSET_CLASSES } from '../../assets/asset-class';
 import { GROUP_KINDS, GROUP_KIND } from '../group-kind';
 
@@ -82,6 +85,9 @@ function uniqueClasses(array: AbstractControl): ValidationErrors | null {
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
+    MatButtonToggleModule,
+    MatTooltipModule,
+    GroupKindMarker,
     MatDialogModule,
     MatFormFieldModule,
     MatIconModule,
@@ -104,7 +110,6 @@ export class GroupFormDialog {
 
   protected readonly kinds = GROUP_KINDS;
   protected readonly assetClasses = ASSET_CLASSES;
-
   private readonly ownColor = this.data.mode === 'edit' ? this.data.group.color : null;
   private readonly takenColors = new Set(
     this.data.groups.map((group) => group.color).filter((color) => color !== this.ownColor),
@@ -161,6 +166,23 @@ export class GroupFormDialog {
   protected readonly sumPercent = computed(() => {
     this.formChange();
     return tenthsOf(allocationRows(this.form.controls.allocation)) / 10;
+  });
+
+  protected readonly selectedLabel = computed(() => `groups.colors.${this.selectedColor()}`);
+
+  protected readonly sumGap = computed(() => {
+    const gap = 1000 - Math.round(this.sumPercent() * 10);
+    return { missing: gap > 0, pp: Math.abs(gap) / 10 };
+  });
+
+  protected readonly liveBar = computed(() => {
+    this.formChange();
+    return allocationRows(this.form.controls.allocation).flatMap((row) => {
+      const { assetClass, percent } = row.controls;
+      return assetClass.value === null || !percent.value
+        ? []
+        : [{ color: assetClassColor(assetClass.value), width: Number(percent.value) }];
+    });
   });
 
   protected readonly formatPercentNumber = formatPercentNumber;

@@ -10,6 +10,7 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetGroupResponse, AssignableAssetResponse } from '../../api/portfolio';
 import type { DashboardResponse } from '../../api/reporting';
 import { client as reportingClient } from '../../api/reporting/client.gen';
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney } from '../../shared/format';
@@ -72,12 +73,14 @@ describe('Groups', () => {
     }) as typeof window.matchMedia;
   }
 
-  afterEach(() => {
+  afterEach(async () => {
     window.matchMedia = originalMatchMedia;
     release?.();
     release = undefined;
     fetchSpy.mockRestore();
     TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
+    await TestBed.inject(LanguageService).setLanguage('en');
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
 
   async function setup(options: SetupOptions = {}): Promise<void> {
@@ -421,6 +424,37 @@ describe('Groups', () => {
     await openMenuItem('Emerytura', 'delete-group');
 
     expect(deleteCalls()).toBe(0);
+  });
+
+  it('delete dialog text and focus', async () => {
+    await setup({ groups: [blueGroup, { ...greenGroup, assetCount: 0 }] });
+    await TestBed.inject(LanguageService).setLanguage('pl');
+
+    await openMenuItem('Emerytura', 'delete-group');
+    const overlay = TestBed.inject(OverlayContainer).getContainerElement();
+    await vi.waitFor(() =>
+      expect(overlay.querySelector('[data-testid="delete-group"]')).toBeNull(),
+    );
+    await openMenuItem('Poduszka', 'delete-group');
+
+    const confirms = dialog.open.mock.calls
+      .filter((call) => call[0] === ConfirmDialog)
+      .map((call) => call[1].data);
+    expect(confirms).toEqual([
+      {
+        title: 'Usunąć grupę?',
+        message:
+          'Grupa "Emerytura" ma aktywa: 3. Jej historia trafi do „Bez grupy", a aktywa oraz domyślne grupy rachunków i miejsc wrócą do „Bez grupy".',
+        confirmLabel: 'Usuń',
+        destructive: true,
+      },
+      {
+        title: 'Usunąć grupę?',
+        message: 'Grupa "Poduszka" nie ma aktywów. Jej historia trafi do „Bez grupy".',
+        confirmLabel: 'Usuń',
+        destructive: true,
+      },
+    ]);
   });
 
   function panel(): HTMLElement {
