@@ -20,20 +20,33 @@
       <legend>{{ 'groups.form.color' | transloco }}</legend>
       <div class="group-form-dialog__palette" role="radiogroup">
         @for (color of palette(); track color.key) {
-          <button
-            type="button"
-            role="radio"
-            class="group-form-dialog__swatch"
-            [class.group-form-dialog__swatch--selected]="color.selected"
-            [style.background-color]="color.css"
-            [attr.data-color]="color.key"
-            [attr.aria-checked]="color.selected"
-            [attr.aria-label]="color.label | transloco"
-            [disabled]="color.disabled"
-            (click)="pickColor(color.key)"
-          ></button>
+          <span
+            class="group-form-dialog__swatch-wrap"
+            [matTooltip]="'groups.form.colorTaken' | transloco"
+            [matTooltipDisabled]="!color.disabled"
+          >
+            <button
+              type="button"
+              role="radio"
+              class="group-form-dialog__swatch"
+              [class.group-form-dialog__swatch--selected]="color.selected"
+              [style.background-color]="color.css"
+              [attr.data-color]="color.key"
+              [attr.aria-checked]="color.selected"
+              [attr.aria-label]="color.label | transloco"
+              [disabled]="color.disabled"
+              (click)="pickColor(color.key)"
+            >
+              @if (color.disabled) {
+                <mat-icon class="group-form-dialog__swatch-cross">close</mat-icon>
+              }
+            </button>
+          </span>
         }
       </div>
+      <p class="group-form-dialog__caption" data-testid="palette-caption">
+        {{ 'groups.form.paletteCaption' | transloco: { color: (selectedLabel() | transloco) } }}
+      </p>
       @if (form.controls.color.hasError('server')) {
         <p class="group-form-dialog__error" role="alert" data-testid="color-error">
           {{ form.controls.color.getError('server') }}
@@ -45,14 +58,20 @@
       }
     </fieldset>
 
-    <mat-form-field appearance="outline" class="group-form-dialog__field">
-      <mat-label>{{ 'groups.form.kind' | transloco }}</mat-label>
-      <mat-select formControlName="kind" data-testid="kind-select">
+    <div class="group-form-dialog__kind">
+      <span class="group-form-dialog__legend">{{ 'groups.form.kind' | transloco }}</span>
+      <mat-button-toggle-group
+        formControlName="kind"
+        data-testid="kind-toggle"
+        [attr.aria-label]="'groups.form.kind' | transloco"
+      >
         @for (kind of kinds; track kind.value) {
-          <mat-option [value]="kind.value">{{ kind.label | transloco }}</mat-option>
+          <mat-button-toggle [value]="kind.value">
+            <app-group-kind-marker [kind]="kind.value" />
+          </mat-button-toggle>
         }
-      </mat-select>
-    </mat-form-field>
+      </mat-button-toggle-group>
+    </div>
 
     <mat-form-field appearance="outline" class="group-form-dialog__field">
       <mat-label>{{ 'groups.form.target' | transloco }}</mat-label>
@@ -134,12 +153,32 @@
         {{ 'groups.form.allocationAdd' | transloco }}
       </button>
       @if (form.controls.allocation.length > 0) {
+        <div
+          class="group-form-dialog__live-bar"
+          data-testid="allocation-live-bar"
+          aria-hidden="true"
+        >
+          @for (segment of liveBar(); track $index) {
+            <span
+              class="group-form-dialog__live-segment"
+              [style.background-color]="segment.color"
+              [style.width.%]="segment.width"
+            ></span>
+          }
+        </div>
         <p
           class="group-form-dialog__allocation-sum"
-          [class.group-form-dialog__error]="form.controls.allocation.invalid"
+          [class.group-form-dialog__error]="form.controls.allocation.hasError('allocationSum')"
           data-testid="allocation-sum"
         >
           {{ 'groups.form.allocationSum' | transloco: { sum: formatPercentNumber(sumPercent()) } }}
+          @if (form.controls.allocation.hasError('allocationSum')) {
+            ·
+            {{
+              (sumGap().missing ? 'groups.form.allocationMissing' : 'groups.form.allocationExcess')
+                | transloco: { pp: formatPercentNumber(sumGap().pp) }
+            }}
+          }
         </p>
       }
       @if (form.controls.allocation.hasError('duplicateClass')) {
@@ -160,7 +199,16 @@
     <button mat-button type="button" (click)="cancel()">
       {{ 'common.cancel' | transloco }}
     </button>
-    <button mat-flat-button color="primary" type="submit" [disabled]="submitting()">
+    <button
+      mat-flat-button
+      color="primary"
+      type="submit"
+      [disabled]="
+        submitting() ||
+        form.controls.allocation.invalid ||
+        form.controls.targetPln.hasError('required')
+      "
+    >
       @if (submitting()) {
         <mat-spinner diameter="20" />
       } @else {

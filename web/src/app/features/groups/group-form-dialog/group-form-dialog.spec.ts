@@ -1,7 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatTooltip } from '@angular/material/tooltip';
+import { By } from '@angular/platform-browser';
 
+import pl from '../../../../i18n/pl.json';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../../core/i18n/language';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { jsonResponse } from '../../assets/asset-form/testing/asset-form-fixtures';
 import { blueGroup, greenGroup } from '../testing/group-fixtures';
@@ -17,8 +21,10 @@ describe('GroupFormDialog', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    await TestBed.inject(LanguageService).setLanguage('en');
+    localStorage.removeItem(LANGUAGE_STORAGE_KEY);
   });
 
   async function setup(
@@ -140,7 +146,9 @@ describe('GroupFormDialog', () => {
     expect(isDisabled(swatch('green'))).toBe(true);
     expect(isDisabled(swatch('orange'))).toBe(false);
     expect(
-      (fixture.nativeElement as HTMLElement).querySelectorAll('[role=radiogroup] [role=radio]'),
+      (fixture.nativeElement as HTMLElement).querySelectorAll(
+        '.group-form-dialog__palette [role=radio]',
+      ),
     ).toHaveLength(12);
   });
 
@@ -244,5 +252,101 @@ describe('GroupFormDialog', () => {
     component['cancel']();
 
     expect(dialogRef.close).toHaveBeenCalledWith(false);
+  });
+
+  function saveButton(): HTMLButtonElement {
+    return (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+      'button[type=submit]',
+    )!;
+  }
+
+  function hintText(): string {
+    return (
+      (fixture.nativeElement as HTMLElement).querySelector('mat-hint')?.textContent?.trim() ?? ''
+    );
+  }
+
+  it('palette caption and taken colours', async () => {
+    await setup({ mode: 'create', groups: [blueGroup, greenGroup] });
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    component['form'].controls.color.setValue('orange');
+    await settle();
+
+    expect(errorText('palette-caption')).toBe(
+      `Wybrany: ${pl.groups.colors.orange} · przekreślone kolory są już używane przez inną grupę`,
+    );
+    expect(isDisabled(swatch('blue'))).toBe(true);
+    expect(swatch('blue').querySelector('mat-icon')).not.toBeNull();
+    expect(swatch('orange').querySelector('mat-icon')).toBeNull();
+    const tooltip = fixture.debugElement
+      .query(By.css('[data-color="blue"]'))
+      .injector.get(MatTooltip, null);
+    expect(tooltip?.message).toBe('Kolor jest już używany przez inną grupę');
+  });
+
+  it('cushion requires a target', async () => {
+    await setup({ mode: 'create', groups: [] });
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    component['form'].controls.name.setValue('Poduszka');
+    component['form'].controls.color.setValue('orange');
+    component['form'].controls.kind.setValue(1);
+    await settle();
+
+    expect(saveButton().disabled).toBe(true);
+    expect(hintText()).toBe('Opcjonalny, wymagany dla poduszki');
+
+    component['form'].controls.kind.setValue(0);
+    await settle();
+
+    expect(saveButton().disabled).toBe(false);
+  });
+
+  it('allocation sum and duplicates', async () => {
+    await setup({ mode: 'create', groups: [] });
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    component['form'].controls.name.setValue('Emerytura');
+    component['form'].controls.color.setValue('orange');
+    await settle();
+
+    setAllocation([[1, 80]]);
+    await settle();
+    expect(errorText('allocation-sum')).toContain('Suma: 80% z 100%');
+    expect(errorText('allocation-sum')).toContain('brakuje 20 pp');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="allocation-live-bar"]'),
+    ).not.toBeNull();
+    expect(saveButton().disabled).toBe(true);
+
+    setAllocation([
+      [1, 70],
+      [9, 50],
+    ]);
+    await settle();
+    expect(errorText('allocation-sum')).toContain('za dużo o 20 pp');
+    expect(saveButton().disabled).toBe(true);
+
+    setAllocation([
+      [1, 50],
+      [1, 50],
+    ]);
+    await settle();
+    const alert = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="allocation-error"]',
+    );
+    expect(alert?.getAttribute('role')).toBe('alert');
+    expect(errorText('allocation-error')).toBe('Każda klasa może wystąpić tylko raz.');
+    expect(saveButton().disabled).toBe(true);
+
+    setAllocation([
+      [1, 50],
+      [9, 50],
+    ]);
+    await settle();
+    expect(errorText('allocation-sum')).toContain('Suma: 100% z 100%');
+    expect(saveButton().disabled).toBe(false);
+
+    setAllocation([]);
+    await settle();
+    expect(saveButton().disabled).toBe(false);
   });
 });

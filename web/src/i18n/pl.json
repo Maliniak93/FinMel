@@ -750,6 +750,10 @@
       "allocationPercent": "Udział (%)",
       "allocationAdd": "Dodaj klasę",
       "allocationSum": "Suma: {{ sum }}% z 100%",
+      "allocationMissing": "brakuje {{ pp }} pp",
+      "allocationExcess": "za dużo o {{ pp }} pp",
+      "paletteCaption": "Wybrany: {{ color }} · przekreślone kolory są już używane przez inną grupę",
+      "colorTaken": "Kolor jest już używany przez inną grupę",
       "allocationDuplicate": "Każda klasa może wystąpić tylko raz."
     },
     "errors": {
@@ -762,7 +766,8 @@
     },
     "delete": {
       "title": "Usunąć grupę?",
-      "message": "Grupa \"{{ name }}\" ma aktywa: {{ count }}. Jej historia trafi do „Bez grupy”, a aktywa oraz domyślne grupy rachunków i miejsc wrócą do „Bez grupy”.",
+      "message": "Grupa \"{{ name }}\" ma aktywa: {{ count }}. Jej historia trafi do „Bez grupy\", a aktywa oraz domyślne grupy rachunków i miejsc wrócą do „Bez grupy\".",
+      "messageEmpty": "Grupa \"{{ name }}\" nie ma aktywów. Jej historia trafi do „Bez grupy\".",
       "failed": "Nie udało się usunąć grupy."
     },
     "assets": {

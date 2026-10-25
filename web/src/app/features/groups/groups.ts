@@ -166,10 +166,10 @@ export class Groups {
         .open(ConfirmDialog, {
           data: {
             title: translate('groups.delete.title'),
-            message: translate('groups.delete.message', {
-              name: group.name,
-              count: Number(group.assetCount),
-            }),
+            message: translate(
+              Number(group.assetCount) > 0 ? 'groups.delete.message' : 'groups.delete.messageEmpty',
+              { name: group.name, count: Number(group.assetCount) },
+            ),
             confirmLabel: translate('common.delete'),
             destructive: true,
           },

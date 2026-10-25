@@ -35,6 +35,45 @@
   }
 }
 
+.group-form-dialog__swatch-wrap {
+  display: inline-flex;
+}
+
+.group-form-dialog__swatch-cross {
+  width: 20px;
+  height: 20px;
+  font-size: 20px;
+  color: var(--mat-sys-on-surface);
+}
+
+.group-form-dialog__caption {
+  margin: 8px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.group-form-dialog__kind {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+
+.group-form-dialog__legend {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.group-form-dialog__live-bar {
+  display: flex;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--mat-sys-surface-variant);
+}
+
+.group-form-dialog__live-segment {
+  height: 100%;
+}
+
 .group-form-dialog__swatch--selected {
   border-color: var(--mat-sys-on-surface);
   box-shadow: 0 0 0 2px var(--mat-sys-surface);
