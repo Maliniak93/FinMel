@@ -2,6 +2,7 @@ import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
@@ -13,6 +14,7 @@ import { provideI18nTesting } from '../../core/i18n/testing';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney } from '../../shared/format';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
+import { GroupAssetsPanel } from './group-assets-panel/group-assets-panel';
 import { Groups } from './groups';
 import { GroupFormDialog } from './group-form-dialog/group-form-dialog';
 import {
@@ -31,6 +33,11 @@ interface SetupOptions {
   assets?: AssignableAssetResponse[];
   dashboard?: DashboardResponse | 'fail';
   groupList?: 'ok' | 'fail' | 'pending';
+  afterAssignment?: {
+    groups: AssetGroupResponse[];
+    assets: AssignableAssetResponse[];
+    dashboard: DashboardResponse;
+  };
 }
 
 describe('Groups', () => {
@@ -45,7 +52,28 @@ describe('Groups', () => {
     reportingClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
+  const originalMatchMedia = window.matchMedia;
+
+  function setViewport(width: number): void {
+    window.matchMedia = ((query: string) => {
+      const min = /min-width:\s*([\d.]+)px/.exec(query);
+      const max = /max-width:\s*([\d.]+)px/.exec(query);
+      const matches = (!min || width >= Number(min[1])) && (!max || width <= Number(max[1]));
+      return {
+        matches,
+        media: query,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+        onchange: null,
+      };
+    }) as typeof window.matchMedia;
+  }
+
   afterEach(() => {
+    window.matchMedia = originalMatchMedia;
     release?.();
     release = undefined;
     fetchSpy.mockRestore();
@@ -53,9 +81,9 @@ describe('Groups', () => {
   });
 
   async function setup(options: SetupOptions = {}): Promise<void> {
-    const groups = options.groups ?? [blueGroup, greenGroup];
-    const assets = options.assets ?? assignableAssets;
-    const dashboard = options.dashboard ?? groupsDashboard;
+    let groups = options.groups ?? [blueGroup, greenGroup];
+    let assets = options.assets ?? assignableAssets;
+    let dashboard = options.dashboard ?? groupsDashboard;
     const gate =
       options.groupList === 'pending'
         ? new Promise<void>((resolve) => {
@@ -75,6 +103,11 @@ describe('Groups', () => {
         return jsonResponse(assets);
       }
       if (url.includes('/api/portfolio/asset-groups/assignment')) {
+        if (options.afterAssignment) {
+          groups = options.afterAssignment.groups;
+          assets = options.afterAssignment.assets;
+          dashboard = options.afterAssignment.dashboard;
+        }
         return new Response(null, { status: 204 });
       }
       if (url.includes('/api/portfolio/asset-groups')) {
@@ -390,9 +423,23 @@ describe('Groups', () => {
     expect(deleteCalls()).toBe(0);
   });
 
-  it('delete closes the open block', async () => {
+  function panel(): HTMLElement {
+    return byTestId(element(), 'assets-panel');
+  }
+
+  function panelComponent(): GroupAssetsPanel {
+    return fixture.debugElement.query(By.directive(GroupAssetsPanel)).componentInstance;
+  }
+
+  function panelOpen(): boolean {
+    return panel().classList.contains('mat-drawer-opened');
+  }
+
+  it('delete closes the open panel', async () => {
+    setViewport(1280);
     await setup();
     await selectGroup('Emerytura');
+    expect(panelOpen()).toBe(true);
     expect(element().querySelector('[data-testid="save-assignment"]')).toBeTruthy();
 
     await openMenuItem('Emerytura', 'delete-group');
@@ -400,6 +447,132 @@ describe('Groups', () => {
     await vi.waitFor(() => expect(deleteCalls()).toBe(1));
     await settle();
     expect(element().querySelector('[data-testid="save-assignment"]')).toBeNull();
+    expect(panelOpen()).toBe(false);
+  });
+
+  it('assets button opens the panel', async () => {
+    setViewport(1280);
+    await setup();
+    expect(panelOpen()).toBe(false);
+
+    await selectGroup('Emerytura');
+
+    expect(panelOpen()).toBe(true);
+    expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('Emerytura');
+    expect(checkbox('Member Bond').checked).toBe(true);
+    expect(byTestId(panel(), 'asset-filter')).toBeTruthy();
+    expect(byTestId(panel(), 'select-all-shown')).toBeTruthy();
+    expect(panel().querySelector('mat-select')).toBeTruthy();
+    const list = element().querySelector('.groups-page__list')!;
+    expect(list.querySelector('[data-testid="asset-row"]')).toBeNull();
+    expect(element().querySelectorAll('[data-testid="save-assignment"]')).toHaveLength(1);
+    expect(panel().contains(byTestId(element(), 'save-assignment'))).toBe(true);
+  });
+
+  it('save refreshes the cards', async () => {
+    setViewport(1280);
+    await setup({
+      afterAssignment: {
+        groups: [{ ...blueGroup, assetCount: 4 }, greenGroup],
+        assets: assignableAssets.map((asset) =>
+          asset.assetId === freeAssetId ? { ...asset, groupId: blueGroupId } : asset,
+        ),
+        dashboard: {
+          ...groupsDashboard,
+          byGroup: groupsDashboard.byGroup.map((entry) =>
+            entry.groupId === blueGroupId ? { ...entry, valuePln: 4800 } : entry,
+          ),
+        },
+      },
+    });
+    await selectGroup('Emerytura');
+
+    await toggle('Free Stock');
+    byTestId(element(), 'save-assignment').click();
+    await settle();
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(panelOpen()).toBe(false);
+      expect(byTestId(groupCard('Emerytura'), 'group-count').textContent).toContain('4');
+      expect(byTestId(groupCard('Emerytura'), 'group-value').textContent).toContain(
+        formatMoney(4800),
+      );
+    });
+  });
+
+  it('ungrouped is read only', async () => {
+    setViewport(1280);
+    await setup();
+
+    byTestId(byTestId(element(), 'ungrouped-card'), 'ungrouped-assets').click();
+    await settle();
+
+    expect(panelOpen()).toBe(true);
+    expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('No group');
+    expect(visibleAssetNames()).toHaveLength(2);
+    expect(visibleAssetNames().some((name) => name.includes('Free Stock'))).toBe(true);
+    expect(visibleAssetNames().some((name) => name.includes('Old Bond'))).toBe(true);
+    expect(visibleAssetNames().some((name) => name.includes('Member Bond'))).toBe(false);
+    expect(panel().querySelector('input[type=checkbox]')).toBeNull();
+    expect(panel().querySelector('[data-testid="save-assignment"]')).toBeNull();
+    expect(byTestId(panel(), 'asset-filter')).toBeTruthy();
+    expect(byTestId(panel(), 'ungrouped-hint')).toBeTruthy();
+  });
+
+  it('panel closes and restores focus', async () => {
+    setViewport(1280);
+    await setup();
+    const opener = byTestId(groupCard('Emerytura'), 'select-group');
+    opener.focus();
+
+    opener.click();
+    await settle();
+    await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true));
+
+    await toggle('Free Stock');
+    byTestId(panel(), 'close-assets-panel').click();
+    await settle();
+    expect(panelOpen()).toBe(false);
+    await vi.waitFor(() => expect(document.activeElement).toBe(opener));
+
+    await selectGroup('Emerytura');
+    expect(checkbox('Free Stock').checked).toBe(false);
+    await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true));
+
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }),
+    );
+    await settle();
+    expect(panelOpen()).toBe(false);
+    await vi.waitFor(() => expect(document.activeElement).toBe(opener));
+
+    await selectGroup('Emerytura');
+    await toggle('Free Stock');
+    await selectGroup('Poduszka');
+    expect(panelOpen()).toBe(true);
+    expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('Poduszka');
+    expect(checkbox('Free Stock').checked).toBe(false);
+    expect(checkbox('Cushion Cash').checked).toBe(true);
+  });
+
+  it('panel mode follows the breakpoint', async () => {
+    setViewport(800);
+    await setup();
+    await selectGroup('Emerytura');
+    expect(panelOpen()).toBe(true);
+    expect(panel().classList.contains('mat-drawer-over')).toBe(true);
+    expect(panel().classList.contains('mat-drawer-side')).toBe(false);
+    TestBed.inject(OverlayContainer).getContainerElement().replaceChildren();
+    fixture.destroy();
+    fetchSpy.mockRestore();
+
+    TestBed.resetTestingModule();
+    setViewport(1280);
+    await setup();
+    await selectGroup('Emerytura');
+    expect(panel().classList.contains('mat-drawer-side')).toBe(true);
+    expect(panel().classList.contains('mat-drawer-over')).toBe(false);
   });
 
   it('lists assignable assets', async () => {
@@ -438,7 +611,7 @@ describe('Groups', () => {
     await settle();
     expect(visibleAssetNames()).toHaveLength(4);
 
-    fixture.componentInstance['classFilter'].set(4);
+    panelComponent()['classFilter'].set(4);
     await settle();
     expect(visibleAssetNames()).toHaveLength(2);
 
@@ -447,7 +620,7 @@ describe('Groups', () => {
     expect(checkbox('Member Bond').checked).toBe(true);
     expect(checkbox('Old Bond').checked).toBe(true);
 
-    fixture.componentInstance['classFilter'].set(null);
+    panelComponent()['classFilter'].set(null);
     await settle();
     expect(checkbox('Free Stock').checked).toBe(false);
     expect(checkbox('Cushion Cash').checked).toBe(true);

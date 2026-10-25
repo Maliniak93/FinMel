@@ -768,6 +768,9 @@
     "assets": {
       "manage": "Aktywa",
       "title": "Aktywa w grupie „{{ name }}”",
+      "closePanel": "Zamknij panel aktywów",
+      "ungroupedHint": "Te aktywa nie należą do żadnej grupy. Aby je przypisać, otwórz panel Aktywa na karcie grupy.",
+      "ungroupedEmpty": "Każde aktywo jest w jakiejś grupie.",
       "loadFailed": "Nie udało się wczytać aktywów.",
       "saveFailed": "Nie udało się zapisać przypisania.",
       "empty": "Nie masz jeszcze aktywów do przypisania.",

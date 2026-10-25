@@ -768,6 +768,9 @@
     "assets": {
       "manage": "Assets",
       "title": "Assets in group \"{{ name }}\"",
+      "closePanel": "Close assets panel",
+      "ungroupedHint": "These assets are in no group. To assign them, open the Assets panel of a group card.",
+      "ungroupedEmpty": "Every asset is in a group.",
       "loadFailed": "Failed to load the assets.",
       "saveFailed": "Failed to save the assignment.",
       "empty": "You have no assets to assign yet.",

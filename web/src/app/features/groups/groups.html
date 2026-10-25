@@ -37,154 +37,66 @@
       </button>
     </app-empty-state>
   } @else if (groupsResource.hasValue()) {
-    <app-summary-strip [items]="summaryItems()" />
-
-    <ul class="groups-page__list">
-      @for (card of cards(); track card.group.id) {
-        <li>
-          <app-group-card
-            [group]="card.group"
-            [metrics]="card.metrics"
-            [selected]="card.group.id === selectedId()"
-            (assets)="select(card.group)"
-            (edit)="openEditDialog(card.group)"
-            (remove)="remove(card.group)"
+    <mat-drawer-container class="groups-page__container" (backdropClick)="closePanel()">
+      <mat-drawer
+        position="end"
+        autoFocus="first-heading"
+        class="groups-page__drawer"
+        data-testid="assets-panel"
+        [mode]="panelMode()"
+        [opened]="panel() !== null"
+        [disableClose]="true"
+        (keydown.escape)="closePanel()"
+      >
+        @if (panel(); as target) {
+          <app-group-assets-panel
+            [groupId]="target.groupId"
+            [groups]="groups()"
+            [assetsResource]="assetsResource"
+            (closed)="closePanel()"
+            (saved)="onAssignmentSaved($event)"
           />
-        </li>
-      }
-      <li>
-        <article class="groups-page__ungrouped" data-testid="ungrouped-card">
-          <h2>{{ 'groups.field.none' | transloco }}</h2>
-          <p class="groups-page__ungrouped-value" data-testid="ungrouped-value">
-            <app-money [amount]="summary().ungrouped" />
-          </p>
-          <p class="groups-page__ungrouped-count" data-testid="ungrouped-count">
-            {{ 'groups.assetCount' | transloco: { count: summary().ungroupedCount } }}
-          </p>
-        </article>
-      </li>
-    </ul>
-  }
-
-  @if (selectedGroup(); as group) {
-    <mat-card class="groups-page__assignment">
-      <mat-card-header class="groups-page__assignment-header">
-        <h2>{{ 'groups.assets.title' | transloco: { name: group.name } }}</h2>
-        <button
-          mat-icon-button
-          type="button"
-          [attr.aria-label]="'common.cancel' | transloco"
-          (click)="closeAssignment()"
-        >
-          <mat-icon>close</mat-icon>
-        </button>
-      </mat-card-header>
-
-      <mat-card-content>
-        @if (assetsResource.error(); as assetsError) {
-          <div class="groups-page__state" role="alert">
-            <p>{{ assetsError.message }}</p>
-            <button mat-button type="button" (click)="assetsResource.reload()">
-              {{ 'common.retry' | transloco }}
-            </button>
-          </div>
-        } @else if (assetsResource.isLoading() && !assetsResource.hasValue()) {
-          <app-skeleton [rows]="3" />
-        } @else if (assetsResource.hasValue() && assets().length === 0) {
-          <p>{{ 'groups.assets.empty' | transloco }}</p>
-        } @else if (assetsResource.hasValue()) {
-          <div class="groups-page__filters">
-            <mat-form-field appearance="outline" class="groups-page__filter">
-              <mat-label>{{ 'groups.assets.filter' | transloco }}</mat-label>
-              <input
-                matInput
-                type="text"
-                autocomplete="off"
-                data-testid="asset-filter"
-                [value]="textFilter()"
-                (input)="onFilterInput($event)"
-              />
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="groups-page__filter">
-              <mat-label>{{ 'groups.assets.classFilter' | transloco }}</mat-label>
-              <mat-select [value]="classFilter()" (selectionChange)="classFilter.set($event.value)">
-                <mat-option [value]="null">{{ 'groups.assets.allClasses' | transloco }}</mat-option>
-                @for (assetClass of presentClasses(); track assetClass.value) {
-                  <mat-option [value]="assetClass.value">{{
-                    assetClass.label | transloco
-                  }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <button
-              mat-button
-              type="button"
-              data-testid="select-all-shown"
-              (click)="selectAllShown()"
-            >
-              {{ 'groups.assets.selectAllShown' | transloco }}
-            </button>
-          </div>
-
-          <table class="groups-page__table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>{{ 'common.name' | transloco }}</th>
-                <th>{{ 'groups.assets.class' | transloco }}</th>
-                <th>{{ 'groups.assets.location' | transloco }}</th>
-                <th>{{ 'groups.assets.group' | transloco }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (asset of shownAssets(); track asset.assetId) {
-                <tr data-testid="asset-row">
-                  <td>
-                    <mat-checkbox
-                      [checked]="checked().has(asset.assetId)"
-                      [attr.aria-label]="asset.name"
-                      (change)="toggle(asset.assetId, $event.checked)"
-                    />
-                  </td>
-                  <td>
-                    {{ asset.name }}
-                    @if (asset.isArchived) {
-                      <span class="groups-page__badge" data-testid="asset-archived">{{
-                        'common.archived' | transloco
-                      }}</span>
-                    }
-                  </td>
-                  <td>{{ assetClassLabel(asset.assetClass) | transloco }}</td>
-                  <td>{{ asset.accountName ?? asset.cashPlaceName }}</td>
-                  <td>
-                    @if (asset.groupId && asset.groupId !== group.id) {
-                      <span
-                        class="groups-page__chip"
-                        data-testid="asset-group-chip"
-                        [style.border-color]="groupColorOf(asset.groupId)"
-                        >{{ groupName(asset.groupId) }}</span
-                      >
-                    }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
         }
-      </mat-card-content>
+      </mat-drawer>
 
-      <mat-card-actions align="end">
-        <button
-          mat-flat-button
-          color="primary"
-          type="button"
-          data-testid="save-assignment"
-          [disabled]="saving() || changeCount() === 0"
-          (click)="saveAssignment()"
-        >
-          {{ 'common.save' | transloco }}
-        </button>
-      </mat-card-actions>
-    </mat-card>
+      <mat-drawer-content class="groups-page__content">
+        <app-summary-strip [items]="summaryItems()" />
+
+        <ul class="groups-page__list">
+          @for (card of cards(); track card.group.id) {
+            <li>
+              <app-group-card
+                [group]="card.group"
+                [metrics]="card.metrics"
+                [selected]="card.group.id === panel()?.groupId"
+                (assets)="openAssets(card.group.id)"
+                (edit)="openEditDialog(card.group)"
+                (remove)="remove(card.group)"
+              />
+            </li>
+          }
+          <li>
+            <article class="groups-page__ungrouped" data-testid="ungrouped-card">
+              <h2>{{ 'groups.field.none' | transloco }}</h2>
+              <p class="groups-page__ungrouped-value" data-testid="ungrouped-value">
+                <app-money [amount]="summary().ungrouped" />
+              </p>
+              <p class="groups-page__ungrouped-count" data-testid="ungrouped-count">
+                {{ 'groups.assetCount' | transloco: { count: summary().ungroupedCount } }}
+              </p>
+              <button
+                mat-stroked-button
+                type="button"
+                class="groups-page__ungrouped-assets"
+                data-testid="ungrouped-assets"
+                (click)="openAssets(null)"
+              >
+                {{ 'groups.assets.manage' | transloco }}
+              </button>
+            </article>
+          </li>
+        </ul>
+      </mat-drawer-content>
+    </mat-drawer-container>
   }
 </div>
