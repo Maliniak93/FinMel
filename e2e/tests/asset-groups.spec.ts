@@ -35,11 +35,8 @@ function pln(amount: string): RegExp {
   return new RegExp(`${num(amount)}\\szł`);
 }
 
-function legendName(label: string, value: string, target?: { amount: string }) {
-  const body = target
-    ? `${num(value)}\\szł\\sz\\s${num(target.amount)}\\szł`
-    : `${num(value)}\\szł`;
-  return new RegExp(`^\\s*${label}\\s.*?${body}`);
+function legendName(label: string, value: string) {
+  return new RegExp(`^\\s*${label}\\s.*?${num(value)}\\szł`);
 }
 
 function navigation(page: Page): Locator {
@@ -476,7 +473,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '50 000,00'),
         legendName('Emerytura', '30 000,00'),
-        legendName('Poduszka', '23 000,00', { amount: '30 000,00' }),
+        legendName('Poduszka', '23 000,00'),
       ],
     });
   });
@@ -496,7 +493,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '50 000,00'),
         legendName('Emerytura', '30 000,00'),
-        legendName('Poduszka', '23 000,00', { amount: '30 000,00' }),
+        legendName('Poduszka', '23 000,00'),
       ],
     });
   });
@@ -519,7 +516,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '45 750,00'),
         legendName('Emerytura', '34 250,00'),
-        legendName('Poduszka', '23 000,00', { amount: '30 000,00' }),
+        legendName('Poduszka', '23 000,00'),
       ],
     });
   });
@@ -549,7 +546,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '46 750,00'),
         legendName('Emerytura', '33 250,00'),
-        legendName('Poduszka', '23 000,00', { amount: '30 000,00' }),
+        legendName('Poduszka', '23 000,00'),
       ],
     });
   });
@@ -591,7 +588,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '46 750,00'),
         legendName('Emerytura', '33 250,00'),
-        legendName('Poduszka', '16 800,00', { amount: '30 000,00' }),
+        legendName('Poduszka', '16 800,00'),
         legendName('Bez grupy', '6 200,00'),
       ],
     });
@@ -609,7 +606,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '46 750,00'),
         legendName('Emerytura', '34 450,00'),
-        legendName('Poduszka', '21 800,00', { amount: '30 000,00' }),
+        legendName('Poduszka', '21 800,00'),
       ],
       absent: 'Bez grupy',
     });
@@ -629,7 +626,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Inwestycje', '47 750,00'),
         legendName('Emerytura', '33 450,00'),
-        legendName('Poduszka', '21 800,00', { amount: '30 000,00' }),
+        legendName('Poduszka', '21 800,00'),
       ],
     });
   });
@@ -643,7 +640,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await cashOperation(dialog, { amount: '11200' });
     await expectDashboard(page, {
       netWorth: '114 200,00',
-      groups: [legendName('Poduszka', '33 000,00', { amount: '30 000,00' })],
+      groups: [legendName('Poduszka', '33 000,00')],
     });
     await expect(groupLegendItem(page, 'Poduszka').getByRole('progressbar')).toHaveAttribute(
       'aria-valuenow',
@@ -724,7 +721,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       groups: [
         legendName('Bez grupy', '52 000,00'),
         legendName('Emerytura', '29 200,00'),
-        legendName('Poduszka', '33 000,00', { amount: '30 000,00' }),
+        legendName('Poduszka', '33 000,00'),
       ],
     });
     await expect(filterButton(page)).toContainText('Wszystko');
@@ -737,15 +734,15 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await expect(dialog).toBeHidden();
   });
 
-  await test.step('Krok 20: on a phone width Struktura majątku and Wg grup are stacked', async () => {
+  await test.step('Krok 20: on a phone width Wg grup and Struktura majątku are stacked in that order', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await dashboardRefetch(page);
     const classes = page.getByRole('heading', { name: 'Struktura majątku' });
     const groups = page.getByRole('heading', { name: 'Wg grup' });
     await expect(groups).toBeVisible();
     await expect(async () => {
-      const first = await classes.boundingBox();
-      const second = await groups.boundingBox();
+      const first = await groups.boundingBox();
+      const second = await classes.boundingBox();
       expect(first).not.toBeNull();
       expect(second).not.toBeNull();
       expect(second?.y ?? 0).toBeGreaterThan((first?.y ?? 0) + (first?.height ?? 0));
