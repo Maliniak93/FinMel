@@ -497,10 +497,11 @@ test('bank accounts, term deposits and physical cash: money moves only between a
       await expect(page.getByTestId('net-worth')).toContainText(pln('33 856,89'), {
         timeout: 3_000,
       });
-      await expect(
-        page.getByRole('button', { name: /^Konta bankowe — 28\s?506,89\szł/ }),
-      ).toBeVisible({ timeout: 3_000 });
-      await expect(page.getByRole('button', { name: /^Gotówka — 5\s?350,00\szł/ })).toBeVisible({
+      const structure = page.locator('.dashboard-page__structure li');
+      await expect(structure.filter({ hasText: 'Konta bankowe' })).toContainText(pln('28 506,89'), {
+        timeout: 3_000,
+      });
+      await expect(structure.filter({ hasText: 'Gotówka' })).toContainText(pln('5 350,00'), {
         timeout: 3_000,
       });
       const cashCard = page.locator('.cash-card');
