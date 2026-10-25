@@ -179,7 +179,11 @@ export class MonthCard {
   });
 
   protected readonly settled = computed(() => {
-    const occurrences = this.month()?.incomes.occurrences ?? [];
+    const incomes = this.month()?.incomes;
+    const occurrences = [
+      ...(incomes?.occurrences ?? []),
+      ...(incomes?.oneOffs ?? []).filter((o) => o.inMonth),
+    ];
     return {
       done: occurrences.filter((o) => o.status === 'Settled' || o.status === 'Skipped').length,
       total: occurrences.length,

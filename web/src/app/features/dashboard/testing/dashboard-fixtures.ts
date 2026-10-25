@@ -180,6 +180,7 @@ export function planningMonthResponse(
       balance: { planPln: 0, actualPln: 0, pendingPln: 0, differencePln: 0 },
       fxUnavailable: false,
       definitions: [],
+      oneOffs: [],
     },
     expenses: { payments: [], costPln: 0, definitions: [] },
     freeFunds: { planPln: 0, forecastPln: 0, incomplete: false },

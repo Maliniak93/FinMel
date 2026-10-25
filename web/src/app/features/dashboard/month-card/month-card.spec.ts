@@ -4,6 +4,7 @@ import {
   CUSHION_GROUP_ID,
   INVESTMENTS_GROUP_ID,
   RETIREMENT_GROUP_ID,
+  RETIREMENT_ID,
   groups,
   jsonResponse,
   planningMonthResponse,
@@ -13,6 +14,29 @@ import { MonthCard } from './month-card';
 
 function occurrence(name: string, status: string): Record<string, unknown> {
   return { recurringIncomeId: `id-${name}`, name, status, amount: 1000, currency: 'PLN' };
+}
+
+function oneOff(name: string, status: string, inMonth: boolean): Record<string, unknown> {
+  return {
+    id: `oneoff-${name}`,
+    name,
+    date: '2026-10-05',
+    accountId: RETIREMENT_ID,
+    accountName: 'Retirement',
+    accountArchived: false,
+    amount: 1800,
+    currency: 'PLN',
+    amountPln: 1800,
+    estimated: false,
+    inMonth,
+    status,
+    actualAmount: null,
+    actualDate: null,
+    actualAmountPln: null,
+    difference: null,
+    depositCreated: false,
+    overdue: false,
+  };
 }
 
 function incomeMonth(extra: Record<string, unknown> = {}): Record<string, unknown> {
@@ -26,9 +50,22 @@ function incomeMonth(extra: Record<string, unknown> = {}): Record<string, unknow
       balance: { planPln: 0, actualPln: 0, pendingPln: 0, differencePln: 0 },
       fxUnavailable: false,
       definitions: [{ id: 'income-1', name: 'Wypłata Dominik' }],
+      oneOffs: [],
     },
     freeFunds: { planPln: 12300, forecastPln: 12243.27, incomplete: false },
     ...extra,
+  });
+}
+
+function recurringAndOneOffMonth(oneOffs: Record<string, unknown>[]): Record<string, unknown> {
+  return incomeMonth({
+    incomes: {
+      occurrences: [occurrence('Pensja', 'Pending')],
+      balance: { planPln: 9800, actualPln: 0, pendingPln: 0, differencePln: 0 },
+      fxUnavailable: false,
+      definitions: [{ id: 'income-1', name: 'Pensja' }],
+      oneOffs,
+    },
   });
 }
 
@@ -142,6 +179,32 @@ describe('MonthCard', () => {
     expect(colours[1]).toContain('var(--sk-g-green)');
     expect(all(element, 'month-card-forecast')[0].textContent).toContain(formatMoney(5300, 'PLN'));
     expect(all(element, 'month-card-settled')[0].textContent).toMatch(/1\D+2/);
+  });
+
+  it('counts in-month one-off incomes in the settled counter', async () => {
+    const element = await render(
+      recurringAndOneOffMonth([
+        oneOff('Premia kwartalna', 'Pending', true),
+        oneOff('Zwrot z przyszłego miesiąca', 'Pending', false),
+      ]),
+    );
+
+    expect(plain(all(element, 'month-card-settled')[0].textContent ?? '')).toContain(
+      'Incomes settled: 0 of 2',
+    );
+  });
+
+  it('counts a settled in-month one-off income as done', async () => {
+    const element = await render(
+      recurringAndOneOffMonth([
+        oneOff('Premia kwartalna', 'Settled', true),
+        oneOff('Zwrot z przyszłego miesiąca', 'Pending', false),
+      ]),
+    );
+
+    expect(plain(all(element, 'month-card-settled')[0].textContent ?? '')).toContain(
+      'Incomes settled: 1 of 2',
+    );
   });
 
   it('shows the free-funds split', async () => {
