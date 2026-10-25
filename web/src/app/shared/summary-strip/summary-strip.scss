@@ -24,3 +24,9 @@
   font-size: 1.5rem;
   line-height: 1.3;
 }
+
+.summary-strip__link {
+  display: inline-block;
+  color: var(--mat-sys-primary);
+  font: var(--mat-sys-label-medium);
+}

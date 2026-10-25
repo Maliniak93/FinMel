@@ -1,0 +1,103 @@
+<article class="group-card" [class.group-card--selected]="selected()" data-testid="group-card">
+  <div class="group-card__bar" [style.background-color]="color()"></div>
+  <div class="group-card__body">
+    <header class="group-card__header">
+      <h2 class="group-card__name" data-testid="group-name">{{ group().name }}</h2>
+      <app-group-kind-marker data-testid="group-kind" [kind]="group().kind" />
+      <button
+        mat-icon-button
+        type="button"
+        class="group-card__menu"
+        data-testid="group-menu"
+        [matMenuTriggerFor]="menu"
+        [attr.aria-label]="'common.actionsFor' | transloco: { name: group().name }"
+      >
+        <mat-icon>more_horiz</mat-icon>
+      </button>
+      <mat-menu #menu="matMenu">
+        <button mat-menu-item type="button" data-testid="edit-group" (click)="edit.emit()">
+          <mat-icon>edit</mat-icon>
+          <span>{{ 'common.edit' | transloco }}</span>
+        </button>
+        <button mat-menu-item type="button" data-testid="delete-group" (click)="remove.emit()">
+          <mat-icon>delete</mat-icon>
+          <span>{{ 'common.delete' | transloco }}</span>
+        </button>
+      </mat-menu>
+    </header>
+
+    <p class="group-card__value" data-testid="group-value">
+      <app-money class="group-card__amount" [amount]="metrics().value" />
+      @if (targetPln(); as target) {
+        <span class="group-card__target">{{
+          'groups.card.ofTarget' | transloco: { amount: formatMoney(target) }
+        }}</span>
+      }
+    </p>
+
+    @if (metrics().progress.state !== 'none') {
+      <app-goal-progress [ratio]="metrics().progress.ratio" [fill]="color()" />
+      <p class="group-card__caption" data-testid="group-progress-caption">
+        @if (metrics().progress.state === 'reached') {
+          <mat-icon class="group-card__caption-icon" aria-hidden="true">check_circle</mat-icon>
+          {{ 'groups.card.reached' | transloco }}
+        } @else {
+          {{
+            'groups.card.shortfall'
+              | transloco: { amount: formatMoney(metrics().progress.shortfall) }
+          }}
+        }
+      </p>
+    }
+
+    <p class="group-card__meta">
+      @if (contributionPln() > 0) {
+        <span data-testid="group-contribution">{{
+          'groups.contribution' | transloco: { amount: formatMoney(contributionPln()) }
+        }}</span>
+      }
+      <span data-testid="group-count">{{
+        'groups.assetCount' | transloco: { count: group().assetCount }
+      }}</span>
+    </p>
+
+    @if (allocationRows().length > 0) {
+      <app-allocation-bar
+        [rows]="allocationRows()"
+        [targetLabel]="targetLabel()"
+        [actualLabel]="actualLabel()"
+      />
+      @if (flagged()) {
+        <p class="group-card__flag" data-testid="group-deviation-flag">
+          <mat-icon class="group-card__flag-icon" aria-hidden="true">warning</mat-icon>
+          {{
+            'groups.card.deviation' | transloco: { pp: formatPercentNumber(metrics().maxDeviation) }
+          }}
+        </p>
+      }
+    }
+
+    @if (metrics().value === null) {
+      <app-status-chip
+        data-testid="group-unavailable"
+        tone="warning"
+        icon="cloud_off"
+        [label]="'groups.card.unavailable' | transloco"
+      />
+    } @else if (metrics().unvaluedCount > 0) {
+      <app-status-chip
+        data-testid="group-incomplete"
+        tone="warning"
+        icon="warning"
+        [uncertain]="true"
+        [label]="'groups.card.incomplete' | transloco: { count: metrics().unvaluedCount }"
+      />
+    }
+
+    <div class="group-card__actions">
+      <button mat-stroked-button type="button" data-testid="select-group" (click)="assets.emit()">
+        {{ 'groups.assets.manage' | transloco }}
+      </button>
+    </div>
+  </div>
+</article>

@@ -2,12 +2,10 @@ import { Component, computed, inject, linkedSignal, resource, signal } from '@an
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
@@ -20,14 +18,21 @@ import {
   putApiPortfolioAssetGroupsAssignment,
   type AssetGroupResponse,
 } from '../../api/portfolio';
+import { getApiReportingDashboard } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { groupColor } from '../../shared/colors';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
-import { formatMoney, formatPercent } from '../../shared/format';
+import { EmptyState } from '../../shared/empty-state/empty-state';
+import { formatMoney } from '../../shared/format';
 import { GroupList } from '../../shared/group-select/group-list';
+import { Money } from '../../shared/money/money';
+import { SectionError } from '../../shared/section-error/section-error';
+import { Skeleton } from '../../shared/skeleton/skeleton';
+import { SummaryStrip, type SummaryItem } from '../../shared/summary-strip/summary-strip';
 import { ASSET_CLASSES, assetClassLabel } from '../assets/asset-class';
+import { GroupCard } from './group-card/group-card';
 import { GroupFormDialog, type GroupFormDialogData } from './group-form-dialog/group-form-dialog';
-import { groupKindLabel } from './group-kind';
+import { buildGroupMetrics, buildGroupsSummary } from './group-metrics';
 
 const MAX_GROUPS = 12;
 
@@ -36,14 +41,18 @@ const MAX_GROUPS = 12;
   selector: 'app-groups',
   imports: [
     MatButtonModule,
+    EmptyState,
+    GroupCard,
     MatCardModule,
     MatCheckboxModule,
-    MatChipsModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
-    MatProgressSpinnerModule,
     MatSelectModule,
+    Money,
+    SectionError,
+    Skeleton,
+    SummaryStrip,
     TranslocoPipe,
   ],
   templateUrl: './groups.html',
@@ -69,8 +78,17 @@ export class Groups {
     },
   });
 
+  protected readonly dashboardResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiReportingDashboard({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(readProblemDetails(result.error).detail ?? translate('groups.loadFailed'));
+      }
+      return result.data;
+    },
+  });
+
   protected readonly assetsResource = resource({
-    params: () => (this.selectedId() === null ? undefined : true),
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioAssetGroupsAssets({ signal: abortSignal });
       if (result.error) {
@@ -85,6 +103,7 @@ export class Groups {
   protected readonly groups = computed(() =>
     this.groupsResource.hasValue() ? this.groupsResource.value() : [],
   );
+  protected readonly maxGroups = MAX_GROUPS;
   protected readonly atLimit = computed(() => this.groups().length >= MAX_GROUPS);
   protected readonly selectedGroup = computed(
     () => this.groups().find((group) => group.id === this.selectedId()) ?? null,
@@ -93,6 +112,35 @@ export class Groups {
   protected readonly assets = computed(() =>
     this.assetsResource.hasValue() ? this.assetsResource.value() : [],
   );
+
+  private readonly dashboard = computed(() =>
+    this.dashboardResource.hasValue() ? this.dashboardResource.value() : null,
+  );
+
+  protected readonly cards = computed(() =>
+    this.groups().map((group) => ({
+      group,
+      metrics: buildGroupMetrics(group, this.dashboard(), this.assets()),
+    })),
+  );
+
+  protected readonly summary = computed(() =>
+    buildGroupsSummary(this.groups(), this.dashboard(), this.assets()),
+  );
+
+  protected readonly summaryItems = computed<SummaryItem[]>(() => {
+    const summary = this.summary();
+    return [
+      { labelKey: 'groups.strip.grouped', amount: summary.grouped, testId: 'strip-grouped' },
+      { labelKey: 'groups.strip.ungrouped', amount: summary.ungrouped, testId: 'strip-ungrouped' },
+      {
+        labelKey: 'groups.strip.contribution',
+        amount: summary.contributionTotal,
+        testId: 'strip-contribution',
+        link: { labelKey: 'groups.strip.planningLink', route: '/planning' },
+      },
+    ];
+  });
 
   private readonly members = computed(
     () =>
@@ -133,12 +181,6 @@ export class Groups {
   });
 
   protected readonly formatMoney = formatMoney;
-  protected readonly formatPercent = formatPercent;
-  protected readonly groupKindLabel = groupKindLabel;
-
-  protected hasContribution(group: AssetGroupResponse): boolean {
-    return Number(group.monthlyContributionPln) > 0;
-  }
   protected readonly groupColor = groupColor;
   protected readonly assetClassLabel = assetClassLabel;
 
@@ -221,6 +263,7 @@ export class Groups {
     if (this.selectedId() === group.id) {
       this.selectedId.set(null);
     }
+    this.assetsResource.reload();
     this.reloadGroups();
   }
 
@@ -263,6 +306,7 @@ export class Groups {
 
   private reloadGroups(): void {
     this.groupsResource.reload();
+    this.dashboardResource.reload();
     this.groupList.reload();
   }
 

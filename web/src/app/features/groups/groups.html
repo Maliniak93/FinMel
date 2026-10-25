@@ -1,6 +1,14 @@
 <div class="groups-page">
   <div class="groups-page__header">
-    <h1>{{ 'groups.title' | transloco }}</h1>
+    <div class="groups-page__heading">
+      <h1>
+        {{ 'groups.title' | transloco }}
+        <span class="groups-page__counter" data-testid="group-counter">{{
+          'groups.counter' | transloco: { count: groups().length, max: maxGroups }
+        }}</span>
+      </h1>
+      <p class="groups-page__subtitle">{{ 'groups.subtitle' | transloco }}</p>
+    </div>
     <button
       mat-flat-button
       color="primary"
@@ -14,106 +22,47 @@
     </button>
   </div>
 
-  @if (atLimit()) {
-    <p class="groups-page__hint" data-testid="group-limit-hint">
-      {{ 'groups.limitHint' | transloco }}
-    </p>
-  }
-
   @if (groupsResource.error(); as loadError) {
-    <div class="groups-page__state" role="alert">
-      <p>{{ loadError.message }}</p>
-      <button mat-button type="button" (click)="groupsResource.reload()">
-        {{ 'common.retry' | transloco }}
-      </button>
-    </div>
+    <app-section-error [message]="loadError.message" (retry)="groupsResource.reload()" />
   } @else if (groupsResource.isLoading() && !groupsResource.hasValue()) {
-    <div class="groups-page__state">
-      <mat-spinner diameter="32" />
-    </div>
+    <app-skeleton [rows]="4" />
   } @else if (groupsResource.hasValue() && groups().length === 0) {
-    <div class="groups-page__state" data-testid="group-empty">
-      <p>{{ 'groups.empty' | transloco }}</p>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+    <app-empty-state
+      data-testid="group-empty"
+      icon="folder_open"
+      [message]="'groups.empty' | transloco"
+    >
+      <button action mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
         {{ 'groups.add' | transloco }}
       </button>
-    </div>
+    </app-empty-state>
   } @else if (groupsResource.hasValue()) {
+    <app-summary-strip [items]="summaryItems()" />
+
     <ul class="groups-page__list">
-      @for (group of groups(); track group.id) {
-        <li
-          class="group-row"
-          data-testid="group-row"
-          [class.group-row--selected]="group.id === selectedId()"
-        >
-          <span
-            class="group-row__swatch"
-            data-testid="group-swatch"
-            [style.background-color]="groupColor(group.color)"
-          ></span>
-          <span class="group-row__name" data-testid="group-name">{{ group.name }}</span>
-          <span class="group-row__count" data-testid="group-count">
-            {{ 'groups.assetCount' | transloco: { count: group.assetCount } }}
-          </span>
-          @if (group.targetPln !== null && group.targetPln !== undefined) {
-            <span class="group-row__target" data-testid="group-target">
-              {{ 'groups.target' | transloco: { amount: formatMoney(group.targetPln) } }}
-            </span>
-          }
-          <span class="group-row__kind" data-testid="group-kind">{{
-            groupKindLabel(group.kind) | transloco
-          }}</span>
-          @if (hasContribution(group)) {
-            <span class="group-row__contribution" data-testid="group-contribution">
-              {{
-                'groups.contribution'
-                  | transloco: { amount: formatMoney(group.monthlyContributionPln) }
-              }}
-            </span>
-          }
-          @if (group.classAllocation.length > 0) {
-            <span class="group-row__allocation" data-testid="group-allocation">
-              @for (share of group.classAllocation; track share.assetClass; let last = $last) {
-                {{
-                  'groups.allocationShare'
-                    | transloco
-                      : {
-                          class: assetClassLabel(share.assetClass) | transloco,
-                          percent: formatPercent(share.percent),
-                        }
-                }}{{ last ? '' : ',' }}
-              }
-            </span>
-          }
-          <span class="group-row__spacer"></span>
-          <button
-            mat-stroked-button
-            type="button"
-            data-testid="select-group"
-            (click)="select(group)"
-          >
-            {{ 'groups.assets.manage' | transloco }}
-          </button>
-          <button
-            mat-icon-button
-            type="button"
-            data-testid="edit-group"
-            [attr.aria-label]="'common.edit' | transloco"
-            (click)="openEditDialog(group)"
-          >
-            <mat-icon>edit</mat-icon>
-          </button>
-          <button
-            mat-icon-button
-            type="button"
-            data-testid="delete-group"
-            [attr.aria-label]="'common.delete' | transloco"
-            (click)="remove(group)"
-          >
-            <mat-icon>delete</mat-icon>
-          </button>
+      @for (card of cards(); track card.group.id) {
+        <li>
+          <app-group-card
+            [group]="card.group"
+            [metrics]="card.metrics"
+            [selected]="card.group.id === selectedId()"
+            (assets)="select(card.group)"
+            (edit)="openEditDialog(card.group)"
+            (remove)="remove(card.group)"
+          />
         </li>
       }
+      <li>
+        <article class="groups-page__ungrouped" data-testid="ungrouped-card">
+          <h2>{{ 'groups.field.none' | transloco }}</h2>
+          <p class="groups-page__ungrouped-value" data-testid="ungrouped-value">
+            <app-money [amount]="summary().ungrouped" />
+          </p>
+          <p class="groups-page__ungrouped-count" data-testid="ungrouped-count">
+            {{ 'groups.assetCount' | transloco: { count: summary().ungroupedCount } }}
+          </p>
+        </article>
+      </li>
     </ul>
   }
 
@@ -140,9 +89,7 @@
             </button>
           </div>
         } @else if (assetsResource.isLoading() && !assetsResource.hasValue()) {
-          <div class="groups-page__state">
-            <mat-spinner diameter="32" />
-          </div>
+          <app-skeleton [rows]="3" />
         } @else if (assetsResource.hasValue() && assets().length === 0) {
           <p>{{ 'groups.assets.empty' | transloco }}</p>
         } @else if (assetsResource.hasValue()) {

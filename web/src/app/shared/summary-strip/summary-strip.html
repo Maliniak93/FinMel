@@ -5,6 +5,9 @@
       <dd class="summary-strip__value sk-num" [attr.data-testid]="item.testId ?? null">
         <app-money [amount]="item.amount" [currency]="item.currency ?? 'PLN'" />
       </dd>
+      @if (item.link; as link) {
+        <a class="summary-strip__link" [routerLink]="link.route">{{ link.labelKey | transloco }}</a>
+      }
     </div>
   }
 </dl>

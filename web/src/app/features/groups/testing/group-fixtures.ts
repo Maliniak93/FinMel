@@ -1,4 +1,5 @@
 import type { AssetGroupResponse, AssignableAssetResponse } from '../../../api/portfolio';
+import type { DashboardResponse } from '../../../api/reporting';
 
 export const blueGroupId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 export const greenGroupId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -87,3 +88,36 @@ export const assignableAssets: AssignableAssetResponse[] = [
     isArchived: true,
   },
 ];
+
+export const groupsDashboard: DashboardResponse = {
+  netWorthPln: 6300,
+  asOf: '2026-10-24',
+  isStale: false,
+  byAssetClass: [],
+  byAccount: [],
+  byGroup: [
+    {
+      groupId: blueGroupId,
+      valuePln: 4000,
+      percentage: 63.5,
+      byAssetClass: [{ assetClass: 4, valuePln: 4000 }],
+    },
+    {
+      groupId: greenGroupId,
+      valuePln: 1500,
+      percentage: 23.8,
+      byAssetClass: [{ assetClass: 0, valuePln: 1500 }],
+    },
+    {
+      groupId: null,
+      valuePln: 800,
+      percentage: 12.7,
+      byAssetClass: [{ assetClass: 2, valuePln: 800 }],
+    },
+  ],
+  byAsset: [
+    { assetId: memberAssetId, valuePln: 4000, priceDate: '2026-10-24', isStale: false },
+    { assetId: freeAssetId, valuePln: 800, priceDate: '2026-10-24', isStale: false },
+    { assetId: otherGroupAssetId, valuePln: 1500, priceDate: '2026-10-24', isStale: false },
+  ],
+};
