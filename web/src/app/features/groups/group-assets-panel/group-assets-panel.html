@@ -1,0 +1,137 @@
+<header class="assets-panel__header">
+  <h2 class="assets-panel__title" data-testid="assets-panel-title">
+    @if (group(); as current) {
+      {{ 'groups.assets.title' | transloco: { name: current.name } }}
+    } @else {
+      {{ 'groups.field.none' | transloco }}
+    }
+  </h2>
+  <button
+    mat-icon-button
+    type="button"
+    data-testid="close-assets-panel"
+    [attr.aria-label]="'groups.assets.closePanel' | transloco"
+    (click)="closed.emit()"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
+</header>
+
+<div class="assets-panel__body">
+  @if (readOnly()) {
+    <p class="assets-panel__hint" data-testid="ungrouped-hint">
+      {{ 'groups.assets.ungroupedHint' | transloco }}
+    </p>
+  }
+
+  @if (assetsResource().error(); as assetsError) {
+    <div class="assets-panel__state" role="alert">
+      <p>{{ assetsError.message }}</p>
+      <button mat-button type="button" (click)="assetsResource().reload()">
+        {{ 'common.retry' | transloco }}
+      </button>
+    </div>
+  } @else if (assetsResource().isLoading() && !assetsResource().hasValue()) {
+    <app-skeleton [rows]="3" />
+  } @else if (assetsResource().hasValue() && !hasAssets()) {
+    <p>
+      {{ (readOnly() ? 'groups.assets.ungroupedEmpty' : 'groups.assets.empty') | transloco }}
+    </p>
+  } @else if (assetsResource().hasValue()) {
+    <div class="assets-panel__filters">
+      <mat-form-field appearance="outline" class="assets-panel__filter">
+        <mat-label>{{ 'groups.assets.filter' | transloco }}</mat-label>
+        <input
+          matInput
+          type="text"
+          autocomplete="off"
+          data-testid="asset-filter"
+          [value]="textFilter()"
+          (input)="onFilterInput($event)"
+        />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="assets-panel__filter">
+        <mat-label>{{ 'groups.assets.classFilter' | transloco }}</mat-label>
+        <mat-select [value]="classFilter()" (selectionChange)="classFilter.set($event.value)">
+          <mat-option [value]="null">{{ 'groups.assets.allClasses' | transloco }}</mat-option>
+          @for (assetClass of presentClasses(); track assetClass.value) {
+            <mat-option [value]="assetClass.value">{{ assetClass.label | transloco }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      @if (!readOnly()) {
+        <button mat-button type="button" data-testid="select-all-shown" (click)="selectAllShown()">
+          {{ 'groups.assets.selectAllShown' | transloco }}
+        </button>
+      }
+    </div>
+
+    <table class="assets-panel__table">
+      <thead>
+        <tr>
+          @if (!readOnly()) {
+            <th></th>
+          }
+          <th>{{ 'common.name' | transloco }}</th>
+          <th>{{ 'groups.assets.class' | transloco }}</th>
+          <th>{{ 'groups.assets.location' | transloco }}</th>
+          @if (!readOnly()) {
+            <th>{{ 'groups.assets.group' | transloco }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (asset of shownAssets(); track asset.assetId) {
+          <tr data-testid="asset-row">
+            @if (!readOnly()) {
+              <td>
+                <mat-checkbox
+                  [checked]="checked().has(asset.assetId)"
+                  [attr.aria-label]="asset.name"
+                  (change)="toggle(asset.assetId, $event.checked)"
+                />
+              </td>
+            }
+            <td>
+              {{ asset.name }}
+              @if (asset.isArchived) {
+                <span class="assets-panel__badge" data-testid="asset-archived">{{
+                  'common.archived' | transloco
+                }}</span>
+              }
+            </td>
+            <td>{{ assetClassLabel(asset.assetClass) | transloco }}</td>
+            <td>{{ asset.accountName ?? asset.cashPlaceName }}</td>
+            @if (!readOnly()) {
+              <td>
+                @if (asset.groupId && asset.groupId !== groupId()) {
+                  <span
+                    class="assets-panel__chip"
+                    data-testid="asset-group-chip"
+                    [style.border-color]="groupColorOf(asset.groupId)"
+                    >{{ groupName(asset.groupId) }}</span
+                  >
+                }
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>
+
+@if (!readOnly()) {
+  <footer class="assets-panel__actions">
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      data-testid="save-assignment"
+      [disabled]="saving() || changeCount() === 0"
+      (click)="saveAssignment()"
+    >
+      {{ 'common.save' | transloco }}
+    </button>
+  </footer>
+}
