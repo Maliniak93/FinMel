@@ -687,7 +687,24 @@
     "title": "Grupy",
     "add": "Dodaj grupę",
     "empty": "Nie masz jeszcze grup. Dodaj grupę, aby podzielić majątek na cele, np. emeryturę czy poduszkę finansową.",
-    "limitHint": "Osiągnięto limit 12 grup. Usuń grupę, aby dodać nową.",
+    "subtitle": "Cele z kwotą docelową, wpłatą miesięczną i alokacją klas aktywów.",
+    "counter": "{{ count }} z {{ max }}",
+    "strip": {
+      "grouped": "W grupach",
+      "ungrouped": "Bez grupy",
+      "contribution": "Wpłaty miesięczne razem",
+      "planningLink": "w Planowaniu jako wydatki →"
+    },
+    "card": {
+      "ofTarget": "/ {{ amount }}",
+      "shortfall": "Brakuje: {{ amount }}.",
+      "reached": "Cel osiągnięty",
+      "deviation": "odchylenie {{ pp }} pp",
+      "incomplete": "wartość niepełna: {{ count }} aktywa bez aktualnej wyceny",
+      "unavailable": "wartość niedostępna",
+      "allocationTarget": "Cel",
+      "allocationActual": "Teraz"
+    },
     "loadFailed": "Nie udało się wczytać grup.",
     "field": {
       "group": "Grupa",
@@ -695,9 +712,7 @@
       "none": "Bez grupy"
     },
     "assetCount": "Aktywa: {{ count }}",
-    "target": "Cel: {{ amount }}",
     "contribution": "Wpłata miesięczna: {{ amount }}",
-    "allocationShare": "{{ class }} {{ percent }}",
     "kind": {
       "regular": "Zwykła",
       "cushion": "Poduszka"

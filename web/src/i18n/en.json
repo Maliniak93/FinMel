@@ -687,7 +687,24 @@
     "title": "Groups",
     "add": "Add group",
     "empty": "No groups yet. Add a group to split your wealth into goals such as retirement or an emergency cushion.",
-    "limitHint": "You reached the limit of 12 groups. Delete a group to add a new one.",
+    "subtitle": "Goals with a target, a monthly contribution and an asset class allocation.",
+    "counter": "{{ count }} of {{ max }}",
+    "strip": {
+      "grouped": "In groups",
+      "ungrouped": "No group",
+      "contribution": "Total monthly contributions",
+      "planningLink": "in Planning as expenses →"
+    },
+    "card": {
+      "ofTarget": "/ {{ amount }}",
+      "shortfall": "Missing: {{ amount }}.",
+      "reached": "Goal reached",
+      "deviation": "deviation {{ pp }} pp",
+      "incomplete": "value incomplete: {{ count }} assets without a current valuation",
+      "unavailable": "value unavailable",
+      "allocationTarget": "Target",
+      "allocationActual": "Now"
+    },
     "loadFailed": "Failed to load groups.",
     "field": {
       "group": "Group",
@@ -695,9 +712,7 @@
       "none": "No group"
     },
     "assetCount": "Assets: {{ count }}",
-    "target": "Target: {{ amount }}",
     "contribution": "Monthly contribution: {{ amount }}",
-    "allocationShare": "{{ class }} {{ percent }}",
     "kind": {
       "regular": "Regular",
       "cushion": "Cushion"
