@@ -167,6 +167,14 @@ describe('SettleOccurrenceDialog', () => {
     expect(values.accountId).toBe(plnAccountId);
     expect((values.actualDate as Date).toDateString()).toBe(new Date(2026, 9, 20).toDateString());
 
+    const amount = element().querySelector<HTMLElement>('[formControlName="actualAmount"]')!;
+    expect(amount.classList).toContain('app-amount');
+    const formField = amount.closest('mat-form-field')!;
+    expect(formField.classList).toContain('mat-mdc-form-field-label-always-float');
+    expect(formField.querySelector('.mat-mdc-form-field-text-suffix')?.textContent?.trim()).toMatch(
+      /^(zł|PLN)$/,
+    );
+
     element()
       .querySelector<HTMLElement>('[formControlName="accountId"] .mat-mdc-select-trigger')!
       .click();

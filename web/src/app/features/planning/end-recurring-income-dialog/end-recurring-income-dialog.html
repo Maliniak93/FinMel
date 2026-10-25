@@ -2,7 +2,11 @@
 
 <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
   <mat-dialog-content>
-    <mat-form-field appearance="outline" class="end-recurring-income-dialog__field">
+    <mat-form-field
+      appearance="outline"
+      floatLabel="always"
+      class="end-recurring-income-dialog__field"
+    >
       <mat-label>{{ 'planning.form.endDate' | transloco }}</mat-label>
       <input
         matInput

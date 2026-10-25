@@ -25,6 +25,7 @@ import {
 } from '../../../api/portfolio';
 import { readProblemDetails, type ApiProblemDetails } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
+import { currencySuffix } from '../../../shared/format';
 import { currentWarsawDate } from '../recurrence';
 
 const MIN_DATE = new Date(2011, 0, 1);
@@ -61,6 +62,7 @@ export class SettleOccurrenceDialog {
   protected readonly minDate = MIN_DATE;
   protected readonly maxDate = currentWarsawDate();
 
+  protected readonly currencySuffix = currencySuffix;
   protected readonly submitting = signal(false);
   protected readonly formError = signal<string | null>(null);
 

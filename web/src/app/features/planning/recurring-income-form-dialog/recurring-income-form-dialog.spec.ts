@@ -303,6 +303,8 @@ describe('RecurringIncomeFormDialog', () => {
     expect(posts()).toHaveLength(0);
     expect(component['form'].controls.date.hasError('dateOutOfRange')).toBe(true);
     expect(dialogRef.close).not.toHaveBeenCalled();
+    await settle();
+    expect(field('date')!.closest('mat-form-field')!.querySelector('mat-error')).not.toBeNull();
 
     fetchSpy.mockImplementation(async () =>
       jsonResponse({ detail: 'Invalid.', errors: { date: ['Date is not allowed.'] } }, 400),
@@ -342,6 +344,22 @@ describe('RecurringIncomeFormDialog', () => {
       date: '2026-12-15',
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('shows the account currency as the amount suffix', async () => {
+    await setup();
+
+    component['form'].controls.accountId.setValue(eurAccountId);
+    await settle();
+
+    const amount = field('amount')!;
+    expect(amount.classList).toContain('app-amount');
+    const formField = amount.closest('mat-form-field')!;
+    expect(formField.classList).toContain('mat-mdc-form-field-label-always-float');
+    expect(formField.querySelector('.mat-mdc-form-field-text-suffix')?.textContent?.trim()).toBe(
+      'EUR',
+    );
+    expect(element().textContent).not.toMatch(/Waluta:|Currency:/);
   });
 
   it('has no effective month field when adding', async () => {

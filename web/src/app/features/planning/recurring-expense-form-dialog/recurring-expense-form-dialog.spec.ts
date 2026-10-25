@@ -106,6 +106,19 @@ describe('RecurringExpenseFormDialog', () => {
     expect(field('currency')).toBeNull();
   });
 
+  it('shows the złoty suffix on the amount', async () => {
+    await setup();
+
+    const amount = field('amount')!;
+    expect(amount.classList).toContain('app-amount');
+    const formField = amount.closest('mat-form-field')!;
+    expect(formField.classList).toContain('mat-mdc-form-field-label-always-float');
+    expect(formField.querySelector('.mat-mdc-form-field-text-suffix')?.textContent?.trim()).toMatch(
+      /^(zł|PLN)$/,
+    );
+    expect(formField.querySelector('mat-label')?.textContent).not.toContain('PLN');
+  });
+
   it('hides the day and shift fields for the last business day and posts no day with shift None', async () => {
     await setup();
     expect(field('dayOfMonth')).not.toBeNull();

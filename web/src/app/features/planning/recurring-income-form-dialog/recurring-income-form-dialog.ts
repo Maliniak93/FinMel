@@ -32,6 +32,7 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
+import { currencySuffix } from '../../../shared/format';
 import { RecurrenceRuleFields } from '../recurrence-rule-fields/recurrence-rule-fields';
 import {
   DAY_KIND,
@@ -150,6 +151,8 @@ export class RecurringIncomeFormDialog {
   protected readonly accounts = computed(() =>
     this.accountsResource.hasValue() ? this.accountsResource.value() : [],
   );
+
+  protected readonly currencySuffix = currencySuffix;
 
   protected readonly selectedCurrency = computed(
     () => this.accounts().find((account) => account.id === this.selectedAccountId())?.currency,
