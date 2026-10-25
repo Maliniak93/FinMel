@@ -414,14 +414,14 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await expect(dialog).toBeHidden();
 
     await page
-      .getByTestId('group-row')
+      .getByTestId('group-card')
       .filter({
         has: page.getByTestId('group-name').getByText('Poduszka finansowa', { exact: true }),
       })
       .getByTestId('select-group')
       .click();
-    const panel = page.locator('mat-card.groups-page__assignment');
-    await expect(panel).toBeVisible();
+    const panel = page.getByTestId('assets-panel');
+    await expect(panel.getByTestId('assets-panel-title')).toBeVisible();
     await panel
       .getByTestId('asset-row')
       .filter({ hasText: 'Lokata Santander' })
@@ -429,7 +429,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
       .check();
     const save = panel.getByTestId('save-assignment');
     await save.click();
-    await expect(save).toBeDisabled();
+    await expect(panel.getByTestId('assets-panel-title')).toHaveCount(0);
 
     await openWealth(page);
     await expect(allRow(page, 'XTB IKE')).toBeVisible();

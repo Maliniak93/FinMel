@@ -229,9 +229,9 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     await expect(dialog).toBeHidden();
 
     const swatch = page
-      .getByTestId('group-row')
+      .getByTestId('group-card')
       .filter({ hasText: 'Wakacje 2027' })
-      .getByTestId('group-swatch');
+      .locator('.group-card__bar');
     await themeButton(page).click();
     await expect(dataTheme(page)).toHaveAttribute('data-theme', 'light');
     await expect(swatch).toHaveCSS('background-color', 'rgb(192, 73, 58)');
