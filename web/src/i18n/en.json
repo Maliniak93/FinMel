@@ -965,7 +965,7 @@
         "title": "Add recurring expense",
         "editTitle": "Edit recurring expense",
         "effectiveFromHint": "Amount and schedule change from this month on; name and dates apply to every month.",
-        "amount": "Amount (PLN)"
+        "amount": "Amount"
       }
     },
     "freeFunds": {
@@ -1000,7 +1000,6 @@
       "nameTooLong": "Name can have at most 200 characters.",
       "accountRequired": "Choose an account.",
       "accountsLoadFailed": "Failed to load the accounts.",
-      "currencyHint": "Currency: {{ currency }}",
       "startDate": "Start date",
       "endDate": "End date (optional)",
       "dateOutOfRange": "Date must be between 2011-01-01 and 2099-12-31.",

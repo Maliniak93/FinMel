@@ -31,6 +31,17 @@ export function formatMoney(amount: number | string, currency = 'PLN'): string {
   }
 }
 
+export function currencySuffix(currency: string): string {
+  try {
+    const part = currencyFormat(currency)
+      .formatToParts(0)
+      .find((candidate) => candidate.type === 'currency');
+    return part?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
 export function formatMoneyCompact(
   amount: number | string,
   currency = 'PLN',

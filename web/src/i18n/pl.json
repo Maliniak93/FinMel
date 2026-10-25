@@ -965,7 +965,7 @@
         "title": "Dodaj wydatek cykliczny",
         "editTitle": "Edytuj wydatek cykliczny",
         "effectiveFromHint": "Kwota i harmonogram zmieniają się od tego miesiąca; nazwa i daty dotyczą każdego miesiąca.",
-        "amount": "Kwota (PLN)"
+        "amount": "Kwota"
       }
     },
     "freeFunds": {
@@ -1000,7 +1000,6 @@
       "nameTooLong": "Nazwa może mieć najwyżej 200 znaków.",
       "accountRequired": "Wybierz konto.",
       "accountsLoadFailed": "Nie udało się wczytać kont.",
-      "currencyHint": "Waluta: {{ currency }}",
       "startDate": "Data początku",
       "endDate": "Data końca (opcjonalnie)",
       "dateOutOfRange": "Data musi mieścić się między 2011-01-01 a 2099-12-31.",

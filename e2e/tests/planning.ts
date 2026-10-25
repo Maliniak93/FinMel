@@ -221,7 +221,7 @@ export async function fillExpense(
   expense: ExpenseInput,
 ): Promise<void> {
   await dialog.getByLabel('Nazwa').fill(expense.name);
-  await dialog.getByRole('spinbutton', { name: 'Kwota (PLN)' }).fill(expense.amount);
+  await dialog.getByRole('spinbutton', { name: 'Kwota', exact: true }).fill(expense.amount);
   await dialog.getByLabel('Data początku').fill(expense.start);
   if (expense.end) {
     await dialog.getByLabel('Data końca').fill(expense.end);
@@ -253,7 +253,7 @@ export async function editExpenseFrom(
   const dialog = await openEditExpense(page, name);
   await dialog.getByLabel('Obowiązuje od').fill(month);
   if (change.amount) {
-    await dialog.getByRole('spinbutton', { name: 'Kwota (PLN)' }).fill(change.amount);
+    await dialog.getByRole('spinbutton', { name: 'Kwota', exact: true }).fill(change.amount);
   }
   if (change.name) {
     await dialog.getByLabel('Nazwa').fill(change.name);

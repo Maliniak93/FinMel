@@ -298,12 +298,12 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
   await test.step('Krok 12: a one-off expense has name, amount and date without an account, and Przegląd auta 1 200 zł on 10.11.2026 is on the expenses list with its mark and date', async () => {
     const dialog = await openOneOffExpenseDialog(page);
     await expect(dialog.getByLabel('Nazwa')).toBeVisible();
-    await expect(dialog.getByRole('spinbutton', { name: 'Kwota (PLN)' })).toBeVisible();
+    await expect(dialog.getByRole('spinbutton', { name: 'Kwota', exact: true })).toBeVisible();
     await expect(dialog.getByLabel('Data', { exact: true })).toBeVisible();
     await expect(dialog.getByRole('combobox', { name: 'Konto', exact: true })).toHaveCount(0);
     await expectNoRuleFields(dialog);
     await dialog.getByLabel('Nazwa').fill(SERVICE);
-    await dialog.getByRole('spinbutton', { name: 'Kwota (PLN)' }).fill('1200');
+    await dialog.getByRole('spinbutton', { name: 'Kwota', exact: true }).fill('1200');
     await dialog.getByLabel('Data', { exact: true }).fill('2026-11-10');
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
