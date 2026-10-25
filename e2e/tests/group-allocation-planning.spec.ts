@@ -88,7 +88,7 @@ async function createGroup(
   await dialog.getByLabel('Nazwa').fill(group.name);
   await dialog.getByRole('radio', { name: group.color }).click();
   if (group.kind) {
-    await choose(page, dialog.getByRole('combobox', { name: 'Rodzaj' }), group.kind);
+    await dialog.getByTestId('kind-toggle').getByText(group.kind, { exact: true }).click();
   }
   if (group.target) {
     await dialog.getByLabel('Cel (PLN)').fill(group.target);
@@ -105,7 +105,7 @@ async function createGroup(
 
 function groupRow(page: Page, name: string): Locator {
   return page
-    .getByTestId('group-row')
+    .getByTestId('group-card')
     .filter({ has: page.getByTestId('group-name').getByText(name, { exact: true }) });
 }
 
@@ -198,28 +198,27 @@ test('group allocation planning: groups with kind, class allocation and contribu
     const first = await openGroupDialog(page);
     await first.getByLabel('Nazwa').fill(CUSHION);
     await first.getByRole('radio', { name: 'Pomarańczowy' }).click();
-    await choose(page, first.getByRole('combobox', { name: 'Rodzaj' }), 'Poduszka');
-    await first.getByRole('button', { name: 'Zapisz' }).click();
-    await expect(first.getByText('Poduszka wymaga celu.')).toBeVisible();
+    await first.getByTestId('kind-toggle').getByText('Poduszka', { exact: true }).click();
+    await expect(first.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
     await first.getByLabel('Cel (PLN)').fill('12000');
     await first.getByRole('button', { name: 'Zapisz' }).click();
     await expect(first).toBeHidden();
-    await expect(page.getByTestId('group-row')).toHaveCount(1);
+    await expect(page.getByTestId('group-card')).toHaveCount(1);
     await expect(groupRow(page, CUSHION).getByTestId('group-kind')).toContainText('Poduszka');
-    await expect(groupRow(page, CUSHION).getByTestId('group-target')).toContainText(
+    await expect(groupRow(page, CUSHION).getByTestId('group-value')).toContainText(
       pln('12 000,00'),
     );
 
     const second = await openGroupDialog(page);
     await second.getByLabel('Nazwa').fill('Druga poduszka');
     await second.getByRole('radio', { name: 'Czerwony' }).click();
-    await choose(page, second.getByRole('combobox', { name: 'Rodzaj' }), 'Poduszka');
+    await second.getByTestId('kind-toggle').getByText('Poduszka', { exact: true }).click();
     await second.getByLabel('Cel (PLN)').fill('1000');
     await second.getByRole('button', { name: 'Zapisz' }).click();
     await expect(second.getByText('Możesz mieć tylko jedną poduszkę.')).toBeVisible();
     await second.getByRole('button', { name: 'Anuluj' }).click();
     await expect(second).toBeHidden();
-    await expect(page.getByTestId('group-row')).toHaveCount(1);
+    await expect(page.getByTestId('group-card')).toHaveCount(1);
   });
 
   await test.step('Krok 2: the regular groups exist, an allocation not summing to 100% is refused and a group without allocation has a single contribution amount', async () => {
@@ -235,9 +234,9 @@ test('group allocation planning: groups with kind, class allocation and contribu
       { assetClass: 'Konta bankowe', percent: '40' },
     ]);
     await expect(pension.getByTestId('allocation-sum')).toContainText('90');
-    await pension.getByRole('button', { name: 'Zapisz' }).click();
+    await expect(pension.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
     await expect(pension).toBeVisible();
-    await expect(page.getByTestId('group-row')).toHaveCount(3);
+    await expect(page.getByTestId('group-card')).toHaveCount(3);
     await pension.getByRole('spinbutton', { name: 'Udział (%)' }).nth(1).fill('50');
     await pension.getByRole('button', { name: 'Zapisz' }).click();
     await expect(pension).toBeHidden();
@@ -252,18 +251,20 @@ test('group allocation planning: groups with kind, class allocation and contribu
       ],
     });
 
-    await expect(page.getByTestId('group-row')).toHaveCount(5);
+    await expect(page.getByTestId('group-card')).toHaveCount(5);
     await expect(groupRow(page, PENSION).getByTestId('group-contribution')).toContainText(
       pln('2 000,00'),
     );
-    await expect(groupRow(page, PENSION).getByTestId('group-allocation')).toContainText(
-      /Lokata\s50.*Konta bankowe\s50/,
+    await expect(groupRow(page, PENSION).locator('.allocation-bar__legend')).toContainText(
+      /Lokata\s?50\s?%.*Konta bankowe\s?50\s?%/,
     );
     await expect(groupRow(page, INVESTMENTS).getByTestId('group-contribution')).toContainText(
       pln('1 000,00'),
     );
     await expect(groupRow(page, CURRENT_EXPENSES).getByTestId('group-contribution')).toHaveCount(0);
-    await expect(groupRow(page, CURRENT_EXPENSES).getByTestId('group-allocation')).toHaveCount(0);
+    await expect(groupRow(page, CURRENT_EXPENSES).locator('.allocation-bar__legend')).toHaveCount(
+      0,
+    );
   });
 
   const listed = await request.get('/api/portfolio/asset-groups', { headers });
@@ -439,7 +440,8 @@ test('group allocation planning: groups with kind, class allocation and contribu
 
   await test.step('Krok 13: Emerytura contribution set to 0 zł raises the free funds of the current month to 6 000 zł and removes the contribution and its breakdown, the past month is unchanged', async () => {
     await page.locator('mat-sidenav').getByRole('link', { name: 'Grupy', exact: true }).click();
-    await groupRow(page, PENSION).getByTestId('edit-group').click();
+    await groupRow(page, PENSION).getByTestId('group-menu').click();
+    await page.getByTestId('edit-group').click();
     await expect(dialog.getByRole('heading', { name: 'Edytuj grupę' })).toBeVisible();
     await dialog.getByLabel('Wpłata miesięczna (PLN)').fill('0');
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
@@ -465,7 +467,8 @@ test('group allocation planning: groups with kind, class allocation and contribu
 
   await test.step('Krok 15: deleting Oszczędności celowe hands its 50% to the other regular groups proportionally and the sum stays 100%', async () => {
     await page.locator('mat-sidenav').getByRole('link', { name: 'Grupy', exact: true }).click();
-    await groupRow(page, TARGETED).getByTestId('delete-group').click();
+    await groupRow(page, TARGETED).getByTestId('group-menu').click();
+    await page.getByTestId('delete-group').click();
     await dialog.getByRole('button', { name: 'Usuń', exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect(groupRow(page, TARGETED)).toHaveCount(0);

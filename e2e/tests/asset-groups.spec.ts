@@ -67,12 +67,12 @@ function groupCombobox(dialog: Locator, name = 'Grupa'): Locator {
 
 function groupRow(page: Page, name: string): Locator {
   return page
-    .getByTestId('group-row')
+    .getByTestId('group-card')
     .filter({ has: page.getByTestId('group-name').getByText(name, { exact: true }) });
 }
 
 function assignmentPanel(page: Page): Locator {
-  return page.locator('mat-card.groups-page__assignment');
+  return page.getByTestId('assets-panel');
 }
 
 function assetRow(page: Page, name: string): Locator {
@@ -298,7 +298,7 @@ async function expectFilteredChart(
 async function saveAssignment(page: Page): Promise<void> {
   const save = assignmentPanel(page).getByTestId('save-assignment');
   await save.click();
-  await expect(save).toBeDisabled();
+  await expect(assignmentPanel(page).getByTestId('assets-panel-title')).toHaveCount(0);
 }
 
 async function openAssignment(page: Page, group: string): Promise<void> {
@@ -360,12 +360,12 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await createGroup(page, { name: 'Emerytura', color: 'Niebieski' });
     await createGroup(page, { name: 'Inwestycje', color: 'Zielony' });
     await createGroup(page, { name: 'Poduszka', color: 'Pomarańczowy', target: '30000' });
-    await expect(page.getByTestId('group-row')).toHaveCount(3);
+    await expect(page.getByTestId('group-card')).toHaveCount(3);
     for (const name of ['Emerytura', 'Inwestycje', 'Poduszka']) {
       await expect(groupRow(page, name).getByTestId('group-count')).toContainText('Aktywa: 0');
     }
-    await expect(groupRow(page, 'Poduszka').getByTestId('group-target')).toContainText(
-      /Cel:\s30\s?000,00\szł/,
+    await expect(groupRow(page, 'Poduszka').getByTestId('group-value')).toContainText(
+      /\/\s30\s?000,00\szł/,
     );
   });
 
@@ -377,7 +377,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await expect(dialog.getByText('Grupa o tej nazwie już istnieje.')).toBeVisible();
     await dialog.getByRole('button', { name: 'Anuluj' }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByTestId('group-row')).toHaveCount(3);
+    await expect(page.getByTestId('group-card')).toHaveCount(3);
   });
 
   await test.step('Krok 4: the colours already used are disabled in the palette', async () => {
@@ -709,12 +709,13 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
   await test.step('Krok 19: deleting Inwestycje warns about its 5 assets and sends them to Bez grupy', async () => {
     await chooseFilter(page, 'Inwestycje');
     await openPage(page, 'Grupy');
-    await groupRow(page, 'Inwestycje').getByTestId('delete-group').click();
+    await groupRow(page, 'Inwestycje').getByTestId('group-menu').click();
+    await page.getByTestId('delete-group').click();
     await expect(dialog).toContainText('ma aktywa: 5');
-    await expect(dialog).toContainText('„Bez grupy”');
+    await expect(dialog).toContainText('Jej historia trafi do „Bez grupy');
     await dialog.getByRole('button', { name: 'Usuń', exact: true }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByTestId('group-row')).toHaveCount(2);
+    await expect(page.getByTestId('group-card')).toHaveCount(2);
 
     await expectDashboard(page, {
       netWorth: '114 200,00',
@@ -767,9 +768,9 @@ test('asset groups: the twelve group limit refuses a thirteenth', async ({
 
   await test.step('Krok 21: with 12 groups adding is blocked with the limit hint and the server refuses a 13th', async () => {
     await openPage(page, 'Grupy');
-    await expect(page.getByTestId('group-row')).toHaveCount(12);
+    await expect(page.getByTestId('group-card')).toHaveCount(12);
     await expect(page.getByTestId('add-group')).toBeDisabled();
-    await expect(page.getByTestId('group-limit-hint')).toContainText('Osiągnięto limit 12 grup.');
+    await expect(page.getByTestId('group-counter')).toContainText('12 z 12');
     const refused = await request.post('/api/portfolio/asset-groups', {
       headers,
       data: { name: 'Grupa 13', color: 'blue' },
