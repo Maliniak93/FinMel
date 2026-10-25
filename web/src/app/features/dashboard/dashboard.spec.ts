@@ -322,8 +322,8 @@ describe('Dashboard', () => {
 
     const order = [
       '.dashboard-page__hero',
+      '.dashboard-page__todo',
       'app-month-card',
-      'app-upcoming-card',
       '.dashboard-page__group-card',
       '.dashboard-page__structure',
       'app-accounts-card',
