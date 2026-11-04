@@ -15,6 +15,7 @@ import {
   openAddExpenseDialog,
   openMonth,
   pln,
+  status,
 } from './planning';
 
 const ACCOUNT_TYPE_BANK = 2;
@@ -253,7 +254,7 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     await dialog.getByRole('checkbox', { name: 'Utwórz wpłatę na konto' }).check();
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
-    await expect(row.getByTestId('occurrence-status')).toHaveText('rozliczone');
+    await expect(status(row)).toHaveText('rozliczone');
     await expectBalance(page, { plan: '8 500,00', actual: '2 500,00', pending: '6 000,00' });
     await expect(overdueRows(page)).toHaveCount(0);
     await openBankAccount(page, BANK);
@@ -274,7 +275,7 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     const occurrence = occurrences(page, REFUND);
     await occurrence.getByTestId('undo-occurrence').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Cofnij', exact: true }).click();
-    await expect(occurrence.getByTestId('occurrence-status')).toHaveText('oczekuje');
+    await expect(status(occurrence)).toHaveText('oczekuje');
     await expectBalance(page, { plan: '8 500,00', actual: '0,00', pending: '8 500,00' });
     await expect(overdueRows(page)).toHaveCount(1);
     await openBankAccount(page, BANK);

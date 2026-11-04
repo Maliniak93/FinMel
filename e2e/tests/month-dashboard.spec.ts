@@ -660,27 +660,18 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     await expect(todoItems(page)).toHaveCount(1);
   });
 
-  await test.step('Krok 18: at 390 px the calendar shows the number of items in the days and a click shows the items under the grid', async () => {
-    await page.goto(`/planning?month=${M}&layout=calendar`);
-    await expect(page.getByTestId('planning-calendar')).toBeVisible();
+  await test.step('Krok 18: at 390 px layout=calendar shows the day list without the layout switch and the calendar', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
-    const events = monthEvents();
-    for (const date of new Set(events.map((event) => event.date))) {
-      const expected = events.filter((event) => event.date === date).length;
-      await expect(calendarCell(page, date).getByTestId('calendar-count')).toHaveText(
-        String(expected),
-      );
+    await page.goto(`/planning?month=${M}&layout=calendar`);
+    await expect(page.getByTestId('day-group').first()).toBeVisible();
+    await expect(page.getByTestId('layout-list')).toHaveCount(0);
+    await expect(page.getByTestId('layout-calendar')).toHaveCount(0);
+    await expect(page.getByTestId('planning-calendar')).toHaveCount(0);
+    for (const { date, name } of monthEvents()) {
+      await expect(
+        page.locator(`[data-testid="day-group"][data-date="${date}"]`).filter({ hasText: name }),
+      ).toHaveCount(1);
     }
-    await expect(page.getByTestId('calendar-item')).toHaveCount(0);
-    await calendarCell(page, TEN).click();
-    const details = page.getByTestId('calendar-details');
-    await expect(details).toContainText(dateInText(TEN));
-    await expect(
-      details.getByTestId('calendar-detail-item').filter({ hasText: '800+' }),
-    ).toHaveCount(1);
-    await expect(
-      details.getByTestId('calendar-detail-item').filter({ hasText: 'Rachunki' }),
-    ).toHaveCount(1);
     await page.setViewportSize({ width: 1280, height: 720 });
   });
 

@@ -1,19 +1,15 @@
-import { BreakpointObserver } from '@angular/cdk/layout';
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, computed, inject, input, output, resource, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
-import { TranslocoPipe, translate } from '@jsverse/transloco';
-import { map } from 'rxjs';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
-  getApiPortfolioBonds,
-  getApiPortfolioDeposits,
+  type BondResponse,
+  type DepositResponse,
   type IncomeOccurrenceResponse,
   type PlanningMonthResponse,
 } from '../../../api/portfolio';
-import { readProblemDetails } from '../../../core/auth/problem-details';
 import { PlanningState } from '../../../core/planning/planning-state';
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatDate, formatMoney } from '../../../shared/format';
@@ -25,7 +21,6 @@ import {
 } from '../settle-occurrence-dialog/settle-occurrence-dialog';
 
 const MAX_ITEMS_IN_CELL = 3;
-const NARROW_VIEWPORT = '(max-width: 599.98px)';
 
 type CalendarItemKind = 'income' | 'payment' | 'deposit' | 'bond';
 type CalendarItemStatus = 'pending' | 'overdue' | 'settled' | 'skipped';
@@ -98,42 +93,9 @@ export class PlanningCalendar {
 
   readonly month = input.required<string>();
   readonly data = input.required<PlanningMonthResponse>();
+  readonly deposits = input<DepositResponse[]>([]);
+  readonly bonds = input<BondResponse[]>([]);
   readonly saved = output<void>();
-
-  private readonly depositsResource = resource({
-    loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioDeposits({ signal: abortSignal });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ?? translate('planning.calendar.deadlinesFailed'),
-        );
-      }
-      return result.data ?? [];
-    },
-  });
-
-  private readonly bondsResource = resource({
-    loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioBonds({ signal: abortSignal });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ?? translate('planning.calendar.deadlinesFailed'),
-        );
-      }
-      return result.data ?? [];
-    },
-  });
-
-  protected readonly narrow = toSignal(
-    inject(BreakpointObserver)
-      .observe(NARROW_VIEWPORT)
-      .pipe(map((state) => state.matches)),
-    { initialValue: false },
-  );
-
-  protected readonly deadlinesFailed = computed(
-    () => !!this.depositsResource.error() || !!this.bondsResource.error(),
-  );
 
   protected readonly weekdayKeys = WEEKDAY_KEYS;
   protected readonly maxItemsInCell = MAX_ITEMS_IN_CELL;
@@ -209,11 +171,9 @@ export class PlanningCalendar {
       });
     }
 
-    const deposits = this.depositsResource.hasValue() ? this.depositsResource.value() : [];
-    const bonds = this.bondsResource.hasValue() ? this.bondsResource.value() : [];
     const first = `${month}-01`;
     const last = toDateOnly(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0));
-    assetDeadlines(deposits, bonds, first, last).forEach((deadline, index) =>
+    assetDeadlines(this.deposits(), this.bonds(), first, last).forEach((deadline, index) =>
       add(deadline.date, {
         key: `${deadline.kind}-${deadline.name}-${deadline.date}-${index}`,
         kind: deadline.kind,

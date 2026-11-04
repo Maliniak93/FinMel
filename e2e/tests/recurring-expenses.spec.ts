@@ -12,6 +12,7 @@ import {
   endExpense,
   expectCost,
   expectFreeFunds,
+  expectOnDay,
   expectReserve,
   expenseDefinition,
   expensePayments,
@@ -24,6 +25,7 @@ import {
   pln,
   settle,
   shiftMonth,
+  status,
   type IncomeInput,
 } from './planning';
 
@@ -106,8 +108,6 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
   await test.step('Krok 1: the Wydatki section of the current month has no payments or definitions, cost 0 zł, free funds plan and forecast 16 500 zł', async () => {
     await openMonth(page, m(0));
     await expect(page.getByTestId('expenses-section')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Wydatki', exact: true })).toBeVisible();
-    await expect(page.getByText('W tym miesiącu nie planujesz żadnych wydatków.')).toBeVisible();
     await expect(page.getByText('Brak wydatków cyklicznych.')).toBeVisible();
     await expect(expensePayments(page)).toHaveCount(0);
     await expectCost(page, '0,00');
@@ -128,7 +128,7 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
     const payment = expensePayments(page, LIFE);
-    await expect(payment).toContainText(dateInText(day(m(0), 1)));
+    await expectOnDay(payment, day(m(0), 1));
     await expect(payment).toContainText(pln('3 000,00'));
     await expectCost(page, '3 000,00');
     await expectFreeFunds(page, '13 500,00');
@@ -143,7 +143,7 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
       day: 10,
     });
     const payment = expensePayments(page, BILLS);
-    await expect(payment).toContainText(dateInText(day(m(0), 10)));
+    await expectOnDay(payment, day(m(0), 10));
     await expect(payment).toContainText(pln('1 000,00'));
     await expectCost(page, '4 000,00');
   });
@@ -196,7 +196,7 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
   await test.step('Krok 8: M+5 lists the OC Toyota payment of 1 200 zł on the 15th, the reserve stays 200 zł and cost is 4 200 zł', async () => {
     await openMonth(page, m(5));
     const payment = expensePayments(page, CAR);
-    await expect(payment).toContainText(dateInText(day(m(5), 15)));
+    await expectOnDay(payment, day(m(5), 15));
     await expect(payment).toContainText(pln('1 200,00'));
     await expectReserve(page, CAR, '200,00');
     await expectCost(page, '4 200,00');
@@ -280,7 +280,7 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
   await test.step('Krok 15: skipping 800+ gives forecast 11 109,94 zł and plan 11 966,67 zł', async () => {
     const row = occurrences(page, BENEFIT);
     await row.getByTestId('skip-occurrence').click();
-    await expect(row.getByTestId('occurrence-status')).toHaveText('pominięte');
+    await expect(status(row)).toHaveText('pominięte');
     await expectFreeFunds(page, '11 966,67', '11 109,94');
   });
 

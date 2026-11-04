@@ -1,0 +1,224 @@
+@if (empty()) {
+  <p class="day-list__empty">{{ 'planning.incomes.empty' | transloco }}</p>
+} @else {
+  <ol class="day-list" [attr.aria-label]="'planning.list.label' | transloco">
+    @for (day of days(); track day.date) {
+      <li
+        class="day-list__day"
+        data-testid="day-group"
+        [class.day-list__day--today]="day.today"
+        [attr.data-date]="day.date"
+        [attr.aria-current]="day.today ? 'date' : null"
+      >
+        <div class="day-list__date">
+          <span class="day-list__day-number sk-num">{{ day.dayNumber }}</span>
+          <span class="day-list__weekday">{{ day.weekdayKey | transloco }}</span>
+        </div>
+        <ul class="day-list__rows">
+          @for (entry of day.rows; track entry.key) {
+            <li class="day-list__row" data-testid="day-row">
+              @switch (entry.kind) {
+                @case ('income') {
+                  @let income = entry.row;
+                  @let occurrence = income.item;
+                  @let status = statusOf(occurrence);
+                  <div
+                    class="day-list__item"
+                    data-testid="occurrence-row"
+                    [class.day-list__item--overdue]="occurrence.overdue"
+                    [class.day-list__item--skipped]="occurrence.status === 'Skipped'"
+                  >
+                    <mat-icon class="day-list__icon" aria-hidden="true">arrow_downward</mat-icon>
+                    <div class="day-list__main">
+                      <span class="day-list__name">
+                        <span data-testid="row-name">{{ occurrence.name }}</span>
+                        @if (income.oneOff) {
+                          <span class="day-list__mark" data-testid="one-off-mark">{{
+                            'planning.oneOff.mark' | transloco
+                          }}</span>
+                        }
+                      </span>
+                      <span class="day-list__meta">
+                        <span>{{ occurrence.accountName }}</span>
+                        @if (occurrence.accountArchived) {
+                          <span class="day-list__warning" data-testid="archived-warning">
+                            <mat-icon aria-hidden="true">warning</mat-icon>
+                            {{ 'planning.archivedAccount' | transloco }}
+                          </span>
+                        }
+                        @if (hasValue(occurrence.actualAmount)) {
+                          <span data-testid="occurrence-actual">
+                            @if (occurrence.actualDate) {
+                              {{
+                                'planning.calendar.settledOn'
+                                  | transloco: { date: formatDate(occurrence.actualDate) }
+                              }}
+                            }
+                            {{ formatMoney(occurrence.actualAmount, occurrence.currency) }}
+                          </span>
+                        }
+                        @if (hasValue(occurrence.difference)) {
+                          <span data-testid="occurrence-difference">
+                            {{ 'planning.occurrence.difference' | transloco }}:
+                            {{ formatMoney(occurrence.difference, occurrence.currency) }}
+                          </span>
+                        }
+                        @if (occurrence.depositCreated) {
+                          <span data-testid="deposit-created">
+                            {{ 'planning.occurrence.depositCreated' | transloco }}
+                          </span>
+                        }
+                        @if (!income.oneOff && income.item.outOfRule) {
+                          <span class="day-list__warning" data-testid="out-of-rule">
+                            {{ 'planning.occurrence.outOfRule' | transloco }}
+                          </span>
+                        }
+                      </span>
+                    </div>
+                    <span class="day-list__status" data-testid="occurrence-status">
+                      <app-status-chip
+                        [label]="status.key | transloco"
+                        [icon]="status.icon"
+                        [tone]="status.tone"
+                      />
+                    </span>
+                    <span class="day-list__amount sk-num">
+                      <span>{{ formatMoney(occurrence.amount, occurrence.currency) }}</span>
+                      @if (occurrence.estimated) {
+                        <span class="day-list__estimate">
+                          @if (hasValue(occurrence.amountPln)) {
+                            {{
+                              'planning.estimate'
+                                | transloco: { amount: formatMoney(occurrence.amountPln, 'PLN') }
+                            }}
+                          } @else {
+                            {{ 'planning.estimateUnavailable' | transloco }}
+                          }
+                        </span>
+                      }
+                    </span>
+                    <span class="day-list__actions">
+                      @if (occurrence.status === 'Pending' || occurrence.status === 'Skipped') {
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="settle-occurrence"
+                          (click)="settle.emit(income)"
+                        >
+                          {{ 'planning.occurrence.settle' | transloco }}
+                        </button>
+                      }
+                      @if (!income.oneOff && income.item.status === 'Pending') {
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="skip-occurrence"
+                          (click)="skip.emit(income.item)"
+                        >
+                          {{ 'planning.occurrence.skip' | transloco }}
+                        </button>
+                      }
+                      @if (occurrence.status === 'Settled') {
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="edit-settlement"
+                          (click)="settle.emit(income)"
+                        >
+                          {{ 'planning.occurrence.edit' | transloco }}
+                        </button>
+                      }
+                      @if (occurrence.status !== 'Pending') {
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="undo-occurrence"
+                          (click)="undo.emit(income)"
+                        >
+                          {{ 'planning.occurrence.undo' | transloco }}
+                        </button>
+                      }
+                    </span>
+                  </div>
+                }
+                @case ('payment') {
+                  <div class="day-list__item" data-testid="expense-payment-row">
+                    <mat-icon class="day-list__icon" aria-hidden="true">arrow_upward</mat-icon>
+                    <div class="day-list__main">
+                      <span class="day-list__name">
+                        <span data-testid="row-name">{{ entry.name }}</span>
+                        @if (entry.oneOff) {
+                          <span class="day-list__mark" data-testid="one-off-mark">{{
+                            'planning.oneOff.mark' | transloco
+                          }}</span>
+                        }
+                      </span>
+                    </div>
+                    <span class="day-list__status"></span>
+                    <span class="day-list__amount sk-num">{{
+                      formatMoney(entry.amount, 'PLN')
+                    }}</span>
+                    <span class="day-list__actions"></span>
+                  </div>
+                }
+                @case ('deadline') {
+                  <div class="day-list__item" data-testid="deadline-row">
+                    <mat-icon class="day-list__icon" aria-hidden="true">event</mat-icon>
+                    <div class="day-list__main">
+                      <span class="day-list__name">
+                        <span data-testid="row-name">{{ entry.deadline.name }}</span>
+                      </span>
+                      <span class="day-list__meta">
+                        <span>{{ kindKey(entry.deadline.kind) | transloco }}</span>
+                        <span>{{ entry.deadline.accountName }}</span>
+                      </span>
+                    </div>
+                    <span class="day-list__status"></span>
+                    <span class="day-list__amount sk-num">{{
+                      formatMoney(entry.deadline.amount, entry.deadline.currency)
+                    }}</span>
+                    <span class="day-list__actions"></span>
+                  </div>
+                }
+              }
+            </li>
+          }
+        </ul>
+      </li>
+    }
+
+    @if (contributions().length > 0) {
+      <li class="day-list__day day-list__day--undated" data-testid="no-date-block">
+        <div class="day-list__date">
+          <span class="day-list__weekday">{{ 'planning.list.noDate' | transloco }}</span>
+        </div>
+        <ul class="day-list__rows">
+          @for (line of contributions(); track line.groupId) {
+            <li class="day-list__row" data-testid="day-row">
+              <div class="day-list__item" data-testid="contribution-row">
+                <span
+                  class="day-list__dot"
+                  aria-hidden="true"
+                  [style.background-color]="colorOf(line.groupId)"
+                ></span>
+                <div class="day-list__main">
+                  <span class="day-list__name">
+                    <span data-testid="row-name">{{ line.name }}</span>
+                    <span class="day-list__mark">{{
+                      'planning.expenses.contribution' | transloco
+                    }}</span>
+                  </span>
+                </div>
+                <span class="day-list__status"></span>
+                <span class="day-list__amount sk-num">{{
+                  formatMoney(negative(line.amountPln), 'PLN')
+                }}</span>
+                <span class="day-list__actions"></span>
+              </div>
+            </li>
+          }
+        </ul>
+      </li>
+    }
+  </ol>
+}

@@ -262,6 +262,8 @@ describe('Planning', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   let responses: Record<string, Record<string, unknown>>;
   let overdueItems: Record<string, unknown>[];
+  let depositsFail: boolean;
+  const originalMatchMedia = window.matchMedia;
 
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
@@ -272,12 +274,27 @@ describe('Planning', () => {
     vi.setSystemTime(new Date(2026, 9, 20, 12));
     responses = {};
     overdueItems = [];
+    depositsFail = false;
   });
 
   afterEach(() => {
     vi.useRealTimers();
     fetchSpy.mockRestore();
+    window.matchMedia = originalMatchMedia;
   });
+
+  function phoneViewport(): void {
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes('max-width'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+      onchange: null,
+    })) as typeof window.matchMedia;
+  }
 
   async function setup(url = '/planning'): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -291,6 +308,18 @@ describe('Planning', () => {
       }
       if (requestUrl(input).includes('/planning/todo')) {
         return jsonResponse({ items: [], paymentLeadDays: 7 });
+      }
+      if (requestUrl(input).includes('/portfolio/deposits') && depositsFail) {
+        return jsonResponse({ detail: 'Deposits down.' }, 500);
+      }
+      if (requestUrl(input).includes('/portfolio/deposits')) {
+        return jsonResponse([]);
+      }
+      if (requestUrl(input).includes('/portfolio/bonds')) {
+        return jsonResponse([]);
+      }
+      if (requestUrl(input).includes('/portfolio/asset-groups')) {
+        return jsonResponse([]);
       }
       const requestedYear = /\/planning\/years\/(\d{4})/.exec(requestUrl(input));
       if (requestedYear) {
@@ -480,6 +509,7 @@ describe('Planning', () => {
     responses['2026-10'] = month({
       occurrences: [
         occurrence('Pensja', '2026-10-05', 500),
+        occurrence('Zaległa', '2026-10-20', 100, { overdue: true }),
         occurrence('Wypłata', '2026-10-30', 9200, {
           status: 'Settled',
           accountName: 'Konto firmowe',
@@ -503,7 +533,7 @@ describe('Planning', () => {
     });
     await setup();
 
-    const [pending, settled, skipped, outOfRule] = rows('occurrence-row');
+    const [pending, skipped, outOfRule, overdue, settled] = rows('occurrence-row');
     const has = (row: HTMLElement, testId: string): boolean =>
       row.querySelector(`[data-testid="${testId}"]`) !== null;
     const statusOf = (row: HTMLElement): string =>
@@ -512,6 +542,17 @@ describe('Planning', () => {
     expect(statusOf(pending)).toMatch(/pending/i);
     expect(statusOf(settled)).toMatch(/settled/i);
     expect(statusOf(skipped)).toMatch(/skipped/i);
+    expect(statusOf(overdue)).toMatch(/overdue/i);
+    for (const row of [pending, skipped, outOfRule, overdue, settled]) {
+      expect(row.querySelector('[data-testid="occurrence-status"] mat-icon')).not.toBeNull();
+    }
+    expect(skipped.classList.contains('day-list__item--skipped')).toBe(true);
+    expect(pending.classList.contains('day-list__item--skipped')).toBe(false);
+    expect(overdue.classList.contains('day-list__item--overdue')).toBe(true);
+    expect(settled.querySelector('[data-testid="occurrence-actual"]')!.textContent).toContain(
+      `Settled on ${formatDate('2026-10-29')}`,
+    );
+    expect(pending.querySelector('[data-testid="occurrence-actual"]')).toBeNull();
 
     expect(has(pending, 'settle-occurrence')).toBe(true);
     expect(has(pending, 'skip-occurrence')).toBe(true);
@@ -627,8 +668,8 @@ describe('Planning', () => {
     );
 
     const [overdueRow, regularRow] = rows('occurrence-row');
-    expect(overdueRow.classList.contains('planning-table__row--overdue')).toBe(true);
-    expect(regularRow.classList.contains('planning-table__row--overdue')).toBe(false);
+    expect(overdueRow.classList.contains('day-list__item--overdue')).toBe(true);
+    expect(regularRow.classList.contains('day-list__item--overdue')).toBe(false);
 
     const text = (testId: string): string => rows(testId)[0].textContent!;
     expect(text('balance-plan')).toContain(formatMoney(9700, 'PLN'));
@@ -793,7 +834,7 @@ describe('Planning', () => {
     await vi.waitFor(() => expect(requestedMonths()).toEqual(['2026-10', '2026-10']));
   });
 
-  it('opens the add expense dialog from the Wydatki section', async () => {
+  it('opens the add expense dialog from the header', async () => {
     await setup();
 
     click('add-expense');
@@ -802,6 +843,84 @@ describe('Planning', () => {
       RecurringExpenseFormDialog,
       expect.anything(),
     );
+  });
+
+  it('opens the add income dialog from the header', async () => {
+    await setup();
+
+    click('add-income');
+
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      RecurringIncomeFormDialog,
+      expect.anything(),
+    );
+  });
+
+  it('shows a retry error when the month fails', async () => {
+    await setup('/planning?month=2026-11');
+    const failing = fetchSpy.getMockImplementation()!;
+    fetchSpy.mockImplementation(async (input: RequestInfo | URL) =>
+      /\/planning\/months\//.test(requestUrl(input))
+        ? jsonResponse({ detail: 'Month down.' }, 500)
+        : failing(input),
+    );
+
+    click('next-month');
+    await vi.waitFor(async () => {
+      await settle();
+      expect(element().querySelector('app-section-error')).not.toBeNull();
+    });
+
+    expect(element().querySelector('app-section-error')!.textContent).toContain('Retry');
+    expect(rows('next-month')).toHaveLength(1);
+    expect(tabs()).toHaveLength(2);
+    expect(rows('payment-lead-days-input')).toHaveLength(1);
+  });
+
+  it('a failed deadline request does not hide the list', async () => {
+    depositsFail = true;
+    responses['2026-10'] = month({ occurrences: [occurrence('Wypłata', '2026-10-09', 6500)] });
+    await setup();
+
+    expect(element().textContent).toContain('Deposit and bond dates could not be loaded.');
+    expect(rows('occurrence-row')).toHaveLength(1);
+    expect(rows('day-group')).toHaveLength(1);
+  });
+
+  it('keeps the overdue occurrences out of the day list', async () => {
+    overdueItems = [overdueItem('800+', '2026-09-10', 800)];
+    responses['2026-10'] = month({ occurrences: [occurrence('Wypłata', '2026-10-09', 6500)] });
+    await setup();
+
+    expect(rows('overdue-section')).toHaveLength(1);
+    expect(rows('overdue-section')[0].textContent).toContain('800+');
+    expect(rows('day-group')).toHaveLength(1);
+    expect(rows('day-group')[0].textContent).not.toContain('800+');
+    expect(rows('occurrence-row')).toHaveLength(1);
+    expect(rows('expense-payment-row')).toHaveLength(0);
+    expect(element().querySelector('.planning-table')).toBeNull();
+  });
+
+  it('shows the list and a summary strip on a phone', async () => {
+    phoneViewport();
+    responses['2026-10'] = month(
+      {
+        occurrences: [occurrence('Wypłata', '2026-10-09', 6500)],
+        balance: balance({ planPln: 6500, pendingPln: 4321.5 }),
+      },
+      {},
+      { planPln: 1234.5, forecastPln: 1234.5 },
+    );
+    await setup('/planning?month=2026-10&layout=calendar');
+
+    expect(rows('layout-list')).toHaveLength(0);
+    expect(rows('layout-calendar')).toHaveLength(0);
+    expect(rows('calendar-cell')).toHaveLength(0);
+    expect(rows('day-group')).toHaveLength(1);
+    const strip = rows('summary-strip');
+    expect(strip).toHaveLength(1);
+    expect(strip[0].textContent).toContain(formatMoney(4321.5, 'PLN'));
+    expect(strip[0].textContent).toContain(formatMoney(1234.5, 'PLN'));
   });
 
   function oneOffIncome(
@@ -1006,7 +1125,7 @@ describe('Planning', () => {
         data: { oneOffIncome: expect.objectContaining({ id: 'one-off-Zwrot podatku' }) },
       }),
     );
-    expect(rows('occurrence-row')[0].classList.contains('planning-table__row--overdue')).toBe(true);
+    expect(rows('occurrence-row')[0].classList.contains('day-list__item--overdue')).toBe(true);
   });
 
   it('shows the free funds plan and forecast, a negative value as a deficit and the incomplete marker', async () => {
@@ -1132,10 +1251,10 @@ describe('Planning', () => {
     );
     await setup();
 
-    const lines = rows('group-contribution');
+    const lines = rows('contribution-row');
     expect(lines).toHaveLength(2);
     expect(lines[0].textContent).toContain('Emerytura');
-    expect(lines[0].textContent).toContain(formatMoney(2000, 'PLN'));
+    expect(lines[0].textContent).toContain(formatMoney(-2000, 'PLN'));
     expect(lines[1].textContent).toContain('Inwestycje');
 
     expect(rows('split-section')).toHaveLength(1);
@@ -1170,14 +1289,14 @@ describe('Planning', () => {
     responses['2026-09'] = month({}, {}, { planPln: 7000, forecastPln: 7000 }, null);
     await setup();
 
-    expect(rows('group-contribution')).toHaveLength(2);
+    expect(rows('contribution-row')).toHaveLength(2);
     expect(rows('split-section')).toHaveLength(1);
 
     click('previous-month');
     await settle();
 
     expect(requestedMonths().at(-1)).toBe('2026-09');
-    expect(rows('group-contribution')).toHaveLength(0);
+    expect(rows('contribution-row')).toHaveLength(0);
     expect(rows('split-section')).toHaveLength(0);
     expect(rows('split-cushion')).toHaveLength(0);
   });

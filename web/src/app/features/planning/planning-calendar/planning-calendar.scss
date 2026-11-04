@@ -104,18 +104,8 @@
   clip-path: inset(50%);
 }
 
-.planning-calendar__more,
-.planning-calendar__count {
+.planning-calendar__more {
   font-size: 0.75rem;
-}
-
-.planning-calendar__count {
-  align-self: flex-start;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--mat-sys-primary-container);
-  color: var(--mat-sys-on-primary-container);
-  font-weight: 500;
 }
 
 .planning-calendar__details {
@@ -152,10 +142,4 @@
 .planning-calendar__detail .planning-calendar__name {
   flex: 1 1 8rem;
   font-weight: 500;
-}
-
-@media (max-width: 599.98px) {
-  .planning-calendar__cell {
-    min-height: 56px;
-  }
 }

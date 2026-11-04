@@ -1,0 +1,187 @@
+.day-list,
+.day-list__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day-list {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: var(--mat-sys-corner-medium);
+}
+
+.day-list__empty {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.day-list__day {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.day-list__day--today {
+  background: var(--sk-accent-tint);
+}
+
+.day-list__date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.day-list__day-number {
+  font: var(--mat-sys-title-large);
+  color: var(--mat-sys-on-surface);
+}
+
+.day-list__weekday {
+  font: var(--mat-sys-label-medium);
+}
+
+.day-list__row:not(:last-child) {
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.day-list__item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.day-list__item--overdue {
+  background: var(--sk-negative-container);
+}
+
+.day-list__item--skipped .day-list__name,
+.day-list__item--skipped .day-list__amount {
+  text-decoration: line-through;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.day-list__icon {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.day-list__dot {
+  width: 12px;
+  height: 12px;
+  margin: 6px;
+  border-radius: 50%;
+}
+
+.day-list__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.day-list__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+
+.day-list__mark {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--sk-neutral-container);
+  font: var(--mat-sys-label-small);
+  font-weight: 400;
+}
+
+.day-list__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.day-list__warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--sk-negative);
+
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+}
+
+.day-list__amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.day-list__estimate {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.day-list__actions {
+  display: flex;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+@media (max-width: 719.98px) {
+  .day-list__day {
+    grid-template-columns: 1fr;
+  }
+
+  .day-list__date {
+    flex-direction: row;
+    gap: 8px;
+    padding: 8px 12px 0;
+  }
+
+  .day-list__item {
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    grid-template-areas:
+      'icon main amount'
+      '. status actions';
+    row-gap: 8px;
+  }
+
+  .day-list__icon,
+  .day-list__dot {
+    grid-area: icon;
+  }
+
+  .day-list__main {
+    grid-area: main;
+  }
+
+  .day-list__amount {
+    grid-area: amount;
+  }
+
+  .day-list__status {
+    grid-area: status;
+  }
+
+  .day-list__actions {
+    grid-area: actions;
+
+    button {
+      min-height: 44px;
+    }
+  }
+}

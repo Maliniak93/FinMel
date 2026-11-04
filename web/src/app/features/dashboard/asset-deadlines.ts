@@ -3,6 +3,7 @@ import type { BondResponse, DepositResponse } from '../../api/portfolio';
 export interface AssetDeadline {
   kind: 'deposit' | 'bond';
   name: string;
+  accountName: string;
   date: string;
   amount: number | string;
   currency: string;
@@ -24,6 +25,7 @@ export function assetDeadlines(
       items.push({
         kind: 'deposit',
         name: deposit.name,
+        accountName: deposit.returnAccountName,
         date: deposit.maturityDate,
         amount: deposit.projection.finalAmount,
         currency: deposit.currency,
@@ -38,6 +40,7 @@ export function assetDeadlines(
       items.push({
         kind: 'bond',
         name: bond.name,
+        accountName: bond.accountName,
         date: bond.maturityDate,
         amount: bond.bookValue,
         currency: 'PLN',
