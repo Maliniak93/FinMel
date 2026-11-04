@@ -73,14 +73,14 @@ export async function logInThroughApi(
 }
 
 export function warsawDate(daysAgo = 0): string {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() - daysAgo);
-  return new Intl.DateTimeFormat('en-CA', {
+  const today = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Warsaw',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(date);
+  }).format(new Date());
+  const [year, month, day] = today.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(year, month - 1, day - daysAgo)).toISOString().slice(0, 10);
 }
 
 function bearer(token: string): { Authorization: string } {

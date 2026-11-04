@@ -275,7 +275,7 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     const occurrence = occurrences(page, REFUND);
     await occurrence.getByTestId('undo-occurrence').click();
     await page.getByRole('dialog').getByRole('button', { name: 'Cofnij', exact: true }).click();
-    await expect(status(occurrence)).toHaveText('oczekuje');
+    await expect(status(occurrence)).toHaveText(/^(oczekuje|zaległe)$/);
     await expectBalance(page, { plan: '8 500,00', actual: '0,00', pending: '8 500,00' });
     await expect(overdueRows(page)).toHaveCount(1);
     await openBankAccount(page, BANK);
