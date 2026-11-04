@@ -96,6 +96,13 @@
   overflow-wrap: anywhere;
 }
 
+.planning-calendar__icon {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  font-size: 14px;
+}
+
 .planning-calendar__status {
   position: absolute;
   width: 1px;

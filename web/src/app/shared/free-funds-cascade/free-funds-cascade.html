@@ -1,0 +1,62 @@
+<div class="cascade">
+  @for (column of columns(); track column.key) {
+    <div class="cascade__column">
+      @if (column.title) {
+        <h3 class="cascade__title">{{ column.title }}</h3>
+      }
+      @for (row of column.rows; track row.key) {
+        <div
+          class="cascade__row"
+          [class.cascade__row--free]="row.key === 'free'"
+          [attr.data-testid]="row.testId"
+        >
+          <span class="cascade__label">{{ row.label }}</span>
+          @if (row.deficit) {
+            <span class="cascade__amount cascade__deficit" [attr.data-testid]="row.deficitTestId">
+              <mat-icon aria-hidden="true">warning</mat-icon>
+              {{ formatMoney(row.amount, 'PLN') }}
+              {{ labels().deficit }}
+            </span>
+          } @else {
+            <span class="cascade__amount">{{ formatMoney(row.amount, 'PLN') }}</span>
+          }
+          <div class="cascade__track">
+            @if (row.key === 'contributions') {
+              <div
+                class="cascade__bar"
+                [style.width.%]="row.percent"
+                [attr.data-testid]="row.barTestId"
+              >
+                <app-split-bar [segments]="segments()" />
+              </div>
+            } @else {
+              <div
+                class="cascade__bar"
+                [class.cascade__bar--income]="row.key === 'incomes'"
+                [class.cascade__bar--expense]="row.key === 'expenses'"
+                [class.cascade__bar--free]="row.key === 'free' && !row.deficit"
+                [class.cascade__bar--deficit]="row.key === 'free' && row.deficit"
+                [style.width.%]="row.percent"
+                [attr.data-testid]="row.barTestId"
+              ></div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+</div>
+
+@if (split().length > 0) {
+  <ul class="cascade__split">
+    @for (row of split(); track row.key) {
+      <li
+        class="cascade__split-row"
+        [attr.data-testid]="testIds()['split-row'] ?? 'cascade-split-row'"
+      >
+        <span>{{ row.label }}</span>
+        <span class="cascade__amount">{{ formatMoney(row.amountPln, 'PLN') }}</span>
+      </li>
+    }
+  </ul>
+}

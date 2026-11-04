@@ -55,6 +55,12 @@ import {
 } from '../../core/planning/planning-state';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { fromDateOnly } from '../../shared/date-only';
+import { activeLocale } from '../../core/i18n/language';
+import {
+  type CascadeLabels,
+  FreeFundsCascade,
+} from '../../shared/free-funds-cascade/free-funds-cascade';
+import { groupColor } from '../../shared/colors';
 import { formatDate, formatMoney, formatMonth } from '../../shared/format';
 import { SectionError } from '../../shared/section-error/section-error';
 import { SummaryStrip, type SummaryItem } from '../../shared/summary-strip/summary-strip';
@@ -88,6 +94,10 @@ const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 const PHONE_QUERY = '(max-width: 719.98px)';
 
+function toGrosze(amount: number | string): number {
+  return Math.round(Number(amount) * 100);
+}
+
 const STATUS_KEYS: Record<RecurringIncomeStatus, string> = {
   Upcoming: 'planning.status.upcoming',
   Active: 'planning.status.active',
@@ -108,6 +118,7 @@ function shiftMonth(month: string, delta: number): string {
     MatChipsModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    FreeFundsCascade,
     MatTabsModule,
     PlanningCalendar,
     PlanningDayList,
@@ -248,6 +259,54 @@ export class Planning {
     this.monthResource.hasValue() ? this.monthResource.value().freeFunds : null,
   );
 
+  protected readonly cascadeLabels = computed<CascadeLabels>(() => {
+    activeLocale();
+    return {
+      incomes: translate('dashboard.monthCard.incomes'),
+      expenses: translate('dashboard.monthCard.expenses'),
+      contributions: translate('dashboard.monthCard.contributions'),
+      free: translate('dashboard.monthCard.free'),
+      deficit: translate('planning.freeFunds.deficit'),
+      plan: translate('planning.freeFunds.plan'),
+      forecast: translate('planning.freeFunds.forecast'),
+    };
+  });
+
+  protected readonly cascadeTestIds = {
+    'plan-free': 'free-funds-plan',
+    'forecast-free': 'free-funds-forecast',
+    'free-deficit': 'free-funds-deficit',
+    'forecast-free-deficit': 'free-funds-deficit',
+  };
+
+  protected readonly cascade = computed(() => {
+    const data = this.monthData();
+    if (!data) {
+      return null;
+    }
+    const contributionsGrosze = data.expenses.groupContributions.reduce(
+      (sum, contribution) => sum + toGrosze(contribution.amountPln),
+      0,
+    );
+    const expenses = (toGrosze(data.expenses.costPln) - contributionsGrosze) / 100;
+    const contributions = contributionsGrosze / 100;
+    const balance = data.incomes.balance;
+    return {
+      plan: {
+        incomes: Number(balance.planPln),
+        expenses,
+        contributions,
+        free: Number(data.freeFunds.planPln),
+      },
+      forecast: {
+        incomes: (toGrosze(balance.actualPln) + toGrosze(balance.pendingPln)) / 100,
+        expenses,
+        contributions,
+        free: Number(data.freeFunds.forecastPln),
+      },
+    };
+  });
+
   protected readonly split = computed(() => this.monthData()?.split ?? null);
 
   private readonly expandedGroups = signal<ReadonlySet<string>>(new Set());
@@ -301,10 +360,6 @@ export class Planning {
 
   protected isMultiMonth(definition: Pick<ExpenseDefinitionResponse, 'intervalMonths'>): boolean {
     return Number(definition.intervalMonths) > 1;
-  }
-
-  protected isNegative(amount: number | string): boolean {
-    return Number(amount) < 0;
   }
 
   protected isPositive(amount: number | string): boolean {
@@ -672,6 +727,10 @@ export class Planning {
       }
       return next;
     });
+  }
+
+  protected groupColorOf(groupId: string): string {
+    return groupColor(this.groups().find((group) => group.id === groupId)?.color);
   }
 
   protected shareValue(group: SplitGroupResponse): string {

@@ -1,0 +1,99 @@
+:host {
+  display: block;
+}
+
+.cascade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.cascade__column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cascade__title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.cascade__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 16px;
+  row-gap: 4px;
+}
+
+.cascade__row--free {
+  font-weight: 600;
+}
+
+.cascade__amount {
+  text-align: right;
+}
+
+.cascade__track {
+  grid-column: 1 / -1;
+  height: 8px;
+}
+
+.cascade__bar {
+  height: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.cascade__bar--income {
+  background-color: var(--sk-positive);
+}
+
+.cascade__bar--expense {
+  background-color: var(--mat-sys-outline);
+}
+
+.cascade__bar--free {
+  background-color: var(--mat-sys-primary);
+}
+
+.cascade__bar--deficit {
+  box-sizing: border-box;
+  background-color: var(--mat-sys-error-container);
+  border: 1px dashed var(--mat-sys-error);
+}
+
+.cascade__deficit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  color: var(--mat-sys-error);
+}
+
+.cascade__deficit mat-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
+.cascade__split {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.875rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.cascade__split-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}

@@ -263,6 +263,7 @@ describe('Planning', () => {
   let responses: Record<string, Record<string, unknown>>;
   let overdueItems: Record<string, unknown>[];
   let depositsFail: boolean;
+  let groupsFail: boolean;
   const originalMatchMedia = window.matchMedia;
 
   beforeAll(() => {
@@ -275,6 +276,7 @@ describe('Planning', () => {
     responses = {};
     overdueItems = [];
     depositsFail = false;
+    groupsFail = false;
   });
 
   afterEach(() => {
@@ -317,6 +319,9 @@ describe('Planning', () => {
       }
       if (requestUrl(input).includes('/portfolio/bonds')) {
         return jsonResponse([]);
+      }
+      if (requestUrl(input).includes('/portfolio/asset-groups') && groupsFail) {
+        return jsonResponse({ detail: 'Groups down.' }, 500);
       }
       if (requestUrl(input).includes('/portfolio/asset-groups')) {
         return jsonResponse([]);
@@ -1129,9 +1134,16 @@ describe('Planning', () => {
   });
 
   it('shows the free funds plan and forecast, a negative value as a deficit and the incomplete marker', async () => {
-    responses['2026-10'] = month({}, {}, { planPln: 12300, forecastPln: 11443.27 });
+    responses['2026-10'] = month(
+      { balance: balance({ planPln: 13600, actualPln: 9000.5, pendingPln: 1000.25 }) },
+      { costPln: 5679.99 },
+      { planPln: 12300, forecastPln: 11443.27 },
+    );
     await setup();
 
+    expect(rows('cascade-plan-incomes')[0].textContent).toContain(formatMoney(13600, 'PLN'));
+    expect(rows('cascade-forecast-incomes')[0].textContent).toContain(formatMoney(10000.75, 'PLN'));
+    expect(rows('cascade-forecast-expenses')[0].textContent).toContain(formatMoney(5679.99, 'PLN'));
     expect(rows('free-funds-plan')[0].textContent).toContain(formatMoney(12300, 'PLN'));
     expect(rows('free-funds-forecast')[0].textContent).toContain(formatMoney(11443.27, 'PLN'));
     expect(rows('free-funds-deficit')).toHaveLength(0);
@@ -1146,6 +1158,27 @@ describe('Planning', () => {
     expect(deficits).toHaveLength(1);
     expect(deficits[0].textContent).toContain(formatMoney(-700, 'PLN'));
     expect(rows('free-funds-incomplete')).toHaveLength(1);
+  });
+
+  it('keeps the cascade when the groups request fails', async () => {
+    groupsFail = true;
+    responses['2026-10'] = month(
+      { occurrences: [occurrence('Wynagrodzenie', '2026-10-09', 11400)] },
+      { groupContributions: contributions, costPln: 4000 },
+      { planPln: 4000, forecastPln: 4000 },
+    );
+    await setup();
+
+    const bar = rows('cascade-plan-contributions')[0].querySelector<HTMLElement>(
+      'app-split-bar [role="img"]',
+    )!;
+    expect(bar.getAttribute('aria-label')).toContain('Emerytura');
+    const segments = [...bar.querySelectorAll<HTMLElement>('.split-bar__segment')];
+    expect(segments).toHaveLength(2);
+    for (const segment of segments) {
+      expect(segment.style.backgroundColor).toContain('--sk-g-none');
+    }
+    expect(rows('occurrence-row').length).toBeGreaterThan(0);
   });
 
   function todoRequests(): number {
@@ -1334,7 +1367,9 @@ describe('Planning', () => {
     const inputs = () => rows('share-input') as HTMLInputElement[];
     const save = () => element().querySelector<HTMLButtonElement>('[data-testid="shares-save"]')!;
     expect(inputs()).toHaveLength(2);
+    const sumIcon = () => rows('share-sum-icon')[0].textContent!.trim();
     expect(rows('share-sum')[0].textContent).toContain('100');
+    expect(sumIcon()).toBe('check_circle');
     expect(save().disabled).toBe(true);
 
     inputs()[0].value = '30';
@@ -1342,6 +1377,7 @@ describe('Planning', () => {
     await settle();
 
     expect(rows('share-sum')[0].textContent).toContain('80');
+    expect(sumIcon()).toBe('warning');
     expect(save().disabled).toBe(true);
 
     inputs()[1].value = '70';
@@ -1349,6 +1385,7 @@ describe('Planning', () => {
     await settle();
 
     expect(rows('share-sum')[0].textContent).toContain('100');
+    expect(sumIcon()).toBe('check_circle');
     expect(save().disabled).toBe(false);
 
     save().click();

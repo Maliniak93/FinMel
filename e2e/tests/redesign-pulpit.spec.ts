@@ -385,7 +385,9 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
       (await page.getByTestId(testId).locator('dd').innerText()).trim();
     const incomesText = await planned('balance-plan');
     const expensesText = await planned('expense-cost');
-    const freeText = await planned('free-funds-plan');
+    const freeText = (
+      await page.getByTestId('free-funds-plan').locator('.cascade__amount').innerText()
+    ).trim();
     const same = (text: string): RegExp => new RegExp(text.replace(/\s/g, '\\s'));
     await openDashboard(page);
     const card = monthCard(page);
@@ -399,7 +401,7 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
       );
     const cardExpenses = await card
       .getByTestId('month-card-expenses')
-      .locator('.month-card__amount')
+      .locator('.cascade__amount')
       .innerText();
     expect(amountOf(cardExpenses) + 2500).toBe(amountOf(expensesText));
     await expect(card.getByTestId('month-card-contributions')).toContainText(pln('2 500,00'));

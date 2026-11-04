@@ -1,4 +1,12 @@
 <ng-template #itemContent let-item>
+  @if (item.status) {
+    <mat-icon class="planning-calendar__icon" aria-hidden="true">{{
+      statusIcon(item.status)
+    }}</mat-icon>
+  }
+  @if (kindIcon(item.kind); as kindGlyph) {
+    <mat-icon class="planning-calendar__icon" aria-hidden="true">{{ kindGlyph }}</mat-icon>
+  }
   <span class="planning-calendar__name">{{ item.name }}</span>
   <span class="planning-calendar__amount">{{ formatMoney(item.amount, item.currency) }}</span>
   @if (item.status) {
