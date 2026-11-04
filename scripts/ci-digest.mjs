@@ -104,7 +104,7 @@ async function main() {
         const out = ghOrNull(["api", `repos/${REPO}/actions/runs/${runId}/jobs?per_page=100`, "--jq", ".jobs"]);
         return out ? JSON.parse(out) : [];
       },
-      readLog: (jobId) => ghOrNull(["api", `repos/${REPO}/actions/jobs/${jobId}/logs`]),
+      readLog: (jobId) => ghOrNull(["api", "--allow-escape-sequences", `repos/${REPO}/actions/jobs/${jobId}/logs`]),
     });
     console.log(formatDigest(pr, digests));
   } catch (err) {

@@ -19,7 +19,7 @@ at `e2e` (app). Nobody is watching: never call `AskUserQuestion`, never build. F
 instead of steps 0 and 4.
 
 `$ARGUMENTS` = `ci:#<n>` → **unattended CI fix**, launched by `scripts/autobuild.mjs` after the CI of part `#<n>`'s open PR
-stayed red (not a rerun case, or red after the rerun). Nobody is watching: never call `AskUserQuestion`, publish no
+stayed red after the rerun. Nobody is watching: never call `AskUserQuestion`, publish no
 issue. Follow **Unattended CI fix** below instead of steps 0–4.
 
 ## 0. Is it already known?

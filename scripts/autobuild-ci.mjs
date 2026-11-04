@@ -2,8 +2,7 @@
 
 import { ciFixOutcome, parseFixResult } from "./e2e-repair.mjs";
 
-export const CI_RERUN_MAX_TESTS = 5;
-export const CI_POLICY_LINE = `CI: rerun failed jobs once when < ${CI_RERUN_MAX_TESTS} tests failed, then one fix session per PR`;
+export const CI_POLICY_LINE = "CI: rerun failed jobs once per head commit, then one fix session per PR";
 export const CI_FIX_MARKER = "<!-- skarbiec-ci-fix -->";
 
 export function jobRef(htmlUrl) {
@@ -31,20 +30,19 @@ const names = (list) => list.map((f) => f.name).join(", ");
 export function decideOnRed(failures, { attemptOf = (f) => f.attempt, fixed = false } = {}) {
   if (!failures.length) return { action: "stop", reason: "no failed job to rerun" };
   const beyond = fixed ? "stop" : "fix";
-  const other = failures.find((f) => f.kind !== "test" && f.kind !== "infra");
-  if (other) return { action: beyond, reason: `${other.name} is neither a test nor an infrastructure failure` };
-  const tests = failures.filter((f) => f.kind === "test");
-  const unknown = tests.find((f) => !Number.isInteger(f.tests));
-  if (unknown) return { action: beyond, reason: `the failed test count of ${unknown.name} is unknown` };
-  const sum = tests.reduce((acc, f) => acc + f.tests, 0);
-  if (sum >= CI_RERUN_MAX_TESTS) return { action: beyond, reason: `${sum} tests failed (${names(tests)}), the limit for a rerun is ${CI_RERUN_MAX_TESTS - 1}` };
+  const stuck = failures.find((f) => f.runId == null);
+  if (stuck) return { action: beyond, reason: `${stuck.name} has no workflow run to rerun` };
   const late = failures.find((f) => !(Number.isInteger(attemptOf(f)) && attemptOf(f) < 2));
   if (late) return { action: beyond, reason: `red after rerun (${late.name})` };
+  const tests = failures.filter((f) => f.kind === "test");
   const infra = failures.filter((f) => f.kind === "infra");
+  const other = failures.filter((f) => f.kind !== "test" && f.kind !== "infra");
+  const counted = tests.reduce((acc, f) => acc + (Number.isInteger(f.tests) ? f.tests : 0), 0);
   const parts = [];
-  if (tests.length) parts.push(`${sum} test${sum === 1 ? "" : "s"} failed (${names(tests)})`);
+  if (tests.length) parts.push(`${counted ? `${counted} test${counted === 1 ? "" : "s"}` : "tests"} failed (${names(tests)})`);
   if (infra.length) parts.push(`infrastructure failure (${names(infra)})`);
-  return { action: "rerun", reason: parts.join(" + "), tests: sum };
+  if (other.length) parts.push(`${names(other)} failed`);
+  return { action: "rerun", reason: parts.join(" + "), tests: counted };
 }
 
 export async function driveCi({ pr, readChecks, readJobs, readLog, rerun, fix, fixMarked, resume, sleep, say, budget, stop, onRerun = () => {}, onFix = () => {}, pollMs, missingMs, timeoutMs, now = Date.now }) {
