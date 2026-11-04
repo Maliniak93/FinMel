@@ -1,9 +1,13 @@
-import { Component, computed, inject, input, resource } from '@angular/core';
+import { BreakpointObserver } from '@angular/cdk/layout';
+import { NgTemplateOutlet } from '@angular/common';
+import { Component, computed, inject, input, resource, signal } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
+import { map } from 'rxjs';
 
 import {
   getApiPortfolioPlanningYearsByYear,
@@ -12,33 +16,65 @@ import {
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { fromDateOnly } from '../../../shared/date-only';
+import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatMoney, formatMonth } from '../../../shared/format';
+import { SectionError } from '../../../shared/section-error/section-error';
 import { currentWarsawMonth } from '../recurrence';
+import { PlanningYearChart } from './planning-year-chart';
 
 const YEAR_PATTERN = /^\d{4}$/;
 
-type ValueColumn = Exclude<keyof PlanningYearTotalsResponse, never>;
+const PHONE_QUERY = '(max-width: 719.98px)';
 
-const VALUE_COLUMNS: { key: ValueColumn; label: string }[] = [
-  { key: 'incomePlanPln', label: 'planning.year.columns.incomePlan' },
-  { key: 'incomeActualPln', label: 'planning.year.columns.incomeActual' },
-  { key: 'differencePln', label: 'planning.year.columns.difference' },
-  { key: 'costPln', label: 'planning.year.columns.cost' },
-  { key: 'freeFundsPlanPln', label: 'planning.year.columns.freeFundsPlan' },
-  { key: 'freeFundsForecastPln', label: 'planning.year.columns.freeFundsForecast' },
+type ValueColumn = keyof PlanningYearTotalsResponse;
+
+interface ColumnDefinition {
+  key: ValueColumn;
+  label: string;
+  phone: boolean;
+}
+
+const VALUE_COLUMNS: ColumnDefinition[] = [
+  { key: 'incomePlanPln', label: 'planning.year.columns.incomePlan', phone: false },
+  { key: 'incomeActualPln', label: 'planning.year.columns.incomeActual', phone: false },
+  { key: 'differencePln', label: 'planning.year.columns.difference', phone: false },
+  { key: 'costPln', label: 'planning.year.columns.cost', phone: true },
+  { key: 'freeFundsPlanPln', label: 'planning.year.columns.freeFundsPlan', phone: false },
+  { key: 'freeFundsForecastPln', label: 'planning.year.columns.freeFundsForecast', phone: true },
 ];
+
+const FREE_FUNDS_KEYS: ValueColumn[] = ['freeFundsPlanPln', 'freeFundsForecastPln'];
+
+interface YearCell {
+  key: ValueColumn;
+  label: string;
+  phone: boolean;
+  text: string;
+  deficit: boolean;
+  actual: boolean;
+}
 
 interface YearRow {
   month: string;
   label: string;
   current: boolean;
   overdue: boolean;
-  cells: string[];
+  incomplete: boolean;
+  cells: YearCell[];
 }
 
 @Component({
   selector: 'app-planning-year',
-  imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, TranslocoPipe],
+  imports: [
+    EmptyState,
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    NgTemplateOutlet,
+    PlanningYearChart,
+    SectionError,
+    TranslocoPipe,
+  ],
   templateUrl: './planning-year.html',
   styleUrl: './planning-year.scss',
 })
@@ -48,6 +84,15 @@ export class PlanningYear {
   readonly year = input<string | number>();
 
   protected readonly columns = VALUE_COLUMNS;
+
+  protected readonly phone = toSignal(
+    inject(BreakpointObserver)
+      .observe(PHONE_QUERY)
+      .pipe(map((state) => state.matches)),
+    { initialValue: false },
+  );
+
+  protected readonly expanded = signal<readonly string[]>([]);
 
   protected readonly selectedYear = computed(() => {
     const requested = String(this.year() ?? '');
@@ -72,28 +117,38 @@ export class PlanningYear {
     },
   });
 
-  protected readonly rows = computed<YearRow[]>(() => {
-    if (!this.yearResource.hasValue()) {
-      return [];
-    }
+  protected readonly months = computed(() =>
+    this.yearResource.hasValue() ? this.yearResource.value().months : [],
+  );
 
+  protected readonly hasDefinitions = computed(() =>
+    this.months().some((month) => month.hasDefinitions),
+  );
+
+  protected readonly rows = computed<YearRow[]>(() => {
     const now = currentWarsawMonth();
-    return this.yearResource.value().months.map((month) => ({
+    return this.months().map((month) => ({
       month: month.month,
       label: formatMonth(fromDateOnly(`${month.month}-01`)),
       current: month.month === now,
       overdue: month.hasOverdue,
-      cells: VALUE_COLUMNS.map((column) => this.cell(month, column.key)),
+      incomplete: month.incomplete,
+      cells: VALUE_COLUMNS.map((column) => this.cell(month, column, month.month < now)),
     }));
   });
 
-  protected readonly totals = computed(() => {
+  protected readonly totals = computed<YearCell[]>(() => {
     if (!this.yearResource.hasValue()) {
       return [];
     }
 
     const { totals } = this.yearResource.value();
-    return VALUE_COLUMNS.map((column) => formatMoney(totals[column.key], 'PLN'));
+    return VALUE_COLUMNS.map((column) => ({
+      ...column,
+      text: formatMoney(totals[column.key], 'PLN'),
+      deficit: false,
+      actual: false,
+    }));
   });
 
   protected readonly hasPrevious = computed(
@@ -119,12 +174,41 @@ export class PlanningYear {
     void this.router.navigate(['/planning'], { queryParams: { month } });
   }
 
-  private cell(month: PlanningYearMonthResponse, key: ValueColumn): string {
+  protected isExpanded(month: string): boolean {
+    return this.expanded().includes(month);
+  }
+
+  protected toggleLabel(month: string): string {
+    return this.isExpanded(month) ? 'planning.year.collapse' : 'planning.year.expand';
+  }
+
+  protected toggle(month: string, event: Event): void {
+    event.stopPropagation();
+    this.expanded.update((open) =>
+      open.includes(month) ? open.filter((item) => item !== month) : [...open, month],
+    );
+  }
+
+  private cell(
+    month: PlanningYearMonthResponse,
+    column: ColumnDefinition,
+    past: boolean,
+  ): YearCell {
+    const base = { key: column.key, label: column.label, phone: column.phone };
     if (!month.hasDefinitions) {
-      return '—';
+      return { ...base, text: '—', deficit: false, actual: false };
     }
 
-    const value = month[key];
-    return value === null || value === undefined ? '' : formatMoney(value, 'PLN');
+    const value = month[column.key];
+    if (value === null || value === undefined) {
+      return { ...base, text: '', deficit: false, actual: false };
+    }
+
+    return {
+      ...base,
+      text: formatMoney(value, 'PLN'),
+      deficit: FREE_FUNDS_KEYS.includes(column.key) && Number(value) < 0,
+      actual: past && column.key === 'freeFundsForecastPln',
+    };
   }
 }

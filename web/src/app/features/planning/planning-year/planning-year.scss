@@ -49,7 +49,63 @@
 }
 
 .planning-year__row--current {
-  background: var(--mat-sys-secondary-container);
+  background: var(--sk-accent-tint);
+
+  > :first-child {
+    border-inline-start: 3px solid var(--sk-accent-stroke);
+  }
+}
+
+.planning-year__row:focus-visible {
+  outline: 2px solid var(--sk-accent-stroke);
+  outline-offset: -2px;
+}
+
+.planning-year__incomplete {
+  margin-inline-start: 8px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  text-transform: none;
+}
+
+.planning-year__deficit {
+  margin-inline-start: 4px;
+  font-size: 0.75rem;
+  color: var(--sk-negative);
+}
+
+.planning-year__table .planning-year__toggle {
+  width: 56px;
+  padding: 0;
+  text-align: center;
+}
+
+.planning-year__expand {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.planning-year__detail {
+  dl {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+  }
+
+  dl > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  dd {
+    margin: 0;
+  }
+}
+
+app-planning-year-chart {
+  display: block;
+  margin-block-end: 24px;
 }
 
 .planning-year__month {

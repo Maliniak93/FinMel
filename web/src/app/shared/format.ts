@@ -139,6 +139,12 @@ export function formatMonthName(value: string | Date | null | undefined): string
     : new Intl.DateTimeFormat(activeLocale(), { month: 'long' }).format(toDate(value));
 }
 
+export function formatMonthShort(value: string | Date | null | undefined): string {
+  return value === null || value === undefined || value === ''
+    ? ''
+    : new Intl.DateTimeFormat(activeLocale(), { month: 'short' }).format(toDate(value));
+}
+
 export function formatDateTime(value: string | Date | null | undefined): string {
   return value === null || value === undefined || value === ''
     ? ''

@@ -41,6 +41,9 @@ const FULL_MONTH = {
   incomplete: false,
 };
 
+let emptyYear = false;
+let yearFails = false;
+
 function totalsOf(months: Record<string, unknown>[]): Record<string, number> {
   return Object.fromEntries(
     VALUE_KEYS.map((key) => [
@@ -65,14 +68,22 @@ function yearPage(year: number): Record<string, unknown> {
       month,
       ...FULL_MONTH,
       incomeActualPln: future ? null : FULL_MONTH.incomeActualPln,
+      freeFundsForecastPln: month === '2026-09' ? 11111.11 : FULL_MONTH.freeFundsForecastPln,
       hasOverdue: month === '2026-10',
+      incomplete: month === '2026-04',
     };
   });
+
+  if (emptyYear) {
+    const empty = months.map(({ month }) => ({ month, ...EMPTY_MONTH }));
+    return { year, firstYear: 2026, lastYear: 2027, months: empty, totals: totalsOf(empty) };
+  }
 
   return { year, firstYear: 2026, lastYear: 2027, months, totals: totalsOf(months) };
 }
 
 describe('PlanningYear', () => {
+  const originalMatchMedia = window.matchMedia;
   let harness: RouterTestingHarness;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
 
@@ -83,18 +94,38 @@ describe('PlanningYear', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 9, 20, 12));
+    emptyYear = false;
+    yearFails = false;
   });
 
   afterEach(() => {
     vi.useRealTimers();
     fetchSpy.mockRestore();
+    window.matchMedia = originalMatchMedia;
   });
+
+  function phoneViewport(): void {
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes('max-width'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+      onchange: null,
+    })) as typeof window.matchMedia;
+  }
 
   async function setup(url = '/planning?tab=year&year=2026'): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const requested = /\/planning\/years\/(\d{4})/.exec(requestUrl(input));
       if (!requested) {
         return jsonResponse({ detail: 'Not found.' }, 404);
+      }
+
+      if (yearFails) {
+        return jsonResponse({ detail: 'Year failed.' }, 500);
       }
 
       return jsonResponse(yearPage(Number(requested[1])));
@@ -170,6 +201,10 @@ describe('PlanningYear', () => {
   it('marks the overdue month and highlights the current month', async () => {
     await setup();
 
+    expect(
+      element().querySelector('app-planning-year-chart [data-current="true"]')?.textContent,
+    ).toContain('Oct');
+
     expect(rows()[9].querySelector('[data-testid="year-overdue"]')).not.toBeNull();
     expect(rows()[9].getAttribute('aria-current')).toBe('date');
     expect(rows().filter((row) => row.getAttribute('aria-current') !== null)).toHaveLength(1);
@@ -209,5 +244,76 @@ describe('PlanningYear', () => {
     await settle();
 
     expect(TestBed.inject(Router).url).toBe('/planning?month=2026-10');
+  });
+
+  it('marks an incomplete month in the table', async () => {
+    await setup();
+
+    expect(rows()[3].querySelector('[data-testid="year-incomplete"]')?.textContent).toContain(
+      'incomplete',
+    );
+    expect(rows()[4].querySelector('[data-testid="year-incomplete"]')).toBeNull();
+  });
+
+  it('shows the result of a past month instead of the forecast', async () => {
+    await setup();
+
+    const past = rows()[8].querySelector('[data-testid="year-result-actual"]');
+    expect(past?.textContent?.trim()).toBe(formatMoney(11111.11, 'PLN'));
+    expect(rows()[9].querySelector('[data-testid="year-result-actual"]')).toBeNull();
+    expect(rows()[10].querySelector('[data-testid="year-result-actual"]')).toBeNull();
+  });
+
+  it('opens the month on Enter from a focused row', async () => {
+    await setup();
+
+    expect(rows()[9].tabIndex).toBe(0);
+    rows()[9].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settle();
+
+    expect(TestBed.inject(Router).url).toBe('/planning?month=2026-10');
+  });
+
+  it('shows one empty state for a year without definitions', async () => {
+    emptyYear = true;
+    await setup();
+
+    expect(element().querySelectorAll('app-empty-state')).toHaveLength(1);
+    expect(rows()).toHaveLength(0);
+    expect(element().querySelector('app-planning-year-chart')).toBeNull();
+    expect(element().querySelector('table')).toBeNull();
+  });
+
+  it('narrows the table on a phone and expands a row', async () => {
+    phoneViewport();
+    await setup();
+
+    expect(element().querySelector('app-planning-year-chart')).not.toBeNull();
+    const headers = Array.from(element().querySelectorAll('thead th'), (th) =>
+      th.textContent?.trim(),
+    );
+    expect(headers).toContain('Month');
+    expect(headers).toContain('Expenses');
+    expect(headers).not.toContain('Income plan');
+
+    const toggle = rows()[9].querySelector<HTMLButtonElement>('[data-testid="year-expand"]')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    await settle();
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const detail = element().querySelector<HTMLElement>('[data-testid="year-detail"]')!;
+    expect(detail.textContent).toContain(formatMoney(16500, 'PLN'));
+    expect(TestBed.inject(Router).url).not.toContain('month=');
+  });
+
+  it('shows a retry error when the year fails', async () => {
+    yearFails = true;
+    await setup();
+
+    const error = element().querySelector('app-section-error');
+    expect(error).not.toBeNull();
+    expect(error!.textContent).toContain('Retry');
+    expect(rows()).toHaveLength(0);
   });
 });
