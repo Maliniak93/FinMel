@@ -837,6 +837,12 @@
       "total": "Total",
       "overdue": "Overdue occurrences",
       "empty": "No definitions",
+      "incomplete": "incomplete",
+      "expand": "Show month details",
+      "collapse": "Hide month details",
+      "chart": {
+        "label": "Free funds, plan and forecast in {{ year }}"
+      },
       "columns": {
         "month": "Month",
         "incomePlan": "Income plan",

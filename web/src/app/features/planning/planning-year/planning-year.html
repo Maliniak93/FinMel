@@ -28,55 +28,129 @@
       <mat-spinner diameter="32" />
     </div>
   } @else if (yearResource.error()) {
-    <p class="planning-year__state" role="alert">{{ yearResource.error()?.message }}</p>
+    <app-section-error [message]="yearResource.error()?.message" (retry)="yearResource.reload()" />
   }
 
   @if (yearResource.hasValue()) {
-    <table class="planning-year__table">
-      <thead>
-        <tr>
-          <th scope="col">{{ 'planning.year.columns.month' | transloco }}</th>
-          @for (column of columns; track column.key) {
-            <th scope="col" class="planning-year__amount">{{ column.label | transloco }}</th>
-          }
-        </tr>
-      </thead>
-      <tbody>
-        @for (row of rows(); track row.month) {
-          <tr
-            class="planning-year__row"
-            data-testid="year-row"
-            tabindex="0"
-            [class.planning-year__row--current]="row.current"
-            [attr.aria-current]="row.current ? 'date' : null"
-            (click)="openMonth(row.month)"
-            (keydown.enter)="openMonth(row.month)"
-          >
-            <th scope="row" class="planning-year__month">
-              {{ row.label }}
-              @if (row.overdue) {
-                <mat-icon
-                  class="planning-year__overdue"
-                  data-testid="year-overdue"
-                  [attr.aria-label]="'planning.year.overdue' | transloco"
-                  >warning</mat-icon
-                >
+    @if (!hasDefinitions()) {
+      <app-empty-state icon="event_note" [message]="'planning.year.empty' | transloco" />
+    } @else {
+      <app-planning-year-chart [months]="months()" [year]="selectedYear()" />
+
+      <ng-template #amount let-cell>
+        @if (cell.actual) {
+          <span data-testid="year-result-actual">{{ cell.text }}</span>
+        } @else {
+          {{ cell.text }}
+        }
+        @if (cell.deficit) {
+          <span class="planning-year__deficit">{{ 'planning.freeFunds.deficit' | transloco }}</span>
+        }
+      </ng-template>
+
+      <table class="planning-year__table">
+        <thead>
+          <tr>
+            <th scope="col">{{ 'planning.year.columns.month' | transloco }}</th>
+            @for (column of columns; track column.key) {
+              @if (!phone() || column.phone) {
+                <th scope="col" class="planning-year__amount">{{ column.label | transloco }}</th>
               }
-            </th>
-            @for (cell of row.cells; track $index) {
-              <td class="planning-year__amount">{{ cell }}</td>
+            }
+            @if (phone()) {
+              <th scope="col" class="planning-year__toggle"></th>
             }
           </tr>
-        }
-      </tbody>
-      <tfoot>
-        <tr data-testid="year-total">
-          <th scope="row">{{ 'planning.year.total' | transloco }}</th>
-          @for (total of totals(); track $index) {
-            <td class="planning-year__amount">{{ total }}</td>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.month) {
+            <tr
+              class="planning-year__row"
+              data-testid="year-row"
+              tabindex="0"
+              [class.planning-year__row--current]="row.current"
+              [attr.aria-current]="row.current ? 'date' : null"
+              (click)="openMonth(row.month)"
+              (keydown.enter)="openMonth(row.month)"
+            >
+              <th scope="row" class="planning-year__month">
+                {{ row.label }}
+                @if (row.overdue) {
+                  <mat-icon
+                    class="planning-year__overdue"
+                    data-testid="year-overdue"
+                    [attr.aria-label]="'planning.year.overdue' | transloco"
+                    >warning</mat-icon
+                  >
+                }
+                @if (row.incomplete) {
+                  <span class="planning-year__incomplete" data-testid="year-incomplete">{{
+                    'planning.year.incomplete' | transloco
+                  }}</span>
+                }
+              </th>
+              @for (cell of row.cells; track cell.key) {
+                @if (!phone() || cell.phone) {
+                  <td class="planning-year__amount">
+                    <ng-container *ngTemplateOutlet="amount; context: { $implicit: cell }" />
+                  </td>
+                }
+              }
+              @if (phone()) {
+                <td class="planning-year__toggle">
+                  <button
+                    mat-icon-button
+                    type="button"
+                    class="planning-year__expand"
+                    data-testid="year-expand"
+                    [attr.aria-expanded]="isExpanded(row.month)"
+                    [attr.aria-label]="toggleLabel(row.month) | transloco"
+                    (click)="toggle(row.month, $event)"
+                    (keydown.enter)="$event.stopPropagation()"
+                  >
+                    <mat-icon>{{
+                      isExpanded(row.month) ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
+                    }}</mat-icon>
+                  </button>
+                </td>
+              }
+            </tr>
+            @if (phone() && isExpanded(row.month)) {
+              <tr class="planning-year__detail" data-testid="year-detail">
+                <td colspan="4">
+                  <dl>
+                    @for (cell of row.cells; track cell.key) {
+                      @if (!cell.phone) {
+                        <div>
+                          <dt>{{ cell.label | transloco }}</dt>
+                          <dd>
+                            <ng-container
+                              *ngTemplateOutlet="amount; context: { $implicit: cell }"
+                            />
+                          </dd>
+                        </div>
+                      }
+                    }
+                  </dl>
+                </td>
+              </tr>
+            }
           }
-        </tr>
-      </tfoot>
-    </table>
+        </tbody>
+        <tfoot>
+          <tr data-testid="year-total">
+            <th scope="row">{{ 'planning.year.total' | transloco }}</th>
+            @for (total of totals(); track total.key) {
+              @if (!phone() || total.phone) {
+                <td class="planning-year__amount">{{ total.text }}</td>
+              }
+            }
+            @if (phone()) {
+              <td class="planning-year__toggle"></td>
+            }
+          </tr>
+        </tfoot>
+      </table>
+    }
   }
 </div>

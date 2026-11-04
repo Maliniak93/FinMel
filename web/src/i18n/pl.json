@@ -837,6 +837,12 @@
       "total": "Razem",
       "overdue": "Zaległe wpływy",
       "empty": "Brak definicji",
+      "incomplete": "niekompletny",
+      "expand": "Pokaż szczegóły miesiąca",
+      "collapse": "Ukryj szczegóły miesiąca",
+      "chart": {
+        "label": "Wolne środki, plan i prognoza w {{ year }}"
+      },
       "columns": {
         "month": "Miesiąc",
         "incomePlan": "Wpływy plan",
