@@ -11,24 +11,15 @@ import {
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { activeLocale } from '../../../core/i18n/language';
-import { groupColor } from '../../../shared/colors';
+import {
+  type CascadeAmounts,
+  type CascadeLabels,
+  type CascadeSplitRow,
+  FreeFundsCascade,
+} from '../../../shared/free-funds-cascade/free-funds-cascade';
 import { formatMoney, formatMonth, formatPercent } from '../../../shared/format';
 import { SectionError } from '../../../shared/section-error/section-error';
-import { SplitBar, type SplitBarSegment } from '../../../shared/split-bar/split-bar';
 import { currentWarsawMonth } from '../../planning/recurrence';
-
-const FULL_PERCENT = 100;
-
-interface SplitRow {
-  key: string;
-  label: string;
-  share: string | null;
-  amountPln: number;
-}
-
-interface CascadeBar {
-  percent: number;
-}
 
 function toGrosze(amount: number | string): number {
   return Math.round(Number(amount) * 100);
@@ -40,9 +31,9 @@ function toGrosze(amount: number | string): number {
     MatButtonModule,
     MatCardModule,
     MatProgressSpinnerModule,
+    FreeFundsCascade,
     RouterLink,
     SectionError,
-    SplitBar,
     TranslocoPipe,
   ],
   templateUrl: './month-card.html',
@@ -100,6 +91,34 @@ export class MonthCard {
 
   protected readonly contributionsPln = computed(() => this.contributionsGrosze() / 100);
 
+  protected readonly contributions = computed(
+    () => this.month()?.expenses.groupContributions ?? [],
+  );
+
+  protected readonly groups = computed(() =>
+    this.groupsResource.hasValue() ? this.groupsResource.value() : [],
+  );
+
+  protected readonly cascadeLabels = computed<CascadeLabels>(() => {
+    activeLocale();
+    return {
+      incomes: translate('dashboard.monthCard.incomes'),
+      expenses: translate('dashboard.monthCard.expenses'),
+      contributions: translate('dashboard.monthCard.contributions'),
+      free: translate('dashboard.monthCard.free'),
+      deficit: translate('dashboard.monthCard.deficit'),
+    };
+  });
+
+  protected readonly testIds = {
+    'plan-incomes': 'month-card-incomes',
+    'plan-expenses': 'month-card-expenses',
+    'plan-contributions': 'month-card-contributions',
+    'plan-free': 'month-card-free',
+    'free-deficit': 'month-card-free-deficit',
+    'split-row': 'month-card-split-row',
+  };
+
   protected readonly expensesPln = computed(
     () => (toGrosze(this.month()?.expenses.costPln ?? 0) - this.contributionsGrosze()) / 100,
   );
@@ -112,68 +131,44 @@ export class MonthCard {
 
   protected readonly isDeficit = computed(() => this.deficitPln() > 0 || this.freePln() < 0);
 
-  protected readonly contributionSegments = computed<SplitBarSegment[]>(() => {
-    const groups = this.groupsResource.hasValue() ? this.groupsResource.value() : [];
-    return (this.month()?.expenses.groupContributions ?? []).map((contribution) => ({
-      key: contribution.groupId,
-      label: contribution.name,
-      value: Number(contribution.amountPln),
-      color: groupColor(groups.find((group) => group.id === contribution.groupId)?.color),
-    }));
-  });
+  protected readonly amounts = computed<CascadeAmounts>(() => ({
+    incomes: this.incomesPln(),
+    expenses: this.expensesPln(),
+    contributions: this.contributionsPln(),
+    free: this.freePln(),
+  }));
 
-  protected readonly axisPln = computed(() =>
-    Math.max(
-      this.incomesPln(),
-      this.expensesPln(),
-      this.contributionsPln(),
-      Math.abs(this.freePln()),
-    ),
-  );
-
-  protected readonly bars = computed(() => {
-    const axis = this.axisPln();
-    const of = (amount: number): CascadeBar => ({
-      percent: axis > 0 ? Math.min(FULL_PERCENT, (Math.abs(amount) / axis) * FULL_PERCENT) : 0,
-    });
-    return {
-      incomes: of(this.incomesPln()),
-      expenses: of(this.expensesPln()),
-      contributions: of(this.contributionsPln()),
-      free: of(this.freePln()),
-    };
-  });
-
-  protected readonly splitRows = computed<SplitRow[]>(() => {
+  protected readonly splitRows = computed<CascadeSplitRow[]>(() => {
     activeLocale();
     const split = this.month()?.split;
     if (!split || split.valuationMissing || this.deficitPln() > 0) {
       return [];
     }
-    const rows: SplitRow[] = [];
+    const target = (key: string, name: string, amountPln: number): CascadeSplitRow => ({
+      key,
+      label: translate('dashboard.monthCard.splitTarget', { name }),
+      amountPln,
+    });
+    const rows: CascadeSplitRow[] = [];
     if (split.cushion) {
-      rows.push({
-        key: split.cushion.groupId,
-        label: split.cushion.name,
-        share: null,
-        amountPln: Number(split.cushion.allocationPln),
-      });
+      rows.push(
+        target(split.cushion.groupId, split.cushion.name, Number(split.cushion.allocationPln)),
+      );
     }
     for (const group of split.groups) {
       rows.push({
         key: group.groupId,
-        label: group.name,
-        share: formatPercent(Number(group.sharePercent)),
+        label: translate('dashboard.monthCard.splitGroup', {
+          name: group.name,
+          share: formatPercent(Number(group.sharePercent)),
+        }),
         amountPln: Number(group.allocationPln),
       });
     }
     if (Number(split.unassignedPln) > 0) {
-      rows.push({
-        key: 'ungrouped',
-        label: translate('dashboard.groups.ungrouped'),
-        share: null,
-        amountPln: Number(split.unassignedPln),
-      });
+      rows.push(
+        target('ungrouped', translate('dashboard.groups.ungrouped'), Number(split.unassignedPln)),
+      );
     }
     return rows;
   });

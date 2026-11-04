@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import {
@@ -68,6 +69,20 @@ const KIND_KEYS: Record<CalendarItemKind, string> = {
   bond: 'planning.calendar.kind.bond',
 };
 
+const STATUS_ICONS: Record<CalendarItemStatus, string> = {
+  pending: 'schedule',
+  overdue: 'error',
+  settled: 'check_circle',
+  skipped: 'block',
+};
+
+const KIND_ICONS: Record<CalendarItemKind, string | null> = {
+  income: null,
+  payment: null,
+  deposit: 'savings',
+  bond: 'account_balance',
+};
+
 function incomeStatus(
   occurrence: Pick<IncomeOccurrenceResponse, 'status' | 'overdue'>,
 ): CalendarItemStatus {
@@ -83,7 +98,7 @@ function incomeStatus(
 // MatDialogModule stays out of imports: it would shadow the TestBed provider override.
 @Component({
   selector: 'app-planning-calendar',
-  imports: [NgTemplateOutlet, MatButtonModule, TranslocoPipe],
+  imports: [NgTemplateOutlet, MatButtonModule, MatIconModule, TranslocoPipe],
   templateUrl: './planning-calendar.html',
   styleUrl: './planning-calendar.scss',
 })
@@ -235,6 +250,14 @@ export class PlanningCalendar {
 
   protected kindKey(kind: CalendarItemKind): string {
     return KIND_KEYS[kind];
+  }
+
+  protected statusIcon(status: CalendarItemStatus): string {
+    return STATUS_ICONS[status];
+  }
+
+  protected kindIcon(kind: CalendarItemKind): string | null {
+    return KIND_ICONS[kind];
   }
 
   protected select(date: string | null): void {

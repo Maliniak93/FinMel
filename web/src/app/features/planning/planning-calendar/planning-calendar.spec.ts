@@ -176,13 +176,16 @@ describe('PlanningCalendar', () => {
     expect(pending[0].dataset['status']).toBe('pending');
     expect(pending[0].textContent).toContain('Wypłata');
     expect(pending[0].textContent).toContain(formatMoney(9000, 'PLN'));
+    expect(pending[0].querySelector('mat-icon')?.textContent).toBe('schedule');
 
     const settled = itemsOf('2027-03-26');
     expect(settled).toHaveLength(1);
     expect(settled[0].dataset['status']).toBe('settled');
     expect(settled[0].textContent).toContain(formatMoney(810, 'PLN'));
 
+    expect(settled[0].querySelector('mat-icon')?.textContent).toBe('check_circle');
     expect(itemsOf('2027-03-12')[0].dataset['status']).toBe('skipped');
+    expect(itemsOf('2027-03-12')[0].querySelector('mat-icon')?.textContent).toBe('block');
     expect(itemsOf('2027-03-15')[0].textContent).toContain('OC Toyota');
     expect(itemsOf('2027-03-15')[0].textContent).toContain(formatMoney(1200, 'PLN'));
 

@@ -331,10 +331,8 @@ export function monthInList(month: string): string {
 }
 
 export async function expectFreeFunds(page: Page, plan: string, forecast?: string): Promise<void> {
-  await expect(page.getByTestId('free-funds-plan').locator('dd')).toContainText(pln(plan));
+  await expect(page.getByTestId('free-funds-plan')).toContainText(pln(plan));
   if (forecast) {
-    await expect(page.getByTestId('free-funds-forecast').locator('dd')).toContainText(
-      pln(forecast),
-    );
+    await expect(page.getByTestId('free-funds-forecast')).toContainText(pln(forecast));
   }
 }
