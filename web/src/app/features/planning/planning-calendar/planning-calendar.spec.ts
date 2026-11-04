@@ -7,7 +7,7 @@ import { PlanningState } from '../../../core/planning/planning-state';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../../shared/format';
 import { depositResponse } from '../../deposits/testing/deposit-fixtures';
-import { jsonResponse, requestUrl } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { jsonResponse } from '../../assets/asset-form/testing/asset-form-fixtures';
 import { SettleOccurrenceDialog } from '../settle-occurrence-dialog/settle-occurrence-dialog';
 import { PlanningCalendar } from './planning-calendar';
 
@@ -98,7 +98,6 @@ describe('PlanningCalendar', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   let dialogOpen: ReturnType<typeof vi.fn>;
   let stateReload: ReturnType<typeof vi.fn>;
-  const originalMatchMedia = window.matchMedia;
 
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
@@ -112,36 +111,12 @@ describe('PlanningCalendar', () => {
   afterEach(() => {
     vi.useRealTimers();
     fetchSpy.mockRestore();
-    window.matchMedia = originalMatchMedia;
   });
 
-  function narrowViewport(): void {
-    window.matchMedia = ((query: string) => ({
-      matches: query.includes('max-width'),
-      media: query,
-      addEventListener: () => undefined,
-      removeEventListener: () => undefined,
-      addListener: () => undefined,
-      removeListener: () => undefined,
-      dispatchEvent: () => false,
-      onchange: null,
-    })) as typeof window.matchMedia;
-  }
-
   async function render(data: Record<string, unknown>): Promise<void> {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = requestUrl(input);
-      if (url.includes('/api/portfolio/deposits')) {
-        return jsonResponse([
-          DEPOSIT,
-          depositResponse({ name: 'Archived', maturityDate: '2027-03-22', isArchived: true }),
-        ]);
-      }
-      if (url.includes('/api/portfolio/bonds')) {
-        return jsonResponse([]);
-      }
-      return jsonResponse({ detail: 'Not found.' }, 404);
-    });
+    fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => jsonResponse({ detail: 'Not found.' }, 404));
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(true) }));
     stateReload = vi.fn();
 
@@ -156,6 +131,11 @@ describe('PlanningCalendar', () => {
     fixture = TestBed.createComponent(PlanningCalendar);
     fixture.componentRef.setInput('month', '2027-03');
     fixture.componentRef.setInput('data', data);
+    fixture.componentRef.setInput('deposits', [
+      DEPOSIT,
+      depositResponse({ name: 'Archived', maturityDate: '2027-03-22', isArchived: true }),
+    ]);
+    fixture.componentRef.setInput('bonds', []);
     await settle();
   }
 
@@ -311,30 +291,6 @@ describe('PlanningCalendar', () => {
     expect(
       cell('2027-03-10').querySelector('[data-testid="calendar-more"]')?.textContent,
     ).toContain('+2');
-
-    cell('2027-03-10').click();
-    await settle();
-    const details = element().querySelector<HTMLElement>('[data-testid="calendar-details"]')!;
-    expect(details.querySelectorAll('[data-testid="calendar-detail-item"]')).toHaveLength(5);
-  });
-
-  it('showsOnlyTheItemCountInACellOnANarrowViewport', async () => {
-    narrowViewport();
-    const crowded = monthData(
-      [PENDING],
-      [
-        payment('Czynsz', '2027-03-10', 2000),
-        payment('Prąd', '2027-03-10', 200),
-        payment('Internet', '2027-03-10', 60),
-        payment('Telefon', '2027-03-10', 40),
-      ],
-    );
-    await render(crowded);
-
-    expect(itemsOf('2027-03-10')).toHaveLength(0);
-    expect(
-      cell('2027-03-10').querySelector('[data-testid="calendar-count"]')?.textContent?.trim(),
-    ).toBe('5');
 
     cell('2027-03-10').click();
     await settle();

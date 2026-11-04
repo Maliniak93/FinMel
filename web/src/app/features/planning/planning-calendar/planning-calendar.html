@@ -7,12 +7,6 @@
 </ng-template>
 
 <div class="planning-calendar" data-testid="planning-calendar">
-  @if (deadlinesFailed()) {
-    <p class="planning-calendar__warning" role="alert" data-testid="calendar-deadlines-failed">
-      {{ 'planning.calendar.deadlinesFailed' | transloco }}
-    </p>
-  }
-
   <div class="planning-calendar__weekdays">
     @for (key of weekdayKeys; track key) {
       <span>{{ key | transloco }}</span>
@@ -37,47 +31,39 @@
       >
         @if (cell.date) {
           <span class="planning-calendar__day">{{ cell.day }}</span>
-          @if (narrow()) {
-            @if (cell.items.length > 0) {
-              <span class="planning-calendar__count" data-testid="calendar-count">{{
-                cell.items.length
-              }}</span>
-            }
-          } @else {
-            @for (item of cell.items.slice(0, maxItemsInCell); track item.key) {
-              @if (item.settleable; as settle) {
-                <button
-                  type="button"
-                  class="planning-calendar__item planning-calendar__item--action"
-                  data-testid="calendar-item"
-                  [attr.data-status]="item.status"
-                  [attr.data-kind]="item.kind"
-                  (click)="openSettleDialog(settle, $event)"
-                >
-                  <ng-container
-                    [ngTemplateOutlet]="itemContent"
-                    [ngTemplateOutletContext]="{ $implicit: item }"
-                  />
-                </button>
-              } @else {
-                <div
-                  class="planning-calendar__item"
-                  data-testid="calendar-item"
-                  [attr.data-status]="item.status"
-                  [attr.data-kind]="item.kind"
-                >
-                  <ng-container
-                    [ngTemplateOutlet]="itemContent"
-                    [ngTemplateOutletContext]="{ $implicit: item }"
-                  />
-                </div>
-              }
-            }
-            @if (cell.items.length > maxItemsInCell) {
-              <span class="planning-calendar__more" data-testid="calendar-more"
-                >+{{ cell.items.length - maxItemsInCell }}</span
+          @for (item of cell.items.slice(0, maxItemsInCell); track item.key) {
+            @if (item.settleable; as settle) {
+              <button
+                type="button"
+                class="planning-calendar__item planning-calendar__item--action"
+                data-testid="calendar-item"
+                [attr.data-status]="item.status"
+                [attr.data-kind]="item.kind"
+                (click)="openSettleDialog(settle, $event)"
               >
+                <ng-container
+                  [ngTemplateOutlet]="itemContent"
+                  [ngTemplateOutletContext]="{ $implicit: item }"
+                />
+              </button>
+            } @else {
+              <div
+                class="planning-calendar__item"
+                data-testid="calendar-item"
+                [attr.data-status]="item.status"
+                [attr.data-kind]="item.kind"
+              >
+                <ng-container
+                  [ngTemplateOutlet]="itemContent"
+                  [ngTemplateOutletContext]="{ $implicit: item }"
+                />
+              </div>
             }
+          }
+          @if (cell.items.length > maxItemsInCell) {
+            <span class="planning-calendar__more" data-testid="calendar-more"
+              >+{{ cell.items.length - maxItemsInCell }}</span
+            >
           }
         }
       </div>

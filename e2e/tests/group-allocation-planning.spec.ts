@@ -124,7 +124,7 @@ function shareInput(page: Page, name: string): Locator {
 }
 
 function contributionOf(page: Page, name: string): Locator {
-  return page.getByTestId('group-contribution').filter({ hasText: name });
+  return page.getByTestId('contribution-row').filter({ hasText: name });
 }
 
 async function createSavings(
@@ -361,7 +361,7 @@ test('group allocation planning: groups with kind, class allocation and contribu
     await openMonth(page, m(-1));
     await expectFreeFunds(page, '7 000,00');
     await expectCost(page, '1 000,00');
-    await expect(page.getByTestId('group-contribution')).toHaveCount(0);
+    await expect(page.getByTestId('contribution-row')).toHaveCount(0);
     await expect(page.getByTestId('split-group')).toHaveCount(0);
   });
 

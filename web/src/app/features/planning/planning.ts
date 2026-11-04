@@ -1,3 +1,4 @@
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { DOCUMENT } from '@angular/common';
 import {
   Component,
@@ -10,7 +11,6 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -19,7 +19,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, map } from 'rxjs';
 
 import {
   deleteApiPortfolioOneOffExpensesById,
@@ -30,6 +30,9 @@ import {
   deleteApiPortfolioRecurringIncomesById,
   deleteApiPortfolioRecurringIncomesByIdChangesByMonth,
   deleteApiPortfolioRecurringIncomesByIdOccurrencesByMonth,
+  getApiPortfolioAssetGroups,
+  getApiPortfolioBonds,
+  getApiPortfolioDeposits,
   getApiPortfolioPlanningMonthsByMonth,
   putApiPortfolioAssetGroupsShares,
   putApiPortfolioPlanningSettings,
@@ -38,7 +41,6 @@ import {
   type ExpenseDefinitionResponse,
   type IncomeDefinitionResponse,
   type IncomeOccurrenceResponse,
-  type OccurrenceStatus,
   type OneOffExpenseResponse,
   type OneOffIncomeResponse,
   type RecurringIncomeStatus,
@@ -54,6 +56,8 @@ import {
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { fromDateOnly } from '../../shared/date-only';
 import { formatDate, formatMoney, formatMonth } from '../../shared/format';
+import { SectionError } from '../../shared/section-error/section-error';
+import { SummaryStrip, type SummaryItem } from '../../shared/summary-strip/summary-strip';
 import { assetClassLabel } from '../assets/asset-class';
 import {
   EndRecurringExpenseDialog,
@@ -72,6 +76,7 @@ import {
   type RecurringIncomeFormDialogData,
 } from './recurring-income-form-dialog/recurring-income-form-dialog';
 import { PlanningCalendar } from './planning-calendar/planning-calendar';
+import { PlanningDayList, type IncomeRow } from './planning-day-list/planning-day-list';
 import { PlanningYear } from './planning-year/planning-year';
 import { currentWarsawMonth, ruleParts } from './recurrence';
 import {
@@ -81,21 +86,13 @@ import {
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-const OCCURRENCE_STATUS_KEYS: Record<OccurrenceStatus, string> = {
-  Pending: 'planning.occurrence.status.pending',
-  Settled: 'planning.occurrence.status.settled',
-  Skipped: 'planning.occurrence.status.skipped',
-};
+const PHONE_QUERY = '(max-width: 719.98px)';
 
 const STATUS_KEYS: Record<RecurringIncomeStatus, string> = {
   Upcoming: 'planning.status.upcoming',
   Active: 'planning.status.active',
   Ended: 'planning.status.ended',
 };
-
-type IncomeRow =
-  | { oneOff: false; key: string; item: IncomeOccurrenceResponse }
-  | { oneOff: true; key: string; item: OneOffIncomeResponse };
 
 function shiftMonth(month: string, delta: number): string {
   const [year, number] = month.split('-').map(Number);
@@ -108,13 +105,15 @@ function shiftMonth(month: string, delta: number): string {
   selector: 'app-planning',
   imports: [
     MatButtonModule,
-    MatCardModule,
     MatChipsModule,
     MatIconModule,
     MatProgressSpinnerModule,
     MatTabsModule,
     PlanningCalendar,
+    PlanningDayList,
     PlanningYear,
+    SectionError,
+    SummaryStrip,
     TranslocoPipe,
   ],
   templateUrl: './planning.html',
@@ -137,7 +136,14 @@ export class Planning {
   readonly year = input<string>();
   readonly layout = input<string>();
 
-  protected readonly calendarLayout = computed(() => this.layout() === 'calendar');
+  protected readonly phone = toSignal(
+    inject(BreakpointObserver)
+      .observe(PHONE_QUERY)
+      .pipe(map((state) => state.matches)),
+    { initialValue: false },
+  );
+
+  protected readonly showCalendar = computed(() => this.layout() === 'calendar' && !this.phone());
 
   protected readonly tabIndex = computed(() => (this.tab() === 'year' ? 1 : 0));
 
@@ -170,41 +176,77 @@ export class Planning {
     this.monthResource.hasValue() ? this.monthResource.value() : null,
   );
 
-  protected readonly incomes = computed(() =>
-    this.monthResource.hasValue() ? this.monthResource.value().incomes : null,
-  );
-
-  protected readonly expenses = computed(() =>
-    this.monthResource.hasValue() ? this.monthResource.value().expenses : null,
-  );
-
-  protected readonly incomeRows = computed<IncomeRow[]>(() => {
-    const plan = this.incomes();
-    if (!plan) {
-      return [];
-    }
-
-    return [
-      ...plan.occurrences.map((item): IncomeRow => ({
-        oneOff: false,
-        key: item.recurringIncomeId + item.nominalMonth,
-        item,
-      })),
-      ...plan.oneOffs
-        .filter((item) => item.inMonth)
-        .map((item): IncomeRow => ({ oneOff: true, key: `one-off-${item.id}`, item })),
-    ];
+  private readonly depositsResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioDeposits({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('planning.calendar.deadlinesFailed'),
+        );
+      }
+      return result.data ?? [];
+    },
   });
 
-  protected readonly monthOneOffExpenses = computed(() =>
-    (this.expenses()?.oneOffs ?? []).filter((item) => item.inMonth),
+  private readonly bondsResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioBonds({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('planning.calendar.deadlinesFailed'),
+        );
+      }
+      return result.data ?? [];
+    },
+  });
+
+  private readonly groupsResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioAssetGroups({ signal: abortSignal });
+      return result.error ? [] : (result.data ?? []);
+    },
+  });
+
+  protected readonly deposits = computed(() =>
+    this.depositsResource.hasValue() ? this.depositsResource.value() : [],
   );
+
+  protected readonly bonds = computed(() =>
+    this.bondsResource.hasValue() ? this.bondsResource.value() : [],
+  );
+
+  protected readonly groups = computed(() =>
+    this.groupsResource.hasValue() ? this.groupsResource.value() : [],
+  );
+
+  protected readonly deadlinesFailed = computed(
+    () => !!this.depositsResource.error() || !!this.bondsResource.error(),
+  );
+
+  protected readonly summaryItems = computed<SummaryItem[]>(() => {
+    const data = this.monthData();
+    return [
+      {
+        labelKey: 'planning.incomes.title',
+        amount: data ? Number(data.incomes.balance.planPln) : null,
+        testId: 'summary-incomes',
+      },
+      {
+        labelKey: 'planning.balance.pending',
+        amount: data ? Number(data.incomes.balance.pendingPln) : null,
+        testId: 'summary-pending',
+      },
+      {
+        labelKey: 'planning.freeFunds.title',
+        amount: data ? Number(data.freeFunds.planPln) : null,
+        testId: 'summary-free-funds',
+      },
+    ];
+  });
 
   protected readonly freeFunds = computed(() =>
     this.monthResource.hasValue() ? this.monthResource.value().freeFunds : null,
   );
-
-  protected readonly contributions = computed(() => this.expenses()?.groupContributions ?? []);
 
   protected readonly split = computed(() => this.monthData()?.split ?? null);
 
@@ -255,10 +297,6 @@ export class Planning {
 
   protected statusKey(status: RecurringIncomeStatus): string {
     return STATUS_KEYS[status];
-  }
-
-  protected occurrenceStatusKey(status: OccurrenceStatus): string {
-    return OCCURRENCE_STATUS_KEYS[status];
   }
 
   protected isMultiMonth(definition: Pick<ExpenseDefinitionResponse, 'intervalMonths'>): boolean {

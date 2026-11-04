@@ -792,6 +792,10 @@
     "title": "Planowanie",
     "previousMonth": "Poprzedni miesiąc",
     "nextMonth": "Następny miesiąc",
+    "list": {
+      "noDate": "bez daty",
+      "label": "Wpływy i wydatki"
+    },
     "calendar": {
       "layout": {
         "label": "Widok miesiąca",
@@ -897,12 +901,6 @@
       "action": "Edytuj"
     },
     "occurrence": {
-      "status": {
-        "pending": "oczekuje",
-        "settled": "rozliczone",
-        "skipped": "pominięte"
-      },
-      "actual": "Faktycznie",
       "difference": "Różnica",
       "outOfRule": "poza regułą",
       "depositCreated": "wpłata utworzona",
@@ -942,9 +940,7 @@
       "accountArchived": "To konto jest zarchiwizowane."
     },
     "expenses": {
-      "title": "Wydatki",
       "add": "Dodaj wydatek",
-      "empty": "W tym miesiącu nie planujesz żadnych wydatków.",
       "cost": "Koszt miesiąca (z rezerwami)",
       "contribution": "Wpłata do grupy",
       "reserve": "{{ amount }}/mies.",

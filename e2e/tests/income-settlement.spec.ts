@@ -25,6 +25,7 @@ import {
   openMonth,
   pln,
   saveEdit,
+  status,
 } from './planning';
 
 const ACCOUNT_TYPE_BANK = 2;
@@ -82,10 +83,6 @@ async function expectBalance(
   await expect(page.getByTestId('balance-difference').locator('dd')).toContainText(
     pln(balance.difference),
   );
-}
-
-function status(row: Locator): Locator {
-  return row.getByTestId('occurrence-status');
 }
 
 function settleDialog(page: Page): Locator {

@@ -59,11 +59,6 @@ function dateParts(iso: string): { year: number; month: number; day: number } {
   return { year, month, day };
 }
 
-export function shortDate(iso: string): RegExp {
-  const { year, month, day } = dateParts(iso);
-  return new RegExp(`^${day}\\s${MONTH_ABBREVIATIONS[month - 1]}\\.?\\s${year}`);
-}
-
 export function dateInText(iso: string): RegExp {
   const { year, month, day } = dateParts(iso);
   return new RegExp(`${day}\\s${MONTH_ABBREVIATIONS[month - 1]}\\.?\\s${year}`);
@@ -87,11 +82,25 @@ export async function openMonth(page: Page, month: string): Promise<void> {
 export function occurrences(page: Page, name: string): Locator {
   return page
     .getByTestId('occurrence-row')
-    .filter({ has: page.getByRole('cell', { name: exactly(name) }) });
+    .filter({ has: page.getByTestId('row-name').filter({ hasText: exactly(name) }) });
 }
 
 export function occurrence(page: Page, name: string, iso: string): Locator {
-  return occurrences(page, name).filter({ has: page.getByRole('cell', { name: shortDate(iso) }) });
+  return page
+    .locator(`[data-testid="day-group"][data-date="${iso}"]`)
+    .getByTestId('occurrence-row')
+    .filter({ has: page.getByTestId('row-name').filter({ hasText: exactly(name) }) });
+}
+
+export async function expectOnDay(row: Locator, iso: string): Promise<void> {
+  await expect(row.locator('xpath=ancestor::*[@data-testid="day-group"]')).toHaveAttribute(
+    'data-date',
+    iso,
+  );
+}
+
+export function status(row: Locator): Locator {
+  return row.getByTestId('occurrence-status').locator('.status-chip__label');
 }
 
 export function definition(page: Page, name: string): Locator {
@@ -205,7 +214,9 @@ export function expenseDefinition(page: Page, name: string): Locator {
 
 export function expensePayments(page: Page, name?: string): Locator {
   const rows = page.getByTestId('expense-payment-row');
-  return name ? rows.filter({ has: page.getByRole('cell', { name: exactly(name) }) }) : rows;
+  return name
+    ? rows.filter({ has: page.getByTestId('row-name').filter({ hasText: exactly(name) }) })
+    : rows;
 }
 
 export async function openAddExpenseDialog(page: Page): Promise<Locator> {
@@ -295,7 +306,7 @@ export async function settle(page: Page, name: string, amount: string): Promise<
   await dialog.getByRole('textbox', { name: 'Faktyczna data' }).fill(warsawDate());
   await dialog.getByRole('button', { name: 'Zapisz' }).click();
   await expect(dialog).toBeHidden();
-  await expect(row.getByTestId('occurrence-status')).toHaveText('rozliczone');
+  await expect(status(row)).toHaveText('rozliczone');
 }
 
 export function shiftMonth(month: string, offset: number): string {

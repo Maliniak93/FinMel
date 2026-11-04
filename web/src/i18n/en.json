@@ -792,6 +792,10 @@
     "title": "Planning",
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
+    "list": {
+      "noDate": "no date",
+      "label": "Incomes and expenses"
+    },
     "calendar": {
       "layout": {
         "label": "Month layout",
@@ -897,12 +901,6 @@
       "action": "Edit"
     },
     "occurrence": {
-      "status": {
-        "pending": "Pending",
-        "settled": "Settled",
-        "skipped": "Skipped"
-      },
-      "actual": "Actual",
       "difference": "Difference",
       "outOfRule": "out of rule",
       "depositCreated": "deposit created",
@@ -942,9 +940,7 @@
       "accountArchived": "This account is archived."
     },
     "expenses": {
-      "title": "Expenses",
       "add": "Add expense",
-      "empty": "No expenses planned this month.",
       "cost": "Monthly cost (with reserves)",
       "contribution": "Group contribution",
       "reserve": "{{ amount }}/mo.",
