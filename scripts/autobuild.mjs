@@ -20,7 +20,7 @@
 //   a build session that ends without shipping a ready workflow run is shipped here from the run's record (ship.mjs --from-run)
 //   a part without Branch is healed first (gh-project.mjs heal); a card with a missing or invalid Tier is skipped with the later open parts of its epic and the cards whose Depends on names it (a log line and one comment each, Status unchanged) and the run ends `done` listing them as `pominięte: …`
 //   transient GitHub errors (5xx, timeouts) are retried for ~8 min before the run stops
-//   a red CI with fewer than 5 failed tests (or only cancelled/timed-out jobs) reruns its failed jobs once per head SHA (GitHub's run_attempt is the counter), with a fresh 90 min wait; any other red, or a red after the rerun, starts one fix session per PR (the PR comment marker `<!-- skarbiec-ci-fix -->` is the counter): `/fix ci:#<n>` on the PR branch (tree kept on a dirty PR branch, `dirty-tree` for any other dirty tree), `ship.mjs --fix-pr` pushes to the same PR, a fresh 90 min wait follows; never counted towards --max-tasks, no session after --until, with the stop file or in a dry run; red after the fix reruns once when < 5 tests failed, otherwise stops `ci-failed` with the job link and the resume line, a session that stops or moves no head `ci-failed` / `blocked`
+//   a red CI first reruns its failed jobs once per head SHA, whatever failed (most reds are flaky) (GitHub's run_attempt is the counter), with a fresh 90 min wait; a red after the rerun starts one fix session per PR (the PR comment marker `<!-- skarbiec-ci-fix -->` is the counter): `/fix ci:#<n>` on the PR branch (tree kept on a dirty PR branch, `dirty-tree` for any other dirty tree), `ship.mjs --fix-pr` pushes to the same PR, a fresh 90 min wait follows; never counted towards --max-tasks, no session after --until, with the stop file or in a dry run; red after the fix reruns once (the new head SHA), then stops `ci-failed` with the job link and the resume line, a session that stops or moves no head `ci-failed` / `blocked`
 //   a GitHub rate limit (primary or secondary) is waited out with no upper bound, then the same call or step reruns (a child ending on the GITHUB_LIMIT marker or ship.mjs exit 4 included); the wait does not count towards the build or CI timeouts, and writes already done (merge, close, summary comment) are skipped
 //   the sleep guard is confirmed (`ready`) and re-armed after every wake; PC sleep gaps are logged (`PC spał …`) and do not count towards the 4 h build limit; a build with no progress for 45 awake minutes (no live dotnet/verify/e2e process) is killed and replayed once per part, a second hang stops the run with reason `hang`
 //   the `still:` heartbeat ends with the agent's current activity (`teraz: <label> (od N min)`), `czeka na proces w tle od <czas>` or `bez postępu od <czas>`; background commands log as `bg: <label>` and `bg done|failed|killed: <label> · <czas>`, never the raw command
@@ -544,7 +544,7 @@ function readJobs(runId) {
 }
 
 function readJobLog(jobId) {
-  const res = retryTransient("job log", () => gh(["api", `repos/${REPO}/actions/jobs/${jobId}/logs`]));
+  const res = retryTransient("job log", () => gh(["api", "--allow-escape-sequences", `repos/${REPO}/actions/jobs/${jobId}/logs`]));
   return res.ok ? res.out : null;
 }
 

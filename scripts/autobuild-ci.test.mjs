@@ -84,42 +84,31 @@ test("countFailedTests", () => {
 
 const fail = (name, kind, tests, attempt = 1) => ({ name, link: URL_OF(7, 1), runId: 7, kind, tests, attempt });
 
-test("decideOnRed threshold", () => {
+test("decideOnRed reruns every first red", () => {
   assert.deepEqual(decideOnRed([fail("a", "test", 3), fail("b", "test", 1)]), { action: "rerun", reason: "4 tests failed (a, b)", tests: 4 });
   assert.equal(decideOnRed([fail("a", "test", 1)]).reason, "1 test failed (a)");
-  assert.equal(decideOnRed([fail("a", "test", 3), fail("b", "test", 2)]).action, "fix");
-  assert.equal(decideOnRed([fail("a", "test", 1), fail("b", "test", null)]).action, "fix");
-  assert.equal(decideOnRed([fail("a", "test", 1), fail("b", "other", null)]).action, "fix");
+  assert.equal(decideOnRed([fail("a", "test", 40)]).action, "rerun");
+  assert.deepEqual(decideOnRed([fail("a", "test", null)]), { action: "rerun", reason: "tests failed (a)", tests: 0 });
+  assert.deepEqual(decideOnRed([fail("a", "other", null)]), { action: "rerun", reason: "a failed", tests: 0 });
+  assert.equal(decideOnRed([fail("a", "test", 1), fail("b", "other", null)]).action, "rerun");
+  assert.equal(decideOnRed([fail("a", "infra", null), fail("b", "test", 5)]).action, "rerun");
+  assert.equal(decideOnRed([fail("a", "infra", null), fail("b", "infra", null)]).reason, "infrastructure failure (a, b)");
+  assert.equal(decideOnRed([fail("a", "test", 1, 1)], { fixed: true }).action, "rerun");
   assert.equal(decideOnRed([]).action, "stop");
-});
-
-test("decideOnRed infra", () => {
-  const mixed = decideOnRed([fail("a", "infra", null), fail("b", "test", 4)]);
-  assert.equal(mixed.action, "rerun");
-  assert.equal(mixed.tests, 4);
-  assert.equal(decideOnRed([fail("a", "infra", null), fail("b", "infra", null)]).action, "rerun");
-  assert.equal(decideOnRed([fail("a", "infra", null), fail("b", "test", 5)]).action, "fix");
 });
 
 test("decideOnRed fixes on a later attempt", () => {
   assert.deepEqual(decideOnRed([fail("a", "test", 1, 2)]), { action: "fix", reason: "red after rerun (a)" });
   assert.equal(decideOnRed([fail("a", "test", 1, null)]).action, "fix");
   assert.equal(decideOnRed([fail("a", "test", 1, 2)], { attemptOf: () => 1 }).action, "rerun");
+  assert.equal(decideOnRed([{ ...fail("a", "test", 1), runId: null }]).action, "fix");
 });
 
-test("decideOnRed fix", () => {
-  for (const failures of [
-    [fail("a", "test", 5)],
-    [fail("a", "other", null)],
-    [fail("a", "test", 1, 2)],
-    [fail("a", "test", 1), fail("b", "other", null)],
-    [fail("a", "test", null)],
-  ]) {
+test("decideOnRed stops once the fix is spent", () => {
+  for (const failures of [[fail("a", "test", 5, 2)], [fail("a", "other", null, 2)], [fail("a", "test", null, 2)], [fail("a", "test", 1, 2), fail("b", "other", null, 2)]]) {
     assert.equal(decideOnRed(failures).action, "fix", JSON.stringify(failures));
     assert.equal(decideOnRed(failures, { fixed: true }).action, "stop", JSON.stringify(failures));
   }
-  assert.equal(decideOnRed([fail("a", "test", 2)], { fixed: true }).action, "rerun");
-  assert.equal(decideOnRed([fail("a", "infra", null)], { fixed: true }).action, "rerun");
   assert.equal(decideOnRed([], { fixed: true }).action, "stop");
 });
 
@@ -185,11 +174,29 @@ test("driveCi reads the attempt from GitHub", async () => {
   assert.deepEqual(calls.rerun, []);
 });
 
-test("driveCi stops without a rerun for an unknown count, another job or 5 tests once the fix is spent", async () => {
+test("driveCi reruns any first red, whatever failed", async () => {
   for (const [jobs, log] of [
     [[job()], () => "no summary"],
     [[job({ steps: [step("Build (warnings as errors)")] })], () => vstest(1)],
-    [[job()], () => vstest(5)],
+    [[job()], () => vstest(50)],
+  ]) {
+    const { io, calls } = harness({
+      checks: (n) => (n === 1 ? [check("fail")] : [check("pass")]),
+      jobs: (n) => jobs.map((j) => ({ ...j, run_attempt: n >= 2 ? 2 : 1 })),
+      log,
+    });
+    const res = await driveCi(io);
+    assert.equal(res.reruns, 1);
+    assert.equal(res.fixes, 0);
+    assert.deepEqual(calls.rerun, [7]);
+  }
+});
+
+test("driveCi stops after the rerun without a second try once the fix is spent", async () => {
+  for (const [jobs, log] of [
+    [[job({ run_attempt: 2 })], () => "no summary"],
+    [[job({ run_attempt: 2, steps: [step("Build (warnings as errors)")] })], () => vstest(1)],
+    [[job({ run_attempt: 2 })], () => vstest(5)],
   ]) {
     const { io, calls } = harness({ checks: () => [check("fail")], jobs: () => jobs, log, marked: true });
     await assert.rejects(driveCi(io), stops("ci-failed", URL_OF(7, 11)));
@@ -259,10 +266,10 @@ test("partLine shows the rerun and the fix", () => {
 });
 
 test("the CI policy line", () => {
-  assert.equal(CI_POLICY_LINE, "CI: rerun failed jobs once when < 5 tests failed, then one fix session per PR");
+  assert.equal(CI_POLICY_LINE, "CI: rerun failed jobs once per head commit, then one fix session per PR");
 });
 
-const buildJob = () => job({ steps: [step("Build (warnings as errors)")] });
+const buildJob = () => job({ steps: [step("Build (warnings as errors)")], run_attempt: 2 });
 
 test("driveCi fixes then merges", async () => {
   const noRerun = harness({
@@ -274,7 +281,7 @@ test("driveCi fixes then merges", async () => {
   assert.equal(res.reruns, 0);
   assert.equal(noRerun.calls.fix.length, 1);
   assert.deepEqual(noRerun.calls.rerun, []);
-  assert.ok(noRerun.calls.say.includes("CI PR #501: reporting is neither a test nor an infrastructure failure — fix session 1"));
+  assert.ok(noRerun.calls.say.includes("CI PR #501: red after rerun (reporting) — fix session 1"));
   assert.deepEqual(noRerun.calls.budgets, [CI_TIMEOUT_MS, CI_MISSING_MS, CI_TIMEOUT_MS]);
 
   // read 1: red, rerun; read 2: the attempt rose; read 3: red after the rerun, fix; reads 4-5: green
@@ -309,14 +316,14 @@ test("driveCi one fix per PR", async () => {
   assert.equal(afterRerun.calls.fix.length, 1);
   assert.deepEqual(afterRerun.calls.rerun, [7]);
 
-  const tooMany = harness({
+  const spent = harness({
     checks: () => [check("fail")],
-    jobs: (n) => (n === 1 ? [buildJob()] : [job()]),
+    jobs: (n) => (n === 1 ? [buildJob()] : [job({ run_attempt: 2 })]),
     log: () => vstest(6),
   });
-  await assert.rejects(driveCi(tooMany.io), stops("ci-failed", URL_OF(7, 11)));
-  assert.equal(tooMany.calls.fix.length, 1);
-  assert.deepEqual(tooMany.calls.rerun, []);
+  await assert.rejects(driveCi(spent.io), stops("ci-failed", URL_OF(7, 11)));
+  assert.equal(spent.calls.fix.length, 1);
+  assert.deepEqual(spent.calls.rerun, []);
 
   const resumed = harness({ checks: () => [check("fail")], jobs: () => [buildJob()], marked: true });
   await assert.rejects(driveCi(resumed.io), stops("ci-failed", `(rerun 0, fix 1)\nresume: ${RESUME}`));
