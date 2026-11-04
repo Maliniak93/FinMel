@@ -126,7 +126,7 @@ export function questions(flags, ctx) {
     list.push(confirmQuestion("shutdown", "Shut the PC down after the run?", { shutdown: true }, { "no-shutdown": true }));
   }
   if (!flags["no-clean"]) {
-    list.push(confirmQuestion("clean", "Delete old generated files (sessions, Playwright output, closed-ticket files, logs) before the run?", {}, { "no-clean": true }));
+    list.push(confirmQuestion("clean", "Delete old generated files (sessions, Playwright output, ticket files, logs, verify and temp leftovers) before the run?", {}, { "no-clean": true }));
   }
   if (flags.start === undefined) {
     list.push(timeQuestion("start", "Start: now, in N minutes or at HH:MM [now]: ", "now", (text) => startAt(text, ctx.now)));

@@ -1,13 +1,12 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { slugOf } from "./claude-history.mjs";
-import { RETENTION, fetchIssueStates, formatReport, planAged, planSessions, planTickets, runClean, unfinishedSessions } from "./clean.mjs";
-import { buildState, createSandbox } from "./fake-gh-sandbox.mjs";
+import { RETENTION, formatReport, planAged, planSessions, runClean } from "./clean.mjs";
 
 const SCRIPTS = path.dirname(fileURLToPath(import.meta.url));
 const DAY = 24 * 60 * 60 * 1000;
@@ -27,6 +26,7 @@ function setDirs(dir, days, now) {
 }
 
 function makeTree(repo, config, now = NOW) {
+  const tmp = path.join(path.dirname(repo), "tmp");
   const history = path.join(config, "projects", slugOf(repo));
   const put = (file, days, content = "x") => {
     mkdirSync(path.dirname(file), { recursive: true });
@@ -38,17 +38,19 @@ function makeTree(repo, config, now = NOW) {
   const settle = () => {
     setDirs(repo, 400, now);
     setDirs(config, 400, now);
+    if (existsSync(tmp)) setDirs(tmp, 400, now);
   };
   return {
     repo,
     config,
+    tmp,
     history,
     put,
     settle,
     issue: (name, days = 1) => put(path.join(repo, "skarbiec-plan", "issues", name), days),
     run: (options = {}) => {
       settle();
-      return runClean({ now, repoRoot: repo, configDir: config, fetchStates: () => new Map(), ...options });
+      return runClean({ now, repoRoot: repo, configDir: config, tmpRoot: tmp, ...options });
     },
     row: (report, id) => report.rows.find((r) => r.id === id),
   };
@@ -60,6 +62,7 @@ function withTree(body) {
   const config = path.join(base, "claude");
   mkdirSync(repo);
   mkdirSync(config);
+  mkdirSync(path.join(base, "tmp"));
   try {
     return body(makeTree(repo, config));
   } finally {
@@ -69,11 +72,8 @@ function withTree(body) {
 
 const entry = (id, days, extra = {}) => ({ id, paths: [id], files: 1, bytes: 10, newestMs: NOW - days * DAY, ...extra });
 
-const workflowLine = (issue) =>
-  JSON.stringify({ message: { content: [{ type: "tool_use", name: "Workflow", input: { scriptPath: `C:\\repo\\skarbiec-plan\\issues\\${issue}.resume.js`, args: { issue } } }] } });
-
 test("selects only expired entries per category", () => {
-  assert.deepEqual(RETENTION, { sessionDays: 30, playwrightDays: 7, ticketDays: 7, logDays: 30 });
+  assert.deepEqual(RETENTION, { sessionDays: 30, playwrightDays: 7, ticketDays: 14, logDays: 30, verifyDays: 7, openapiDays: 7, tempDays: 3 });
   const ids = (list) => list.map((e) => e.id);
 
   const sessions = planSessions([entry("old", 31), entry("edge", 29), entry("new", 1)], { now: NOW });
@@ -113,7 +113,10 @@ test("never leaves its roots", () => {
       t.put(path.join(t.repo, "skarbiec-plan", "archive", "old.md"), 400),
       t.put(path.join(t.repo, "skarbiec-plan", "prompts", "done.md"), 400),
       t.put(path.join(t.repo, "skarbiec-plan", "przewodnik", "index.html"), 400),
-      t.put(path.join(t.repo, ".git", "verify-stop-1.json"), 400),
+      t.put(path.join(t.repo, ".git", "verify-cache.json"), 400),
+      t.put(path.join(t.repo, "web", "package.json"), 400),
+      t.put(path.join(t.tmp, "skarbiec-autobuild.stop"), 400),
+      t.put(path.join(t.tmp, "other-dir", "a.txt"), 400),
       t.put(path.join(t.repo, "node_modules", "x", "index.js"), 400),
       t.put(path.join(t.repo, "e2e", "tests", "a.spec.ts"), 400),
       t.put(path.join(t.repo, "e2e", "old.txt"), 400),
@@ -130,12 +133,13 @@ test("never leaves its roots", () => {
       t.put(path.join(t.repo, ".playwright-mcp", "old.yml"), 400),
       t.put(path.join(t.repo, "skarbiec-plan", "autobuild-runs", "old.log"), 400),
       t.issue("30.md", 400),
+      t.put(path.join(t.repo, ".git", "verify-stop-1.json"), 400),
+      t.put(path.join(t.repo, "web", "openapi-ts-error-1.log"), 400),
+      t.put(path.join(t.tmp, "gh-sandbox-1", "a.txt"), 400),
     ];
-    const states = new Map([[30, { state: "CLOSED", stateReason: "COMPLETED", closedAt: new Date(NOW - 20 * DAY).toISOString() }]]);
     const removed = [];
     t.run({
       apply: true,
-      fetchStates: () => states,
       remove: (p) => {
         removed.push(p);
         rmSync(p, { recursive: true, force: true });
@@ -170,83 +174,77 @@ test("session age is the newest mtime of the unit", () => {
   });
 });
 
-test("keeps the session of an unfinished ticket", () => {
-  const holding = new Map([
-    ["aaa", new Set([77])],
-    ["bbb", new Set([78])],
-  ]);
-  const resumeNumbers = new Set([77, 78]);
-  const done = { state: "CLOSED", stateReason: "COMPLETED", closedAt: new Date(NOW - 3 * DAY).toISOString() };
-  assert.deepEqual([...unfinishedSessions({ holding, resumeNumbers, states: new Map([[77, { state: "OPEN" }], [78, done]]) })], ["aaa"]);
-  assert.deepEqual([...unfinishedSessions({ holding, resumeNumbers, states: new Map() })].sort(), ["aaa", "bbb"]);
-  assert.deepEqual([...unfinishedSessions({ holding, resumeNumbers, states: new Map([[77, done], [78, done]]) })], []);
-  assert.deepEqual([...unfinishedSessions({ holding, resumeNumbers: new Set(), states: new Map() })], []);
-
+test("sessions are removed by age alone", () => {
   withTree((t) => {
-    t.put(path.join(t.history, "aaa.jsonl"), 40, `${workflowLine(77)}\n`);
-    t.put(path.join(t.history, "bbb.jsonl"), 40, `{"type":"user"}\n`);
-    t.issue("77.resume.js", 40);
-    const sessionFiles = (report) => t.row(report, "sessions").files;
-
-    const open = new Map([[77, { state: "OPEN", stateReason: null, closedAt: null }]]);
-    assert.equal(sessionFiles(t.run({ fetchStates: () => open })), 1);
-    assert.equal(sessionFiles(t.run({ fetchStates: () => new Map() })), 1);
-
-    const completed = new Map([[77, { state: "CLOSED", stateReason: "COMPLETED", closedAt: new Date(NOW - 3 * DAY).toISOString() }]]);
-    assert.equal(sessionFiles(t.run({ fetchStates: () => completed })), 2);
-
-    const notPlanned = new Map([[77, { state: "CLOSED", stateReason: "NOT_PLANNED", closedAt: new Date(NOW - 30 * DAY).toISOString() }]]);
-    assert.equal(sessionFiles(t.run({ fetchStates: () => notPlanned })), 1);
+    t.put(path.join(t.history, "aaa.jsonl"), 40, '{"input":{"scriptPath":"skarbiec-plan/issues/77.resume.js"}}\n');
+    t.put(path.join(t.history, "bbb.jsonl"), 29);
+    t.issue("77.resume.js", 1);
+    const report = t.run({ apply: true });
+    assert.ok(!existsSync(path.join(t.history, "aaa.jsonl")));
+    assert.ok(existsSync(path.join(t.history, "bbb.jsonl")));
+    assert.equal(t.row(report, "sessions").files, 1);
   });
 });
 
-test("ticket files need a completed issue closed over 7 days ago", () => {
-  const closed = (reason, days) => ({ state: "CLOSED", stateReason: reason, closedAt: new Date(NOW - days * DAY).toISOString() });
-  const states = new Map([
-    [1, { state: "OPEN", stateReason: null, closedAt: null }],
-    [2, closed("NOT_PLANNED", 20)],
-    [3, closed("COMPLETED", 3)],
-    [4, closed("COMPLETED", 10)],
-    [5, null],
-  ]);
-  const groups = [1, 2, 3, 4, 5, 6].map((n) => entry(n, 40, { files: 7 }));
-  const plan = planTickets(groups, states, NOW);
-  assert.deepEqual(plan.selected.map((g) => g.id), [4]);
-  assert.deepEqual(plan.kept.map((g) => g.id), [3]);
-  assert.deepEqual(plan.unknown.map((g) => g.id), [1, 2, 5, 6]);
-
+test("ticket files are selected by their own age", () => {
   withTree((t) => {
-    const kinds = ["md", "run.json", "resume.js", "manual.md", "e2e.patch", "diagnosis.md", "ci-fix.md"];
-    for (const n of [1, 2, 3, 4, 5, 6]) for (const kind of kinds) t.issue(`${n}.${kind}`, 40);
-    const report = t.run({ apply: true, fetchStates: () => states });
-
-    for (const kind of kinds) assert.ok(!existsSync(path.join(t.repo, "skarbiec-plan", "issues", `4.${kind}`)), `4.${kind}`);
-    for (const n of [1, 2, 3, 5, 6]) for (const kind of kinds) assert.ok(existsSync(path.join(t.repo, "skarbiec-plan", "issues", `${n}.${kind}`)), `${n}.${kind}`);
-    const row = t.row(report, "tickets");
-    assert.equal(row.files, 7);
-    assert.equal(row.skipped, 28);
-    assert.match(row.notes.join("\n"), /skipped \(stan nieznany\)/);
+    const old = t.issue("612.run.json", 15);
+    const young = t.issue("612.md", 13);
+    const report = t.run({ apply: true });
+    assert.ok(!existsSync(old));
+    assert.ok(existsSync(young));
+    assert.equal(t.row(report, "tickets").files, 1);
   });
 });
 
-test("ticket states come from batched GraphQL requests", () => {
-  const calls = [];
-  const numbers = Array.from({ length: 120 }, (_, i) => i + 1);
-  const states = fetchIssueStates(numbers, (query) => {
-    calls.push(query);
-    const repository = {};
-    for (const m of query.matchAll(/i(\d+): issueOrPullRequest\(number: \d+\)/g)) {
-      const n = Number(m[1]);
-      repository[`i${n}`] = n === 2 ? { __typename: "PullRequest" } : n === 3 ? null : { __typename: "Issue", state: "CLOSED", stateReason: "COMPLETED", closedAt: "2026-10-01T00:00:00Z" };
-    }
-    return { repository };
+test("ticket cleaning keeps unknown names and future files", () => {
+  withTree((t) => {
+    const kept = [t.issue("612.manual.md.bak", 40), t.issue("notes.txt", 40), t.issue("613.md", -5)];
+    const report = t.run({ apply: true });
+    for (const file of kept) assert.ok(existsSync(file), file);
+    assert.equal(t.row(report, "tickets").files, 0);
   });
-  assert.equal(calls.length, 3);
-  assert.deepEqual(calls.map((q) => (q.match(/issueOrPullRequest/g) ?? []).length), [50, 50, 20]);
-  assert.equal(states.size, 120);
-  assert.equal(states.get(2), null);
-  assert.equal(states.get(3), null);
-  assert.deepEqual(states.get(1), { state: "CLOSED", stateReason: "COMPLETED", closedAt: "2026-10-01T00:00:00Z" });
+});
+
+test("verify run files are swept after 7 days", () => {
+  withTree((t) => {
+    const gone = ["verify-result.json", "verify-result-2.json", "verify-result.json.log", "verify-before.json", "verify-stop-1.json"].map((n) => t.put(path.join(t.repo, ".git", n), 8));
+    const kept = ["verify-cache.json", "e2e-result.json", "verify.pid", "verify-result.json.tmp"].map((n) => t.put(path.join(t.repo, ".git", n), 8));
+    const young = t.put(path.join(t.repo, ".git", "verify-result-3.json"), 6);
+    const report = t.run({ apply: true });
+    for (const file of gone) assert.ok(!existsSync(file), file);
+    for (const file of [...kept, young]) assert.ok(existsSync(file), file);
+    assert.equal(t.row(report, "verify").files, 5);
+  });
+});
+
+test("openapi error logs are swept after 7 days", () => {
+  withTree((t) => {
+    const log = t.put(path.join(t.repo, "web", "openapi-ts-error-1.log"), 8);
+    const pkg = t.put(path.join(t.repo, "web", "package.json"), 400);
+    const report = t.run({ apply: true });
+    assert.ok(!existsSync(log));
+    assert.ok(existsSync(pkg));
+    assert.equal(t.row(report, "openapi").files, 1);
+  });
+});
+
+test("temp leftovers are swept after 3 days", () => {
+  withTree((t) => {
+    const gone = [
+      t.put(path.join(t.tmp, "skarbiec-compose-x", "a.txt"), 4),
+      t.put(path.join(t.tmp, "skarbiec-compose-x", "sub", "b.txt"), 5),
+      t.put(path.join(t.tmp, "gh-sandbox-1-aux"), 4),
+      t.put(path.join(t.tmp, "skarbiec-autobuild-5-comment.md"), 4),
+      t.put(path.join(t.tmp, "verify-cache-a"), 4),
+    ];
+    const kept = [t.put(path.join(t.tmp, "skarbiec-autobuild.stop"), 40), t.put(path.join(t.tmp, "other-dir", "a.txt"), 40), t.put(path.join(t.tmp, "skarbiec-autobuild-6-skip.md"), 1)];
+    const report = t.run({ apply: true });
+    for (const file of gone) assert.ok(!existsSync(file), file);
+    for (const file of kept) assert.ok(existsSync(file), file);
+    assert.ok(existsSync(t.tmp));
+    assert.equal(t.row(report, "temp").files, 5);
+  });
 });
 
 test("apply deletes, preview does not", () => {
@@ -297,61 +295,11 @@ test("unknown flags exit 1 with the usage line", () => {
   assert.match(res.stderr, /usage: clean\.mjs \[--apply\]/);
 });
 
-function sandboxTree(failIssueStates) {
-  const config = mkdtempSync(path.join(os.tmpdir(), "clean-config-"));
-  const before = process.env.CLAUDE_CONFIG_DIR;
-  process.env.CLAUDE_CONFIG_DIR = config;
-  const state = buildState({ issues: [{ number: 10, status: "Done" }, { number: 11, status: "Done" }] });
-  state.issues[10].stateReason = "COMPLETED";
-  state.issues[10].closedAt = new Date(Date.now() - 30 * DAY).toISOString();
-  state.issues[11].stateReason = "COMPLETED";
-  state.issues[11].closedAt = new Date(Date.now() - 2 * DAY).toISOString();
-  state.failIssueStates = failIssueStates;
-  const sandbox = createSandbox(state);
-  process.env.CLAUDE_CONFIG_DIR = before ?? "";
-  if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR;
-  const tree = makeTree(sandbox.dir, config, Date.now());
-  const files = {
-    ticket: tree.issue("10.md", 40),
-    young: tree.issue("11.md", 40),
-    log: tree.put(path.join(sandbox.dir, "skarbiec-plan", "autobuild-runs", "old.log"), 40),
-    report: tree.put(path.join(sandbox.dir, "e2e", "playwright-report", "index.html"), 10),
-    session: tree.put(path.join(tree.history, "old.jsonl"), 40),
-  };
-  tree.settle();
-  return { sandbox, files, cleanup: () => {
-    sandbox.cleanup();
-    rmSync(config, { recursive: true, force: true });
-  } };
-}
-
-test("survives an unreachable GitHub", () => {
-  const { sandbox, files, cleanup } = sandboxTree(true);
-  try {
-    const res = sandbox.run("clean.mjs", ["--apply"]);
-    assert.equal(res.code, 0, res.out);
-    assert.ok(existsSync(files.ticket), "no ticket file is selected without a state");
-    assert.ok(existsSync(files.young));
-    assert.ok(!existsSync(files.log));
-    assert.ok(!existsSync(files.report));
-    assert.ok(!existsSync(files.session));
-    assert.match(res.stdout, /skipped \(stan nieznany\)/);
-    assert.match(res.stdout, /GitHub niedostępny/);
-  } finally {
-    cleanup();
-  }
-});
-
-test("reachable GitHub deletes the completed ticket only", () => {
-  const { sandbox, files, cleanup } = sandboxTree(false);
-  try {
-    const res = sandbox.run("clean.mjs", ["--apply"]);
-    assert.equal(res.code, 0, res.out);
-    assert.ok(!existsSync(files.ticket));
-    assert.ok(existsSync(files.young));
-    assert.equal(sandbox.log().filter((l) => l.kind === "issueStates").length, 1);
-    assert.ok(statSync(path.join(sandbox.dir, "skarbiec-plan", "issues")).isDirectory());
-  } finally {
-    cleanup();
-  }
+test("preview lists the new categories", () => {
+  withTree((t) => {
+    t.put(path.join(t.repo, ".git", "verify-result.json"), 8);
+    const text = formatReport(t.run());
+    for (const label of ["wyniki verify", "logi openapi", "pliki tymczasowe"]) assert.match(text, new RegExp(label));
+    assert.ok(existsSync(path.join(t.repo, ".git", "verify-result.json")));
+  });
 });
