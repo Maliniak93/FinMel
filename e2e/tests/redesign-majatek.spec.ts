@@ -460,10 +460,19 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await dialog.getByRole('button', { name: 'Archiwizuj', exact: true }).click();
     await expect(dialog).toBeHidden();
 
-    await clickTab(page, 'Wszystko');
-    await expect(allRow(page, 'Lokata Santander')).toBeVisible();
-    await expect(allRow(page, 'IKE do archiwum')).toHaveCount(0);
-    await expect(tab(page, 'Rachunki inwestycyjne')).toContainText('2 rachunki');
+    await expectProjected(
+      async () => {
+        await refetchWealth(page);
+        await clickTab(page, 'Wszystko');
+      },
+      async () => {
+        await expect(allRow(page, 'Lokata Santander')).toBeVisible({ timeout: 3_000 });
+        await expect(allRow(page, 'IKE do archiwum')).toHaveCount(0, { timeout: 3_000 });
+        await expect(tab(page, 'Rachunki inwestycyjne')).toContainText('2 rachunki', {
+          timeout: 3_000,
+        });
+      },
+    );
   });
 
   await test.step('Krok 15: "Pokaż zarchiwizowane" brings IKE do archiwum back dimmed with the "Zarchiwizowany" mark and in the count under the tab; switching it off hides it again', async () => {
