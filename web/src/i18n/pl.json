@@ -1245,6 +1245,11 @@
     "interestCredited": "Naliczone odsetki",
     "interestDue": "Odsetki do rozliczenia",
     "hasOpenDeposit": "Na to konto wróci otwarta lokata",
+    "current": {
+      "title": "Konta bieżące",
+      "sum": "Suma w PLN",
+      "incomplete": "niepełna suma"
+    },
     "interest": {
       "settle": "Rozlicz odsetki",
       "settleMonths": "Rozlicz odsetki (miesiące do rozliczenia: {{ count }})",
@@ -1275,6 +1280,7 @@
   },
   "accounts": {
     "showArchived": "Pokaż zarchiwizowane",
+    "outsideNetWorthLabel": "Poza majątkiem",
     "newAccount": "Nowy rachunek",
     "empty": "Nie masz jeszcze żadnych rachunków.",
     "summary": {
@@ -1351,6 +1357,8 @@
       "nameTooLong": "Nazwa jest za długa.",
       "duplicateName": "Rachunek o tej nazwie już istnieje.",
       "variant": "Wariant",
+      "outsideNetWorth": "Poza majątkiem (konto bieżące)",
+      "outsideNetWorthHint": "Konto nie wchodzi do majątku, pulpitu ani list majątku.",
       "fixedHint": "Typu, opakowania podatkowego i waluty nie można zmienić po utworzeniu rachunku."
     },
     "contribution": {

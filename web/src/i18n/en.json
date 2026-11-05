@@ -1245,6 +1245,11 @@
     "interestCredited": "Interest credited",
     "interestDue": "Interest to settle",
     "hasOpenDeposit": "An open deposit will return to this account",
+    "current": {
+      "title": "Current accounts",
+      "sum": "Sum in PLN",
+      "incomplete": "incomplete sum"
+    },
     "interest": {
       "settle": "Settle interest",
       "settleMonths": "Settle interest ({{ count }} months due)",
@@ -1275,6 +1280,7 @@
   },
   "accounts": {
     "showArchived": "Show archived",
+    "outsideNetWorthLabel": "Outside net worth",
     "newAccount": "New account",
     "empty": "You don't have any accounts yet.",
     "summary": {
@@ -1351,6 +1357,8 @@
       "nameTooLong": "Name is too long.",
       "duplicateName": "An account with this name already exists.",
       "variant": "Variant",
+      "outsideNetWorth": "Outside net worth (current account)",
+      "outsideNetWorthHint": "The account is left out of net worth, the dashboard and wealth lists.",
       "fixedHint": "The type, tax wrapper and currency can't be changed after the account is created."
     },
     "contribution": {

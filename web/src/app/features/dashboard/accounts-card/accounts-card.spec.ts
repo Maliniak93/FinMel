@@ -123,4 +123,40 @@ describe('AccountsCard', () => {
 
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('Poza rachunkami');
   });
+
+  it('omits flagged accounts', async () => {
+    const FLAGGED_ID = '66666666-6666-6666-6666-666666666666';
+    const { fixture } = await renderCard(AccountsCard, {
+      accounts: jsonResponse([
+        ...accounts,
+        accountResponse({
+          id: FLAGGED_ID,
+          name: 'Revolut ROR',
+          type: 2,
+          wrapper: 0,
+          outsideNetWorth: true,
+        }),
+      ]),
+      dashboard: jsonResponse({
+        ...withOutsideAccounts,
+        byAccount: [
+          ...withOutsideAccounts.byAccount,
+          {
+            accountId: FLAGGED_ID,
+            valuePln: 275,
+            snapshotDate: '2026-08-09',
+            isStale: false,
+            percentage: 14,
+          },
+        ],
+      }),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const text = element.textContent ?? '';
+
+    expect(text).toContain('XTB IKE');
+    expect(text).not.toContain('Revolut ROR');
+    expect(text).not.toContain(formatMoney(275));
+    expect(element.querySelector(`a[href="/wealth/bank/${FLAGGED_ID}"]`)).toBeNull();
+  });
 });

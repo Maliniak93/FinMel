@@ -35,6 +35,9 @@
           @for (account of accounts(); track account.id) {
             <mat-option [value]="account.id">
               {{ account.name }} ({{ account.currency }} {{ formatAmount(account.cashBalance) }})
+              @if (account.outsideNetWorth) {
+                · {{ 'accounts.outsideNetWorthLabel' | transloco }}
+              }
             </mat-option>
           }
         </mat-select>
@@ -68,7 +71,12 @@
           <mat-option [value]="null">{{ 'deposits.form.returnToSource' | transloco }}</mat-option>
         }
         @for (account of returnAccounts(); track account.id) {
-          <mat-option [value]="account.id">{{ account.name }}</mat-option>
+          <mat-option [value]="account.id"
+            >{{ account.name }}
+            @if (account.outsideNetWorth) {
+              · {{ 'accounts.outsideNetWorthLabel' | transloco }}
+            }
+          </mat-option>
         }
       </mat-select>
       @if (form.controls.returnAccountId.hasError('server')) {

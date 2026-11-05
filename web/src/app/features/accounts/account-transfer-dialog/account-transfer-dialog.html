@@ -12,6 +12,9 @@
         @for (candidate of targets(); track candidate.assetId) {
           <mat-option [value]="candidate.assetId">
             {{ candidate.name }} ({{ formatMoney(candidate.balance, account.currency) }})
+            @if (candidate.outsideNetWorth) {
+              · {{ 'accounts.outsideNetWorthLabel' | transloco }}
+            }
           </mat-option>
         }
       </mat-select>

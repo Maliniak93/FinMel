@@ -6,14 +6,22 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
+import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { jsonResponse } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { pickSelectOption, selectOptionLabels } from '../../deposits/testing/deposit-fixtures';
 import { RecurringIncomeFormDialog } from './recurring-income-form-dialog';
 
 const plnAccountId = '11111111-1111-1111-1111-111111111111';
 const eurAccountId = '22222222-2222-2222-2222-222222222222';
 const archivedAccountId = '33333333-3333-3333-3333-333333333333';
 
-function account(id: string, name: string, currency: string, isArchived = false) {
+function account(
+  id: string,
+  name: string,
+  currency: string,
+  isArchived = false,
+  outsideNetWorth = false,
+) {
   return {
     id,
     name,
@@ -23,7 +31,7 @@ function account(id: string, name: string, currency: string, isArchived = false)
     isArchived,
     cashAssetId: `cash-${id}`,
     cashBalance: 0,
-    outsideNetWorth: false,
+    outsideNetWorth,
   };
 }
 
@@ -37,13 +45,19 @@ describe('RecurringIncomeFormDialog', () => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.useRealTimers();
     fetchSpy.mockRestore();
+    await restoreEnglish();
   });
 
   async function setup(
     data: { definition: IncomeDefinitionResponse } | null = null,
+    accounts: unknown[] = [
+      account(plnAccountId, 'mBank ROR', 'PLN'),
+      account(eurAccountId, 'Revolut EUR', 'EUR'),
+      account(archivedAccountId, 'Stare konto', 'PLN', true),
+    ],
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -54,11 +68,7 @@ describe('RecurringIncomeFormDialog', () => {
       if (request.method !== 'GET') {
         return jsonResponse({ id: 'new-income' }, 201);
       }
-      return jsonResponse([
-        account(plnAccountId, 'mBank ROR', 'PLN'),
-        account(eurAccountId, 'Revolut EUR', 'EUR'),
-        account(archivedAccountId, 'Stare konto', 'PLN', true),
-      ]);
+      return jsonResponse(accounts);
     });
 
     await TestBed.configureTestingModule({
@@ -386,5 +396,20 @@ describe('RecurringIncomeFormDialog', () => {
     expect(options[1]).toContain('Revolut EUR');
     expect(options[1]).toContain('EUR');
     expect(options.join(' ')).not.toContain('Stare konto');
+  });
+
+  it('labels flagged accounts and keeps them selectable', async () => {
+    await setup(null, [
+      account(plnAccountId, 'mBank ROR', 'PLN', false, true),
+      account(eurAccountId, 'Revolut EUR', 'EUR'),
+    ]);
+    await switchLanguage(fixture, 'pl');
+
+    await pickSelectOption(fixture, 'accountId', 'mBank ROR');
+    expect(component['form'].controls.accountId.value).toBe(plnAccountId);
+
+    const labels = await selectOptionLabels(fixture, 'accountId');
+    expect(labels.find((label) => label.includes('mBank ROR'))).toMatch(/·\s*Poza majątkiem$/);
+    expect(labels.find((label) => label.includes('Revolut EUR'))).not.toMatch(/Poza majątkiem/);
   });
 });

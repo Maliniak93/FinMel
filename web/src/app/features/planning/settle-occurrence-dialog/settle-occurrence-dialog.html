@@ -54,7 +54,12 @@
       <mat-label>{{ 'planning.account' | transloco }}</mat-label>
       <mat-select formControlName="accountId">
         @for (account of accounts(); track account.id) {
-          <mat-option [value]="account.id">{{ account.name }} · {{ account.currency }}</mat-option>
+          <mat-option [value]="account.id"
+            >{{ account.name }} · {{ account.currency }}
+            @if (account.outsideNetWorth) {
+              · {{ 'accounts.outsideNetWorthLabel' | transloco }}
+            }
+          </mat-option>
         }
       </mat-select>
       @if (accountsResource.error(); as loadError) {

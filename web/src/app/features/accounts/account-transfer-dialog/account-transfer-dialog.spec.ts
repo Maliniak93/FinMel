@@ -12,6 +12,7 @@ import {
   renderedText,
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { pickSelectOption, selectOptionLabels } from '../../deposits/testing/deposit-fixtures';
 import { AccountTransferDialog, type AccountTransferDialogData } from './account-transfer-dialog';
 
 const sourceCashId = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
@@ -31,9 +32,12 @@ const data: AccountTransferDialogData = {
   },
 };
 
+const flaggedCashId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+
 const candidates = [
   { assetId: sourceCashId, name: 'XTB IKE', balance: 5000 },
   { assetId: targetCashId, name: 'Obligacje IKE', balance: 0 },
+  { assetId: flaggedCashId, name: 'Revolut ROR', balance: 3200, outsideNetWorth: true },
 ];
 
 describe('AccountTransferDialog', () => {
@@ -195,6 +199,18 @@ describe('AccountTransferDialog', () => {
       ),
     );
     expect(url.searchParams.get('currency')).toBe('USD');
+  });
+
+  it('labels flagged accounts and keeps them selectable', async () => {
+    await setup();
+    await switchLanguage(fixture, 'pl');
+
+    await pickSelectOption(fixture, 'targetAssetId', 'Revolut ROR');
+    expect(form().controls['targetAssetId'].value).toBe(flaggedCashId);
+
+    const labels = await selectOptionLabels(fixture, 'targetAssetId');
+    expect(labels.find((label) => label.includes('Revolut ROR'))).toMatch(/·\s*Poza majątkiem$/);
+    expect(labels.find((label) => label.includes('Obligacje IKE'))).not.toMatch(/Poza majątkiem/);
   });
 
   it('a server 400 TransferCurrencyMismatch shows "Różne waluty" and keeps the dialog open', async () => {

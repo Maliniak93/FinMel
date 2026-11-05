@@ -37,6 +37,12 @@
           } @else {
             <app-status-chip [label]="taxWrapperLabel(account.wrapper) | transloco" icon="shield" />
           }
+          @if (account.outsideNetWorth) {
+            <app-status-chip
+              [label]="'accounts.outsideNetWorthLabel' | transloco"
+              icon="visibility_off"
+            />
+          }
           @if (account.isArchived) {
             <app-status-chip [label]="'common.archived' | transloco" icon="inventory_2" />
           }

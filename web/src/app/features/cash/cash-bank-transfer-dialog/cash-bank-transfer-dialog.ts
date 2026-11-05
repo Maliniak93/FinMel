@@ -44,6 +44,7 @@ interface Counterpart {
   assetId: string;
   name: string;
   balance: number | string;
+  outsideNetWorth?: boolean;
 }
 
 function today(): Date {
@@ -125,6 +126,7 @@ export class CashBankTransferDialog {
           assetId: account.cashAssetId,
           name: account.name,
           balance: account.cashBalance,
+          outsideNetWorth: account.outsideNetWorth,
         }));
     },
   });
