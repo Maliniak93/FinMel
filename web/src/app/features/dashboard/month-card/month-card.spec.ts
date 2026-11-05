@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { formatMoney } from '../../../shared/format';
 import {
@@ -270,5 +273,18 @@ describe('MonthCard', () => {
     await switchLanguage(fixture, 'pl');
 
     expect(all(element, 'month-card-settled')[0].textContent).toContain('Wpływy załatwione');
+  });
+});
+
+describe('MonthCard stylesheet', () => {
+  it('rules the cascade rows, with a 24 px title', () => {
+    const scss = readFileSync(
+      resolve(process.cwd(), 'src/app/features/dashboard/month-card/month-card.scss'),
+      'utf8',
+    );
+
+    expect(scss).toMatch(/\.month-card__title\s*\{[^}]*font-size:\s*24px/);
+    expect(scss).toMatch(/border-bottom:/);
+    expect(scss).toMatch(/\.month-card__cascade\s*\{[^}]*border-top:/);
   });
 });

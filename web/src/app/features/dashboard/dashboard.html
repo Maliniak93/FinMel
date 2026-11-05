@@ -1,5 +1,12 @@
 <div class="dashboard-page">
-  <h1>{{ 'dashboard.title' | transloco }}</h1>
+  <header class="dashboard-page__header">
+    <h1>{{ 'dashboard.title' | transloco }}</h1>
+    @if (dashboardResource.hasValue() && dashboardResource.value().asOf !== null) {
+      <p class="dashboard-page__as-of">
+        {{ 'dashboard.asOf' | transloco: { date: formatDate(dashboardResource.value().asOf!) } }}
+      </p>
+    }
+  </header>
 
   @if (dashboardResource.error(); as loadError) {
     <div class="dashboard-page__state" role="alert">
@@ -41,9 +48,6 @@
                 </mat-chip-set>
               }
             </div>
-            <p class="dashboard-page__as-of">
-              {{ 'dashboard.asOf' | transloco: { date: formatDate(dashboard.asOf) } }}
-            </p>
 
             @if (change(); as change) {
               <p
@@ -109,9 +113,9 @@
           <app-month-card />
         </div>
 
-        <div class="dashboard-page__pair">
-          <mat-card class="dashboard-page__card dashboard-page__group-card">
-            <mat-card-content>
+        <div class="dashboard-page__pair dashboard-page__pair--split">
+          <section class="dashboard-page__group-card">
+            <div>
               <h2 class="dashboard-page__card-title">{{ 'dashboard.groups.title' | transloco }}</h2>
               @if (groupsResource.error(); as groupsError) {
                 <app-section-error
@@ -215,11 +219,11 @@
                   }
                 </ul>
               }
-            </mat-card-content>
-          </mat-card>
+            </div>
+          </section>
 
-          <mat-card class="dashboard-page__card dashboard-page__structure">
-            <mat-card-content>
+          <section class="dashboard-page__structure">
+            <div>
               <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
               <app-split-bar [segments]="structureSegments()" />
               <ul class="dashboard-page__structure-list">
@@ -241,11 +245,11 @@
                   </li>
                 }
               </ul>
-            </mat-card-content>
-          </mat-card>
+            </div>
+          </section>
         </div>
 
-        <div class="dashboard-page__pair">
+        <div class="dashboard-page__pair dashboard-page__pair--ruled">
           <app-accounts-card />
           <app-cash-card />
         </div>

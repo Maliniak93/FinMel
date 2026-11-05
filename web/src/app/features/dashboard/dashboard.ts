@@ -1,6 +1,5 @@
 import { Component, computed, linkedSignal, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -81,7 +80,6 @@ function toGrosze(amount: number | string): number {
   selector: 'app-dashboard',
   imports: [
     MatButtonModule,
-    MatCardModule,
     MatChipsModule,
     MatProgressSpinnerModule,
     MatTooltipModule,

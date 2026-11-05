@@ -21,10 +21,12 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
 }
 
 .todo-card__row {
+  padding: var(--sk-space-2) 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:

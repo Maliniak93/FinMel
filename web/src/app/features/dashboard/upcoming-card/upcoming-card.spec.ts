@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { polishProblems, restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
 import { bondResponse } from '../../../../testing/bond-fixtures';
 import { BOND_STATUS } from '../../bonds/bond-interest';
@@ -192,5 +195,17 @@ describe('UpcomingCard', () => {
     fixture.detectChanges();
 
     expect(polishProblems(english, texts())).toEqual([]);
+  });
+});
+
+describe('UpcomingCard stylesheet', () => {
+  it('rules the list and every row, with a 24 px title', () => {
+    const scss = readFileSync(
+      resolve(process.cwd(), 'src/app/features/dashboard/upcoming-card/upcoming-card.scss'),
+      'utf8',
+    );
+
+    expect(scss).toMatch(/\.upcoming-card__list\s*\{[^}]*border-top:/);
+    expect(scss).toMatch(/\.upcoming-card__row\s*\{[^}]*border-bottom:/);
   });
 });

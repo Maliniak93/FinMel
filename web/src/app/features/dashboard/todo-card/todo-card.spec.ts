@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { restoreEnglish } from '../../../../testing/i18n';
 import { dateOnlyFromToday, jsonResponse, renderCard } from '../testing/dashboard-fixtures';
 import { TodoCard } from './todo-card';
@@ -48,5 +51,17 @@ describe('TodoCard', () => {
     fixture.detectChanges();
 
     expect(element.querySelectorAll('[data-testid="todo-card-item"]')).toHaveLength(7);
+  });
+});
+
+describe('TodoCard stylesheet', () => {
+  it('rules the list and every row, with a 24 px title', () => {
+    const scss = readFileSync(
+      resolve(process.cwd(), 'src/app/features/dashboard/todo-card/todo-card.scss'),
+      'utf8',
+    );
+
+    expect(scss).toMatch(/\.todo-card__list\s*\{[^}]*border-top:/);
+    expect(scss).toMatch(/\.todo-card__row\s*\{[^}]*border-bottom:/);
   });
 });
