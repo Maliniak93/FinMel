@@ -62,6 +62,7 @@
               [attr.aria-pressed]="!showCalendar()"
               (click)="selectLayout(false)"
             >
+              <mat-icon aria-hidden="true">view_list</mat-icon>
               {{ 'planning.calendar.layout.list' | transloco }}
             </button>
             <button
@@ -72,6 +73,7 @@
               [attr.aria-pressed]="showCalendar()"
               (click)="selectLayout(true)"
             >
+              <mat-icon aria-hidden="true">calendar_month</mat-icon>
               {{ 'planning.calendar.layout.calendar' | transloco }}
             </button>
           </div>
@@ -179,7 +181,7 @@
                   <dt>{{ 'planning.balance.pending' | transloco }}</dt>
                   <dd>{{ formatMoney(plan.balance.pendingPln, 'PLN') }}</dd>
                 </div>
-                <div data-testid="balance-difference">
+                <div class="planning-balance__difference" data-testid="balance-difference">
                   <dt>{{ 'planning.balance.difference' | transloco }}</dt>
                   <dd>{{ formatMoney(plan.balance.differencePln, 'PLN') }}</dd>
                 </div>

@@ -206,6 +206,33 @@ describe('PlanningCalendar', () => {
     expect(details.textContent).toContain(formatDate('2027-03-25'));
   });
 
+  it('renders the weekday row and the grid', async () => {
+    await render(monthData([], []));
+    await vi.waitFor(async () => {
+      await settle();
+      expect(cells().length).toBeGreaterThan(0);
+    });
+
+    expect(element().querySelectorAll('.planning-calendar__weekdays > span')).toHaveLength(7);
+    expect(
+      element().querySelectorAll('.planning-calendar__grid [data-testid="calendar-cell"]'),
+    ).toHaveLength(cells().length);
+  });
+
+  it('renders the day details heading at the prototype scale', async () => {
+    await render(monthData([], []));
+    await vi.waitFor(async () => {
+      await settle();
+      expect(cells().length).toBeGreaterThan(0);
+    });
+
+    cell('2027-03-05').click();
+    await settle();
+
+    const heading = element().querySelector<HTMLElement>('[data-testid="calendar-details"] h3')!;
+    expect(getComputedStyle(heading).fontSize).toBe('20px');
+  });
+
   it('places one-off entries on their dates', async () => {
     const data = monthData([], []) as {
       incomes: Record<string, unknown>;
