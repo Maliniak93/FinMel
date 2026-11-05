@@ -29,9 +29,23 @@ export function syncRunStatusLabel(status: SyncRunStatus | null | undefined): st
     : (SYNC_RUN_STATUS_LABELS[Number(status)] ?? 'enums.syncRunStatus.unknown');
 }
 
+// Mirrors Skarbiec.MarketData.Data.SyncRunSource in declaration order.
+const SYNC_RUN_SOURCE_LABELS: readonly string[] = [
+  'enums.syncRunSource.schedule',
+  'enums.syncRunSource.start',
+  'enums.syncRunSource.manual',
+];
+
+export function syncRunSourceLabel(source: number | null | undefined): string {
+  return source === null || source === undefined
+    ? 'enums.syncRunSource.unknown'
+    : (SYNC_RUN_SOURCE_LABELS[Number(source)] ?? 'enums.syncRunSource.unknown');
+}
+
 export const RUN_KINDS = [
   { key: 'prices', label: 'enums.syncRunKind.prices' },
   { key: 'fx', label: 'enums.syncRunKind.fx' },
+  { key: 'bondCatalog', label: 'enums.syncRunKind.bondCatalog' },
 ] as const;
 
 @Component({
@@ -52,6 +66,7 @@ export class Settings {
   protected readonly triggering = signal(false);
   protected readonly triggerError = signal<string | null>(null);
   protected readonly syncRunStatusLabel = syncRunStatusLabel;
+  protected readonly syncRunSourceLabel = syncRunSourceLabel;
   protected readonly runKinds = RUN_KINDS;
   protected readonly formatDateTime = formatDateTime;
 
