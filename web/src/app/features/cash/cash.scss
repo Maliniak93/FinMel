@@ -8,15 +8,7 @@
 }
 
 .cash-page__totals {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
   margin-bottom: 24px;
-  padding: 16px 20px;
-  border: 1px solid var(--mat-sys-outline-variant);
-  border-radius: var(--mat-sys-corner-medium);
 }
 
 .cash-page__total-main {
@@ -24,15 +16,6 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-}
-
-.cash-page__total-label {
-  color: var(--mat-sys-on-surface-variant);
-}
-
-.cash-page__total-value {
-  font-size: 1.5rem;
-  font-weight: 500;
 }
 
 .cash-page__total-list {
@@ -65,7 +48,7 @@
   flex: 1;
   margin: 0;
   font-family: var(--sk-font-display, inherit);
-  font-size: 1.25rem;
+  font-size: 22px;
 }
 
 .cash-place__value {
@@ -97,6 +80,7 @@
   align-items: center;
   gap: 12px;
   padding: 4px 0;
+  border-top: 1px solid var(--mat-sys-outline-variant);
 }
 
 .cash-place__currency {

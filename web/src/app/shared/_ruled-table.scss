@@ -1,0 +1,19 @@
+@mixin ruled-table {
+  th.mat-mdc-header-cell {
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  td.mat-mdc-cell {
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  td.mat-mdc-footer-cell {
+    border-top: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+}

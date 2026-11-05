@@ -58,6 +58,16 @@
   }
 }
 
+.wealth-all__row {
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.wealth-all__actions mat-icon {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+}
+
 .wealth-all__section th {
   padding-top: 20px;
   font-weight: 600;

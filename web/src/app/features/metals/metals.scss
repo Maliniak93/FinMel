@@ -1,3 +1,5 @@
+@use '../../shared/ruled-table' as ruled;
+
 .metals-page__header {
   display: flex;
   align-items: center;
@@ -34,6 +36,7 @@
 }
 
 .metals-page__table {
+  @include ruled.ruled-table;
   width: 100%;
 }
 

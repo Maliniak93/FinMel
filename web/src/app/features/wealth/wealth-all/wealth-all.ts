@@ -54,7 +54,7 @@ const FLAG_VIEWS: Record<WealthFlag, FlagView> = {
     tone: 'warning',
   },
   maturity: { labelKey: 'wealth.status.maturity', icon: 'event', tone: 'warning' },
-  interestDue: { labelKey: 'wealth.status.interestDue', icon: 'payments', tone: 'warning' },
+  interestDue: { labelKey: 'wealth.status.interestDue', icon: 'payments', tone: 'negative' },
 };
 
 // MatDialogModule stays out of imports: it would shadow the TestBed provider override.

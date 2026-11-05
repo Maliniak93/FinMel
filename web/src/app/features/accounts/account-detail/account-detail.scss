@@ -1,3 +1,5 @@
+@use '../../../shared/ruled-table' as ruled;
+
 .account-detail__back {
   display: inline-flex;
   align-items: center;
@@ -39,6 +41,7 @@
 }
 
 .account-detail__table {
+  @include ruled.ruled-table;
   width: 100%;
 }
 
