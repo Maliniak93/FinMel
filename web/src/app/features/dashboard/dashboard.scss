@@ -125,11 +125,15 @@
 }
 
 .dashboard-page__change--positive {
-  color: var(--mat-sys-primary);
+  color: var(--sk-positive);
 }
 
 .dashboard-page__change--negative {
-  color: var(--mat-sys-error);
+  color: var(--sk-negative);
+}
+
+.dashboard-page__change--neutral {
+  color: var(--mat-sys-on-surface-variant);
 }
 
 .dashboard-page__change-range {

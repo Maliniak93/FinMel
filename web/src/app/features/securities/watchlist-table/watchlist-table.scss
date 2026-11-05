@@ -30,11 +30,15 @@
 }
 
 .watchlist-table__change.positive {
-  color: light-dark(#2e7d32, #81c784);
+  color: var(--sk-positive);
 }
 
 .watchlist-table__change.negative {
-  color: var(--mat-sys-error);
+  color: var(--sk-negative);
+}
+
+.watchlist-table__change.neutral {
+  color: var(--mat-sys-on-surface-variant);
 }
 
 .at-target {

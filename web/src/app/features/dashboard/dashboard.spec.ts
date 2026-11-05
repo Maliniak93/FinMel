@@ -194,7 +194,7 @@ describe('Dashboard', () => {
     const change = element.querySelector('.dashboard-page__change') as HTMLElement;
     expect(lastHistoryParams(fetchSpy).get('range')).toBe('YTD');
     expect(normalised(change.textContent ?? '')).toContain(normalised(formatSignedMoney(250)));
-    expect(change.textContent).toContain(formatPercent(25));
+    expect(normalised(change.textContent ?? '')).toContain(normalised(`(+${formatPercent(25)})`));
     expect(change.classList).toContain('dashboard-page__change--positive');
     expect(change.classList).not.toContain('dashboard-page__change--negative');
 
@@ -447,6 +447,31 @@ describe('Dashboard', () => {
 
     expect(change.classList).toContain('dashboard-page__change--negative');
     expect(change.classList).not.toContain('dashboard-page__change--positive');
+    expect(normalised(change.textContent ?? '')).toContain(normalised(formatSignedMoney(-250)));
+    expect(change.textContent).toContain('−');
+  });
+
+  it('colours a zero or rounded-zero change neutral', async () => {
+    await setup(jsonResponse(dashboard), (url) =>
+      url.includes('range=YTD') ? historyWithChange(0.004, 25) : historyWithChange(0, 0),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    const change = () => element.querySelector('.dashboard-page__change') as HTMLElement;
+
+    expect(change().classList).toContain('dashboard-page__change--neutral');
+    expect(change().classList).not.toContain('dashboard-page__change--positive');
+    expect(change().classList).not.toContain('dashboard-page__change--negative');
+
+    const ytdToggle = [...element.querySelectorAll('mat-button-toggle button')].find(
+      (button) => button.textContent?.trim() === 'YTD',
+    ) as HTMLButtonElement;
+    ytdToggle.click();
+    await fixture.whenStable();
+
+    expect(change().classList).toContain('dashboard-page__change--neutral');
+    expect(change().classList).not.toContain('dashboard-page__change--positive');
+    expect(change().classList).not.toContain('dashboard-page__change--negative');
+    expect(normalised(change().textContent ?? '')).not.toContain('+');
   });
 
   it('switching the range updates the change', async () => {
@@ -564,7 +589,10 @@ describe('Dashboard', () => {
     ) as HTMLElement;
 
     expect(value.textContent).toContain(formatMoney(15000));
-    expect(textOf(value.querySelector('.dashboard-page__change'))).toBe('—');
+    const dash = value.querySelector('.dashboard-page__change') as HTMLElement;
+
+    expect(textOf(dash)).toBe('—');
+    expect(dash.classList).toContain('dashboard-page__change--neutral');
   });
 
   it('a failing card does not break the dashboard', async () => {
@@ -902,6 +930,26 @@ describe('dashboard stylesheet', () => {
     expect(scss).toMatch(
       /\.dashboard-page__hero\b[^{]*\{[^}]*padding-bottom:\s*var\(--sk-space-8\)/,
     );
+  });
+
+  it('colours the change with the sign tokens', () => {
+    const scss = dashboardStylesheet();
+    const ruleOf = (selector: string): string =>
+      scss.match(new RegExp(`\\.${selector}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+    const selectors = [
+      'dashboard-page__change--positive',
+      'dashboard-page__change--negative',
+      'dashboard-page__change--neutral',
+    ];
+
+    expect(ruleOf('dashboard-page__change--positive')).toMatch(/color:\s*var\(--sk-positive\)/);
+    expect(ruleOf('dashboard-page__change--negative')).toMatch(/color:\s*var\(--sk-negative\)/);
+    expect(ruleOf('dashboard-page__change--neutral')).toMatch(
+      /color:\s*var\(--mat-sys-on-surface-variant\)/,
+    );
+    for (const selector of selectors) {
+      expect(ruleOf(selector)).not.toMatch(/#[0-9a-fA-F]{3,6}\b|rgb\(/);
+    }
   });
 
   it('sizes the "Do zrobienia" heading at 24 px', () => {

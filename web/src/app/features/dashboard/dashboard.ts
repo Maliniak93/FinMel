@@ -15,6 +15,7 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { activeLocale } from '../../core/i18n/language';
 import { assetClassColor, groupColor } from '../../shared/colors';
+import { changeDirection } from '../../shared/change-direction';
 import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { ALLOCATION_DEVIATION_PP } from '../../shared/allocation-bar/allocation-bar';
@@ -194,11 +195,12 @@ export class Dashboard {
       history.changePercent === null || history.changePercent === undefined
         ? null
         : Number(history.changePercent);
+    const direction = changeDirection(amount, percent, 4);
     return {
       amount,
       percent,
-      sign: amount > 0 ? '+' : '',
-      direction: amount > 0 ? 'positive' : amount < 0 ? 'negative' : 'neutral',
+      sign: direction === 'neutral' || (percent ?? 0) <= 0 ? '' : '+',
+      direction,
     };
   });
 

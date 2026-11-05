@@ -54,6 +54,7 @@
                 class="dashboard-page__change"
                 [class.dashboard-page__change--positive]="change.direction === 'positive'"
                 [class.dashboard-page__change--negative]="change.direction === 'negative'"
+                [class.dashboard-page__change--neutral]="change.direction === 'neutral'"
               >
                 {{ formatSignedMoney(change.amount) }}
                 @if (change.percent !== null) {
@@ -73,7 +74,7 @@
                 }}</span>
               </p>
             } @else {
-              <p class="dashboard-page__change">—</p>
+              <p class="dashboard-page__change dashboard-page__change--neutral">—</p>
             }
 
             @if (staleCount() > 0) {
