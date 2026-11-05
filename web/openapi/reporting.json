@@ -303,7 +303,8 @@
       "NetWorthHistoryPoint": {
         "required": [
           "date",
-          "netWorthPln"
+          "netWorthPln",
+          "isIncomplete"
         ],
         "type": "object",
         "properties": {
@@ -318,6 +319,9 @@
               "string"
             ],
             "format": "double"
+          },
+          "isIncomplete": {
+            "type": "boolean"
           }
         }
       },

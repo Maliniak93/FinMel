@@ -35,21 +35,46 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             .AsNoTracking()
             .Where(s => start == null || s.Date >= start)
             .OrderBy(s => s.Date)
-            .Select(s => new { s.Date, NetWorthPln = s.TotalPln })
+            .Select(s => new { s.Date, NetWorthPln = s.TotalPln, IsIncomplete = false })
             .ToListAsync(cancellationToken);
 
-        if (assetClass is { } filterClass && groupId is null && !ungrouped)
+        if (assetClass is null && groupId is null && !ungrouped)
+        {
+            var flaggedDates = (await db.AssetValuations
+                    .AsNoTracking()
+                    .Where(v => v.IsStale && v.ValuePln == 0m && v.Quantity > 0m)
+                    .Where(v => start == null || v.Date >= start)
+                    .Select(v => v.Date)
+                    .Distinct()
+                    .ToListAsync(cancellationToken))
+                .ToHashSet();
+
+            points = points
+                .Select(p => new { p.Date, p.NetWorthPln, IsIncomplete = flaggedDates.Contains(p.Date) })
+                .ToList();
+        }
+        else if (assetClass is { } filterClass && groupId is null && !ungrouped)
         {
             var classTotals = await db.AssetValuations
                 .AsNoTracking()
                 .Where(v => v.AssetClass == filterClass)
                 .Where(v => start == null || v.Date >= start)
                 .GroupBy(v => v.Date)
-                .Select(g => new { Date = g.Key, ValuePln = g.Sum(v => v.ValuePln) })
-                .ToDictionaryAsync(t => t.Date, t => t.ValuePln, cancellationToken);
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    ValuePln = g.Sum(v => v.ValuePln),
+                    IsIncomplete = g.Any(v => v.IsStale && v.ValuePln == 0m && v.Quantity > 0m),
+                })
+                .ToDictionaryAsync(t => t.Date, cancellationToken);
 
             points = points
-                .Select(p => new { p.Date, NetWorthPln = classTotals.GetValueOrDefault(p.Date) })
+                .Select(p => new
+                {
+                    p.Date,
+                    NetWorthPln = classTotals.TryGetValue(p.Date, out var total) ? total.ValuePln : 0m,
+                    IsIncomplete = classTotals.TryGetValue(p.Date, out var flagged) && flagged.IsIncomplete,
+                })
                 .ToList();
         }
         else if (groupId is not null || ungrouped)
@@ -58,7 +83,14 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             var lines = db.AssetValuations
                 .AsNoTracking()
                 .Where(v => start == null || v.Date >= start)
-                .Join(db.Positions, v => v.AssetId, p => p.AssetId, (v, p) => new { v.Date, v.AssetClass, v.ValuePln, p.GroupId })
+                .Join(db.Positions, v => v.AssetId, p => p.AssetId, (v, p) => new
+                {
+                    v.Date,
+                    v.AssetClass,
+                    v.ValuePln,
+                    IsMissing = v.IsStale && v.ValuePln == 0m && v.Quantity > 0m,
+                    p.GroupId,
+                })
                 .Where(x => x.GroupId == groupId);
 
             if (assetClass is { } groupClass)
@@ -68,11 +100,16 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
 
             var groupTotals = await lines
                 .GroupBy(x => x.Date)
-                .Select(g => new { Date = g.Key, ValuePln = g.Sum(x => x.ValuePln) })
-                .ToDictionaryAsync(t => t.Date, t => t.ValuePln, cancellationToken);
+                .Select(g => new { Date = g.Key, ValuePln = g.Sum(x => x.ValuePln), IsIncomplete = g.Any(x => x.IsMissing) })
+                .ToDictionaryAsync(t => t.Date, cancellationToken);
 
             points = points
-                .Select(p => new { p.Date, NetWorthPln = groupTotals.GetValueOrDefault(p.Date) })
+                .Select(p => new
+                {
+                    p.Date,
+                    NetWorthPln = groupTotals.TryGetValue(p.Date, out var total) ? total.ValuePln : 0m,
+                    IsIncomplete = groupTotals.TryGetValue(p.Date, out var flagged) && flagged.IsIncomplete,
+                })
                 .ToList();
         }
 
@@ -89,7 +126,7 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
         {
             Range = range.ToUpperInvariant(),
             Points = points
-                .Select(p => new NetWorthHistoryPoint { Date = p.Date, NetWorthPln = p.NetWorthPln })
+                .Select(p => new NetWorthHistoryPoint { Date = p.Date, NetWorthPln = p.NetWorthPln, IsIncomplete = p.IsIncomplete })
                 .ToList(),
             ChangePln = changePln,
             ChangePercent = changePercent,

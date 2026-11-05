@@ -780,6 +780,102 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task RebuildAfterFxBackfill_ClearsIncomplete()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 100m,
+                quantityHistory: [(today.AddDays(-10), 100m)]);
+            for (var offset = 5; offset >= 1; offset--)
+            {
+                await db.SeedValuationLineAsync(userId, accountId, assetId, today.AddDays(-offset), 0m, cancellationToken,
+                    quantity: 100m, isStale: true);
+                await db.SeedSnapshotAsync(userId, today.AddDays(-offset), 0m, cancellationToken, isStale: true);
+            }
+        }
+
+        var client = new FakePriceQuoteClient().WithFxHistory("USDPLN", (today.AddDays(-10), 4.0m));
+
+        await RunFxChainAsync(client, async provider =>
+        {
+            await provider.GetRequiredService<IBus>().Publish(new FxHistoryBackfilled
+            {
+                From = today.AddDays(-5),
+                To = today.AddDays(-1),
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            await WaitForSnapshotAsync(provider, userId, today.AddDays(-1), cancellationToken, s => s.TotalPln == 400m);
+
+            for (var offset = 5; offset >= 1; offset--)
+            {
+                var line = Assert.Single(await GetLinesAsync(containers, accountId, today.AddDays(-offset), cancellationToken));
+                Assert.Equal(400m, line.ValuePln);
+                Assert.False(line.IsStale && line.ValuePln == 0m && line.Quantity > 0m);
+                Assert.Equal(400m, (await GetSnapshotAsync(containers, userId, today.AddDays(-offset), cancellationToken))!.TotalPln);
+            }
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task RebuildAfterFxBackfill_StartsOnFirstPositionDate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var firstDate = new DateOnly(2023, 12, 15);
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 100m,
+                quantityHistory: [(firstDate, 100m)]);
+        }
+
+        await RunFxChainAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await provider.GetRequiredService<IBus>().Publish(new FxHistoryBackfilled
+            {
+                From = new DateOnly(2023, 1, 1),
+                To = today.AddDays(-1),
+                OccurredAtUtc = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+
+            await WaitForSnapshotAsync(provider, userId, today.AddDays(-1), cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            var snapshots = await GetAllSnapshotsAsync(containers, userId, cancellationToken);
+            Assert.Equal(firstDate, snapshots.Min(s => s.Date));
+        }, cancellationToken);
+    }
+
+    private Task RunFxChainAsync(
+        IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
+        RunAsync(
+            containers,
+            x =>
+            {
+                x.AddConsumer<HistoryRebuildConsumer>(typeof(TestConsumerDefinition));
+                x.AddConsumer<FxHistoryBackfilledConsumer>(typeof(FxBackfilledTestDefinition));
+            },
+            action,
+            cancellationToken,
+            priceQuoteClient);
+
+    private sealed class FxBackfilledTestDefinition : IdempotentConsumerDefinition<FxHistoryBackfilledConsumer, ReportingDbContext>
+    {
+        public FxBackfilledTestDefinition() => Endpoint(e => e.Name = "history-rebuild-fx-backfilled-test");
+    }
+
     private static async Task SeedFreeCashAsync(
         ReportingDbContext db, Guid assetId, Guid userId, Guid accountId, DateOnly today, CancellationToken cancellationToken)
     {

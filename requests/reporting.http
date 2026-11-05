@@ -14,7 +14,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/reporting/dashboard
 Authorization: Bearer {{authToken}}
 
-### Net worth history — range: 1M | 1Y | YTD | MAX (default 1Y), one point per snapshot date; response carries points plus changePln / changePercent (null without two points)
+### Net worth history — range: 1M | 1Y | YTD | MAX (default 1Y), one point per snapshot date; response carries points (date, netWorthPln, isIncomplete = a line in scope has no price or rate that day, so the total leaves it out) plus changePln / changePercent (null without two points)
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y
 Authorization: Bearer {{authToken}}
 

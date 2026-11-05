@@ -52,6 +52,7 @@ export type DashboardResponse = {
 export type NetWorthHistoryPoint = {
     date: string;
     netWorthPln: number | string;
+    isIncomplete: boolean;
 };
 
 export type NetWorthHistoryResponse = {
