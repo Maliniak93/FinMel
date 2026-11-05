@@ -201,7 +201,7 @@ export class Groups {
 
   private openFormDialog(data: GroupFormDialogData): void {
     this.dialog
-      .open(GroupFormDialog, { width: '480px', data })
+      .open(GroupFormDialog, { width: '540px', data })
       .afterClosed()
       .subscribe((saved) => {
         if (saved) {

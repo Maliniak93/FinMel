@@ -295,11 +295,42 @@ describe('Groups', () => {
     expect(byTestId(element(), 'strip-ungrouped').textContent).toContain(formatMoney(0));
   });
 
-  it('planning link', async () => {
+  it('renders the summary strip', async () => {
     await setup();
 
-    const link = byTestId(element(), 'summary-strip').querySelector<HTMLAnchorElement>('a');
+    const strip = byTestId(element(), 'summary-strip');
+    const items = Array.from(strip.querySelectorAll<HTMLElement>('.summary-strip__item'));
+    expect(items).toHaveLength(3);
+    expect(byTestId(items[0], 'strip-grouped').textContent).toContain(formatMoney(5500));
+    expect(byTestId(items[1], 'strip-ungrouped').textContent).toContain(formatMoney(800));
+    const contribution = byTestId(items[2], 'strip-contribution');
+    const link = items[2].querySelector<HTMLAnchorElement>('.summary-strip__link');
     expect(link?.getAttribute('href')).toBe('/planning');
+    expect(
+      contribution.compareDocumentPosition(link!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('shows the ungrouped row only when there are ungrouped assets', async () => {
+    await setup();
+
+    const card = byTestId(element(), 'ungrouped-card');
+    const list = element().querySelector('.groups-page__list')!;
+    expect(list.contains(card)).toBe(false);
+    expect(list.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('hides the ungrouped row when there are no ungrouped assets', async () => {
+    await setup({
+      assets: assignableAssets.filter((asset) => asset.assetId !== freeAssetId),
+      dashboard: {
+        ...groupsDashboard,
+        byGroup: groupsDashboard.byGroup.filter((entry) => entry.groupId),
+      },
+    });
+
+    expect(element().querySelectorAll('[data-testid="group-card"]')).toHaveLength(2);
+    expect(element().querySelector('[data-testid="ungrouped-card"]')).toBeNull();
   });
 
   it('ungrouped card', async () => {
@@ -375,6 +406,18 @@ describe('Groups', () => {
       }),
     );
     await vi.waitFor(() => expect(groupLists()).toBeGreaterThan(before));
+  });
+
+  it('opens the group dialog 540 px wide', async () => {
+    await setup();
+
+    byTestId(element(), 'add-group').click();
+    await settle();
+
+    expect(dialog.open).toHaveBeenCalledWith(
+      GroupFormDialog,
+      expect.objectContaining({ width: '540px' }),
+    );
   });
 
   it('counter and limit', async () => {

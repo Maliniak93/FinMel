@@ -80,9 +80,24 @@ describe('GroupCard', () => {
     expect(byTestId('group-progress-caption').textContent).toContain(formatMoney(20000));
     expect(byTestId('group-contribution').textContent).toContain(formatMoney(1000));
     expect(byTestId('group-count').textContent).toContain('2');
+  });
+
+  it('renders the allocation block', async () => {
+    await render(cushion);
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('app-allocation-bar')).toBeTruthy();
     expect(root.querySelectorAll('.allocation-bar__legend-row')).toHaveLength(2);
     const flag = byTestId('group-deviation-flag');
     expect(flag.textContent).toContain('13.3');
     expect(flag.querySelector('mat-icon')).toBeTruthy();
+  });
+
+  it('colours the top edge with the group colour', async () => {
+    await render(cushion);
+
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('.group-card__bar')).toBeNull();
+    expect(byTestId('group-card').style.borderTopColor).toContain('--sk-g-green');
   });
 });

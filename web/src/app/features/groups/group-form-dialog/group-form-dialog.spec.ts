@@ -301,6 +301,18 @@ describe('GroupFormDialog', () => {
     expect(saveButton().disabled).toBe(false);
   });
 
+  it('opens with the allocation fieldset', async () => {
+    await setup({ mode: 'create', groups: [] });
+    const root = fixture.nativeElement as HTMLElement;
+    const fieldset = root.querySelector<HTMLFieldSetElement>('[data-testid="allocation-editor"]');
+    expect(fieldset?.tagName).toBe('FIELDSET');
+    expect(fieldset!.querySelector('legend')).toBeTruthy();
+
+    setAllocation([[1, 80]]);
+    await settle();
+    expect(root.querySelector('[data-testid="allocation-live-bar"]')).not.toBeNull();
+  });
+
   it('allocation sum and duplicates', async () => {
     await setup({ mode: 'create', groups: [] });
     await TestBed.inject(LanguageService).setLanguage('pl');
