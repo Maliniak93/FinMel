@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { expect, test } from './fixtures';
+import { expectProjected } from './projection';
 
 function runRow(page: Page, label: string) {
   return page.locator('.settings-page__run').filter({ hasText: label });
@@ -13,8 +14,13 @@ test.describe('sync przy starcie', () => {
       await page.goto('/settings');
       await page.getByRole('button', { name: 'Synchronizuj teraz' }).click();
       const prices = runRow(page, 'Ceny');
-      await expect(prices).toContainText('Zakończona', { timeout: 30_000 });
-      await expect(prices).toContainText('ręcznie');
+      await expectProjected(
+        () => page.reload(),
+        async () => {
+          await expect(prices).toContainText('Zakończona', { timeout: 3_000 });
+          await expect(prices).toContainText('ręcznie', { timeout: 3_000 });
+        },
+      );
     });
 
     await test.step('Krok 2: wiersz Kursy walut Zakończona ze źródłem Harmonogram lub Start', async () => {

@@ -228,17 +228,14 @@ test('redesign foundation: Classical look, three-mode shell, shared patterns and
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
 
-    const swatch = page
-      .getByTestId('group-card')
-      .filter({ hasText: 'Wakacje 2027' })
-      .locator('.group-card__bar');
+    const swatch = page.getByTestId('group-card').filter({ hasText: 'Wakacje 2027' });
     await themeButton(page).click();
     await expect(dataTheme(page)).toHaveAttribute('data-theme', 'light');
-    await expect(swatch).toHaveCSS('background-color', 'rgb(192, 73, 58)');
+    await expect(swatch).toHaveCSS('border-top-color', 'rgb(192, 73, 58)');
 
     await themeButton(page).click();
     await expect(dataTheme(page)).toHaveAttribute('data-theme', 'dark');
-    await expect(swatch).toHaveCSS('background-color', 'rgb(232, 138, 124)');
+    await expect(swatch).toHaveCSS('border-top-color', 'rgb(232, 138, 124)');
 
     await themeButton(page).click();
     await expect(themeButton(page)).toHaveAccessibleName(/^Motyw: systemowy/);

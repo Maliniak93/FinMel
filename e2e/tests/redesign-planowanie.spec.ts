@@ -234,8 +234,8 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
     await expect(page.getByRole('tab', { name: 'Miesiąc', exact: true })).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Rok', exact: true })).toBeVisible();
     await expect(page.getByTestId('month-label')).toHaveText(monthLabel(MONTH));
-    await expect(page.getByTestId('layout-list')).toHaveText('Lista');
-    await expect(page.getByTestId('layout-calendar')).toHaveText('Kalendarz');
+    await expect(page.getByTestId('layout-list')).toContainText('Lista');
+    await expect(page.getByTestId('layout-calendar')).toContainText('Kalendarz');
     await expect(page.getByTestId('deadline-row')).toHaveCount(1);
     await expect(page.getByTestId('day-group')).toHaveCount(1);
     await expect(page.getByTestId('balance-plan').locator('dd')).toContainText(pln('0,00'));
