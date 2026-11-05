@@ -58,6 +58,22 @@
   font-size: 12px;
 }
 
+.net-worth-chart__band {
+  fill: var(--mat-sys-tertiary-container);
+  fill-opacity: 0.6;
+  pointer-events: none;
+}
+
+.net-worth-chart__band-label {
+  fill: var(--mat-sys-on-surface-variant);
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.net-worth-chart__tooltip-incomplete {
+  font-style: italic;
+}
+
 .net-worth-chart__area {
   fill: var(--mat-sys-primary-container);
   fill-opacity: 0.5;

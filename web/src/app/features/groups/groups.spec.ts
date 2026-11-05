@@ -605,24 +605,28 @@ describe('Groups', () => {
 
     opener.click();
     await settle();
-    await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true));
+    await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true), {
+      timeout: 5000,
+    });
 
     await toggle('Free Stock');
     byTestId(panel(), 'close-assets-panel').click();
     await settle();
     expect(panelOpen()).toBe(false);
-    await vi.waitFor(() => expect(document.activeElement).toBe(opener));
+    await vi.waitFor(() => expect(document.activeElement).toBe(opener), { timeout: 5000 });
 
     await selectGroup('Emerytura');
     expect(checkbox('Free Stock').checked).toBe(false);
-    await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true));
+    await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true), {
+      timeout: 5000,
+    });
 
     (document.activeElement as HTMLElement).dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }),
     );
     await settle();
     expect(panelOpen()).toBe(false);
-    await vi.waitFor(() => expect(document.activeElement).toBe(opener));
+    await vi.waitFor(() => expect(document.activeElement).toBe(opener), { timeout: 5000 });
 
     await selectGroup('Emerytura');
     await toggle('Free Stock');

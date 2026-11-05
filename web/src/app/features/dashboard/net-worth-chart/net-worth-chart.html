@@ -125,12 +125,33 @@
             {{ formatAxisDate(tick.date, view.xTickUnit) }}
           </text>
         }
+        @for (band of view.bands; track band.x) {
+          <rect
+            class="net-worth-chart__band"
+            aria-hidden="true"
+            [attr.x]="band.x"
+            [attr.y]="margin.top"
+            [attr.width]="band.width"
+            [attr.height]="plotHeight"
+          />
+        }
         <path class="net-worth-chart__area" [attr.d]="view.areaPath" [style.fill]="seriesColor()" />
         <path
           class="net-worth-chart__line"
           [attr.d]="view.linePath"
           [style.stroke]="seriesColor()"
         />
+        @for (band of view.bands; track band.x) {
+          @if (band.showLabel) {
+            <text
+              class="net-worth-chart__band-label"
+              [attr.x]="band.x + 6"
+              [attr.y]="margin.top + 14"
+            >
+              {{ 'netWorthChart.incompleteUntil' | transloco: { date: formatDate(band.lastDate) } }}
+            </text>
+          }
+        }
         @if (hovered(); as point) {
           <line
             class="net-worth-chart__guide"
@@ -171,6 +192,11 @@
           }
           <span class="net-worth-chart__tooltip-date">{{ formatDate(point.date) }}</span>
           <span class="net-worth-chart__tooltip-value">{{ formatMoney(point.value) }}</span>
+          @if (point.isIncomplete) {
+            <span class="net-worth-chart__tooltip-incomplete">{{
+              'netWorthChart.incompleteValue' | transloco
+            }}</span>
+          }
         </div>
       }
     </div>

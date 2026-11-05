@@ -28,6 +28,7 @@ const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 const Y_TICK_COUNT = 5;
 const Y_LABEL_FRACTION_DIGITS = 2;
+const BAND_LABEL_MIN_WIDTH = 200;
 
 export interface NetWorthChartGroup {
   readonly key: string;
@@ -39,6 +40,14 @@ interface ChartPoint {
   readonly y: number;
   readonly date: string;
   readonly value: number;
+  readonly isIncomplete: boolean;
+}
+
+interface ChartBand {
+  readonly x: number;
+  readonly width: number;
+  readonly lastDate: string;
+  readonly showLabel: boolean;
 }
 
 @Component({
@@ -123,7 +132,27 @@ export class NetWorthChart {
       y: toY(values[i]),
       date: p.date,
       value: values[i],
+      isIncomplete: p.isIncomplete,
     }));
+
+    const bands: ChartBand[] = [];
+    let runStart = -1;
+    for (let i = 0; i <= coordinates.length; i++) {
+      const flagged = i < coordinates.length && coordinates[i].isIncomplete;
+      if (flagged && runStart < 0) {
+        runStart = i;
+      } else if (!flagged && runStart >= 0) {
+        const startX = coordinates[runStart].x;
+        const width = coordinates[i - 1].x - startX;
+        bands.push({
+          x: startX,
+          width,
+          lastDate: coordinates[i - 1].date,
+          showLabel: width >= BAND_LABEL_MIN_WIDTH,
+        });
+        runStart = -1;
+      }
+    }
 
     const line = coordinates.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join('L');
     const bottom = MARGIN.top + PLOT_HEIGHT;
@@ -139,6 +168,7 @@ export class NetWorthChart {
       xMin,
       xSpan,
       coordinates,
+      bands,
       linePath: `M${line}`,
       areaPath: `M${line}L${last.x.toFixed(2)},${bottom}L${first.x.toFixed(2)},${bottom}Z`,
       yTicks: yTicks.map((value) => ({ value, y: toY(value) })),

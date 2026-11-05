@@ -521,6 +521,8 @@
     "allClasses": "Wszystko",
     "chartLabelForClass": "Wykres historii wartości, {{ class }}, {{ range }}: od {{ from }} do {{ to }}",
     "chartLabel": "Wykres historii wartości majątku, {{ range }}: od {{ from }} do {{ to }}",
+    "incompleteUntil": "wycena niepełna do {{ date }}",
+    "incompleteValue": "Wycena niepełna",
     "notEnoughHistory": "Za mało historii, aby narysować wykres.",
     "loadFailed": "Nie udało się wczytać historii wartości majątku."
   },

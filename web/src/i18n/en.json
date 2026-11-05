@@ -521,6 +521,8 @@
     "allClasses": "All",
     "chartLabelForClass": "Net worth history chart for {{ class }}, {{ range }}: from {{ from }} to {{ to }}",
     "chartLabel": "Net worth history chart, {{ range }}: from {{ from }} to {{ to }}",
+    "incompleteUntil": "Incomplete until {{ date }}",
+    "incompleteValue": "Incomplete valuation",
     "notEnoughHistory": "Not enough history to chart yet.",
     "loadFailed": "Failed to load net-worth history."
   },
