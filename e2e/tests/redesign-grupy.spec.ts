@@ -238,7 +238,7 @@ test('redesign Grupy: cards, summary, assets panel, dialog and deletion', async 
 
     const cushion = card(page, 'Poduszka finansowa');
     await expect(cushion).toBeVisible();
-    await expect(cushion.locator('.group-card__bar')).toHaveCSS('background-color', /^rgb/);
+    await expect(cushion).toHaveCSS('border-top-color', /^rgb/);
     await expect(cushion.getByTestId('group-kind')).toContainText('Poduszka');
     await expect(cushion.getByTestId('group-kind').locator('mat-icon')).toHaveText('shield');
     await expect(cushion.getByTestId('group-value')).toContainText(pln('0,00'));
