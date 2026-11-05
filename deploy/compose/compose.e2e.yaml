@@ -54,6 +54,7 @@ services:
       BondCatalog__PageUrl: http://market-stub:8080/mf/page
       PriceSync__Cron: "0/15 * * * * ?"
       FxSync__Cron: "0/15 * * * * ?"
+      StartupSync__Enabled: "false"
     depends_on:
       market-stub: { condition: service_healthy }
 

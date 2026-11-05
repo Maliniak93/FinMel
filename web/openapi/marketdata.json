@@ -693,6 +693,9 @@
       "PriceSource": {
         "type": "integer"
       },
+      "SyncRunSource": {
+        "type": "integer"
+      },
       "SyncRunStatus": {
         "type": "integer"
       },
@@ -700,6 +703,7 @@
         "required": [
           "runId",
           "status",
+          "source",
           "startedAt",
           "syncedCount",
           "noDataCount",
@@ -713,6 +717,9 @@
           },
           "status": {
             "$ref": "#/components/schemas/SyncRunStatus"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SyncRunSource"
           },
           "startedAt": {
             "type": "string",
@@ -781,6 +788,16 @@
             ]
           },
           "backfill": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/SyncRunSummary"
+              }
+            ]
+          },
+          "bondCatalog": {
             "oneOf": [
               {
                 "type": "null"

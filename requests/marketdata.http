@@ -34,11 +34,11 @@ Content-Type: application/json
 GET {{baseUrl}}/api/marketdata/instruments/{{addCustomInstrument.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### Trigger a price sync
+### Trigger a price sync — 409 Conflict.SyncAlreadyRunning while the start sync or a Prices run is running
 POST {{baseUrl}}/api/marketdata/sync/trigger
 Authorization: Bearer {{authToken}}
 
-### Get sync status — the latest run per kind: { hasRun, prices?, fx?, backfill? }
+### Get sync status — the latest run per kind: { hasRun, prices?, fx?, backfill?, bondCatalog? }, each with source (Schedule, Startup, Manual)
 GET {{baseUrl}}/api/marketdata/sync/status
 Authorization: Bearer {{authToken}}
 

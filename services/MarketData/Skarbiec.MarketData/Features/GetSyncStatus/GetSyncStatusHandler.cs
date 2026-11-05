@@ -11,13 +11,15 @@ public sealed class GetSyncStatusHandler(MarketDataDbContext dbContext)
         var prices = await LatestAsync(SyncRunKind.Prices, cancellationToken);
         var fx = await LatestAsync(SyncRunKind.Fx, cancellationToken);
         var backfill = await LatestAsync(SyncRunKind.Backfill, cancellationToken);
+        var bondCatalog = await LatestAsync(SyncRunKind.BondCatalog, cancellationToken);
 
         return new SyncStatusResponse
         {
-            HasRun = prices is not null || fx is not null || backfill is not null,
+            HasRun = prices is not null || fx is not null || backfill is not null || bondCatalog is not null,
             Prices = prices,
             Fx = fx,
             Backfill = backfill,
+            BondCatalog = bondCatalog,
         };
     }
 
@@ -30,6 +32,7 @@ public sealed class GetSyncStatusHandler(MarketDataDbContext dbContext)
             {
                 RunId = r.Id,
                 Status = r.Status,
+                Source = r.Source,
                 StartedAt = r.StartedAt,
                 FinishedAt = r.FinishedAt,
                 SyncedCount = r.SyncedCount,

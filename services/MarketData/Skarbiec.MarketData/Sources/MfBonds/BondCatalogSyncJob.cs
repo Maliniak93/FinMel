@@ -19,10 +19,11 @@ public sealed class BondCatalogSyncJob(
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
-    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken) => await RunAsync(cancellationToken);
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken) =>
+        await RunAsync(cancellationToken, SyncJobData.ReadSource(context));
 
     // Quartz-independent entry point, so tests drive a run without faking IJobExecutionContext.
-    public async Task RunAsync(CancellationToken cancellationToken)
+    public async Task RunAsync(CancellationToken cancellationToken, SyncRunSource runSource = SyncRunSource.Schedule)
     {
         using var activity = ActivitySource.StartActivity("BondCatalogSyncJob.Run");
 
@@ -32,6 +33,7 @@ public sealed class BondCatalogSyncJob(
             Kind = SyncRunKind.BondCatalog,
             StartedAt = timeProvider.GetUtcNow(),
             Status = SyncRunStatus.Running,
+            Source = runSource,
         };
         db.SyncRuns.Add(run);
         await db.SaveChangesAsync(cancellationToken);

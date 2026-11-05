@@ -76,6 +76,26 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
     }
 
     [Fact]
+    public async Task UnexpectedException_FinishesRunFailed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        await db.SeedCurrencyCatalogAsync(cancellationToken);
+
+        var job = new FxSyncJob(db, new ThrowingFxRateSource(), publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance);
+        await Record.ExceptionAsync(() => job.RunAsync(cancellationToken));
+
+        await using var readDb = CreateDbContext();
+        var run = await readDb.SyncRuns.AsNoTracking().SingleAsync(cancellationToken);
+        Assert.Equal(SyncRunStatus.Failed, run.Status);
+        Assert.NotNull(run.FinishedAt);
+    }
+
+    [Fact]
     public async Task RunAsync_SecondRun_DoesNotBackfillAgain()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

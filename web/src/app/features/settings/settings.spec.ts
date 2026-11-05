@@ -21,6 +21,7 @@ const completedRun: SyncStatusResponse = {
   prices: {
     runId: '11111111-1111-1111-1111-111111111111',
     status: 1,
+    source: 0,
     startedAt: '2026-08-10T18:30:00Z',
     finishedAt: '2026-08-10T18:31:00Z',
     syncedCount: 5,
@@ -127,6 +128,7 @@ describe('Settings', () => {
       prices: {
         runId: '11111111-1111-1111-1111-111111111111',
         status: 1,
+        source: 0,
         startedAt: '2026-08-10T18:30:00Z',
         finishedAt: '2026-08-10T18:31:00Z',
         syncedCount: 5,
@@ -136,6 +138,7 @@ describe('Settings', () => {
       fx: {
         runId: '22222222-2222-2222-2222-222222222222',
         status: 1,
+        source: 1,
         startedAt: '2026-08-10T13:00:00Z',
         finishedAt: '2026-08-10T13:00:30Z',
         syncedCount: 4,
