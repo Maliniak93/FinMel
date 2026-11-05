@@ -33,7 +33,7 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(p => p.UserId == userId && !p.IsArchived)
+            .Where(p => p.UserId == userId && !p.IsArchived && !p.OutsideNetWorth)
             .ToListAsync(cancellationToken);
 
         var pricesByInstrument = await LoadLatestPricesAsync(positions, cancellationToken);

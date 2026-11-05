@@ -19,7 +19,8 @@ internal static class PositionEvents
         IReadOnlyList<QuantityPoint>? quantityHistory = null,
         AssetClass assetClass = AssetClass.Cash,
         IReadOnlyList<ClassPoint>? classHistory = null,
-        Guid? groupId = null)
+        Guid? groupId = null,
+        bool outsideNetWorth = false)
     {
         var id = assetId ?? Guid.NewGuid();
         await bus.Publish(new AssetPositionChanged
@@ -36,7 +37,7 @@ internal static class PositionEvents
             ClassHistory = classHistory ?? [],
             QuantityHistory = quantityHistory ?? [],
             IsArchived = isArchived,
-            OutsideNetWorth = false,
+            OutsideNetWorth = outsideNetWorth,
             Version = version,
             OccurredAtUtc = DateTimeOffset.UtcNow,
         }, cancellationToken);

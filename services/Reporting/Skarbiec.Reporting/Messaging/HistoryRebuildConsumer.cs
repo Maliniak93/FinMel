@@ -79,7 +79,7 @@ public sealed class HistoryRebuildConsumer(
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(p => p.UserId == userId)
+            .Where(p => p.UserId == userId && !p.OutsideNetWorth)
             .ToListAsync(cancellationToken);
 
         var instrumentIds = positions

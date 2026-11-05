@@ -31,6 +31,9 @@ public sealed class Position : IUserOwned
     // A position is valued unless this is set.
     public required bool IsArchived { get; set; }
 
+    // A flagged position is left out of every valuation line and snapshot, today's and rebuilt ones.
+    public bool OutsideNetWorth { get; set; }
+
     // End-of-day quantity per transaction date, ascending; empty for a position with no transactions.
     public List<PositionQuantityPoint> QuantityHistory { get; set; } = [];
 

@@ -41,6 +41,7 @@ public sealed class AssetPositionChangedConsumer(
                 Quantity = message.Quantity,
                 QuoteUnitsPerQuantity = message.QuoteUnitsPerQuantity,
                 IsArchived = message.IsArchived,
+                OutsideNetWorth = message.OutsideNetWorth,
                 Version = message.Version,
                 UpdatedAt = DateTimeOffset.UtcNow,
                 QuantityHistory = ToHistory(message),
@@ -68,6 +69,7 @@ public sealed class AssetPositionChangedConsumer(
             position.Quantity = message.Quantity;
             position.QuoteUnitsPerQuantity = message.QuoteUnitsPerQuantity;
             position.IsArchived = message.IsArchived;
+            position.OutsideNetWorth = message.OutsideNetWorth;
             position.Version = message.Version;
             position.UpdatedAt = DateTimeOffset.UtcNow;
             position.QuantityHistory = ToHistory(message);

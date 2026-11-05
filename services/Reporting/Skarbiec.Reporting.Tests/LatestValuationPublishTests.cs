@@ -67,6 +67,45 @@ public sealed class LatestValuationPublishTests(SkarbiecContainersFixture contai
             cancellationToken);
     }
 
+    [Fact]
+    public async Task ExcludesOutsideNetWorthPosition()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var snapshotDate = new DateOnly(2026, 8, 10);
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var flaggedGroupId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Deposit, quantity: 1_000m, groupId: groupId);
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.BankAccount, quantity: 700m, groupId: flaggedGroupId, outsideNetWorth: true);
+        }
+
+        await RunAsync(
+            containers,
+            x =>
+            {
+                x.AddConsumer<DailyPricesSyncedConsumer>(typeof(TestConsumerDefinition));
+                x.AddConsumer<LatestValuationRecorderConsumer>();
+            },
+            async provider =>
+            {
+                await PublishDailyPricesSyncedAsync(provider.GetRequiredService<IBus>(), snapshotDate, cancellationToken);
+
+                var recorder = provider.GetRequiredService<LatestValuationRecorder>();
+                var published = Assert.Single(await recorder.SettledDeliveriesForAsync(userId, cancellationToken));
+
+                Assert.Equal(1_000m, published.TotalPln);
+                Assert.Equal(AssetClass.Deposit, Assert.Single(published.ByAssetClass).AssetClass);
+                Assert.Equal(groupId, Assert.Single(published.ByGroup).GroupId);
+            },
+            cancellationToken);
+    }
+
     private sealed class TestConsumerDefinition : IdempotentConsumerDefinition<DailyPricesSyncedConsumer, ReportingDbContext>
     {
         public TestConsumerDefinition() => Endpoint(e => e.Name = QueueName);

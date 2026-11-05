@@ -25,6 +25,11 @@ public static class HistoryChange
             candidates.Add(Earlier(oldStart, newStart));
         }
 
+        if (stored.OutsideNetWorth != incoming.OutsideNetWorth)
+        {
+            candidates.Add(Earlier(oldStart, newStart));
+        }
+
         candidates.Add(FirstClassDifference(stored, incoming, oldStart, newStart));
         candidates.Add(FirstQuantityDifference(stored.QuantityHistory, incoming.QuantityHistory));
 
