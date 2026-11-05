@@ -66,6 +66,25 @@ const monthPoints: HistoryPoints = Array.from({ length: 20 }, (_, i) => ({
   isIncomplete: false,
 }));
 
+function dailyPoints(
+  month: string,
+  count: number,
+  incomplete: (index: number) => boolean,
+): HistoryPoints {
+  return Array.from({ length: count }, (_, i) => ({
+    date: `${month}-${String(i + 1).padStart(2, '0')}`,
+    netWorthPln: 10000 + i * 100,
+    isIncomplete: incomplete(i),
+  }));
+}
+
+const PLOT_LEFT = 64;
+const PLOT_WIDTH = 560;
+
+function bandsOf(element: HTMLElement): SVGRectElement[] {
+  return [...element.querySelectorAll<SVGRectElement>('.net-worth-chart__band')];
+}
+
 describe('NetWorthChart', () => {
   let fixture: ComponentFixture<NetWorthChart>;
 
@@ -282,6 +301,74 @@ describe('NetWorthChart', () => {
     expect(chart.group()).toBeNull();
     expect(chart.assetClass()).toBeNull();
     expect(label()).toContain('All');
+  });
+
+  it('draws one band for a run of incomplete points', async () => {
+    const element = await setup(dailyPoints('2026-08', 10, (i) => i >= 2 && i <= 5));
+
+    const bands = bandsOf(element);
+
+    expect(bands).toHaveLength(1);
+    expect(Number(bands[0].getAttribute('x'))).toBeCloseTo(PLOT_LEFT + (2 / 9) * PLOT_WIDTH, 0);
+    expect(Number(bands[0].getAttribute('width'))).toBeCloseTo((3 / 9) * PLOT_WIDTH, 0);
+    expect(bands[0].getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('draws a band per run', async () => {
+    const element = await setup(dailyPoints('2026-08', 20, (i) => i <= 8 || i >= 11));
+
+    expect(bandsOf(element)).toHaveLength(2);
+    expect(element.querySelectorAll('.net-worth-chart__band-label')).toHaveLength(2);
+  });
+
+  it('labels the band with the last incomplete day', async () => {
+    const element = await setup(dailyPoints('2024-03', 20, (i) => i <= 11));
+    const label = () => normalised(textOf(element.querySelector('.net-worth-chart__band-label')));
+
+    expect(label()).toMatch(/incomplete/i);
+    expect(label()).toContain(formatDate('2024-03-12'));
+
+    await switchLanguage(fixture, 'pl');
+
+    expect(label()).toBe(`wycena niepełna do ${normalised(formatDate('2024-03-12'))}`);
+  });
+
+  it('draws no band when every point is complete', async () => {
+    const element = await setup(dailyPoints('2026-08', 10, () => false));
+
+    expect(bandsOf(element)).toHaveLength(0);
+    expect(element.querySelector('.net-worth-chart__band-label')).toBeNull();
+  });
+
+  it('marks an incomplete point in the tooltip', async () => {
+    const element = await setup(dailyPoints('2026-08', 10, (i) => i <= 4));
+
+    hoverPlot(element, 0);
+    await fixture.whenStable();
+
+    expect(textOf(element.querySelector('.net-worth-chart__tooltip'))).toMatch(/incomplete/i);
+
+    hoverPlot(element, 300);
+    await fixture.whenStable();
+
+    expect(textOf(element.querySelector('.net-worth-chart__tooltip'))).not.toMatch(/incomplete/i);
+  });
+
+  it('clips the band to the visible range', async () => {
+    const element = await setup(dailyPoints('2024-03', 20, (i) => i <= 11));
+    const label = () => normalised(textOf(element.querySelector('.net-worth-chart__band-label')));
+    const before = label();
+
+    fixture.componentRef.setInput('points', dailyPoints('2024-03', 20, (i) => i <= 11).slice(5));
+    fixture.componentRef.setInput('range', '1M');
+    await fixture.whenStable();
+
+    const bands = bandsOf(element);
+    expect(bands).toHaveLength(1);
+    expect(Number(bands[0].getAttribute('x'))).toBeCloseTo(PLOT_LEFT, 0);
+    expect(Number(bands[0].getAttribute('width'))).toBeCloseTo((6 / 14) * PLOT_WIDTH, 0);
+    expect(label()).toBe(before);
+    expect(label()).toContain(formatDate('2024-03-12'));
   });
 
   it('shows not enough history', async () => {

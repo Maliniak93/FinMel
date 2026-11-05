@@ -203,6 +203,26 @@ describe('Dashboard', () => {
     expect(normalised(change.textContent ?? '')).toContain('zmiana za YTD');
   });
 
+  it('passes the incomplete flag to the chart', async () => {
+    await setup(
+      jsonResponse(dashboard),
+      jsonResponse({
+        range: '1Y',
+        points: [
+          { date: '2026-07-01', netWorthPln: 1000, isIncomplete: true },
+          { date: '2026-07-02', netWorthPln: 1100, isIncomplete: true },
+          { date: '2026-07-03', netWorthPln: 1200, isIncomplete: false },
+        ],
+        changePln: null,
+        changePercent: null,
+      } satisfies NetWorthHistoryResponse),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(component['historyPoints']().map((p) => p.isIncomplete)).toEqual([true, true, false]);
+    expect(element.querySelectorAll('app-net-worth-chart .net-worth-chart__band')).toHaveLength(1);
+  });
+
   it('shows how many valuations are stale', async () => {
     const line = (assetId: string, isStale: boolean) => ({
       assetId,
