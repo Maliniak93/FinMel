@@ -105,10 +105,12 @@ internal static class ReportingApi
         IReadOnlyList<(DateOnly Date, decimal Quantity)>? quantityHistory = null,
         DateOnly? archivedOn = null,
         IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null,
-        Guid? groupId = null)
+        Guid? groupId = null,
+        bool outsideNetWorth = false)
     {
         db.Positions.Add(new Data.Position
         {
+            OutsideNetWorth = outsideNetWorth,
             GroupId = groupId,
             AssetId = assetId,
             UserId = userId,

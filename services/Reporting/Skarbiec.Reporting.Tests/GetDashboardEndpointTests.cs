@@ -334,6 +334,34 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task OutsideNetWorthPosition_ExcludedFromTotals()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var rorAccountId = Guid.NewGuid();
+        var savingsAccountId = Guid.NewGuid();
+        var rorGroupId = Guid.NewGuid();
+        var savingsGroupId = Guid.NewGuid();
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.WaitUntilReadyAsync(cancellationToken);
+
+        await Bus.PublishCashPositionAsync(userId, rorAccountId, 3_200m, cancellationToken,
+            assetClass: AssetClass.BankAccount, groupId: rorGroupId, outsideNetWorth: true);
+        await Bus.PublishCashPositionAsync(userId, savingsAccountId, 40_000m, cancellationToken,
+            assetClass: AssetClass.Deposit, groupId: savingsGroupId);
+
+        using var response = await client.GetDashboardWhenAsync(d => d.NetWorthPln == 40_000m, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(40_000m, body!.NetWorthPln);
+        Assert.Equal(savingsAccountId, Assert.Single(body.ByAccount).AccountId);
+        Assert.Equal(AssetClass.Deposit, Assert.Single(body.ByAssetClass).AssetClass);
+        Assert.Equal(savingsGroupId, Assert.Single(body.ByGroup).GroupId);
+    }
+
+    [Fact]
     public async Task ByGroup_SplitsNetWorth()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

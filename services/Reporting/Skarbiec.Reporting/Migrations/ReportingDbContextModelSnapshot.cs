@@ -328,6 +328,9 @@ namespace Skarbiec.Reporting.Migrations
                     b.Property<bool>("IsArchived")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("OutsideNetWorth")
+                        .HasColumnType("boolean");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(18, 8)
                         .HasColumnType("numeric(18,8)");

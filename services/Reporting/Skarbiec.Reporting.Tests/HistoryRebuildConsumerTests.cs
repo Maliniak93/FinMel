@@ -72,6 +72,106 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task Rebuild_SkipsOutsideNetWorthPosition()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var keptAccountId = Guid.NewGuid();
+        var flaggedAccountId = Guid.NewGuid();
+        var keptAssetId = Guid.NewGuid();
+        var flaggedAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(keptAssetId, userId, keptAccountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 40_000m,
+                quantityHistory: [(today.AddDays(-20), 40_000m)]);
+            await db.SeedPositionAsync(flaggedAssetId, userId, flaggedAccountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 3_200m,
+                quantityHistory: [(today.AddDays(-20), 3_200m)], outsideNetWorth: true);
+            await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-5), cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            Assert.Empty(await GetAllLinesAsync(containers, flaggedAccountId, cancellationToken));
+
+            for (var offset = 5; offset >= 1; offset--)
+            {
+                var date = today.AddDays(-offset);
+                Assert.Equal(40_000m, Assert.Single(await GetLinesAsync(containers, keptAccountId, date, cancellationToken)).ValuePln);
+                Assert.Equal(40_000m, (await GetSnapshotAsync(containers, userId, date, cancellationToken))!.TotalPln);
+            }
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task FlagOn_RemovesLines_FlagOff_RestoresThem()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+        var otherAccountId = Guid.NewGuid();
+        var otherAssetId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 100m,
+                quantityHistory: [(today.AddDays(-20), 100m)]);
+            await db.SeedPositionAsync(otherAssetId, userId, otherAccountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                quantityHistory: [(today.AddDays(-20), 10m)]);
+            for (var offset = 20; offset >= 1; offset--)
+            {
+                await db.SeedValuationLineAsync(userId, accountId, assetId, today.AddDays(-offset), 100m, cancellationToken, quantity: 100m);
+            }
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+
+            await using (var db = OpenDbContext(containers))
+            {
+                await db.Positions.IgnoreQueryFilters().Where(p => p.AssetId == assetId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.OutsideNetWorth, true), cancellationToken);
+                await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-20), cancellationToken);
+            }
+
+            await bus.PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            Assert.Empty(await GetAllLinesAsync(containers, accountId, cancellationToken));
+            Assert.Equal(10m, (await GetSnapshotAsync(containers, userId, today.AddDays(-3), cancellationToken))!.TotalPln);
+
+            await using (var db = OpenDbContext(containers))
+            {
+                await db.Positions.IgnoreQueryFilters().Where(p => p.AssetId == assetId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.OutsideNetWorth, false), cancellationToken);
+                await db.SeedHistoryRebuildRequestAsync(userId, today.AddDays(-20), cancellationToken, revision: 2);
+            }
+
+            await bus.PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            for (var offset = 20; offset >= 1; offset--)
+            {
+                var line = Assert.Single(await GetLinesAsync(containers, accountId, today.AddDays(-offset), cancellationToken));
+                Assert.Equal(100m, line.ValuePln);
+            }
+
+            Assert.Equal(110m, (await GetSnapshotAsync(containers, userId, today.AddDays(-3), cancellationToken))!.TotalPln);
+        }, cancellationToken);
+    }
+
+    [Fact]
     public async Task Rebuild_FillsWeekendDaysWithCarriedForwardValue()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

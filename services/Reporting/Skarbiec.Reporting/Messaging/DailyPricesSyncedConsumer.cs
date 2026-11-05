@@ -32,7 +32,7 @@ public sealed class DailyPricesSyncedConsumer(
         var positions = await db.Positions
             .AsNoTracking()
             .IgnoreQueryFilters()
-            .Where(p => !p.IsArchived)
+            .Where(p => !p.IsArchived && !p.OutsideNetWorth)
             .ToListAsync(cancellationToken);
 
         if (positions.Count == 0)

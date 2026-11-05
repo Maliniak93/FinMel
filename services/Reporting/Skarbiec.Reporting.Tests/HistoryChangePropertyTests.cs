@@ -121,6 +121,23 @@ public sealed class HistoryChangePropertyTests
         Assert.Null(HistoryChange.EarliestAffectedDate(stored, incoming));
     }
 
+    [Theory]
+    [MemberData(nameof(Seeds))]
+    public void EarliestAffectedDate_FlagChanged_IsEarlierOfOldAndNewStart(int seed)
+    {
+        var random = new Random(seed);
+        var oldHistory = RandomHistory(random);
+        var newHistory = random.Next(2) == 0 ? oldHistory : RandomHistory(random);
+        var flagOn = random.Next(2) == 0;
+
+        var stored = Stored(history: oldHistory, outsideNetWorth: !flagOn);
+        var incoming = Incoming(history: newHistory, outsideNetWorth: flagOn);
+
+        var expected = oldHistory[0].Date < newHistory[0].Date ? oldHistory[0].Date : newHistory[0].Date;
+
+        Assert.Equal(expected, HistoryChange.EarliestAffectedDate(stored, incoming));
+    }
+
     [Fact]
     public void EarliestAffectedDate_AssetArchived_IsTheUtcDateOfTheEvent()
     {
@@ -212,8 +229,10 @@ public sealed class HistoryChangePropertyTests
         bool isArchived = false,
         DateOnly? archivedOn = null,
         IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null,
-        Guid? groupId = null) => new()
+        Guid? groupId = null,
+        bool outsideNetWorth = false) => new()
         {
+            OutsideNetWorth = outsideNetWorth,
             GroupId = groupId,
             ClassHistory = [.. (classHistory ?? []).Select(p => new PositionClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
             AssetId = AssetId,
@@ -240,7 +259,8 @@ public sealed class HistoryChangePropertyTests
         bool isArchived = false,
         DateTimeOffset? occurredAt = null,
         IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null,
-        Guid? groupId = null) => new()
+        Guid? groupId = null,
+        bool outsideNetWorth = false) => new()
         {
             GroupId = groupId,
             AssetId = AssetId,
@@ -255,7 +275,7 @@ public sealed class HistoryChangePropertyTests
             QuantityHistory = [.. history.Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             ClassHistory = [.. (classHistory ?? []).Select(p => new ClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
             IsArchived = isArchived,
-            OutsideNetWorth = false,
+            OutsideNetWorth = outsideNetWorth,
             Version = 1,
             OccurredAtUtc = occurredAt ?? DateTimeOffset.UtcNow,
         };

@@ -426,6 +426,37 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
     }
 
     [Fact]
+    public async Task TransferAcrossBoundary_RaisesNetWorthOnItsDay()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var transferDay = Today.AddDays(-5);
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.WaitUntilReadyAsync(cancellationToken);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, Guid.NewGuid(), cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 1_000m,
+                quantityHistory: [(Today.AddDays(-10), 2_000m), (transferDay, 1_000m)], outsideNetWorth: true);
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, Guid.NewGuid(), cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 1_500m,
+                quantityHistory: [(Today.AddDays(-10), 500m), (transferDay, 1_500m)]);
+            await db.RebuildHistoryAsync(Bus, userId, Today.AddDays(-10), cancellationToken);
+        }
+
+        var series = await GetSeriesAsync(client, null, cancellationToken);
+
+        for (var offset = 10; offset >= 1; offset--)
+        {
+            var date = Today.AddDays(-offset);
+            var expected = date < transferDay ? 500m : 1_500m;
+            Assert.Equal(expected, Assert.Single(series, p => p.Date == date).NetWorthPln);
+        }
+    }
+
+    [Fact]
     public async Task GroupFilter_SumsGroupLines()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

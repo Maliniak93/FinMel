@@ -812,6 +812,136 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task StoresOutsideNetWorth()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var assetId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+
+            await bus.Publish(Event(assetId, accountId, userId, quantity: 5m, version: 0, outsideNetWorth: true), cancellationToken);
+            var first = await WaitForPositionAsync(provider, assetId, cancellationToken);
+            Assert.True(first.OutsideNetWorth);
+
+            await bus.Publish(Event(assetId, accountId, userId, quantity: 5m, version: 1, outsideNetWorth: false), cancellationToken);
+            var second = await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
+            Assert.False(second.OutsideNetWorth);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task FlagChange_RequestsRebuildFromFirstQuantityDate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var history = new[] { (today.AddDays(-30), 10m), (today.AddDays(-10), 20m) };
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 20m,
+                quantityHistory: history, classHistory: [(today.AddDays(-30), AssetClass.Cash)]);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            await provider.GetRequiredService<IBus>().Publish(
+                Event(assetId, accountId, userId, quantity: 20m, version: 1, history: history,
+                    classHistory: [(today.AddDays(-30), AssetClass.Cash)], outsideNetWorth: true),
+                cancellationToken);
+
+            var request = await WaitForRebuildRequestAsync(provider, userId, cancellationToken);
+            Assert.Equal(today.AddDays(-30), request.FromDate);
+            Assert.Equal(userId, request.UserId);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task UnchangedFlag_NoRebuild()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var history = new[] { (today.AddDays(-30), 10m) };
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                quantityHistory: history, classHistory: [(today.AddDays(-30), AssetClass.Cash)], outsideNetWorth: true);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            await provider.GetRequiredService<IBus>().Publish(
+                Event(assetId, accountId, userId, quantity: 10m, version: 1, history: history,
+                    classHistory: [(today.AddDays(-30), AssetClass.Cash)], outsideNetWorth: true),
+                cancellationToken);
+            var position = await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
+            Assert.True(position.OutsideNetWorth);
+
+            // Nothing signals an absent request, so give a late outbox delivery time to land before asserting none.
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+
+            Assert.Null(await GetRebuildRequestAsync(containers, userId, cancellationToken));
+            Assert.DoesNotContain(userId, RequestedUsers);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task FlagFlipToday_RevaluesToday()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var assetId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var history = new[] { (today, 10m) };
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, quantity: 10m,
+                quantityHistory: history, classHistory: [(today, AssetClass.Cash)]);
+            await db.SeedValuationLineAsync(userId, accountId, assetId, today, 10m, cancellationToken, quantity: 10m);
+            await db.SeedSnapshotAsync(userId, today, 10m, cancellationToken);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            await provider.GetRequiredService<IBus>().Publish(
+                Event(assetId, accountId, userId, quantity: 10m, version: 1, history: history,
+                    classHistory: [(today, AssetClass.Cash)], outsideNetWorth: true),
+                cancellationToken);
+            await WaitForPositionAsync(provider, assetId, cancellationToken, p => p.Version == 1);
+
+            await WaitForAsync(
+                provider,
+                (db, ct) => db.AssetValuations.IgnoreQueryFilters().CountAsync(l => l.AccountId == accountId && l.Date == today, ct),
+                count => count == 0,
+                "Removing the flagged position's line for today",
+                cancellationToken);
+
+            Assert.Empty(await GetLinesAsync(containers, accountId, today, cancellationToken));
+
+            // Nothing signals an absent request, so give a late outbox delivery time to land before asserting none.
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+
+            Assert.Null(await GetRebuildRequestAsync(containers, userId, cancellationToken));
+            Assert.DoesNotContain(userId, RequestedUsers);
+        }, cancellationToken);
+    }
+
     private static AssetPositionChanged Event(
         Guid assetId,
         Guid accountId,
@@ -824,14 +954,15 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         IReadOnlyList<(DateOnly Date, decimal Quantity)>? history = null,
         AssetClass assetClass = AssetClass.Cash,
         IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null,
-        Guid? groupId = null) => new()
+        Guid? groupId = null,
+        bool outsideNetWorth = false) => new()
         {
             GroupId = groupId,
             QuoteUnitsPerQuantity = quoteUnitsPerQuantity,
             ClassHistory = [.. (classHistory ?? []).Select(p => new ClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
             QuantityHistory = [.. (history ?? []).Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             IsArchived = isArchived,
-            OutsideNetWorth = false,
+            OutsideNetWorth = outsideNetWorth,
             AssetId = assetId,
             AccountId = accountId,
             UserId = userId,
