@@ -40,6 +40,51 @@ public sealed class BankAccountOutboxTests(SkarbiecContainersFixture containers)
     }
 
     [Fact]
+    public async Task FlagChange_RepublishesCash()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var account = await CreateBankAccountAsync(scope.ServiceProvider, "mBank", "PLN", 0m, cancellationToken);
+        var before = await dbContext.Assets.AsNoTracking().SingleAsync(a => a.Id == account.CashAssetId, cancellationToken);
+        var eventsBefore = (await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken))
+            .Count(e => e.AssetId == account.CashAssetId);
+
+        var flagged = await scope.ServiceProvider.GetRequiredService<UpdateAccountHandler>().HandleAsync(
+            account.Id,
+            new UpdateAccountRequest { Name = "mBank", Variant = BankVariant.Savings, BankName = "mBank", AnnualInterestRatePercent = 0m, OutsideNetWorth = true },
+            cancellationToken);
+
+        Assert.True(flagged.IsSuccess);
+        var events = (await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken))
+            .Where(e => e.AssetId == account.CashAssetId).ToList();
+        Assert.Equal(eventsBefore + 1, events.Count);
+        Assert.DoesNotContain(events, e => e.Version <= before.Version && e.OutsideNetWorth);
+        var evt = Assert.Single(events, e => e.Version == before.Version + 1);
+        Assert.True(evt.OutsideNetWorth);
+    }
+
+    [Fact]
+    public async Task UnchangedFlagAndGroup_PublishesNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PortfolioDbContext>();
+        var account = await CreateBankAccountAsync(scope.ServiceProvider, "mBank", "PLN", 0m, cancellationToken, outsideNetWorth: true);
+        var eventsBefore = await CountPositionEventsAsync(cancellationToken);
+
+        var updated = await scope.ServiceProvider.GetRequiredService<UpdateAccountHandler>().HandleAsync(
+            account.Id,
+            new UpdateAccountRequest { Name = "mBank", Variant = BankVariant.Savings, BankName = "mBank", AnnualInterestRatePercent = 0m, OutsideNetWorth = true },
+            cancellationToken);
+
+        Assert.True(updated.IsSuccess);
+        Assert.Equal(eventsBefore, await CountPositionEventsAsync(cancellationToken));
+        Assert.True((await dbContext.ReadPublishedAsync<AssetPositionChanged>(cancellationToken))
+            .Single(e => e.AssetId == account.CashAssetId).OutsideNetWorth);
+    }
+
+    [Fact]
     public async Task Deposit_PublishesBankAccountPositionWithAccountAndCurrency()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

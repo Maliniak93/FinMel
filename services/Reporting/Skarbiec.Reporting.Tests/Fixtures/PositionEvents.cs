@@ -36,6 +36,7 @@ internal static class PositionEvents
             ClassHistory = classHistory ?? [],
             QuantityHistory = quantityHistory ?? [],
             IsArchived = isArchived,
+            OutsideNetWorth = false,
             Version = version,
             OccurredAtUtc = DateTimeOffset.UtcNow,
         }, cancellationToken);

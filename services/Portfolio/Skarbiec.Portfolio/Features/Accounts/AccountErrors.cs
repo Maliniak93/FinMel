@@ -65,6 +65,9 @@ internal static class AccountErrors
     public static Error BankFieldsNotAllowed { get; } =
         new("Validation.BankFieldsNotAllowed", "Only a Bank account has a variant, bank name or rate, and only a Bank account can hold a currency other than PLN.");
 
+    public static Error OutsideNetWorthNotAllowed { get; } =
+        new("Validation.OutsideNetWorthNotAllowed", "Only a Bank account can be kept outside net worth.");
+
     public static Error NotAllowed(AssetClass assetClass) =>
         new("Validation.AccountNotAllowed", $"A {assetClass} asset sits in no account.");
 }

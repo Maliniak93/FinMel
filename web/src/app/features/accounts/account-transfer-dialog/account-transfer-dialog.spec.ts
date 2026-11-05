@@ -27,6 +27,7 @@ const data: AccountTransferDialogData = {
     isArchived: false,
     cashAssetId: sourceCashId,
     cashBalance: 5000,
+    outsideNetWorth: false,
   },
 };
 

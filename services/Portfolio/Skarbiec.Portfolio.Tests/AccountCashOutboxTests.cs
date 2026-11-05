@@ -38,6 +38,27 @@ public sealed class AccountCashOutboxTests(SkarbiecContainersFixture containers)
     }
 
     [Fact]
+    public async Task Cash_PublishesOutsideNetWorthFalse()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var scope = Provider.CreateAsyncScope();
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "XTB IKE", cancellationToken);
+        var stockId = await AddAssetWithBuyAsync(scope.ServiceProvider, accountId, "Shares", cancellationToken);
+        var cashId = (await LoadAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken)).Id;
+        var flaggedBank = await CreateBankAccountAsync(scope.ServiceProvider, "mBank", "PLN", 0m, cancellationToken, outsideNetWorth: true);
+        var unflaggedBank = await CreateBankAccountAsync(scope.ServiceProvider, "Nest", "PLN", 0m, cancellationToken);
+
+        var events = await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>()
+            .ReadPublishedAsync<AssetPositionChanged>(cancellationToken);
+
+        Assert.Contains(events, e => e.AssetId == stockId);
+        Assert.All(
+            events.Where(e => e.AssetId == stockId || e.AssetId == cashId || e.AssetId == unflaggedBank.CashAssetId),
+            e => Assert.False(e.OutsideNetWorth));
+        Assert.All(events.Where(e => e.AssetId == flaggedBank.CashAssetId), e => Assert.True(e.OutsideNetWorth));
+    }
+
+    [Fact]
     public async Task UpdateDefaultGroup_PublishesNothing()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

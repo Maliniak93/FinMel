@@ -24,6 +24,7 @@ public sealed class AssetPositionChangedContractTests
         Assert.Equal(12.5m, evt.Quantity);
         Assert.Equal(1m, evt.QuoteUnitsPerQuantity);
         Assert.True(evt.IsArchived);
+        Assert.True(evt.OutsideNetWorth);
         Assert.Equal(3L, evt.Version);
         Assert.Equal(new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero), evt.OccurredAtUtc);
     }

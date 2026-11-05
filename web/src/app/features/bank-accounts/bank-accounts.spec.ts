@@ -22,6 +22,7 @@ const mBank = bankAccountResponse({
   id: '11111111-1111-1111-1111-111111111111',
   name: 'mBank',
   cashBalance: 5000,
+  outsideNetWorth: false,
   bank: { variant: BANK_VARIANT.Current, bankName: 'mBank', annualInterestRatePercent: 0 },
 });
 
@@ -29,6 +30,7 @@ const nest = bankAccountResponse({
   id: '22222222-2222-2222-2222-222222222222',
   name: 'Nest Oszczędnościowe',
   cashBalance: 10000,
+  outsideNetWorth: false,
   bank: {
     variant: BANK_VARIANT.Savings,
     bankName: 'Nest Bank',
@@ -52,6 +54,7 @@ const archived = bankAccountResponse({
   name: 'Old bank',
   isArchived: true,
   cashBalance: 0,
+  outsideNetWorth: false,
 });
 
 describe('BankAccounts', () => {

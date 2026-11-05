@@ -136,6 +136,7 @@ export function accountResponse(overrides: Partial<AccountResponse> = {}): Accou
     isArchived: false,
     cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
     cashBalance: 0,
+    outsideNetWorth: false,
     ...overrides,
   };
 }

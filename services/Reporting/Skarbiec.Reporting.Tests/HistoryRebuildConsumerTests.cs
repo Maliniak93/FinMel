@@ -241,6 +241,7 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
                             new QuantityPoint { Date = today.AddDays(-5), Quantity = 150m },
                         ],
                         IsArchived = false,
+                        OutsideNetWorth = false,
                         Version = 1,
                         OccurredAtUtc = DateTimeOffset.UtcNow,
                     },

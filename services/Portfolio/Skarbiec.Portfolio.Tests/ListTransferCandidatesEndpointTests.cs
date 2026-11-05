@@ -3,6 +3,7 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.CashPlacesApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
@@ -28,6 +29,22 @@ public sealed class ListTransferCandidatesEndpointTests(SkarbiecContainersFixtur
         Assert.Equal("Sejf", candidate.GetProperty("name").GetString());
         Assert.Equal(5_000m, candidate.GetProperty("balance").GetDecimal());
         Assert.NotEqual(brokerage.CashAssetId, candidate.GetProperty("assetId").GetGuid());
+    }
+
+    [Fact]
+    public async Task IncludesOutsideNetWorthFlag()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var flagged = await client.CreateBankAccountAsync(cancellationToken, "Poza majatkiem", outsideNetWorth: true);
+        var plain = await client.CreateBankAccountAsync(cancellationToken, "Zwykle");
+
+        var response = await client.GetAsync(TransferCandidatesUri("PLN", "Cash", accountCash: true), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var candidates = (await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList();
+        Assert.True(candidates.Single(c => c.GetProperty("assetId").GetGuid() == flagged.MoneyAssetId).GetProperty("outsideNetWorth").GetBoolean());
+        Assert.False(candidates.Single(c => c.GetProperty("assetId").GetGuid() == plain.MoneyAssetId).GetProperty("outsideNetWorth").GetBoolean());
     }
 
     [Fact]

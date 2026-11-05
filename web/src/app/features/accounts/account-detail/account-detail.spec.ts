@@ -36,6 +36,7 @@ const account = {
   isArchived: false,
   cashAssetId,
   cashBalance: 2000,
+  outsideNetWorth: false,
 };
 
 const holdings = [

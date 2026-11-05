@@ -20,4 +20,7 @@ public sealed record UpdateAccountRequest
     /// <summary>A Bank account's yearly rate in percent, 0 when omitted; it applies from the next unsettled period.</summary>
     [Range(typeof(decimal), "0", "100")]
     public decimal? AnnualInterestRatePercent { get; init; }
+
+    /// <summary>Bank accounts only: keeps the balance out of net worth and clears the group.</summary>
+    public bool OutsideNetWorth { get; init; }
 }

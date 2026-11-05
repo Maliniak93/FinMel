@@ -12,4 +12,5 @@ public sealed class Account : IUserOwned
     public required string Currency { get; init; }
     public bool IsArchived { get; set; }
     public Guid? DefaultGroupId { get; set; }
+    public bool OutsideNetWorth { get; set; }
 }

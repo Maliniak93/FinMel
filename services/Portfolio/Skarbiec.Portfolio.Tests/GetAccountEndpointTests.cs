@@ -18,6 +18,29 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class GetAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
+    public async Task OutsideNetWorth_ValuesInPln()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.30m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var flagged = await client.CreateBankAccountAsync(
+            cancellationToken, "Konto EUR", currency: "EUR", balance: 100m, outsideNetWorth: true);
+        var plain = await client.CreateBankAccountAsync(cancellationToken, "Zwykle EUR", currency: "EUR", balance: 50m);
+
+        var flaggedResponse = await client.GetAsync(AccountUri(flagged.AccountId), cancellationToken);
+        var plainResponse = await client.GetAsync(AccountUri(plain.AccountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, flaggedResponse.StatusCode);
+        var flaggedBody = await flaggedResponse.ReadJsonAsync(cancellationToken);
+        Assert.True(flaggedBody.GetProperty("outsideNetWorth").GetBoolean());
+        Assert.Equal(430m, flaggedBody.GetProperty("cashBalancePln").GetDecimal());
+        var plainBody = await plainResponse.ReadJsonAsync(cancellationToken);
+        Assert.False(plainBody.GetProperty("outsideNetWorth").GetBoolean());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, plainBody.GetProperty("cashBalancePln").ValueKind);
+    }
+
+    [Fact]
     public async Task ReturnsGroupId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

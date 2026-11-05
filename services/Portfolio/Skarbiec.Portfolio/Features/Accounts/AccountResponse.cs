@@ -19,6 +19,12 @@ public sealed record AccountResponse
     /// <summary>The account's money in its currency, the quantity of its cash asset.</summary>
     public required decimal CashBalance { get; init; }
 
+    /// <summary>True when the Bank account is kept outside net worth.</summary>
+    public bool OutsideNetWorth { get; init; }
+
+    /// <summary>Set only by the list and get reads, for a flagged account: the balance at the latest rate in PLN; null when MarketData has no rate.</summary>
+    public decimal? CashBalancePln { get; init; }
+
     /// <summary>Set only by the account reads, for an IKE or IKZE account; null for a Regular one.</summary>
     public ContributionResponse? Contribution { get; init; }
 
@@ -38,6 +44,7 @@ public static class AccountMappingExtensions
         IsArchived = account.IsArchived,
         CashAssetId = cash.Id,
         GroupId = account.Type == AccountType.Bank ? cash.GroupId : account.DefaultGroupId,
-        CashBalance = cash.Quantity
+        CashBalance = cash.Quantity,
+        OutsideNetWorth = account.OutsideNetWorth
     };
 }

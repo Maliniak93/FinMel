@@ -39,6 +39,7 @@ const accountList = [
     wrapper: 1,
     isArchived: false,
     cashBalance: 5000,
+    outsideNetWorth: false,
     groupId: blueGroupId,
   },
   {
@@ -48,6 +49,7 @@ const accountList = [
     wrapper: 0,
     isArchived: false,
     cashBalance: 1000,
+    outsideNetWorth: false,
   },
   {
     id: 'b3333333-3333-3333-3333-333333333333',
@@ -56,6 +58,7 @@ const accountList = [
     wrapper: 0,
     isArchived: true,
     cashBalance: 0,
+    outsideNetWorth: false,
   },
   {
     id: 'b4444444-4444-4444-4444-444444444444',
@@ -64,6 +67,7 @@ const accountList = [
     wrapper: 1,
     isArchived: false,
     cashBalance: 0,
+    outsideNetWorth: false,
   },
 ];
 

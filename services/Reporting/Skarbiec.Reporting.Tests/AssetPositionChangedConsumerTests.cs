@@ -51,6 +51,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 ClassHistory = [],
                 QuantityHistory = [],
                 IsArchived = false,
+                OutsideNetWorth = false,
                 Version = 0,
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
@@ -218,6 +219,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 ClassHistory = [],
                 QuantityHistory = [],
                 IsArchived = false,
+                OutsideNetWorth = false,
                 Version = 1,
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
@@ -293,6 +295,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
                 ClassHistory = [],
                 QuantityHistory = [],
                 IsArchived = false,
+                OutsideNetWorth = false,
                 Version = 0,
                 OccurredAtUtc = DateTimeOffset.UtcNow,
             }, cancellationToken);
@@ -828,6 +831,7 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
             ClassHistory = [.. (classHistory ?? []).Select(p => new ClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
             QuantityHistory = [.. (history ?? []).Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             IsArchived = isArchived,
+            OutsideNetWorth = false,
             AssetId = assetId,
             AccountId = accountId,
             UserId = userId,

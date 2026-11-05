@@ -215,6 +215,11 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<bool>("OutsideNetWorth")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(20)

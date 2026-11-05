@@ -318,6 +318,7 @@ public sealed class InstrumentUsageConsumerTests(SkarbiecContainersFixture conta
             ClassHistory = [],
             QuantityHistory = [],
             IsArchived = false,
+            OutsideNetWorth = false,
             Version = version,
             FirstTransactionDate = firstTransactionDate,
             OccurredAtUtc = DateTimeOffset.UtcNow,

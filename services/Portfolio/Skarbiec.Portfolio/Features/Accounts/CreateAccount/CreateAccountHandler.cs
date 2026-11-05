@@ -32,6 +32,11 @@ public sealed class CreateAccountHandler(PortfolioDbContext dbContext, PositionE
             return AccountErrors.BankFieldsNotAllowed;
         }
 
+        if (request.OutsideNetWorth && request.Type != AccountType.Bank)
+        {
+            return AccountErrors.OutsideNetWorthNotAllowed;
+        }
+
         var nameTaken = await dbContext.Accounts
             .AsNoTracking()
             .AnyAsync(a => a.Name == request.Name, cancellationToken);
@@ -53,14 +58,15 @@ public sealed class CreateAccountHandler(PortfolioDbContext dbContext, PositionE
             Type = request.Type,
             Wrapper = request.Wrapper,
             Currency = currency,
-            DefaultGroupId = request.Type == AccountType.Bank ? null : request.GroupId
+            DefaultGroupId = request.Type == AccountType.Bank ? null : request.GroupId,
+            OutsideNetWorth = request.OutsideNetWorth
         };
 
         var money = new Asset
         {
             Id = Guid.NewGuid(),
             AccountId = account.Id,
-            GroupId = request.GroupId,
+            GroupId = request.OutsideNetWorth ? null : request.GroupId,
             AssetClass = AccountCash.MoneyClassOf(request.Type),
             Name = account.Name,
             Currency = currency,
