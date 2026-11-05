@@ -3,6 +3,7 @@ import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
+import { readStylesheet } from '../../../testing/stylesheet';
 import { mockWealthApi } from '../../../testing/wealth-fixtures';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
@@ -67,6 +68,23 @@ describe('WealthLayout', () => {
     const selected = links.filter((a) => a.getAttribute('aria-selected') === 'true');
     expect(selected).toHaveLength(1);
     expect(selected[0].textContent).toContain(label);
+  });
+
+  it('renders the tab bar', async () => {
+    await harness.navigateByUrl('/wealth', WealthLayout);
+    harness.detectChanges();
+    const element = harness.routeNativeElement as HTMLElement;
+    expect(element.querySelector('nav[mat-tab-nav-bar]')).not.toBeNull();
+
+    const styles = readStylesheet('src/styles.scss');
+    const at = styles.indexOf('mat.tabs-overrides(');
+    expect(at).toBeGreaterThanOrEqual(0);
+    const tabs = styles.slice(at, styles.indexOf('  );', at));
+    expect(tabs).toMatch(/17px/);
+    expect(tabs).toMatch(/2px/);
+    expect(tabs).toMatch(/1px/);
+    expect(tabs).toContain('--sk-accent-stroke');
+    expect(tabs).toContain('--mat-sys-outline-variant');
   });
 
   it('tab captions', async () => {

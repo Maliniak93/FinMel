@@ -1,3 +1,5 @@
+@use '../../shared/ruled-table' as ruled;
+
 .transactions-page__breadcrumb {
   display: flex;
   align-items: center;
@@ -102,6 +104,7 @@
 }
 
 .transactions-page__table {
+  @include ruled.ruled-table;
   width: 100%;
 }
 

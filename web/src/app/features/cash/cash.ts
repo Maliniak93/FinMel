@@ -31,6 +31,7 @@ import { Money } from '../../shared/money/money';
 import { SectionError } from '../../shared/section-error/section-error';
 import { Skeleton } from '../../shared/skeleton/skeleton';
 import { StatusChip } from '../../shared/status-chip/status-chip';
+import { SummaryStrip } from '../../shared/summary-strip/summary-strip';
 import { CashOperationDialog } from '../accounts/cash-operation-dialog/cash-operation-dialog';
 import {
   CashBankTransferDialog,
@@ -66,6 +67,7 @@ const CONFLICT_MESSAGES: Record<string, string> = {
     SectionError,
     Skeleton,
     StatusChip,
+    SummaryStrip,
     TranslocoPipe,
   ],
   templateUrl: './cash.html',
@@ -95,6 +97,15 @@ export class Cash {
           .places.filter((place) => this.includeArchived() || !place.isArchived)
       : [],
   );
+
+  protected readonly totalItems = computed(() => [
+    {
+      labelKey: 'cash.total',
+      amount: this.placesResource.hasValue()
+        ? this.num(this.placesResource.value().totalValuePln)
+        : null,
+    },
+  ]);
 
   protected readonly fxTooltip = computed(() => {
     if (!this.placesResource.hasValue()) {

@@ -8,11 +8,8 @@
 
     @if (visiblePlaces().length > 0) {
       <section class="cash-page__totals">
+        <app-summary-strip [items]="totalItems()" />
         <div class="cash-page__total-main">
-          <span class="cash-page__total-label">{{ 'cash.total' | transloco }}</span>
-          @if (cash.totalValuePln !== null && cash.totalValuePln !== undefined) {
-            <app-money class="cash-page__total-value" [amount]="num(cash.totalValuePln)" />
-          }
           @if (cash.fxUnavailable) {
             <span [matTooltip]="fxTooltip()">
               <app-status-chip

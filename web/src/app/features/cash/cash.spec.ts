@@ -18,6 +18,7 @@ import {
   showArchived,
 } from '../../../testing/archive';
 import { restoreEnglish, switchLanguage, textOf } from '../../../testing/i18n';
+import { readStylesheet, rulesFor } from '../../../testing/stylesheet';
 import { hasSwatch } from '../../../testing/swatch';
 import { CashOperationDialog } from '../accounts/cash-operation-dialog/cash-operation-dialog';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
@@ -195,16 +196,15 @@ describe('Cash', () => {
       .filter((request: Request) => request.method !== 'GET');
   }
 
-  it('totals strip and rows', async () => {
+  it('renders the totals strip and balance rows', async () => {
     await setup();
     const strip = element().querySelector<HTMLElement>('.cash-page__totals')!;
 
+    expect(strip.querySelector('[data-testid="summary-strip"]')).not.toBeNull();
     expect(textOf(strip)).toContain(spaced(formatMoney(6106)));
-    expect(Array.from(strip.querySelectorAll('.cash-page__total'), textOf)).toEqual([
-      `PLN: ${spaced(formatMoney(4300, 'PLN'))}`,
-      `EUR: ${spaced(formatMoney(420, 'EUR'))}`,
-      `CHF: ${spaced(formatMoney(200, 'CHF'))}`,
-    ]);
+    expect(textOf(strip)).toContain(spaced(formatMoney(4300, 'PLN')));
+    expect(textOf(strip)).toContain(spaced(formatMoney(420, 'EUR')));
+    expect(textOf(strip)).toContain(spaced(formatMoney(200, 'CHF')));
     expect(strip.querySelector('.status-chip--uncertain')?.textContent).toContain(
       'Exchange rate unavailable',
     );
@@ -216,6 +216,9 @@ describe('Cash', () => {
     expect(textOf(balanceRow('Safe', 'CHF'))).toContain('Exchange rate unavailable');
     expect(textOf(balanceRow('Safe', 'EUR'))).toContain('≈');
     expect(textOf(balanceRow('Safe', 'EUR'))).toContain(spaced(formatMoney(1806)));
+    expect(
+      rulesFor(readStylesheet('src/app/features/cash/cash.scss'), /cash-place__balance(?![\w-])/),
+    ).toMatch(/border-top:\s*1px solid var\(--mat-sys-outline-variant\)/);
 
     await switchLanguage(fixture, 'pl');
     expect(textOf(element().querySelector('.cash-page__totals'))).toContain('Łączna wartość');

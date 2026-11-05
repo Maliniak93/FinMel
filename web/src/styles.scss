@@ -105,6 +105,17 @@ html {
       selected-state-text-color: var(--mat-sys-on-surface),
     )
   );
+  @include mat.tabs-overrides(
+    (
+      divider-height: 1px,
+      divider-color: var(--mat-sys-outline-variant),
+      active-indicator-height: 2px,
+      active-indicator-color: var(--sk-accent-stroke),
+      active-focus-indicator-color: var(--sk-accent-stroke),
+      active-hover-indicator-color: var(--sk-accent-stroke),
+      label-text-size: 17px,
+    )
+  );
   @include mat.table-overrides(
     (
       background-color: transparent,

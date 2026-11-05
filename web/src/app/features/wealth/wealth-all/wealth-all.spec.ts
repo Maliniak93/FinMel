@@ -6,6 +6,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { menuItemLabel, rowMenuItems, showArchived } from '../../../../testing/archive';
+import { readStylesheet, rulesFor } from '../../../../testing/stylesheet';
 import {
   ASOF,
   GROUP_ID,
@@ -20,6 +21,7 @@ import { client as reportingClient } from '../../../api/reporting/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { AccountFormDialog } from '../../accounts/account-form-dialog/account-form-dialog';
 import { AssetFormDialog } from '../../assets/asset-form/asset-form-dialog/asset-form-dialog';
+import { BOND_STATUS } from '../../bonds/bond-interest';
 import { BondPurchaseDialog } from '../../bonds/bond-purchase-dialog/bond-purchase-dialog';
 import { CashPlaceFormDialog } from '../../cash/cash-place-form-dialog/cash-place-form-dialog';
 import { DepositFormDialog } from '../../deposits/deposit-form-dialog/deposit-form-dialog';
@@ -261,6 +263,33 @@ describe('WealthAll', () => {
     expect(root().querySelector('app-empty-state')!.textContent).toContain(
       'Nothing matches the filters.',
     );
+  });
+
+  it('renders ruled rows and a total row', async () => {
+    await setup();
+
+    expect(root().querySelectorAll('tr.wealth-all__row').length).toBeGreaterThan(0);
+    expect(total()).toContain(formatMoney(115800));
+
+    const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    expect(rulesFor(css, /thead/)).toMatch(
+      /border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/,
+    );
+    expect(rulesFor(css, /__row|tbody tr/)).toMatch(
+      /border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/,
+    );
+  });
+
+  it('shows interest to settle in the error tone', async () => {
+    const data = wealthApiData();
+    data.bonds = data.bonds.map((bond) => ({ ...bond, status: BOND_STATUS.InterestDue }));
+    await setup({ data });
+
+    const bondRow = row('EDO0935')!;
+    expect(bondRow.querySelector('.status-chip--negative')?.textContent).toContain(
+      'Interest to settle',
+    );
+    expect(bondRow.querySelector('.status-chip--warning')).toBeNull();
   });
 
   it('row links', async () => {
