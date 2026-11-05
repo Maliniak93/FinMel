@@ -34,6 +34,30 @@ function requestMethod(input: unknown): string {
   return input instanceof Request ? input.method : 'GET';
 }
 
+function syncRun(runId: string, source: number) {
+  return {
+    runId,
+    status: 1,
+    source,
+    startedAt: '2026-08-10T13:00:00Z',
+    finishedAt: '2026-08-10T13:00:30Z',
+    syncedCount: 4,
+    noDataCount: 0,
+    failedCount: 0,
+  };
+}
+
+function runRow(element: HTMLElement, label: string): HTMLElement | undefined {
+  return Array.from(element.querySelectorAll<HTMLElement>('.settings-page__run')).find(
+    (row) => textOf(row.querySelector('.settings-page__run-label')) === label,
+  );
+}
+
+function runChips(element: HTMLElement, label: string): string[] {
+  const chips = runRow(element, label)?.querySelectorAll('mat-chip') ?? [];
+  return Array.from(chips, (chip) => textOf(chip));
+}
+
 describe('Settings', () => {
   let fixture: ComponentFixture<Settings>;
   let component: Settings;
@@ -225,5 +249,68 @@ describe('Settings', () => {
     );
     expect(status).not.toBe('No sync has run yet.');
     expect(isTranslationIn('pl', status)).toBe(true);
+  });
+
+  it('shows the source of each run', async () => {
+    await setup(
+      jsonResponse({
+        hasRun: true,
+        prices: syncRun('11111111-1111-1111-1111-111111111111', 1),
+        fx: syncRun('22222222-2222-2222-2222-222222222222', 0),
+      }),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    expect(runChips(element, 'Prices')).toContain('Start');
+    expect(runChips(element, 'FX')).toContain('Schedule');
+
+    fetchSpy.mockImplementation(async () =>
+      jsonResponse({
+        hasRun: true,
+        prices: syncRun('33333333-3333-3333-3333-333333333333', 2),
+      }),
+    );
+    component['statusResource'].reload();
+    await fixture.whenStable();
+
+    expect(runChips(element, 'Prices')).toContain('Manual');
+  });
+
+  it('shows the bond catalog run', async () => {
+    await setup(
+      jsonResponse({
+        hasRun: true,
+        prices: syncRun('11111111-1111-1111-1111-111111111111', 0),
+        bondCatalog: syncRun('44444444-4444-4444-4444-444444444444', 1),
+      }),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+    expect(runChips(element, 'Bond catalog')).toEqual(
+      expect.arrayContaining(['Completed', 'Start']),
+    );
+
+    fetchSpy.mockImplementation(async () =>
+      jsonResponse({
+        hasRun: true,
+        prices: syncRun('11111111-1111-1111-1111-111111111111', 0),
+        bondCatalog: null,
+      }),
+    );
+    component['statusResource'].reload();
+    await fixture.whenStable();
+
+    expect(runRow(element, 'Bond catalog')).toBeUndefined();
+  });
+
+  it('labels an unknown source', async () => {
+    await setup(
+      jsonResponse({
+        hasRun: true,
+        prices: syncRun('11111111-1111-1111-1111-111111111111', 99),
+      }),
+    );
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(runChips(element, 'Prices')).toContain('Unknown');
+    expect(element.querySelector('app-section-error')).toBeNull();
   });
 });

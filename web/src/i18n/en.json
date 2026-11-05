@@ -208,7 +208,14 @@
     },
     "syncRunKind": {
       "prices": "Prices",
-      "fx": "FX"
+      "fx": "FX",
+      "bondCatalog": "Bond catalog"
+    },
+    "syncRunSource": {
+      "schedule": "Schedule",
+      "start": "Start",
+      "manual": "Manual",
+      "unknown": "Unknown"
     },
     "currency": {
       "pln": "PLN — Polish złoty",

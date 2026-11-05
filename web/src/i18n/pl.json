@@ -208,7 +208,14 @@
     },
     "syncRunKind": {
       "prices": "Ceny",
-      "fx": "Kursy walut"
+      "fx": "Kursy walut",
+      "bondCatalog": "Katalog obligacji"
+    },
+    "syncRunSource": {
+      "schedule": "harmonogram",
+      "start": "start",
+      "manual": "ręcznie",
+      "unknown": "Nieznany"
     },
     "currency": {
       "pln": "PLN — złoty polski",
