@@ -1,7 +1,6 @@
 // Usage: imported by autobuild.mjs - the queue plan, the next piece of work, the start and window times; pure, injectable, runs nothing on import
 
 import { postOnce } from "./autobuild-gh.mjs";
-import { shortOf } from "./priority.mjs";
 import { itemTag, queueOf } from "./queue.mjs";
 
 const partNumbers = (epic) => (epic.subIssues ?? []).map((s) => (typeof s === "object" ? s.number : s));
@@ -84,7 +83,7 @@ export async function runQueue({ items = Infinity, includeManual = false, only =
   const closedParts = new Set();
   const skipped = [];
   const blocked = new Set();
-  let previous = null;
+  const announcedManual = new Set();
 
   const skip = async (number, reason) => {
     skipped.push({ number, reason });
@@ -100,6 +99,12 @@ export async function runQueue({ items = Infinity, includeManual = false, only =
     for (const q of queueOf(cards)) {
       if (finished.has(q.number)) continue;
       queue.push(nextPart && q.epic && started.has(q.number) ? { ...q, next: await nextPart(q) } : q);
+    }
+
+    for (const q of queue) {
+      if (!q.manual || includeManual || announcedManual.has(q.number)) continue;
+      announcedManual.add(q.number);
+      log(`pominięto ręczną kartę #${q.number} (In progress bez etykiety autobuild)`);
     }
 
     const closable = queue.find((q) => q.epic && started.has(q.number) && q.next === null);
@@ -129,8 +134,7 @@ export async function runQueue({ items = Infinity, includeManual = false, only =
       continue;
     }
 
-    const continuation = queue.find((q) => q.number === previous && q.epic && q.next !== null);
-    if (continuation && continuation.number !== item.number) log(`kolejka zmieniona: #${item.number} (${shortOf(item.priority)}) przed #${continuation.number}`);
+    if (!started.has(item.number) && item.status === "In progress" && !item.manual) log(`kontynuuję rozpoczęte: #${item.number}`);
 
     started.add(item.number);
     if (part === null) {
@@ -142,7 +146,6 @@ export async function runQueue({ items = Infinity, includeManual = false, only =
     const result = await buildPart(item, part, cards);
     if (!item.epic || result === false) finished.add(item.number);
     else if (await isClosed(part)) closedParts.add(part);
-    previous = item.number;
   }
 }
 

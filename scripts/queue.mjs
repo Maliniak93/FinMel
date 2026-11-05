@@ -9,9 +9,10 @@ export function queueOf(cards) {
   const byNumber = new Map(cards.map((c) => [c.number, c]));
   const parts = new Set(cards.flatMap((c) => (c.epic ? partNumbers(c) : [])));
   const topLevel = cards.filter((c) => c.parent == null && !parts.has(c.number));
-  const inRank = (status, urgent) => topLevel.filter((c) => c.status === status && (c.priority === PRIORITIES[0]) === urgent);
+  const started = topLevel.filter((c) => c.status === "In progress");
+  const todo = (urgent) => topLevel.filter((c) => c.status === "Todo" && (c.priority === PRIORITIES[0]) === urgent);
 
-  return [...inRank("In progress", true), ...inRank("Todo", true), ...inRank("In progress", false), ...inRank("Todo", false)].map((c) => {
+  return [...started, ...todo(true), ...todo(false)].map((c) => {
     if (!c.epic) return { ...c, manual: c.status === "In progress" && !c.autobuild };
 
     const children = partNumbers(c)
