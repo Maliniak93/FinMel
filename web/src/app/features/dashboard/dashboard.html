@@ -99,6 +99,32 @@
               (retry)="historyResource.reload()"
             />
           </section>
+
+          <section class="dashboard-page__structure">
+            <div>
+              <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
+              <app-split-bar [segments]="structureSegments()" />
+              <ul class="dashboard-page__structure-list">
+                @for (row of structureRows(); track row.assetClass) {
+                  <li class="dashboard-page__structure-row">
+                    <span
+                      class="dashboard-page__swatch"
+                      [style.background]="assetClassColor(row.assetClass)"
+                    ></span>
+                    <a [routerLink]="assetClassPage(row.assetClass)">{{
+                      assetClassLabel(row.assetClass) | transloco
+                    }}</a>
+                    <span class="dashboard-page__structure-value">{{
+                      formatMoney(row.valuePln)
+                    }}</span>
+                    <span class="dashboard-page__structure-share">{{
+                      formatPercent(row.percentage)
+                    }}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+          </section>
         </div>
 
         <div class="dashboard-page__pair">
@@ -222,36 +248,10 @@
             </div>
           </section>
 
-          <section class="dashboard-page__structure">
-            <div>
-              <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
-              <app-split-bar [segments]="structureSegments()" />
-              <ul class="dashboard-page__structure-list">
-                @for (row of structureRows(); track row.assetClass) {
-                  <li class="dashboard-page__structure-row">
-                    <span
-                      class="dashboard-page__swatch"
-                      [style.background]="assetClassColor(row.assetClass)"
-                    ></span>
-                    <a [routerLink]="assetClassPage(row.assetClass)">{{
-                      assetClassLabel(row.assetClass) | transloco
-                    }}</a>
-                    <span class="dashboard-page__structure-value">{{
-                      formatMoney(row.valuePln)
-                    }}</span>
-                    <span class="dashboard-page__structure-share">{{
-                      formatPercent(row.percentage)
-                    }}</span>
-                  </li>
-                }
-              </ul>
-            </div>
-          </section>
-        </div>
-
-        <div class="dashboard-page__pair dashboard-page__pair--ruled">
-          <app-accounts-card />
-          <app-cash-card />
+          <div class="dashboard-page__side">
+            <app-accounts-card />
+            <app-cash-card />
+          </div>
         </div>
       </div>
     }
