@@ -343,16 +343,32 @@ describe('Dashboard', () => {
     expect(textsOf(structure, 'li a')).toEqual(['Akcje', 'Gotówka', 'ETF']);
   });
 
+  it('puts the structure in the hero after the chart', async () => {
+    await setup(jsonResponse(dashboardWithClasses));
+    const element = fixture.nativeElement as HTMLElement;
+    const hero = element.querySelector('.dashboard-page__hero') as HTMLElement;
+
+    expect(hero).not.toBeNull();
+    expect([...hero.children].map((child) => child.className)).toEqual([
+      'dashboard-page__value',
+      'dashboard-page__history',
+      'dashboard-page__structure',
+    ]);
+    expect(
+      element.querySelector('.dashboard-page__pair--split .dashboard-page__structure'),
+    ).toBeNull();
+  });
+
   it('stacks the sections on a narrow container', async () => {
     await setup(jsonResponse(dashboardWithGroups()), undefined, { groups: jsonResponse(groups) });
     const element = fixture.nativeElement as HTMLElement;
 
     const order = [
       '.dashboard-page__hero',
+      '.dashboard-page__hero .dashboard-page__structure',
       '.dashboard-page__todo',
       'app-month-card',
       '.dashboard-page__group-card',
-      '.dashboard-page__structure',
       'app-accounts-card',
       'app-cash-card',
     ];
@@ -369,6 +385,24 @@ describe('Dashboard', () => {
     expect(split).toBeGreaterThan(-1);
     expect(css.slice(split)).toMatch(/\.dashboard-page__hero[^{]*\{[^}]*5fr/);
     expect(css.slice(0, split)).not.toMatch(/\.dashboard-page__hero[^{]*\{[^}]*5fr/);
+  });
+
+  it('puts accounts and cash in one column beside the groups', async () => {
+    await setup(jsonResponse(dashboardWithGroups()), undefined, { groups: jsonResponse(groups) });
+    const element = fixture.nativeElement as HTMLElement;
+    const split = element.querySelector('.dashboard-page__pair--split') as HTMLElement;
+
+    expect(split).not.toBeNull();
+    const children = [...split.children] as HTMLElement[];
+    expect(children).toHaveLength(2);
+    expect(children[0]).toBe(element.querySelector('.dashboard-page__group-card'));
+    expect(children[1].querySelector('app-accounts-card')).not.toBeNull();
+    expect(children[1].querySelector('app-cash-card')).not.toBeNull();
+    expect([...children[1].children].map((child) => child.tagName.toLowerCase())).toEqual([
+      'app-accounts-card',
+      'app-cash-card',
+    ]);
+    expect(element.querySelector('.dashboard-page__pair--ruled')).toBeNull();
   });
 
   it('renders the as-of date in the page header', async () => {
@@ -885,6 +919,40 @@ describe('dashboard stylesheet', () => {
     expect(base).toMatch(/\.dashboard-page__group-card\s*\{[^}]*border-top:/);
     expect(base).toMatch(/\.dashboard-page__structure\s*\{[^}]*border-top:/);
     expect(base).not.toMatch(/\d+fr\s+\d+fr/);
+  });
+
+  it('lays the hero out in two rows on a wide container', () => {
+    const scss = dashboardStylesheet();
+    const split = scss.indexOf('@container (min-width: 720px)');
+    const base = scss.slice(0, split);
+    const wide = scss.slice(split);
+
+    expect(split).toBeGreaterThan(-1);
+    expect(wide).toMatch(/\.dashboard-page__hero\s*\{[^}]*5fr/);
+    expect(wide).toMatch(
+      /\.dashboard-page__hero\s*\{[^}]*grid-template-areas:\s*["']value history["']\s*["']structure history["']/,
+    );
+    expect(wide).toMatch(/\.dashboard-page__hero\s*\{[^}]*row-gap:\s*var\(--sk-space-8\)/);
+    expect(scss).toMatch(/\.dashboard-page__value\s*\{[^}]*grid-area:\s*value/);
+    expect(scss).toMatch(/\.dashboard-page__structure\s*\{[^}]*grid-area:\s*structure/);
+    expect(scss).toMatch(/\.dashboard-page__history\s*\{[^}]*grid-area:\s*history/);
+    expect(scss).toMatch(/\.dashboard-page__history\s*\{[^}]*align-self:\s*start/);
+    expect(base).not.toMatch(/grid-template-areas:\s*"[^"]*"\s*"/);
+    expect(base).not.toMatch(/\.dashboard-page__hero\s*\{[^}]*\d+fr/);
+    expect(wide).toMatch(
+      /\.dashboard-page__pair--split\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*7fr\)\s*minmax\(0,\s*5fr\)/,
+    );
+  });
+
+  it('lets the structure rows wrap', () => {
+    const structureRules = [
+      ...dashboardStylesheet().matchAll(/\.dashboard-page__structure[^{]*\{([^}]*)\}/g),
+    ]
+      .map((match) => match[1])
+      .join('\n');
+
+    expect(structureRules).toMatch(/min-width:\s*0/);
+    expect(structureRules).toMatch(/overflow-wrap:\s*anywhere/);
   });
 
   it('styles the dashboard only with tokens', () => {
