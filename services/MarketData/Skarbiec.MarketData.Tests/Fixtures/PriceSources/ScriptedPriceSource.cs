@@ -8,7 +8,8 @@ public sealed class ScriptedPriceSource(
     PriceSource source,
     PriceFetchResult<InstrumentQuote>? latestResult = null,
     PriceFetchResult<InstrumentQuote>? historyResult = null,
-    int? maxHistoryDays = null) : IPriceSource
+    int? maxHistoryDays = null,
+    IReadOnlyDictionary<Guid, PriceFetchResult<InstrumentQuote>>? historyResultsByInstrumentId = null) : IPriceSource
 {
     public PriceSource Source { get; } = source;
 
@@ -45,6 +46,12 @@ public sealed class ScriptedPriceSource(
     {
         HistoryFetchCount++;
         _historyWindows.Add((from, to));
+
+        // A per-instrument override wins, so one instrument can fail while the others succeed.
+        if (historyResultsByInstrumentId is not null && historyResultsByInstrumentId.TryGetValue(instrument.Id, out var scripted))
+        {
+            return Task.FromResult(scripted);
+        }
 
         if (historyResult is null)
         {

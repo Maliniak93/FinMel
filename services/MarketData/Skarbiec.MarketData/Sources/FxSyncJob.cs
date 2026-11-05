@@ -69,7 +69,7 @@ public sealed class FxSyncJob(
             .Select(c => c.Code)
             .ToListAsync(cancellationToken);
 
-        var backfillFailed = await BackfillNewCurrenciesAsync(codes, cancellationToken);
+        var backfillFailed = await BackfillNewCurrenciesAsync(codes, run.Source, cancellationToken);
 
         var synced = 0;
         var noData = 0;
@@ -135,22 +135,38 @@ public sealed class FxSyncJob(
     }
 
     // One currency at a time, so one failure never stops the others.
-    private async Task<HashSet<string>> BackfillNewCurrenciesAsync(List<string> codes, CancellationToken cancellationToken)
+    // A currency with no rates gets a year of history; on a startup run one with rates gets the days since its last rate.
+    private async Task<HashSet<string>> BackfillNewCurrenciesAsync(
+        List<string> codes, SyncRunSource source, CancellationToken cancellationToken)
     {
         var pairs = codes.Select(Pair).ToList();
-        var pairsWithHistory = await db.FxRates
+        var lastDates = await db.FxRates
             .AsNoTracking()
             .Where(r => pairs.Contains(r.Pair))
-            .Select(r => r.Pair)
-            .Distinct()
-            .ToListAsync(cancellationToken);
+            .GroupBy(r => r.Pair)
+            .Select(g => new { Pair = g.Key, Last = g.Max(r => r.Date) })
+            .ToDictionaryAsync(x => x.Pair, x => x.Last, cancellationToken);
 
         var to = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-        var from = to.AddDays(-FxHistoryDays);
         var failed = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var code in codes.Where(c => !pairsWithHistory.Contains(Pair(c))))
+        foreach (var code in codes)
         {
+            DateOnly from;
+            if (lastDates.TryGetValue(Pair(code), out var lastDate))
+            {
+                if (source != SyncRunSource.Startup || PriceSyncJob.ClampGapStart(lastDate, to) is not { } gapFrom)
+                {
+                    continue;
+                }
+
+                from = gapFrom;
+            }
+            else
+            {
+                from = to.AddDays(-FxHistoryDays);
+            }
+
             var result = await SafeFetch.RunAsync(
                 () => fxRateSource.FetchHistoryAsync(code, from, to, cancellationToken),
                 ex => $"FX history fetch for {code} threw unexpectedly: {ex.Message}");
