@@ -20,6 +20,10 @@
   background: var(--mat-sys-secondary-container);
 }
 
+.planning-page__layout mat-icon {
+  margin-inline-end: 4px;
+}
+
 .planning-page__month {
   min-width: 10rem;
   text-align: center;
@@ -86,6 +90,9 @@
   justify-content: space-between;
   gap: 8px 16px;
   margin-top: 8px;
+  padding-block: var(--sk-space-2);
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
 .planning-split__sum {
@@ -128,6 +135,15 @@
     margin: 0;
     font-weight: 500;
   }
+}
+
+.planning-balance__difference {
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  padding-top: var(--sk-space-2);
+}
+
+h2 {
+  font-size: 22px;
 }
 
 .planning-section__incomplete {
@@ -286,6 +302,8 @@
   .planning-layout__aside {
     position: sticky;
     top: 16px;
+    padding-inline-start: var(--sk-space-4);
+    border-left: 1px solid var(--mat-sys-outline-variant);
   }
 }
 

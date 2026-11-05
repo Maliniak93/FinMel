@@ -30,6 +30,11 @@
   row-gap: 4px;
 }
 
+.cascade__row:not(:last-child) {
+  padding-bottom: var(--sk-space-2);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
 .cascade__row--free {
   font-weight: 600;
 }

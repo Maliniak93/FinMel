@@ -1256,6 +1256,61 @@ describe('Planning', () => {
     expect(rows('calendar-cell')).toHaveLength(0);
   });
 
+  it('renders the sticky aside', async () => {
+    await setup('/planning?month=2027-03');
+
+    const aside = element().querySelector<HTMLElement>('.planning-layout__aside')!;
+    expect(aside).not.toBeNull();
+    expect(aside.previousElementSibling).toBe(element().querySelector('.planning-layout__main'));
+  });
+
+  it('renders the balance and split blocks', async () => {
+    responses['2026-10'] = month(
+      {},
+      { groupContributions: contributions, costPln: 4000 },
+      { planPln: 4000, forecastPln: 4000 },
+      splitView(),
+    );
+    await setup();
+
+    expect(rows('balance-difference')).toHaveLength(1);
+    expect(element().querySelectorAll('.cascade__row').length).toBeGreaterThan(0);
+    expect(element().querySelector('.planning-split__shares')).not.toBeNull();
+  });
+
+  it('renders the section headings at the prototype scale', async () => {
+    await setup('/planning?month=2027-03');
+
+    const heading = element().querySelector<HTMLElement>('[data-testid="month-balance"] h2')!;
+    expect(getComputedStyle(heading).fontSize).toBe('22px');
+  });
+
+  it('switches between list and calendar', async () => {
+    await setup('/planning?month=2027-03');
+
+    const list = element().querySelector<HTMLElement>('[data-testid="layout-list"]')!;
+    const calendar = element().querySelector<HTMLElement>('[data-testid="layout-calendar"]')!;
+    expect(list.querySelector('mat-icon')?.textContent).toBe('view_list');
+    expect(list.querySelector('mat-icon')?.getAttribute('aria-hidden')).toBe('true');
+    expect(calendar.querySelector('mat-icon')?.textContent).toBe('calendar_month');
+    expect(calendar.querySelector('mat-icon')?.getAttribute('aria-hidden')).toBe('true');
+    expect(list.getAttribute('aria-pressed')).toBe('true');
+
+    click('layout-calendar');
+    await vi.waitFor(async () => {
+      await settle();
+      expect(rows('calendar-cell').length).toBeGreaterThan(0);
+    });
+    expect(calendar.getAttribute('aria-pressed')).toBe('true');
+
+    click('layout-list');
+    await vi.waitFor(async () => {
+      await settle();
+      expect(rows('calendar-cell')).toHaveLength(0);
+    });
+    expect(list.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('switches to the Rok tab and back, keeping the year in the query params', async () => {
     await setup();
 
