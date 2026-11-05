@@ -36,7 +36,7 @@ Abbreviated format. Status: ✅ accepted / 🕐 pending / ❌ rejected. ADR-001�
 
 ## ADR-007 ✅ Prices only from our own database (jobs in MarketData)
 
-**Decision:** external APIs (NBP, Yahoo) are queried exclusively by Quartz jobs in MarketData; the rest of the system reads via the MarketData API or read models. Narrowed by ADR-018 (ticker verification only). CoinGecko was dropped with the Crypto class (accounts epic part 1).
+**Decision:** external APIs (NBP, Yahoo) are queried exclusively by Quartz jobs in MarketData; the rest of the system reads via the MarketData API or read models. Narrowed by ADR-018 (ticker verification only) and ADR-045 (FX lookup read-through). CoinGecko was dropped with the Crypto class (accounts epic part 1).
 
 ## ADR-008 ✅ PLN base currency, `decimal` everywhere
 
@@ -92,6 +92,8 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Consequences:** every slice's handler signature is `Result`/`Result<T>` instead of throwing or returning `TypedResults` directly; the endpoint does the mapping; one shared ProblemDetails-mapping helper needed in ServiceDefaults (T0.3); error paths become assertable on `Result.IsFailure`/`Error` in tests without catching exceptions; `Money.Create(...)` (T0.2) is the first user of the pattern.
 
 ## ADR-018 ✅ Ticker verification may call a provider in the request path — a narrow exception to ADR-007
+
+Narrowed by ADR-045 (the FX rate lookup is a further request-path exception).
 
 **Context:** a user adding a market asset must learn *before* the asset exists whether the ticker they typed is real at its provider (modification set 1, S6/M1.1). ADR-007 forbids exactly that: external APIs are queried only by Quartz jobs. T2.8 shipped the compliant alternative — create the instrument `Unverified`, let `HistoryBackfillJob` flip it to `Verified`/`Failed` off the request path — and its own scope allowed a documented "pragmatic exception" instead. Live probes on 2026-08-11 settled the trade-off: stooq.com now gates every CSV endpoint behind a JavaScript proof-of-work challenge (`/q/l/` → 404 HTML, `/q/d/l/` → challenge page), so a plain `HttpClient` cannot reach it at all. Create-then-poll therefore makes the user wait on a job only to be told "Failed" for every Stock/Etf/Bond ticker — a worse answer, delivered later, after the instrument row already exists.
 **Decision:** MarketData may call a price provider **synchronously in a request path for exactly one purpose: verifying that a user-supplied ticker exists at its provider, before the instrument (and therefore the asset) is created.** Never for valuation, never to persist a `PriceQuote`/`FxRate` — prices still reach the database only through Quartz jobs, so ADR-007 stands unchanged for everything else. Containment is part of the decision, not an implementation detail:
@@ -200,6 +202,8 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Consequences:** an unofficial API can change or rate-limit without notice — a failure surfaces as `PriceFetchResult.Error`, the `SyncRun` turns Partial/Failed and quotes go stale (Reporting already flags a quote older than 7 days); swapping the provider again is one `IPriceSource` (plus the search source of ADR-030). ADR-018's "every Stock/Etf ticker is Unreachable" constraint no longer holds.
 
 ## ADR-030 ✅ Instrument search may query the provider in the request path — a second narrow exception to ADR-007
+
+Narrowed by ADR-045 (the FX rate lookup is a third request-path exception).
 
 **Shipped:** 2026-10-08 (spec `instrument-search`, #199).
 
@@ -313,3 +317,9 @@ Contract-versioning clause ("additive versioning, breaking = `V2`") suspended by
 **Context:** the user holds Bank accounts whose money is not part of their wealth (a business or shared account) but still wants to track the balance, transfers and income on it. Reporting values every position it replicates.
 **Decision:** `Account.OutsideNetWorth` (Bank accounts only, default false) is set on create and update; setting it clears the money asset's group, since the account then belongs to no asset group. The flag rides on the money asset's `AssetPositionChanged` (`required bool OutsideNetWorth`, true only for the money asset of a flagged Bank account), republished whenever the flag or the group changes, so Reporting needs no Portfolio call (ADR-021, as ADR-040 does for the group). Portfolio reads value a flagged account in PLN (`AccountResponse.CashBalancePln`) at the latest rate from `POST /internal/fx/latest-batch`, failing soft to null (ADR-036). Reporting ignores the field until its own part stops counting flagged positions.
 **Consequences:** a flag on a Brokerage, Bonds or cash-place balance is rejected (`Validation.OutsideNetWorthNotAllowed`); turning the flag off does not restore the previous group. Amends ADR-040.
+
+## ADR-045 🕐 The FX rate lookup reads through to NBP for a date older than the currency's coverage — a third narrow exception to ADR-007
+
+**Context:** `FxHistoryBackfillJob` fills a currency's rate history back to the oldest transaction, but it starts from the position event of that transaction. A foreign-currency transaction dated before the stored history is rejected by Portfolio's lookup (`Validation.FxRateMissing`) before any event exists, so nothing could ask for more history.
+**Decision:** `GET /internal/fx/{currency}/rate` may call `IFxRateSource.FetchHistoryAsync` synchronously when no stored rate exists on or before the date and the currency's `HistoryCoveredFrom` is null or later than the date. It asks NBP for `[date − 14 days, date]` and returns the last rate on or before the date. Containment as in ADR-018: an architecture test limits `IFxRateSource` in `Features` to the `GetFxRate` slice, one attempt, 5 s timeout, no retry, and the fetched rate is never stored — the position event's backfill persists the history. NBP no data stays 404 `NotFound.FxRate`; an NBP error or timeout is 503 `ServiceUnavailable.FxRate`, which Portfolio already maps to `MarketDataUnavailable`. A date inside coverage with no row stays a plain 404 with no source call.
+**Consequences:** a foreign transaction of any age can be recorded when NBP answers; while NBP is down such a write fails with 503 instead of being silently rejected. Narrows ADR-007, ADR-018 and ADR-030.
