@@ -177,14 +177,33 @@ internal static class MarketDataApi
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public static async Task SeedCurrencyCatalogAsync(this MarketDataDbContext db, CancellationToken cancellationToken)
+    public static async Task SeedCurrencyCatalogAsync(
+        this MarketDataDbContext db, CancellationToken cancellationToken, DateOnly? historyCoveredFrom = null)
     {
         db.Currencies.AddRange(
             new Currency { Code = "PLN", Name = "Polish Zloty", Symbol = "zl", DecimalPlaces = 2, DisplayOrder = 0 },
-            new Currency { Code = "EUR", Name = "Euro", Symbol = "EUR", DecimalPlaces = 2, DisplayOrder = 1 },
-            new Currency { Code = "USD", Name = "US Dollar", Symbol = "$", DecimalPlaces = 2, DisplayOrder = 2 },
-            new Currency { Code = "GBP", Name = "British Pound", Symbol = "GBP", DecimalPlaces = 2, DisplayOrder = 3 },
-            new Currency { Code = "CHF", Name = "Swiss Franc", Symbol = "CHF", DecimalPlaces = 2, DisplayOrder = 4 });
+            new Currency { Code = "EUR", Name = "Euro", Symbol = "EUR", DecimalPlaces = 2, DisplayOrder = 1, HistoryCoveredFrom = historyCoveredFrom },
+            new Currency { Code = "USD", Name = "US Dollar", Symbol = "$", DecimalPlaces = 2, DisplayOrder = 2, HistoryCoveredFrom = historyCoveredFrom },
+            new Currency { Code = "GBP", Name = "British Pound", Symbol = "GBP", DecimalPlaces = 2, DisplayOrder = 3, HistoryCoveredFrom = historyCoveredFrom },
+            new Currency { Code = "CHF", Name = "Swiss Franc", Symbol = "CHF", DecimalPlaces = 2, DisplayOrder = 4, HistoryCoveredFrom = historyCoveredFrom });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public static async Task SeedAssetLinkAsync(
+        this MarketDataDbContext db,
+        DateOnly? firstTransactionDate,
+        CancellationToken cancellationToken,
+        Guid? instrumentId = null,
+        bool isRemoved = false)
+    {
+        db.AssetInstrumentLinks.Add(new AssetInstrumentLink
+        {
+            AssetId = Guid.NewGuid(),
+            InstrumentId = instrumentId,
+            FirstTransactionDate = firstTransactionDate,
+            Version = 1,
+            IsRemoved = isRemoved,
+        });
         await db.SaveChangesAsync(cancellationToken);
     }
 }

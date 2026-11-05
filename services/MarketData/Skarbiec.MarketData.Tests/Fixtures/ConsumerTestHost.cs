@@ -94,6 +94,10 @@ public static class ConsumerTestHost
         services.AddSingleton<IHistoryBackfillTrigger>(fakeTrigger);
         trigger = fakeTrigger;
 
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<FakeFxHistoryBackfillTrigger>();
+        services.AddSingleton<IFxHistoryBackfillTrigger>(sp => sp.GetRequiredService<FakeFxHistoryBackfillTrigger>());
+
         services.AddDbContext<MarketDataDbContext>(options => options.UseNpgsql(containers.PostgresConnectionString));
 
         services.AddMassTransit(x =>

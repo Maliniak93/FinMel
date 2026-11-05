@@ -47,7 +47,7 @@ public static class QuoteUpsert
     }
 
     public static async Task<HashSet<string>> UpsertFxRatesAsync(
-        MarketDataDbContext db, IReadOnlyList<FxRateQuote> rates, CancellationToken cancellationToken)
+        MarketDataDbContext db, IReadOnlyList<FxRateQuote> rates, CancellationToken cancellationToken, bool save = true)
     {
         if (rates.Count == 0)
         {
@@ -78,7 +78,11 @@ public static class QuoteUpsert
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        if (save)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         return pairs;
     }
 }

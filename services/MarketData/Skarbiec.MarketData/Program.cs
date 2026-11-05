@@ -55,12 +55,14 @@ if (!OpenApiBuildTime.IsActive)
     // After AddPriceSyncJob: it reuses that call's scheduler.
     builder.AddFxSyncJob();
     builder.AddHistoryBackfillJob();
+    builder.AddFxHistoryBackfillJob();
     builder.AddBondCatalogSyncJob();
     builder.AddStartupSync();
     builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing
         .AddSource(PriceSyncJob.ActivitySourceName)
         .AddSource(FxSyncJob.ActivitySourceName)
         .AddSource(HistoryBackfillJob.ActivitySourceName)
+        .AddSource(FxHistoryBackfillJob.ActivitySourceName)
         .AddSource(BondCatalogSyncJob.ActivitySourceName));
 }
 

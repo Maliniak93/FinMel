@@ -166,8 +166,9 @@ writes the reproduction steps.
 - Prices sync on a 2-minute cron. After a holding is added, the sync button on Settings pulls its price at once instead of
   waiting for the cron.
 - The bond catalog fills at startup when it is empty, so bond series exist right after `up`.
-- FX history covers 365 days. A transaction dated earlier has no rate; a stock or ETF Buy/Sell then fails with
-  `Validation.FxRateMissing`.
+- FX history reaches the oldest live transaction minus 14 days (at least 365 days back), filled in the background
+  after startup and after a position change. A transaction dated before that has no rate; a stock or ETF Buy/Sell then
+  fails with `Validation.FxRateMissing`.
 
 ## Definition of Done
 

@@ -19,6 +19,8 @@ public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
 
     public FakeHistoryBackfillTrigger BackfillTrigger { get; } = new();
 
+    public FakeFxHistoryBackfillTrigger FxBackfillTrigger { get; } = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
@@ -28,6 +30,7 @@ public sealed class MarketDataApiFactory(SkarbiecContainersFixture containers)
             services.AddSingleton<ITickerVerifier>(TickerVerifier);
             services.AddSingleton<IInstrumentSearchSource>(InstrumentSearch);
             services.AddSingleton<IHistoryBackfillTrigger>(BackfillTrigger);
+            services.AddSingleton<IFxHistoryBackfillTrigger>(FxBackfillTrigger);
         });
     }
 }
