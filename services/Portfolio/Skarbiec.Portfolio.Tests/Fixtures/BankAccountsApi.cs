@@ -60,7 +60,8 @@ internal static class BankAccountsApi
         string? bankName = "mBank",
         decimal annualInterestRatePercent = 0m,
         TaxWrapper wrapper = TaxWrapper.Regular,
-        Guid? groupId = null) => new
+        Guid? groupId = null,
+        bool outsideNetWorth = false) => new
         {
             name,
             type = (int)AccountType.Bank,
@@ -69,7 +70,8 @@ internal static class BankAccountsApi
             variant = VariantValue(variant),
             bankName,
             annualInterestRatePercent,
-            groupId
+            groupId,
+            outsideNetWorth
         };
 
     public static object NewUpdateBankBody(
@@ -77,13 +79,15 @@ internal static class BankAccountsApi
         string variant = SavingsVariant,
         string? bankName = "Nest Bank",
         decimal annualInterestRatePercent = 4m,
-        Guid? groupId = null) => new
+        Guid? groupId = null,
+        bool outsideNetWorth = false) => new
         {
             name,
             variant = VariantValue(variant),
             bankName,
             annualInterestRatePercent,
-            groupId
+            groupId,
+            outsideNetWorth
         };
 
     public static object NewSettleInterestBody(DateOnly periodEnd, decimal grossInterest, decimal tax) =>
@@ -99,11 +103,12 @@ internal static class BankAccountsApi
         string currency = "PLN",
         decimal annualInterestRatePercent = 0m,
         decimal balance = 0m,
-        DateOnly? depositedOn = null)
+        DateOnly? depositedOn = null,
+        bool outsideNetWorth = false)
     {
         var response = await client.PostAsJsonAsync(
             AccountsUri,
-            NewBankAccountBody(name, variant, currency, name, annualInterestRatePercent),
+            NewBankAccountBody(name, variant, currency, name, annualInterestRatePercent, outsideNetWorth: outsideNetWorth),
             cancellationToken);
         response.EnsureSuccessStatusCode();
         var created = await response.ReadJsonAsync(cancellationToken);

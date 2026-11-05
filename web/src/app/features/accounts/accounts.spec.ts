@@ -36,6 +36,7 @@ const brokerage: AccountResponse = {
   isArchived: false,
   cashAssetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1',
   cashBalance: 2000,
+  outsideNetWorth: false,
 };
 
 const bonds: AccountResponse = {
@@ -47,6 +48,7 @@ const bonds: AccountResponse = {
   isArchived: false,
   cashAssetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2',
   cashBalance: 0,
+  outsideNetWorth: false,
 };
 
 const archived: AccountResponse = {
@@ -58,6 +60,7 @@ const archived: AccountResponse = {
   isArchived: true,
   cashAssetId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3',
   cashBalance: 0,
+  outsideNetWorth: false,
 };
 
 const emptyDashboard: DashboardResponse = {

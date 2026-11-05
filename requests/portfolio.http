@@ -127,7 +127,8 @@ Content-Type: application/json
   "currency": "PLN",
   "variant": 0,
   "bankName": "mBank",
-  "annualInterestRatePercent": 0
+  "annualInterestRatePercent": 0,
+  "outsideNetWorth": false
 }
 
 ### Create a savings Bank account
@@ -150,7 +151,7 @@ Content-Type: application/json
 GET {{baseUrl}}/api/portfolio/accounts?type=Bank
 Authorization: Bearer {{authToken}}
 
-### Change a Bank account's variant, bank and rate (the rate applies from the next unsettled month)
+### Change a Bank account's variant, bank and rate (the rate applies from the next unsettled month); outsideNetWorth true keeps the balance out of net worth and clears the group (400 Validation.OutsideNetWorthNotAllowed on a non-Bank account)
 PUT {{baseUrl}}/api/portfolio/accounts/{{createNestAccount.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -159,7 +160,8 @@ Content-Type: application/json
   "name": "Nest Oszczednosciowe",
   "variant": 1,
   "bankName": "Nest Bank",
-  "annualInterestRatePercent": 4
+  "annualInterestRatePercent": 4,
+  "outsideNetWorth": true
 }
 
 ### Deposit into the savings Bank account (its money is the cashAssetId of the account)

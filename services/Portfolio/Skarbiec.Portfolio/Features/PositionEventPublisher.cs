@@ -81,9 +81,31 @@ public sealed class PositionEventPublisher(
             ClassHistory = classHistory,
             IsArchived = asset.IsArchived,
             GroupId = asset.GroupId,
+            OutsideNetWorth = await IsOutsideNetWorthAsync(asset, cancellationToken),
             Version = asset.Version,
             OccurredAtUtc = timeProvider.GetUtcNow()
         }, cancellationToken);
+    }
+
+    // Local first, like AccountTypeAsync: the flag may be staged but not saved yet.
+    private async Task<bool> IsOutsideNetWorthAsync(Asset asset, CancellationToken cancellationToken)
+    {
+        if (asset.AccountId is not { } accountId || asset.AssetClass != AssetClass.BankAccount)
+        {
+            return false;
+        }
+
+        var local = dbContext.Accounts.Local.FirstOrDefault(a => a.Id == accountId);
+        if (local is not null)
+        {
+            return local.OutsideNetWorth;
+        }
+
+        return await dbContext.Accounts
+            .AsNoTracking()
+            .Where(a => a.Id == accountId)
+            .Select(a => a.OutsideNetWorth)
+            .FirstAsync(cancellationToken);
     }
 
     private async Task<(AssetClass AssetClass, IReadOnlyList<ClassPoint> ClassHistory)> EffectiveClassAsync(

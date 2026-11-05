@@ -23,6 +23,7 @@ function account(id: string, name: string, currency: string, isArchived = false)
     isArchived,
     cashAssetId: `cash-${id}`,
     cashBalance: 0,
+    outsideNetWorth: false,
   };
 }
 

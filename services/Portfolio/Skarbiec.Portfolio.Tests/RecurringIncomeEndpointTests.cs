@@ -80,6 +80,21 @@ public sealed class RecurringIncomeEndpointTests(SkarbiecContainersFixture conta
     }
 
     [Fact]
+    public async Task AcceptsOutsideNetWorthAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "Poza majatkiem", outsideNetWorth: true);
+        Assert.True((await client.GetAccountJsonAsync(account.AccountId, cancellationToken)).GetProperty("outsideNetWorth").GetBoolean());
+
+        var response = await client.PostAsJsonAsync(
+            RecurringIncomesUri, NewRecurringIncomeBody(account.AccountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
     public async Task ArchivedAccount_RejectedOnCreate_StillCountedAfterwards()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

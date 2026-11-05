@@ -179,6 +179,14 @@ internal static class PortfolioAssertions
             $"Expected a validation error keyed '{field}', got: {string.Join(", ", problem.Errors.Keys)}.");
     }
 
+    public static async Task AssertValidationFailureAsync(this HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var body = await response.ReadJsonAsync(cancellationToken);
+        Assert.StartsWith("Validation.", body.GetProperty("errorCode").GetString());
+    }
+
     public const string InvalidTransferCounterpartErrorCode = "Validation.InvalidTransferCounterpart";
 
     public const string InsufficientFundsErrorCode = "Validation.InsufficientFunds";

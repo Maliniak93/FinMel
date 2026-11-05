@@ -214,4 +214,39 @@ public sealed class CreateAccountEndpointTests(SkarbiecContainersFixture contain
         await ikeBank.AssertProblemAsync(HttpStatusCode.BadRequest, WrapperNotAllowedErrorCode, cancellationToken);
         await usdBrokerage.AssertProblemAsync(HttpStatusCode.BadRequest, BankFieldsNotAllowedErrorCode, cancellationToken);
     }
+
+    [Fact]
+    public async Task OutsideNetWorth_ClearsGroup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            AccountsUri, NewBankAccountBody("mBank", groupId: group.Id, outsideNetWorth: true), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.ReadJsonAsync(cancellationToken);
+        Assert.True(body.GetProperty("outsideNetWorth").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("groupId").ValueKind);
+        var moneyId = body.GetProperty("cashAssetId").GetGuid();
+        Assert.Null((await ReadAssetGroupStatesAsync(userId, cancellationToken, moneyId))[moneyId].GroupId);
+    }
+
+    [Fact]
+    public async Task OutsideNetWorth_OnNonBank_Returns422()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.PostAsJsonAsync(
+            AccountsUri,
+            new { name = "XTB", type = (int)AccountType.Brokerage, wrapper = (int)TaxWrapper.Regular, outsideNetWorth = true },
+            cancellationToken);
+
+        await response.AssertValidationFailureAsync(cancellationToken);
+        var accounts = await client.GetFromJsonAsync<List<AccountResponse>>(AccountsUri, cancellationToken);
+        Assert.Empty(accounts!);
+    }
 }

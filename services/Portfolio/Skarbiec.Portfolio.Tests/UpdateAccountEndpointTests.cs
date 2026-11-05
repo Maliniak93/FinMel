@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
@@ -115,5 +116,51 @@ public sealed class UpdateAccountEndpointTests(SkarbiecContainersFixture contain
         var archive = await client.PostAsync(ArchiveAccountUri(mBank.AccountId), content: null, cancellationToken);
 
         await archive.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.AccountNotEmptyErrorCode, cancellationToken);
+    }
+
+    [Fact]
+    public async Task OutsideNetWorth_OnNonBank_Returns422()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await client.CreateAccountAsync(cancellationToken, "Obligacje", AccountType.Bonds);
+
+        var response = await client.PutAsJsonAsync(
+            AccountUri(accountId), new { name = "Obligacje", outsideNetWorth = true }, cancellationToken);
+
+        await response.AssertValidationFailureAsync(cancellationToken);
+        var account = await client.GetAccountJsonAsync(accountId, cancellationToken);
+        Assert.False(account.GetProperty("outsideNetWorth").GetBoolean());
+    }
+
+    [Fact]
+    public async Task OutsideNetWorth_On_ClearsGroup_Off_KeepsNone()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var group = await client.CreateAssetGroupAsync(cancellationToken);
+        var created = await client.PostAsJsonAsync(AccountsUri, NewBankAccountBody("mBank", groupId: group.Id), cancellationToken);
+        var body = await created.ReadJsonAsync(cancellationToken);
+        var accountId = body.GetProperty("id").GetGuid();
+        var moneyId = body.GetProperty("cashAssetId").GetGuid();
+
+        var flagged = await client.PutAsJsonAsync(
+            AccountUri(accountId), NewUpdateBankBody("mBank", groupId: group.Id, outsideNetWorth: true), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, flagged.StatusCode);
+        var flaggedBody = await flagged.ReadJsonAsync(cancellationToken);
+        Assert.True(flaggedBody.GetProperty("outsideNetWorth").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, flaggedBody.GetProperty("groupId").ValueKind);
+        Assert.Null((await ReadAssetGroupStatesAsync(userId, cancellationToken, moneyId))[moneyId].GroupId);
+
+        var unflagged = await client.PutAsJsonAsync(
+            AccountUri(accountId), NewUpdateBankBody("mBank", outsideNetWorth: false), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, unflagged.StatusCode);
+        var unflaggedBody = await unflagged.ReadJsonAsync(cancellationToken);
+        Assert.False(unflaggedBody.GetProperty("outsideNetWorth").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, unflaggedBody.GetProperty("groupId").ValueKind);
+        Assert.Null((await ReadAssetGroupStatesAsync(userId, cancellationToken, moneyId))[moneyId].GroupId);
     }
 }

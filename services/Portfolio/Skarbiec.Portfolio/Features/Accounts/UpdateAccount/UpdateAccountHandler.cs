@@ -31,6 +31,11 @@ public sealed class UpdateAccountHandler(
             return AccountErrors.BankFieldsNotAllowed;
         }
 
+        if (request.OutsideNetWorth && account.Type != AccountType.Bank)
+        {
+            return AccountErrors.OutsideNetWorthNotAllowed;
+        }
+
         if (!string.Equals(account.Name, request.Name, StringComparison.Ordinal))
         {
             var nameTaken = await dbContext.Accounts
@@ -58,10 +63,15 @@ public sealed class UpdateAccountHandler(
         {
             account.DefaultGroupId = request.GroupId;
         }
-        else if (cash.GroupId != request.GroupId)
+        else
         {
-            cash.GroupId = request.GroupId;
-            await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
+            var groupId = request.OutsideNetWorth ? null : request.GroupId;
+            if (cash.GroupId != groupId || account.OutsideNetWorth != request.OutsideNetWorth)
+            {
+                cash.GroupId = groupId;
+                account.OutsideNetWorth = request.OutsideNetWorth;
+                await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
+            }
         }
 
         if (terms is not null)

@@ -185,7 +185,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         decimal annualInterestRatePercent,
         CancellationToken cancellationToken,
         decimal balance = 0m,
-        Guid? groupId = null)
+        Guid? groupId = null,
+        bool outsideNetWorth = false)
     {
         var created = await services.GetRequiredService<CreateAccountHandler>().HandleAsync(
             new CreateAccountRequest
@@ -197,7 +198,8 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
                 Variant = BankVariant.Savings,
                 BankName = name,
                 AnnualInterestRatePercent = annualInterestRatePercent,
-                GroupId = groupId
+                GroupId = groupId,
+                OutsideNetWorth = outsideNetWorth
             },
             cancellationToken);
         Assert.True(created.IsSuccess, created.IsFailure ? created.Error.Code : null);

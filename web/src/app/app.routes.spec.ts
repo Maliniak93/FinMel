@@ -85,6 +85,7 @@ describe('app routing (authenticated)', () => {
             isArchived: false,
             cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
             cashBalance: 0,
+            outsideNetWorth: false,
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),

@@ -50,6 +50,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             account.Property(a => a.Type).HasConversion<string>().HasMaxLength(20);
             account.Property(a => a.Wrapper).HasConversion<string>().HasMaxLength(20);
             account.Property(a => a.Currency).HasMaxLength(3);
+            account.Property(a => a.OutsideNetWorth).HasDefaultValue(false);
 
             // Case-sensitive exact match on Postgres's default collation; the client trims before submit.
             account.HasIndex(a => new { a.UserId, a.Name }).IsUnique();

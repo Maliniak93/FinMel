@@ -255,6 +255,7 @@ public sealed class HistoryChangePropertyTests
             QuantityHistory = [.. history.Select(p => new QuantityPoint { Date = p.Date, Quantity = p.Quantity })],
             ClassHistory = [.. (classHistory ?? []).Select(p => new ClassPoint { Date = p.Date, AssetClass = p.AssetClass })],
             IsArchived = isArchived,
+            OutsideNetWorth = false,
             Version = 1,
             OccurredAtUtc = occurredAt ?? DateTimeOffset.UtcNow,
         };

@@ -29,4 +29,7 @@ public sealed record CreateAccountRequest
     /// <summary>A Bank account's yearly rate in percent, 0 when omitted.</summary>
     [Range(typeof(decimal), "0", "100")]
     public decimal? AnnualInterestRatePercent { get; init; }
+
+    /// <summary>Bank accounts only: keeps the balance out of net worth and clears the group.</summary>
+    public bool OutsideNetWorth { get; init; }
 }

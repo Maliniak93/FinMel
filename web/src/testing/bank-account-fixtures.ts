@@ -30,6 +30,7 @@ export function bankAccountResponse(
     isArchived: false,
     cashAssetId: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1',
     cashBalance: 10000,
+    outsideNetWorth: false,
     bank: bankTerms(bank),
     ...rest,
   };

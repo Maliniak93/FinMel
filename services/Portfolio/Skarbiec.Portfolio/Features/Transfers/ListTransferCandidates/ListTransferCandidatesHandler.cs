@@ -37,7 +37,8 @@ public sealed class ListTransferCandidatesHandler(PortfolioDbContext dbContext)
             {
                 AssetId = a.Id,
                 Name = a.Name,
-                Balance = a.Quantity
+                Balance = a.Quantity,
+                OutsideNetWorth = dbContext.Accounts.Any(account => account.Id == a.AccountId && account.OutsideNetWorth)
             })
             .ToListAsync(cancellationToken);
 

@@ -72,6 +72,7 @@ public sealed class ClassHistoryTenancyTests(SkarbiecContainersFixture container
                         ],
                         QuantityHistory = [.. history.Select(p => new QuantityPoint { Date = p.Item1, Quantity = p.Item2 })],
                         IsArchived = false,
+                        OutsideNetWorth = false,
                         Version = 1,
                         OccurredAtUtc = DateTimeOffset.UtcNow,
                     },

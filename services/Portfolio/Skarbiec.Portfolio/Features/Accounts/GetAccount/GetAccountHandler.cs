@@ -3,10 +3,12 @@ using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts.BankInterest;
 using Skarbiec.Portfolio.Features.Deposits;
+using Skarbiec.Portfolio.MarketData;
 
 namespace Skarbiec.Portfolio.Features.Accounts.GetAccount;
 
-public sealed class GetAccountHandler(PortfolioDbContext dbContext, TimeProvider timeProvider)
+public sealed class GetAccountHandler(
+    PortfolioDbContext dbContext, IInstrumentQuoteLookupClient quoteLookup, TimeProvider timeProvider)
 {
     public async Task<Result<AccountResponse>> HandleAsync(Guid id, int? year, CancellationToken cancellationToken)
     {
@@ -26,8 +28,12 @@ public sealed class GetAccountHandler(PortfolioDbContext dbContext, TimeProvider
         var bank = await dbContext.LoadBankInterestAsync(
             [account], money, WarsawCalendar.Today(timeProvider), cancellationToken);
 
+        var pln = await AccountOutsideNetWorthValuation.ValueAsync(
+            quoteLookup, timeProvider, [(account, cash)], cancellationToken);
+
         return account.ToResponse(cash) with
         {
+            CashBalancePln = pln.GetValueOrDefault(id),
             Contribution = contributions.GetValueOrDefault(id),
             Bank = bank.GetValueOrDefault(id)?.ToResponse()
         };

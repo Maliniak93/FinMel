@@ -60,6 +60,7 @@ const account: AccountResponse = {
   isArchived: false,
   cashAssetId: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
   cashBalance: 0,
+  outsideNetWorth: false,
 };
 
 const transaction: TransactionResponse = {

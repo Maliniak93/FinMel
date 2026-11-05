@@ -17,6 +17,7 @@
     { "date": "2025-01-10", "assetClass": 2 }
   ],
   "isArchived": true,
+  "outsideNetWorth": true,
   "version": 3,
   "occurredAtUtc": "2026-01-15T10:00:00+00:00",
   "correlationId": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",

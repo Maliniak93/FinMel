@@ -5,4 +5,5 @@ public sealed record TransferCandidateResponse
     public required Guid AssetId { get; init; }
     public required string Name { get; init; }
     public required decimal Balance { get; init; }
+    public bool OutsideNetWorth { get; init; }
 }

@@ -68,6 +68,23 @@ public sealed class AccountTenancyIsolationTests(SkarbiecContainersFixture conta
     }
 
     [Fact]
+    public async Task OutsideNetWorthAccount_IsolatedFromOtherUser()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await owner.CreateBankAccountAsync(cancellationToken, "Poza majatkiem", outsideNetWorth: true);
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var read = await stranger.GetAsync(AccountUri(account.AccountId), cancellationToken);
+        var update = await stranger.PutAsJsonAsync(
+            AccountUri(account.AccountId), NewUpdateBankBody("Poza majatkiem", outsideNetWorth: false), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, read.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
+        Assert.True((await owner.GetAccountJsonAsync(account.AccountId, cancellationToken)).GetProperty("outsideNetWorth").GetBoolean());
+    }
+
+    [Fact]
     public async Task Put_ByStranger_LeavesNameUnchanged()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

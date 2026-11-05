@@ -14,6 +14,8 @@ export type AccountResponse = {
     cashAssetId: string;
     groupId?: null | string;
     cashBalance: number | string;
+    outsideNetWorth?: boolean;
+    cashBalancePln?: null | number | string;
     contribution?: null | ContributionResponse;
     bank?: null | BankTermsResponse;
 };
@@ -333,6 +335,7 @@ export type CreateAccountRequest = {
     variant?: null | BankVariant;
     bankName?: null | string;
     annualInterestRatePercent?: null | number | string;
+    outsideNetWorth?: boolean;
 };
 
 export type CreateAssetGroupRequest = {
@@ -933,6 +936,7 @@ export type TransferCandidateResponse = {
     assetId: string;
     name: string;
     balance: number | string;
+    outsideNetWorth?: boolean;
 };
 
 export type TransferDirection = number;
@@ -945,6 +949,7 @@ export type UpdateAccountRequest = {
     variant?: null | BankVariant;
     bankName?: null | string;
     annualInterestRatePercent?: null | number | string;
+    outsideNetWorth?: boolean;
 };
 
 export type UpdateAssetGroupRequest = {

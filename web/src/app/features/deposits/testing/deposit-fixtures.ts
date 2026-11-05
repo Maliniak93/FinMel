@@ -13,6 +13,7 @@ export const mBankAccount: AccountResponse = bankAccountResponse({
   name: 'mBank',
   cashAssetId: 'a1a1a1a1-0000-0000-0000-000000000001',
   cashBalance: 20000,
+  outsideNetWorth: false,
   bank: { variant: 0, bankName: 'mBank', annualInterestRatePercent: 0 },
 });
 
@@ -21,6 +22,7 @@ export const nestAccount: AccountResponse = bankAccountResponse({
   name: 'Nest Oszczędnościowe',
   cashAssetId: 'b2b2b2b2-0000-0000-0000-000000000002',
   cashBalance: 0,
+  outsideNetWorth: false,
 });
 
 export const mBankUsdAccount: AccountResponse = bankAccountResponse({
@@ -29,6 +31,7 @@ export const mBankUsdAccount: AccountResponse = bankAccountResponse({
   currency: 'USD',
   cashAssetId: 'c3c3c3c3-0000-0000-0000-000000000003',
   cashBalance: 1000,
+  outsideNetWorth: false,
   bank: { variant: 0, bankName: 'mBank', annualInterestRatePercent: 0 },
 });
 
@@ -38,6 +41,7 @@ export const archivedBankAccount: AccountResponse = bankAccountResponse({
   isArchived: true,
   cashAssetId: 'd4d4d4d4-0000-0000-0000-000000000004',
   cashBalance: 0,
+  outsideNetWorth: false,
 });
 
 export const bankAccountsForDeposits: AccountResponse[] = [

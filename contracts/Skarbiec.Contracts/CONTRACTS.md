@@ -48,6 +48,8 @@ to its seeded MarketData instrument id, so changing an id orphans every stored r
    `AssetClass` is then the class today. A Bonds account's cash publishes `Bond` with no points.
    `AssetPositionChanged.GroupId` (`Guid?`, not `required`) is the user's asset group the asset belongs
    to, null for none; every publish carries it, and a payload without it deserializes it as `null`.
+   `AssetPositionChanged.OutsideNetWorth` (`bool`, `required`) is true only for the money asset of a Bank
+   account the user keeps outside net worth; every publish sets it and a change of the flag republishes the asset.
 
 `WatchlistItemAdded` and `WatchlistItemRemoved` (`WatchlistItemId, UserId, InstrumentId, OccurredAtUtc`) are
 Portfolio's facts about a user's watchlist; MarketData counts watchers from them (watchlist part 2).
