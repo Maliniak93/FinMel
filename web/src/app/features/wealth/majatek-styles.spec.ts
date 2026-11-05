@@ -79,4 +79,34 @@ describe('Majątek stylesheets', () => {
     expect(rulesFor(phone, /summary-strip__value/)).toMatch(/font-size:\s*14px/);
     expect(rulesFor(phone, /summary-strip__label/)).toMatch(/font-size:\s*10px/);
   });
+
+  it('wealth tables keep name, value and menu on a phone', () => {
+    const accounts = readStylesheet('src/app/features/accounts/accounts.scss');
+    const accountsPhone = mediaBlock(accounts, '(width < 720px)');
+    for (const column of ['type', 'wrapper', 'cash', 'securities']) {
+      expect(rulesFor(accountsPhone, new RegExp(`mat-column-${column}\\b`)), column).toMatch(
+        /display:\s*none/,
+      );
+    }
+    for (const column of ['name', 'value', 'actions']) {
+      expect(rulesFor(accountsPhone, new RegExp(`mat-column-${column}\\b`)), column).not.toMatch(
+        /display:\s*none/,
+      );
+    }
+
+    const wealthAll = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    const wealthPhone = mediaBlock(wealthAll, '(width < 720px)');
+    for (const selector of [/wealth-all__table/, /\bthead\b/, /\btbody\b/]) {
+      expect(rulesFor(wealthPhone, selector), String(selector)).toMatch(/display:\s*block/);
+    }
+    const rows = rulesFor(wealthPhone, /\btr\b|__row/);
+    expect(rows).toMatch(/display:\s*grid/);
+    expect(rows).toMatch(/grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+48px/);
+    expect(rulesFor(wealthPhone, /col--place/)).toMatch(/display:\s*none/);
+    expect(rulesFor(wealthPhone, /col--group/)).toMatch(/display:\s*none/);
+    expect(rulesFor(wealthPhone, /td\.wealth-all__col--status(?!:empty)/)).not.toMatch(
+      /display:\s*none/,
+    );
+    expect(rulesFor(wealthPhone, /thead th\.wealth-all__col--status/)).toMatch(/display:\s*none/);
+  });
 });
