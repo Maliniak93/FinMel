@@ -292,6 +292,23 @@ describe('WealthAll', () => {
     expect(bondRow.querySelector('.status-chip--warning')).toBeNull();
   });
 
+  it('marks the place, group and status cells', async () => {
+    const data = wealthApiData();
+    data.bonds = data.bonds.map((bond) => ({ ...bond, status: BOND_STATUS.InterestDue }));
+    await setup({ data });
+
+    for (const column of ['place', 'group', 'status']) {
+      expect(root().querySelector(`thead .wealth-all__col--${column}`), column).not.toBeNull();
+    }
+
+    const bondRow = row('EDO0935')!;
+    expect(bondRow.querySelector('td.wealth-all__col--place')).not.toBeNull();
+    expect(bondRow.querySelector('td.wealth-all__col--group')).not.toBeNull();
+    expect(
+      bondRow.querySelector('td.wealth-all__col--status .status-chip--negative')?.textContent,
+    ).toContain('Interest to settle');
+  });
+
   it('row links', async () => {
     await setup();
     const href = (name: string) =>

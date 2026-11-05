@@ -92,9 +92,15 @@
       <thead>
         <tr>
           <th scope="col">{{ 'wealth.column.name' | transloco }}</th>
-          <th scope="col">{{ 'wealth.column.place' | transloco }}</th>
-          <th scope="col">{{ 'wealth.column.group' | transloco }}</th>
-          <th scope="col">{{ 'wealth.column.status' | transloco }}</th>
+          <th scope="col" class="wealth-all__col--place">
+            {{ 'wealth.column.place' | transloco }}
+          </th>
+          <th scope="col" class="wealth-all__col--group">
+            {{ 'wealth.column.group' | transloco }}
+          </th>
+          <th scope="col" class="wealth-all__col--status">
+            {{ 'wealth.column.status' | transloco }}
+          </th>
           <th scope="col" class="wealth-all__num">{{ 'wealth.column.value' | transloco }}</th>
           <th scope="col"></th>
         </tr>
@@ -126,8 +132,8 @@
                   </div>
                 }
               </td>
-              <td>{{ row.accountLabel }}</td>
-              <td>
+              <td class="wealth-all__col--place">{{ row.accountLabel }}</td>
+              <td class="wealth-all__col--group">
                 @if (groupOf(row); as group) {
                   <span
                     class="wealth-all__swatch"
@@ -136,7 +142,7 @@
                   {{ group.name }}
                 }
               </td>
-              <td>
+              <td class="wealth-all__col--status">
                 @for (flag of row.flags; track flag) {
                   <app-status-chip
                     [label]="
