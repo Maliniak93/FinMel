@@ -924,6 +924,7 @@ describe('Planning', () => {
     expect(rows('day-group')).toHaveLength(1);
     const strip = rows('summary-strip');
     expect(strip).toHaveLength(1);
+    expect(element().querySelector('.planning-page__strip')).toBeNull();
     expect(strip[0].textContent).toContain(formatMoney(4321.5, 'PLN'));
     expect(strip[0].textContent).toContain(formatMoney(1234.5, 'PLN'));
   });

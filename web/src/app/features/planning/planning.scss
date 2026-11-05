@@ -207,14 +207,6 @@ h2 {
   gap: 8px;
 }
 
-.planning-page__strip {
-  overflow-x: auto;
-
-  app-summary-strip {
-    min-width: max-content;
-  }
-}
-
 .planning-page__warning {
   padding: 8px 12px;
   border-radius: var(--mat-sys-corner-small);
