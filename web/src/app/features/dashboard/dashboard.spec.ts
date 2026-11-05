@@ -162,8 +162,8 @@ describe('Dashboard', () => {
     return jsonResponse({
       range: '1Y',
       points: [
-        { date: '2026-07-01', netWorthPln: 1000 },
-        { date: '2026-08-01', netWorthPln: 1250 },
+        { date: '2026-07-01', netWorthPln: 1000, isIncomplete: false },
+        { date: '2026-08-01', netWorthPln: 1250, isIncomplete: false },
       ],
       changePln,
       changePercent,

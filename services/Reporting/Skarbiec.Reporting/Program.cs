@@ -39,6 +39,7 @@ if (!OpenApiBuildTime.IsActive)
             x.AddConsumer<AssetRemovedConsumer>(typeof(AssetRemovedConsumerDefinition));
             x.AddConsumer<HistoryRebuildConsumer>(typeof(HistoryRebuildConsumerDefinition));
             x.AddConsumer<InstrumentHistoryBackfilledConsumer>(typeof(InstrumentHistoryBackfilledConsumerDefinition));
+            x.AddConsumer<FxHistoryBackfilledConsumer>(typeof(FxHistoryBackfilledConsumerDefinition));
         });
 
     // The daily prices and FX batch and their history twins, sent to MarketData's /internal endpoints with no token.

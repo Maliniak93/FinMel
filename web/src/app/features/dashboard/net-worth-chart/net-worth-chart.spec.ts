@@ -55,14 +55,15 @@ function hoverPlot(element: HTMLElement, clientX: number): void {
 type HistoryPoints = NetWorthHistoryResponse['points'];
 
 const yearPoints: HistoryPoints = [
-  { date: '2026-06-01', netWorthPln: 10000 },
-  { date: '2026-07-01', netWorthPln: 11000 },
-  { date: '2026-08-01', netWorthPln: 10500 },
+  { date: '2026-06-01', netWorthPln: 10000, isIncomplete: false },
+  { date: '2026-07-01', netWorthPln: 11000, isIncomplete: false },
+  { date: '2026-08-01', netWorthPln: 10500, isIncomplete: false },
 ];
 
 const monthPoints: HistoryPoints = Array.from({ length: 20 }, (_, i) => ({
   date: `2026-08-${String(i + 1).padStart(2, '0')}`,
   netWorthPln: 10000 + i * 100,
+  isIncomplete: false,
 }));
 
 describe('NetWorthChart', () => {
@@ -197,7 +198,7 @@ describe('NetWorthChart', () => {
   });
 
   it('not enough history', async () => {
-    const element = await setup([{ date: '2026-08-01', netWorthPln: 10000 }]);
+    const element = await setup([{ date: '2026-08-01', netWorthPln: 10000, isIncomplete: false }]);
 
     expect(textOf(element.querySelector('.net-worth-chart__empty'))).toBe(
       'Not enough history to chart yet.',
@@ -284,7 +285,11 @@ describe('NetWorthChart', () => {
   });
 
   it('shows not enough history', async () => {
-    const element = await setup([{ date: '2026-08-01', netWorthPln: 10000 }], '1Y', CLASSES);
+    const element = await setup(
+      [{ date: '2026-08-01', netWorthPln: 10000, isIncomplete: false }],
+      '1Y',
+      CLASSES,
+    );
 
     expect(textOf(element.querySelector('.net-worth-chart__empty'))).toBe(
       'Not enough history to chart yet.',

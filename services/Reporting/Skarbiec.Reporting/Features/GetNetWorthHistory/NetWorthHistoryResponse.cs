@@ -17,4 +17,7 @@ public sealed record NetWorthHistoryPoint
 {
     public required DateOnly Date { get; init; }
     public required decimal NetWorthPln { get; init; }
+
+    /// <summary>True when a line in scope has no price or rate for the day, so the total leaves it out.</summary>
+    public required bool IsIncomplete { get; init; }
 }

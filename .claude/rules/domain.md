@@ -28,7 +28,7 @@ The default is a starting point the user may override; the mode, not the class, 
 
 ## Valuation algorithm
 
-Use the **last known** price and FX rate at or before the snapshot date (weekends, holidays, gaps). Mark the line `IsStale` when the price or rate used is more than 7 days older than the snapshot date. Missing data never zeroes a position — it produces a stale line.
+Use the **last known** price and FX rate at or before the snapshot date (weekends, holidays, gaps). Mark the line `IsStale` when the price or rate used is more than 7 days older than the snapshot date. A missing price or rate produces a zero-valued stale line, so the total is partial; history marks such a day `IsIncomplete` (derived: a line that is `IsStale`, worth 0 and has `Quantity > 0`), unlike a line carried from an old price, which keeps its value.
 
 ## Currencies
 
