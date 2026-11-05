@@ -1,7 +1,7 @@
 export const meta = {
   name: 'build-feature',
   description: 'Spec to a verified, reviewed change and the exact ship command: failing tests, implementation, verification, adversarial review',
-  whenToUse: 'Invoked by /build and /fix after `gh-project.mjs prepare` cut the issue branch (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
+  whenToUse: 'Invoked by /build after `gh-project.mjs prepare` cut the issue branch, and by /fix ci:#<n> on the PR branch (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
   phases: [
     { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; haiku/high on tier 1, sonnet/medium on tier 2 (skippable; skipped for an Area whose profile has no test-writer: Scripts, Claude, Docs, CI/Infra, E2E - the implementer then writes the missing tests itself)' },
     { title: 'Implement', detail: 'implementer reads the playbooks of the Area profile first, does the work and runs scripts/verify.mjs itself (scoped by the changed files, `--all` on the last non-e2e part of an epic) with up to 3 fixes; sonnet/medium on tier 1, haiku/high on a tier-1 skip-tests cleanup, sonnet/high on tier 2; a red result escalates once to opus (medium on tier 1, high on tier 2), a second red blocks the run' },

@@ -8,7 +8,7 @@ Specs are GitHub issues on the FinMel project, not files (see `workflow.md` → 
 
 1. **`/design <idea>`** — interview, drafts the spec and, after your approval, publishes it as an issue at Status Todo.
 2. **`/build #<issue> [--tier 1|2]`** — moves the card to In progress, runs Tests → Implement → Verify → Review → Ship: commits the change on the issue's branch, pushes and opens the PR, then comments the run report with the PR link on the issue. **The merge is yours** — no agent merges.
-3. **`/fix <bug>`** — reproduces the bug, finds the root cause, publishes a fix issue with a reproduction test as its acceptance criterion, and after your approval runs the same pipeline as `/build`.
+3. **`/fix <bug>`** — reproduces the bug, finds the root cause, publishes a fix issue with a reproduction test as its acceptance criterion, and after your approval publishes it at P0 for `scripts/autobuild.mjs` to build.
 4. **`/board`** — what is in progress, what to build next, cards that disagree with git.
 5. **`/check`** — quick repo-wide verification (`node scripts/verify.mjs`) with a five-line summary.
 6. **`/ops <task>`** — CI, dependabot, runner, branch cleanup.

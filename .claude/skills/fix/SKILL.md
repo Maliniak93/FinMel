@@ -1,14 +1,14 @@
 ---
 name: fix
-description: Reproduce a bug, find its root cause, publish a one-criterion fix spec as an issue on the FinMel GitHub project, and (after approval) build it with the same pipeline that ships features. Never patches without a failing reproduction.
+description: Reproduce a bug, find its root cause, and publish a one-criterion fix spec as an issue on the FinMel GitHub project at P0, where scripts/autobuild.mjs builds it. Never patches without a failing reproduction.
 argument-hint: "<bug description, failing test name, verify failure, log path, or idea:<slug>>"
 disable-model-invocation: true
 model: claude-opus-5-5
 effort: high
 ---
 
-Turn the bug in `$ARGUMENTS` into a verified fix. You diagnose and specify; the pipeline implements,
-so the author of the fix is never its reviewer.
+Turn the bug in `$ARGUMENTS` into a published fix issue. You diagnose and specify; `scripts/autobuild.mjs`
+builds it through the same pipeline that ships features, so the author of the fix is never its reviewer.
 
 `$ARGUMENTS` = `idea:<slug>` → `node scripts/idea.mjs show <slug>` is the bug report (shaped by `/idea`):
 start the reproduction from its "Kroki reprodukcji"; its "Hipotezy" are unverified; its "Powiązane"
@@ -97,15 +97,15 @@ the umbrella is titled `Fix: <symptom>` and published with `--epic --kind fix`; 
 test that fails today**, reproducing the defect of its own layer, plus the `verify.mjs` AC for its projects.
 A part whose reproduction only goes green once a later part merges is a wrong cut — re-cut it.
 
-## 4. Approve, publish, build
+## 4. Approve and publish
 
 Run `node scripts/gh-project.mjs check --body-file <scratchpad>/fix-<slug>.md` and fix what it lists.
 Then present at most 10 lines: symptom, root cause + evidence, fix approach, tier, the AC-1 test name — for a
-split, one line per part (title, tier, AC-1 test) instead of the last three. Add `Obszar: <Area>` (one per part for a split, none for the umbrella); the user may change it. Add one line `Priorytet: P1 — <powód> → <output of node scripts/gh-project.mjs priority --where P1 --body-file <scratchpad>/fix-<slug>.md>` (P0 when the feature does not work at all; for a split the umbrella's, parts none; the user may change it). Ask for approval; iterate on the draft until the user says yes. Only after an explicit yes:
+split, one line per part (title, tier, AC-1 test) instead of the last three. Add `Obszar: <Area>` (one per part for a split, none for the umbrella); the user may change it. Add one line `Priorytet: P0 → <output of node scripts/gh-project.mjs priority --where P0 --body-file <scratchpad>/fix-<slug>.md>` (a fix always starts at P0; for a split the umbrella's, parts none; the user lowers it later with `/prio #<n> <P>`). Ask for approval; iterate on the draft until the user says yes. Only after an explicit yes:
 
 ```
 node scripts/gh-project.mjs create --title "Fix: <symptom>" --body-file <scratchpad>/fix-<slug>.md \
-  --slug <slug> --tier <1|2> --kind fix --area <area> --priority <P0|P1>
+  --slug <slug> --tier <1|2> --kind fix --area <area> --priority P0
 ```
 
 It prints `{"number","url","branch"}` — the branch is `fix/<slug>`. It reads the card back and rewrites a missing field once;
@@ -113,8 +113,9 @@ if a Branch or Tier is still missing it exits non-zero with the ready `node scri
 commands (a missing Area or Priority is only a warning) — run those instead of creating a duplicate. For a split: the umbrella first (`--epic`), then each part in build order
 with `--parent <umbrella number>` and its own `--area` (no `--priority`); the umbrella takes `--priority` and no `--area`.
 
-Then build it — for a split, the **first part only**; each next part is `/build #<n>` for the user once the
-previous one has merged. Build it exactly as `/build` steps 1–5 do and report as `/build` does.
+Then build nothing: `/fix` ends here. The last line of your final message is
+`Zgłoszenie #<n> w kolejce (P0). Uruchom node scripts/autobuild.mjs` — for a split, the umbrella's `<n>`; its parts
+are built by autobuild in order, none by `/fix`.
 
 ## Unattended e2e repair (`e2e:#<n>`)
 
