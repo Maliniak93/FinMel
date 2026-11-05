@@ -22,7 +22,8 @@ internal static class SyncHost
         IMfBondSource bondSource,
         CancellationToken cancellationToken,
         IReadOnlyDictionary<string, string?>? settings = null,
-        IEnumerable<IPriceSource>? priceSources = null)
+        IEnumerable<IPriceSource>? priceSources = null,
+        FakeFxHistoryBackfillTrigger? fxBackfillTrigger = null)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Configuration["ConnectionStrings:marketdata-db"] = containers.PostgresConnectionString;
@@ -40,6 +41,8 @@ internal static class SyncHost
         builder.Services.AddScoped<TriggerSyncHandler>();
         builder.Services.AddSingleton(fxSource);
         builder.Services.AddSingleton(bondSource);
+        builder.Services.AddSingleton<IHistoryBackfillTrigger>(new FakeHistoryBackfillTrigger());
+        builder.Services.AddSingleton<IFxHistoryBackfillTrigger>(fxBackfillTrigger ?? new FakeFxHistoryBackfillTrigger());
         foreach (var priceSource in priceSources ?? [])
         {
             builder.Services.AddSingleton(priceSource);

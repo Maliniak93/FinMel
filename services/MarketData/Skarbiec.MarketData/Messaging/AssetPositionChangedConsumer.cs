@@ -11,7 +11,10 @@ namespace Skarbiec.MarketData.Messaging;
 public sealed class AssetPositionChangedConsumer(
     MarketDataDbContext db,
     IHistoryBackfillTrigger backfillTrigger,
-    ILogger<AssetPositionChangedConsumer> logger) : IConsumer<AssetPositionChanged>
+    IFxHistoryBackfillTrigger fxBackfillTrigger,
+    TimeProvider timeProvider,
+    ILogger<AssetPositionChangedConsumer> logger,
+    FxHistoryOptions? fxHistoryOptions = null) : IConsumer<AssetPositionChanged>
 {
     public async Task Consume(ConsumeContext<AssetPositionChanged> context)
     {
@@ -54,6 +57,13 @@ public sealed class AssetPositionChangedConsumer(
         if (instrumentId is { } heldInstrumentId)
         {
             await EnqueueMissingHistoryAsync(heldInstrumentId, cancellationToken);
+        }
+
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        if (await FxHistoryNeed.AnyLaggingAsync(db, today, fxHistoryOptions, cancellationToken))
+        {
+            // Scheduled after the save, outside the consume transaction; a duplicate enqueue is harmless, as backfill upserts.
+            await fxBackfillTrigger.EnqueueAsync(cancellationToken);
         }
     }
 

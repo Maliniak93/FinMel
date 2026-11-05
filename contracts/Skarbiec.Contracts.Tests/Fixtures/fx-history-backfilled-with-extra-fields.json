@@ -1,0 +1,6 @@
+{
+  "from": "2023-11-16",
+  "to": "2025-10-22",
+  "occurredAtUtc": "2026-01-15T10:00:00+00:00",
+  "schemaHint": "this field does not exist yet and must not break deserialization"
+}

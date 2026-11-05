@@ -28,6 +28,7 @@ public static class StartupSyncExtensions
             configuration[FxSyncJobExtensions.FxSyncCronConfigKey] ?? FxSyncJobExtensions.DefaultProductionCron,
             configuration[PriceSyncJobExtensions.PriceSyncCronConfigKey] ?? PriceSyncJobExtensions.DefaultProductionCron,
             configuration[BondCatalogSyncJobExtensions.BondCatalogSyncCronConfigKey] ?? BondCatalogSyncJobExtensions.DefaultProductionCron));
+        builder.Services.AddScoped<HistoryCoverageReconciler>();
         builder.Services.AddHostedService<StartupSyncService>();
 
         return builder;

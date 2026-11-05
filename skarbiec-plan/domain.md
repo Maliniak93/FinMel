@@ -153,7 +153,7 @@ erDiagram
 
 | Entity | Fields | Role |
 |---|---|---|
-| `Currency` | `Code (PK), Name, Symbol, DecimalPlaces, DisplayOrder` | no `FallbackRateToPln`, no `IsPivot` (PLN is the fixed base). Seed: PLN, EUR, USD, GBP, CHF |
+| `Currency` | `Code (PK), Name, Symbol, DecimalPlaces, DisplayOrder, HistoryCoveredFrom?` | no `FallbackRateToPln`, no `IsPivot` (PLN is the fixed base). Seed: PLN, EUR, USD, GBP, CHF. `HistoryCoveredFrom` is the earliest date `FxHistoryBackfillJob` has fetched rates back to (null = never); the need date is `min(today − 365, oldest live transaction) − 14 days` |
 | `Instrument` | `Id, Ticker, Name, Source, QuoteCurrency, AssetClass, Exchange?, VerificationStatus, HistoryCoveredFrom?` | `HistoryCoveredFrom` is the earliest date `HistoryBackfillJob` has covered (the requested date, even when the source clamped it), null until the first backfill. `QuoteCurrency` is unconstrained (whatever the provider quotes), except a Stock/Etf takes it and `Exchange` (the configured name, e.g. GPW, Xetra; null for gold and silver) from the `InstrumentSearch:Exchanges` entry matching its ticker suffix (ADR-030). Portfolio rejects a market asset whose class or currency differs from its instrument's |
 | `PriceQuote` | `InstrumentId, Date, ClosePrice` — unique (instrument, date) | unchanged |
 | `FxRate` | `Pair (e.g. USDPLN), Date, Rate` — unique (pair, date) | unchanged |

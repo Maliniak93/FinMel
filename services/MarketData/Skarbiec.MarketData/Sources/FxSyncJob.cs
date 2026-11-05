@@ -21,7 +21,6 @@ public sealed class FxSyncJob(
     public const string ActivitySourceName = "Skarbiec.MarketData.FxSyncJob";
 
     private const string BaseCurrency = "PLN";
-    private const int FxHistoryDays = 365;
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
@@ -75,7 +74,7 @@ public sealed class FxSyncJob(
         var noData = 0;
         var failed = backfillFailed.Count;
 
-        // No latest rate after a failed first backfill: one row would count as history and the backfill would never retry.
+        // No latest rate after a failed gap fill: it would move the last stored date to today and the gap would never be retried.
         var latestCodes = codes.Where(c => !backfillFailed.Contains(c)).ToList();
         var latestPairs = latestCodes.Select(Pair).ToHashSet(StringComparer.Ordinal);
 
@@ -135,7 +134,7 @@ public sealed class FxSyncJob(
     }
 
     // One currency at a time, so one failure never stops the others.
-    // A currency with no rates gets a year of history; on a startup run one with rates gets the days since its last rate.
+    // Only on a startup run, and only a currency that has rates: it gets the days since its last rate. Older history is FxHistoryBackfillJob's.
     private async Task<HashSet<string>> BackfillNewCurrenciesAsync(
         List<string> codes, SyncRunSource source, CancellationToken cancellationToken)
     {
@@ -152,19 +151,11 @@ public sealed class FxSyncJob(
 
         foreach (var code in codes)
         {
-            DateOnly from;
-            if (lastDates.TryGetValue(Pair(code), out var lastDate))
+            if (!lastDates.TryGetValue(Pair(code), out var lastDate)
+                || source != SyncRunSource.Startup
+                || PriceSyncJob.ClampGapStart(lastDate, to) is not { } from)
             {
-                if (source != SyncRunSource.Startup || PriceSyncJob.ClampGapStart(lastDate, to) is not { } gapFrom)
-                {
-                    continue;
-                }
-
-                from = gapFrom;
-            }
-            else
-            {
-                from = to.AddDays(-FxHistoryDays);
+                continue;
             }
 
             var result = await SafeFetch.RunAsync(

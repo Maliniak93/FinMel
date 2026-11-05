@@ -198,6 +198,49 @@ public sealed class MarketDataOutboxTests(SkarbiecContainersFixture containers) 
     }
 
     [Fact]
+    public async Task FxBackfill_PublishesEventOnce()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var scope = _provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var needDate = today.AddDays(-365 - 14);
+        await db.SeedCurrencyCatalogAsync(cancellationToken);
+        await db.SeedFxRateAsync("EURPLN", today.AddDays(-100), 4m, cancellationToken);
+
+        var source = new ScriptedFxRateSource(
+            historyResult: PriceFetchResult<FxRateQuote>.NoData(),
+            historyResultsByCode: new Dictionary<string, PriceFetchResult<FxRateQuote>>
+            {
+                ["USD"] = PriceFetchResult<FxRateQuote>.Success(
+                [
+                    new FxRateQuote("USDPLN", needDate, 3.9m),
+                    new FxRateQuote("USDPLN", today, 4m),
+                ]),
+            });
+
+        var job = new FxHistoryBackfillJob(db, source, publishEndpoint, TimeProvider.System, NullLogger<FxHistoryBackfillJob>.Instance);
+        await job.RunAsync(cancellationToken);
+
+        var outboxMessages = await db.Set<OutboxMessage>().ToListAsync(cancellationToken);
+        var outboxMessage = Assert.Single(outboxMessages, m => m.MessageType.Contains(nameof(FxHistoryBackfilled)));
+
+        using var envelope = JsonDocument.Parse(outboxMessage.Body);
+        var payload = envelope.RootElement.GetProperty("message");
+        Assert.Equal(needDate.ToString("yyyy-MM-dd"), payload.GetProperty("from").GetString());
+        Assert.Equal(today.ToString("yyyy-MM-dd"), payload.GetProperty("to").GetString());
+
+        // Everything is covered now, so a second run extends nothing and publishes nothing more.
+        await job.RunAsync(cancellationToken);
+
+        outboxMessages = await db.Set<OutboxMessage>().ToListAsync(cancellationToken);
+        Assert.Single(outboxMessages, m => m.MessageType.Contains(nameof(FxHistoryBackfilled)));
+    }
+
+    [Fact]
     public async Task HistoryBackfill_NoDataOrError_DoesNotPublish()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -34,6 +34,8 @@ public sealed class StartupSyncService(
             {
                 await SyncIfStaleAsync(kind, cron, stoppingToken);
             }
+
+            await ReconcileCoverageAsync(stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
@@ -99,6 +101,19 @@ public sealed class StartupSyncService(
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
             logger.LogWarning(ex, "Startup sync of {Kind} failed.", kind);
+        }
+    }
+
+    private async Task ReconcileCoverageAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<HistoryCoverageReconciler>().ReconcileAsync(cancellationToken);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Startup history coverage reconcile failed.");
         }
     }
 

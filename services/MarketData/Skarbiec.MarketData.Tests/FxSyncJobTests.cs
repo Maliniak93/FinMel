@@ -48,7 +48,7 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
     }
 
     [Fact]
-    public async Task RunAsync_FirstRunForCurrency_BackfillsTwelveMonths()
+    public async Task FirstRun_FetchesLatestOnly()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
@@ -57,22 +57,18 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         await db.SeedCurrencyCatalogAsync(cancellationToken);
-        // No FxRate row at all yet, so every non-PLN currency needs a first-use backfill.
+        // No FxRate row at all yet: the job stores only the latest rate; history is the backfill job's.
 
-        var history = OneYearOfDates().Select(d => new FxRateQuote("EURPLN", d, 4m)).ToList();
-        var fxSource = new ScriptedFxRateSource(LatestForAllNonPln(), PriceFetchResult<FxRateQuote>.Success(history));
+        var fxSource = new ScriptedFxRateSource(LatestForAllNonPln());
 
         var job = new FxSyncJob(db, fxSource, publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance);
         await job.RunAsync(cancellationToken);
 
-        // Read from the arguments the job passed: the fake returns the canned history regardless of the range.
-        Assert.Equal(NonPlnCodes.Order(), fxSource.HistoryFetches.Select(f => f.CurrencyCode).Order());
-        Assert.All(fxSource.HistoryFetches, f => Assert.True(
-            f.To.DayNumber - f.From.DayNumber >= 365,
-            $"{f.CurrencyCode} backfill requested {f.From}..{f.To}, shorter than 365 days."));
-
-        var earliestEur = await db.FxRates.Where(r => r.Pair == "EURPLN").MinAsync(r => r.Date, cancellationToken);
-        Assert.True(Today.DayNumber - earliestEur.DayNumber >= 365);
+        Assert.Equal(0, fxSource.HistoryFetchCount);
+        foreach (var code in NonPlnCodes)
+        {
+            Assert.Equal(1, await db.FxRates.CountAsync(r => r.Pair == $"{code}PLN", cancellationToken));
+        }
     }
 
     [Fact]
@@ -85,9 +81,11 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
 
         await db.SeedCurrencyCatalogAsync(cancellationToken);
+        await db.SeedFxRateAsync("EURPLN", DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-5), 4m, cancellationToken);
 
+        // The startup gap fill is the only place the job reads RequestDelay, which is what throws.
         var job = new FxSyncJob(db, new ThrowingFxRateSource(), publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance);
-        await Record.ExceptionAsync(() => job.RunAsync(cancellationToken));
+        await Record.ExceptionAsync(() => job.RunAsync(cancellationToken, SyncRunSource.Startup));
 
         await using var readDb = CreateDbContext();
         var run = await readDb.SyncRuns.AsNoTracking().SingleAsync(cancellationToken);
@@ -135,76 +133,6 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         var run = await db.SyncRuns.SingleAsync(cancellationToken);
         Assert.True(run.NoDataCount > 0);
         Assert.NotEqual(SyncRunStatus.Failed, run.Status);
-    }
-
-    [Fact]
-    public async Task RunAsync_OneCurrencyBackfillFails_OthersStillSynced_RunRecordedAsPartial()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
-        await using var scope = provider.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
-        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
-
-        await db.SeedCurrencyCatalogAsync(cancellationToken);
-        // No history yet, so every currency backfills; EUR's is scripted to fail.
-        var historyResultsByCode = NonPlnCodes.ToDictionary(
-            code => code,
-            code => code == "EUR"
-                ? PriceFetchResult<FxRateQuote>.Error("simulated failure")
-                : PriceFetchResult<FxRateQuote>.Success(OneYearOfDates().Select(d => new FxRateQuote($"{code}PLN", d, 4m)).ToList()));
-
-        var fxSource = new ScriptedFxRateSource(LatestForAllNonPln(), historyResultsByCode: historyResultsByCode);
-
-        var job = new FxSyncJob(db, fxSource, publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance);
-        await job.RunAsync(cancellationToken);
-
-        var run = await db.SyncRuns.SingleAsync(cancellationToken);
-        Assert.Equal(SyncRunStatus.Partial, run.Status);
-        Assert.True(run.FailedCount >= 1);
-
-        Assert.True(await db.FxRates.AnyAsync(r => r.Pair == "USDPLN" && r.Date == Today, cancellationToken));
-        Assert.True(await db.FxRates.AnyAsync(r => r.Pair == "GBPPLN" && r.Date == Today, cancellationToken));
-        Assert.True(await db.FxRates.AnyAsync(r => r.Pair == "CHFPLN" && r.Date == Today, cancellationToken));
-    }
-
-    [Fact]
-    public async Task RunAsync_BackfillFailed_WritesNoLatestRateForThatCurrency_AndRetriesBackfillNextRun()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
-        await using var scope = provider.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
-        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
-
-        await db.SeedCurrencyCatalogAsync(cancellationToken);
-
-        // Run 1: EUR's backfill fails, yet the latest result still carries EURPLN, so only the job can keep it out.
-        var firstRunSource = new ScriptedFxRateSource(
-            LatestForAllNonPln(),
-            historyResultsByCode: NonPlnCodes.ToDictionary(
-                code => code,
-                code => code == "EUR"
-                    ? PriceFetchResult<FxRateQuote>.Error("simulated failure")
-                    : PriceFetchResult<FxRateQuote>.Success(OneYearOfDates().Select(d => new FxRateQuote($"{code}PLN", d, 4m)).ToList())));
-
-        await new FxSyncJob(db, firstRunSource, publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance)
-            .RunAsync(cancellationToken);
-
-        Assert.False(
-            await db.FxRates.AnyAsync(r => r.Pair == "EURPLN", cancellationToken),
-            "a currency whose backfill failed must keep zero FxRate rows so the next run retries it.");
-
-        // Run 2: every backfill succeeds, and only EUR is backfilled again.
-        var secondRunSource = new ScriptedFxRateSource(
-            LatestForAllNonPln(),
-            PriceFetchResult<FxRateQuote>.Success(OneYearOfDates().Select(d => new FxRateQuote("EURPLN", d, 4m)).ToList()));
-
-        await new FxSyncJob(db, secondRunSource, publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance)
-            .RunAsync(cancellationToken);
-
-        Assert.Equal("EUR", Assert.Single(secondRunSource.HistoryFetches).CurrencyCode);
-        Assert.True(await db.FxRates.AnyAsync(r => r.Pair == "EURPLN" && r.Date == Today, cancellationToken));
     }
 
     [Fact]
@@ -331,11 +259,5 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         {
             await db.SeedFxRateAsync($"{code}PLN", Today.AddDays(-30), 4m, cancellationToken);
         }
-    }
-
-    private static List<DateOnly> OneYearOfDates()
-    {
-        var start = Today.AddDays(-365);
-        return Enumerable.Range(0, 366).Select(offset => start.AddDays(offset)).ToList();
     }
 }

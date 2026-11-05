@@ -9,4 +9,6 @@ public sealed class Currency
     public required string Symbol { get; set; }
     public int DecimalPlaces { get; set; } = 2;
     public int DisplayOrder { get; set; }
+
+    public DateOnly? HistoryCoveredFrom { get; set; }
 }

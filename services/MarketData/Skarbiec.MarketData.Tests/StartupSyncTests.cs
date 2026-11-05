@@ -38,6 +38,65 @@ public sealed class StartupSyncTests(SkarbiecContainersFixture containers) : Mar
     }
 
     [Fact]
+    public async Task RunsReconcilerAfterSyncs()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using (var seedDb = CreateDbContext())
+        {
+            await seedDb.SeedCurrencyCatalogAsync(cancellationToken);
+        }
+
+        var fxTrigger = new FakeFxHistoryBackfillTrigger();
+        var host = await SyncHost.StartAsync(
+            _containers, new NoOpFxRateSource(), FakeMfBondSource.FromFixture(), cancellationToken, fxBackfillTrigger: fxTrigger);
+        try
+        {
+            await SyncHost.WaitUntilAsync(() => Task.FromResult(fxTrigger.Attempts >= 1), cancellationToken);
+
+            await using var db = CreateDbContext();
+            var runs = await db.SyncRuns.AsNoTracking().ToListAsync(cancellationToken);
+            Assert.Equal(3, runs.Count);
+            Assert.All(runs, r => Assert.NotEqual(SyncRunStatus.Running, r.Status));
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            Assert.Equal(1, fxTrigger.Attempts);
+        }
+        finally
+        {
+            await SyncHost.CleanUpAsync(host, cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task ReconcilerFailure_DoesNotAbortStartup()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using (var seedDb = CreateDbContext())
+        {
+            await seedDb.SeedCurrencyCatalogAsync(cancellationToken);
+        }
+
+        var fxTrigger = new FakeFxHistoryBackfillTrigger(new InvalidOperationException("scheduler down"));
+        var host = await SyncHost.StartAsync(
+            _containers, new NoOpFxRateSource(), FakeMfBondSource.FromFixture(), cancellationToken, fxBackfillTrigger: fxTrigger);
+        try
+        {
+            await SyncHost.WaitUntilAsync(() => Task.FromResult(fxTrigger.Attempts >= 1), cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+
+            await using var db = CreateDbContext();
+            var runs = await db.SyncRuns.AsNoTracking().ToListAsync(cancellationToken);
+            Assert.Equal([SyncRunKind.Fx, SyncRunKind.Prices, SyncRunKind.BondCatalog], runs.OrderBy(r => r.StartedAt).Select(r => r.Kind));
+            Assert.All(runs, r => Assert.Equal(SyncRunSource.Startup, r.Source));
+            Assert.False(host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping.IsCancellationRequested);
+        }
+        finally
+        {
+            await SyncHost.CleanUpAsync(host, cancellationToken);
+        }
+    }
+
+    [Fact]
     public async Task FxGapStoredBeforePricesEventPublished()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

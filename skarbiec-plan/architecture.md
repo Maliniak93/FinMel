@@ -33,6 +33,7 @@ Angular talks only to the Gateway (ADR-013).
 | `LatestValuationChanged` | `UserId, Date, IsStale, TotalPln, ByAssetClass (AssetClass, ValuePln; zero classes omitted), OccurredAtUtc` | after every write of a user's snapshot: position/removal revaluation, the daily sync, a history rebuild (Portfolio replicates it, ADR-038) |
 | `DailyPricesSynced` | as today, plus `Kind: Prices \| Fx` | end of a sync job |
 | `InstrumentHistoryBackfilled` | `InstrumentId, From, To, OccurredAtUtc` (the clamped window the backfill fetched) | `HistoryBackfillJob` finishes with quotes stored (not on NoData or Error) |
+| `FxHistoryBackfilled` | `From, To, OccurredAtUtc` (earliest and latest date the run added across currencies) | `FxHistoryBackfillJob` stored rates for at least one currency (not on NoData or Error only) |
 | `UserRegistered` | as today | no consumer yet (Notifications is an idea, not built) |
 
 `AssetChanged` and `TransactionRecorded` are removed — today they have no consumers and don't carry full state. Contracts are edited in place, no `V2` types (ADR-043).
@@ -127,6 +128,9 @@ sequenceDiagram
     MD->>MD: inbox check, upsert AssetInstrumentLink + InstrumentUsage
     alt earliest FirstTransactionDate of live holdings < Instrument.HistoryCoveredFrom (or none covered)
         MD->>MD: enqueue HistoryBackfillJob(from = that date)
+    end
+    alt any currency's HistoryCoveredFrom is null or later than min(today - 365, oldest live FirstTransactionDate) - 14 days
+        MD->>MD: enqueue FxHistoryBackfillJob (also queued at startup by HistoryCoverageReconciler)
     end
 ```
 

@@ -287,6 +287,9 @@ namespace Skarbiec.MarketData.Migrations
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("integer");
 
+                    b.Property<DateOnly?>("HistoryCoveredFrom")
+                        .HasColumnType("date");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
