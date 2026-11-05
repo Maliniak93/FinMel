@@ -81,9 +81,7 @@
       </div>
 
       @if (phone() && monthData()) {
-        <div class="planning-page__strip">
-          <app-summary-strip [items]="summaryItems()" />
-        </div>
+        <app-summary-strip [items]="summaryItems()" />
       }
 
       @if (overdue().length > 0) {

@@ -4,7 +4,9 @@
 }
 
 .summary-strip__list {
-  display: flex;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   margin: 0;
   padding: 0;
   border-top: 1px solid var(--mat-sys-outline-variant);
@@ -12,7 +14,6 @@
 }
 
 .summary-strip__item {
-  flex: 1 1 0;
   min-width: 0;
   padding: var(--sk-space-3) 0 var(--sk-space-3) var(--sk-space-4);
 
@@ -37,6 +38,21 @@
   font-family: var(--mat-sys-brand-family);
   font-size: 28px;
   line-height: 1.2;
+}
+
+@media (width < 720px) {
+  .summary-strip__item {
+    padding-left: var(--sk-space-2);
+  }
+
+  .summary-strip__label {
+    font-size: 10px;
+  }
+
+  .summary-strip__value {
+    font-size: 14px;
+    overflow-wrap: anywhere;
+  }
 }
 
 .summary-strip__link {

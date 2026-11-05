@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { readStylesheet, rulesFor } from '../../../testing/stylesheet';
+import { mediaBlock, readStylesheet, rulesFor } from '../../../testing/stylesheet';
 
 const MAJATEK_DIRS = [
   'src/app/features/wealth',
@@ -65,5 +65,18 @@ describe('Majątek stylesheets', () => {
     const strip = readStylesheet('src/app/shared/summary-strip/summary-strip.scss');
     expect(strip).toMatch(/var\(--sk-space-3\)/);
     expect(strip).toMatch(/var\(--sk-space-4\)/);
+  });
+
+  it('summary strip cells are equal grid tracks with 14 px phone values', () => {
+    const strip = readStylesheet('src/app/shared/summary-strip/summary-strip.scss');
+    const list = rulesFor(strip, /summary-strip__list/);
+    expect(list).toMatch(/display:\s*grid/);
+    expect(list).toMatch(/grid-auto-flow:\s*column/);
+    expect(list).toMatch(/grid-auto-columns:\s*minmax\(0,\s*1fr\)/);
+    expect(rulesFor(strip, /summary-strip__item/)).not.toMatch(/\bflex\s*:/);
+
+    const phone = mediaBlock(strip, '(width < 720px)');
+    expect(rulesFor(phone, /summary-strip__value/)).toMatch(/font-size:\s*14px/);
+    expect(rulesFor(phone, /summary-strip__label/)).toMatch(/font-size:\s*10px/);
   });
 });

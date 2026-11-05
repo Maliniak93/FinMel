@@ -11,3 +11,23 @@ export function rulesFor(css: string, selector: RegExp): string {
     .map((match) => match[2])
     .join('\n');
 }
+
+export function mediaBlock(css: string, condition: string): string {
+  const start = css.indexOf(`@media ${condition}`);
+  if (start === -1) {
+    throw new Error(`no @media ${condition} block`);
+  }
+  const open = css.indexOf('{', start);
+  let depth = 0;
+  for (let i = open; i < css.length; i++) {
+    if (css[i] === '{') {
+      depth++;
+    } else if (css[i] === '}') {
+      depth--;
+      if (depth === 0) {
+        return css.slice(open + 1, i);
+      }
+    }
+  }
+  throw new Error(`unclosed @media ${condition} block`);
+}
