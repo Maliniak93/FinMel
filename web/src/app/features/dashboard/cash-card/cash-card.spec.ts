@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { polishProblems, restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
 import { formatMoney } from '../../../shared/format';
 import { cashPlacesResponse, jsonResponse, renderCard } from '../testing/dashboard-fixtures';
@@ -7,6 +10,32 @@ describe('CashCard', () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     await restoreEnglish();
+  });
+
+  it('renders the total row', async () => {
+    const { fixture } = await renderCard(CashCard, {
+      cash: jsonResponse(
+        cashPlacesResponse(
+          [
+            { currency: 'PLN', balance: 800 },
+            { currency: 'EUR', balance: 420 },
+          ],
+          2600,
+        ),
+      ),
+    });
+    const rows = [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('li')];
+    const total = rows[rows.length - 1];
+
+    expect(total?.classList.contains('cash-card__total')).toBe(true);
+    expect(total?.textContent).toContain(formatMoney(2600));
+
+    const scss = readFileSync(
+      resolve(process.cwd(), 'src/app/features/dashboard/cash-card/cash-card.scss'),
+      'utf8',
+    );
+    expect(scss).not.toMatch(/border-top/);
+    expect(scss).toMatch(/\.cash-card__row\s*\{[^}]*border-bottom:/);
   });
 
   it('shows totals per currency', async () => {

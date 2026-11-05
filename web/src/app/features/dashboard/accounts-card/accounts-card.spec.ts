@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { formatMoney, formatPercent } from '../../../shared/format';
 import { jsonResponse, accountResponse, renderCard } from '../testing/dashboard-fixtures';
@@ -158,5 +161,16 @@ describe('AccountsCard', () => {
     expect(text).not.toContain('Revolut ROR');
     expect(text).not.toContain(formatMoney(275));
     expect(element.querySelector(`a[href="/wealth/bank/${FLAGGED_ID}"]`)).toBeNull();
+  });
+});
+
+describe('AccountsCard stylesheet', () => {
+  it('rules every account row', () => {
+    const scss = readFileSync(
+      resolve(process.cwd(), 'src/app/features/dashboard/accounts-card/accounts-card.scss'),
+      'utf8',
+    );
+
+    expect(scss).toMatch(/\.accounts-card__row\s*\{[^}]*border-bottom:/);
   });
 });

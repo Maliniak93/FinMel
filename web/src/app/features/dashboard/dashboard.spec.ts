@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
@@ -43,6 +46,10 @@ import {
 
 function normalised(text: string): string {
   return text.replace(/\s+/g, ' ');
+}
+
+function dashboardStylesheet(): string {
+  return readFileSync(resolve(process.cwd(), 'src/app/features/dashboard/dashboard.scss'), 'utf8');
 }
 
 describe('Dashboard', () => {
@@ -344,6 +351,39 @@ describe('Dashboard', () => {
     expect(css.slice(0, split)).not.toMatch(/\.dashboard-page__hero[^{]*\{[^}]*5fr/);
   });
 
+  it('renders the as-of date in the page header', async () => {
+    await setup(jsonResponse(dashboard));
+    const element = fixture.nativeElement as HTMLElement;
+    const asOf = element.querySelector('.dashboard-page__as-of');
+    const header = asOf?.closest('header');
+
+    expect(asOf?.textContent).toContain('As of');
+    expect(header?.querySelector('h1')?.textContent?.trim()).toBeTruthy();
+    expect(asOf?.closest('.dashboard-page__value')).toBeNull();
+  });
+
+  it('renders groups and structure without a card frame', async () => {
+    await setup(jsonResponse(dashboardWithClasses), undefined, { groups: jsonResponse(groups) });
+    const element = fixture.nativeElement as HTMLElement;
+
+    for (const selector of ['.dashboard-page__group-card', '.dashboard-page__structure']) {
+      const section = element.querySelector(selector);
+      expect(section, selector).not.toBeNull();
+      expect(section?.tagName.toLowerCase(), selector).not.toBe('mat-card');
+      expect(section?.classList.contains('mat-mdc-card'), selector).toBe(false);
+      expect(section?.querySelector('mat-card, .mat-mdc-card'), selector).toBeNull();
+    }
+    expect(element.querySelectorAll('.dashboard-page__group-row').length).toBeGreaterThan(0);
+    expect(element.querySelectorAll('.dashboard-page__structure-row').length).toBeGreaterThan(0);
+
+    const scss = dashboardStylesheet();
+    expect(scss).toMatch(/\.dashboard-page__group-card\s*\{[^}]*border-top:/);
+    expect(scss).toMatch(/\.dashboard-page__structure\s*\{[^}]*border-top:/);
+    expect(scss).toMatch(/7fr\)?\s+(minmax\(0,\s*)?5fr/);
+    expect(scss).toMatch(/\.dashboard-page__group-row\s*\{[^}]*border-bottom:/);
+    expect(scss).toMatch(/\.dashboard-page__structure-row\s*\{[^}]*border-bottom:/);
+  });
+
   it('styles a negative change as negative', async () => {
     await setup(jsonResponse(dashboard), historyWithChange(-250, -20));
 
@@ -457,7 +497,7 @@ describe('Dashboard', () => {
 
     expect(element.querySelectorAll('.dashboard-page__value')).toHaveLength(1);
     expect(value.textContent).toContain(formatMoney(15000));
-    expect(value.querySelector('.dashboard-page__as-of')).not.toBeNull();
+    expect(value.querySelector('.dashboard-page__as-of')).toBeNull();
     expect(value.textContent).toContain('Stale');
     expect(changeText()).toContain(normalised(formatMoney(250)));
     expect(changeText()).toContain('1Y');
@@ -795,6 +835,50 @@ describe('Dashboard', () => {
       expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
       expect(textOf(element.querySelector('.net-worth-chart__filter'))).toContain('All');
     });
+  });
+});
+
+describe('dashboard stylesheet', () => {
+  it('rules the hero bottom edge with the outline-variant colour and 36.8 px padding', () => {
+    const scss = dashboardStylesheet();
+
+    expect(scss).toMatch(
+      /\.dashboard-page__hero\b[^{]*\{[^}]*border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/,
+    );
+    expect(scss).toMatch(
+      /\.dashboard-page__hero\b[^{]*\{[^}]*padding-bottom:\s*var\(--sk-space-8\)/,
+    );
+  });
+
+  it('sizes the "Do zrobienia" heading at 24 px', () => {
+    expect(dashboardStylesheet()).toMatch(
+      /\.dashboard-page__todo-head\s*\{[^}]*\.dashboard-page__card-title\s*\{[^}]*font-size:\s*24px/,
+    );
+  });
+
+  it('stacks the sections on a phone', () => {
+    const scss = dashboardStylesheet();
+    const split = scss.indexOf('@container (min-width: 720px)');
+    const base = scss.slice(0, split);
+
+    expect(split).toBeGreaterThan(-1);
+    expect(base).toMatch(/\.dashboard-page__group-card\s*\{[^}]*border-top:/);
+    expect(base).toMatch(/\.dashboard-page__structure\s*\{[^}]*border-top:/);
+    expect(base).not.toMatch(/\d+fr\s+\d+fr/);
+  });
+
+  it('styles the dashboard only with tokens', () => {
+    const dir = resolve(process.cwd(), 'src/app/features/dashboard');
+    const styles = readdirSync(dir, { recursive: true })
+      .map(String)
+      .filter((file) => file.endsWith('.scss'))
+      .map((file) => readFileSync(resolve(dir, file), 'utf8'))
+      .join('\n');
+    const scss = dashboardStylesheet();
+
+    expect(styles).not.toMatch(/#[0-9a-fA-F]{3,6}\b|rgb\(/);
+    expect(scss).toMatch(/var\(--mat-sys-outline-variant\)/);
+    expect(scss).toMatch(/var\(--sk-space-8\)/);
   });
 });
 
