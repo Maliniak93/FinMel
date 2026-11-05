@@ -10,6 +10,11 @@
 .shell__nav {
   width: 232px;
   border-right: 1px solid var(--mat-sys-outline-variant);
+  overflow: hidden;
+}
+
+:host ::ng-deep .shell__nav .mat-drawer-inner-container {
+  overflow: hidden;
 }
 
 .shell__nav--rail {
@@ -25,6 +30,7 @@
 .shell__nav-body {
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
   height: 100%;
   padding: var(--sk-space-6) 0 var(--sk-space-4);
 }
@@ -70,12 +76,20 @@
 }
 
 .shell__nav-link:hover {
-  background: var(--sk-accent-tint);
+  margin-right: var(--sk-space-3);
+  border-radius: 0 var(--sk-radius-md) var(--sk-radius-md) 0;
+  background: color-mix(in srgb, var(--sk-accent-tint) 50%, transparent);
 }
 
 .shell__nav-link--active {
   margin-right: var(--sk-space-3);
   border-radius: 0 var(--sk-radius-md) var(--sk-radius-md) 0;
+  border-left-color: var(--sk-accent-stroke);
+  background: var(--sk-accent-tint);
+  color: var(--mat-sys-primary);
+}
+
+.shell__nav-link--active:hover {
   border-left-color: var(--sk-accent-stroke);
   background: var(--sk-accent-tint);
   color: var(--mat-sys-primary);
@@ -168,6 +182,7 @@
 .shell__content-area {
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .shell__top-bar {
@@ -190,8 +205,11 @@
 
 .shell__content {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   padding: 24px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .shell__bottom-nav {
