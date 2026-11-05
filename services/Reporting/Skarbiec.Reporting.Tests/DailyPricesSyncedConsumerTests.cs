@@ -484,6 +484,30 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
     }
 
     [Fact]
+    public async Task GapOverWeekend_RequestsRebuildFromDayAfterLastSnapshot()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var friday = new DateOnly(2026, 8, 7);
+        var wednesday = new DateOnly(2026, 8, 12);
+        var userId = Guid.NewGuid();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, Guid.NewGuid(), cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "PLN", quantity: 1_000m);
+            await db.SeedSnapshotAsync(userId, friday, 1_000m, cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await PublishSyncAsync(provider, wednesday, cancellationToken);
+
+            var request = await WaitForRebuildRequestAsync(provider, userId, cancellationToken);
+            Assert.Equal(friday.AddDays(1), request.FromDate);
+        }, cancellationToken);
+    }
+
+    [Fact]
     public async Task Consume_PendingRequest_RepublishesRebuild()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

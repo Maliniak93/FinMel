@@ -228,6 +228,95 @@ public sealed class FxSyncJobTests(SkarbiecContainersFixture containers) : Marke
         Assert.Equal(SyncRunKind.Fx, run.Kind);
     }
 
+    [Fact]
+    public async Task StartupRun_FillsGapSinceLastRate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var lastRate = today.AddDays(-5);
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        await db.SeedCurrencyCatalogAsync(cancellationToken);
+        await SeedRatesAtAsync(db, lastRate, cancellationToken);
+
+        var fxSource = new ScriptedFxRateSource(LatestForAllNonPln(), historyResultsByCode: GapHistory(today));
+
+        var job = new FxSyncJob(db, fxSource, publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance);
+        await job.RunAsync(cancellationToken, SyncRunSource.Startup);
+
+        Assert.Equal(NonPlnCodes.Order(), fxSource.HistoryFetches.Select(f => f.CurrencyCode).Order());
+        Assert.All(fxSource.HistoryFetches, f => Assert.Equal(lastRate.AddDays(1), f.From));
+
+        foreach (var code in NonPlnCodes)
+        {
+            var dates = await db.FxRates.Where(r => r.Pair == $"{code}PLN" && r.Date > lastRate && r.Date <= today)
+                .Select(r => r.Date).OrderBy(d => d).ToListAsync(cancellationToken);
+            Assert.Equal([today.AddDays(-3), today.AddDays(-2)], dates);
+        }
+    }
+
+    [Fact]
+    public async Task StartupRun_GapIsCappedAt30Days()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        await db.SeedCurrencyCatalogAsync(cancellationToken);
+        await SeedRatesAtAsync(db, today.AddDays(-60), cancellationToken);
+
+        var fxSource = new ScriptedFxRateSource(LatestForAllNonPln(), historyResultsByCode: GapHistory(today));
+
+        var job = new FxSyncJob(db, fxSource, publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance);
+        await job.RunAsync(cancellationToken, SyncRunSource.Startup);
+
+        Assert.Equal(NonPlnCodes.Length, fxSource.HistoryFetchCount);
+        Assert.All(fxSource.HistoryFetches, f => Assert.Equal(today.AddDays(-30), f.From));
+    }
+
+    [Fact]
+    public async Task ScheduledRun_FetchesLatestOnly()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        await db.SeedCurrencyCatalogAsync(cancellationToken);
+        await SeedRatesAtAsync(db, today.AddDays(-5), cancellationToken);
+
+        var fxSource = new ScriptedFxRateSource(LatestForAllNonPln());
+
+        var job = new FxSyncJob(db, fxSource, publishEndpoint, TimeProvider.System, NullLogger<FxSyncJob>.Instance);
+        await job.RunAsync(cancellationToken);
+
+        Assert.Equal(0, fxSource.HistoryFetchCount);
+    }
+
+    private static Dictionary<string, PriceFetchResult<FxRateQuote>> GapHistory(DateOnly today) => NonPlnCodes.ToDictionary(
+        code => code,
+        code => PriceFetchResult<FxRateQuote>.Success(
+        [
+            new FxRateQuote($"{code}PLN", today.AddDays(-3), 4.1m),
+            new FxRateQuote($"{code}PLN", today.AddDays(-2), 4.2m),
+        ]));
+
+    private static async Task SeedRatesAtAsync(MarketDataDbContext db, DateOnly date, CancellationToken cancellationToken)
+    {
+        foreach (var code in NonPlnCodes)
+        {
+            await db.SeedFxRateAsync($"{code}PLN", date, 4m, cancellationToken);
+        }
+    }
+
     private static PriceFetchResult<FxRateQuote> LatestForAllNonPln() => PriceFetchResult<FxRateQuote>.Success(
     [
         new FxRateQuote("EURPLN", Today, 4.30m),

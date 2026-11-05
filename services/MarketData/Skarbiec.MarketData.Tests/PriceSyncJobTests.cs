@@ -197,6 +197,163 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
         Assert.Equal(1, Assert.IsType<int>(jobActivity.GetTagItem("skarbiec.sync_run.skipped")));
     }
 
+    [Fact]
+    public async Task StartupRun_FillsGapSinceLastQuote()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = UtcToday();
+        var lastQuote = today.AddDays(-5);
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var instrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
+        await db.SaveChangesAsync(cancellationToken);
+        await db.SeedQuoteAsync(instrument.Id, lastQuote, 100m, cancellationToken);
+
+        var source = new ScriptedPriceSource(
+            PriceSource.Yahoo,
+            historyResult: PriceFetchResult<InstrumentQuote>.Success(
+            [
+                new InstrumentQuote(instrument.Id, today.AddDays(-3), 101m),
+                new InstrumentQuote(instrument.Id, today.AddDays(-2), 102m),
+                new InstrumentQuote(instrument.Id, today, 103m),
+            ]));
+
+        var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken, SyncRunSource.Startup);
+
+        Assert.Equal(1, source.HistoryFetchCount);
+        Assert.Equal(lastQuote.AddDays(1), Assert.Single(source.HistoryWindows).From);
+
+        var dates = await db.PriceQuotes.Where(q => q.InstrumentId == instrument.Id).Select(q => q.Date).OrderBy(d => d).ToListAsync(cancellationToken);
+        Assert.Equal([lastQuote, today.AddDays(-3), today.AddDays(-2), today], dates);
+    }
+
+    [Fact]
+    public async Task StartupRun_GapIsCappedAt30Days()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = UtcToday();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var instrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
+        await db.SaveChangesAsync(cancellationToken);
+        await db.SeedQuoteAsync(instrument.Id, today.AddDays(-60), 100m, cancellationToken);
+
+        var source = new ScriptedPriceSource(
+            PriceSource.Yahoo,
+            historyResult: PriceFetchResult<InstrumentQuote>.Success([new InstrumentQuote(instrument.Id, today, 103m)]));
+
+        var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken, SyncRunSource.Startup);
+
+        Assert.Equal(today.AddDays(-30), Assert.Single(source.HistoryWindows).From);
+    }
+
+    [Theory]
+    [InlineData(SyncRunSource.Schedule)]
+    [InlineData(SyncRunSource.Manual)]
+    public async Task ScheduledAndManualRuns_FetchLatestOnly(SyncRunSource runSource)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = UtcToday();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var instrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
+        await db.SaveChangesAsync(cancellationToken);
+        await db.SeedQuoteAsync(instrument.Id, today.AddDays(-5), 100m, cancellationToken);
+
+        var source = new ScriptedPriceSource(
+            PriceSource.Yahoo,
+            PriceFetchResult<InstrumentQuote>.Success([new InstrumentQuote(instrument.Id, today, 103m)]),
+            PriceFetchResult<InstrumentQuote>.Success([new InstrumentQuote(instrument.Id, today.AddDays(-3), 101m)]));
+
+        var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken, runSource);
+
+        Assert.Equal(0, source.HistoryFetchCount);
+        Assert.Equal(instrument.Id, Assert.Single(source.LatestFetchedInstrumentIds));
+    }
+
+    [Fact]
+    public async Task StartupRun_GapFetchError_MarksRunPartial()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = UtcToday();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var broken = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
+        var healthy = NewUsedInstrument(db, "MSFT.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
+        await db.SaveChangesAsync(cancellationToken);
+        await db.SeedQuoteAsync(broken.Id, today.AddDays(-5), 100m, cancellationToken);
+        await db.SeedQuoteAsync(healthy.Id, today.AddDays(-5), 200m, cancellationToken);
+
+        var source = new ScriptedPriceSource(
+            PriceSource.Yahoo,
+            historyResultsByInstrumentId: new Dictionary<Guid, PriceFetchResult<InstrumentQuote>>
+            {
+                [broken.Id] = PriceFetchResult<InstrumentQuote>.Error("simulated failure"),
+                [healthy.Id] = PriceFetchResult<InstrumentQuote>.Success(
+                [
+                    new InstrumentQuote(healthy.Id, today.AddDays(-3), 201m),
+                    new InstrumentQuote(healthy.Id, today.AddDays(-2), 202m),
+                ]),
+            });
+
+        var job = new PriceSyncJob(db, [source], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken, SyncRunSource.Startup);
+
+        var run = await db.SyncRuns.SingleAsync(cancellationToken);
+        Assert.Equal(SyncRunStatus.Partial, run.Status);
+        Assert.Equal(1, run.FailedCount);
+        Assert.Equal(2, await db.PriceQuotes.CountAsync(q => q.InstrumentId == healthy.Id && q.Date > today.AddDays(-5), cancellationToken));
+        Assert.Equal(1, await db.PriceQuotes.CountAsync(q => q.InstrumentId == broken.Id, cancellationToken));
+    }
+
+    [Fact]
+    public async Task StartupRun_GapFill_IsIdempotent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = UtcToday();
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var instrument = NewUsedInstrument(db, "AAPL.US", PriceSource.Yahoo, "USD", AssetClass.Stock);
+        await db.SaveChangesAsync(cancellationToken);
+        await db.SeedQuoteAsync(instrument.Id, today.AddDays(-5), 100m, cancellationToken);
+
+        PriceSyncJob NewJob() => new(
+            db,
+            [new ScriptedPriceSource(PriceSource.Yahoo, historyResult: PriceFetchResult<InstrumentQuote>.Success(
+            [
+                new InstrumentQuote(instrument.Id, today.AddDays(-3), 101m),
+                new InstrumentQuote(instrument.Id, today.AddDays(-2), 102m),
+            ]))],
+            publishEndpoint,
+            TimeProvider.System,
+            NullLogger<PriceSyncJob>.Instance);
+
+        await NewJob().RunAsync(cancellationToken, SyncRunSource.Startup);
+        await NewJob().RunAsync(cancellationToken, SyncRunSource.Startup);
+
+        Assert.Equal(3, await db.PriceQuotes.CountAsync(q => q.InstrumentId == instrument.Id, cancellationToken));
+    }
+
+    private static DateOnly UtcToday() => DateOnly.FromDateTime(DateTime.UtcNow);
+
     private static ActivityListener ListenToPriceSyncJob(ConcurrentBag<Activity> activities)
     {
         var listener = new ActivityListener

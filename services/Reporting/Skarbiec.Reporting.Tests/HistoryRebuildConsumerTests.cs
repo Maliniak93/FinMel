@@ -72,6 +72,46 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task Rebuild_FillsWeekendDaysWithCarriedForwardValue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = Today;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var assetId = Guid.NewGuid();
+        var lastQuoteDay = today.AddDays(-6);
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(assetId, userId, accountId, cancellationToken,
+                assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued, currency: "USD", quantity: 1_000m,
+                quantityHistory: [(today.AddDays(-20), 1_000m)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, lastQuoteDay.AddDays(1), cancellationToken);
+        }
+
+        var client = new FakePriceQuoteClient().WithFxHistory("USDPLN", (lastQuoteDay, 4.0m));
+
+        await RunConsumerAsync(client, async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            for (var offset = 5; offset >= 1; offset--)
+            {
+                var date = today.AddDays(-offset);
+
+                var line = Assert.Single(await GetLinesAsync(containers, accountId, date, cancellationToken));
+                Assert.Equal(4_000m, line.ValuePln);
+                Assert.Equal(4.0m, line.FxRateUsed);
+
+                var snapshot = await GetSnapshotAsync(containers, userId, date, cancellationToken);
+                Assert.NotNull(snapshot);
+                Assert.Equal(4_000m, snapshot.TotalPln);
+            }
+        }, cancellationToken);
+    }
+
+    [Fact]
     public async Task Rebuild_StartMovedLater_DeletesEarlierRows()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

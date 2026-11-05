@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Skarbiec.MarketData.Data;
 using Skarbiec.MarketData.Features.TriggerSync;
+using Skarbiec.MarketData.Sources;
 using Skarbiec.MarketData.Tests.Fixtures;
 using Skarbiec.MarketData.Tests.Fixtures.PriceSources;
 using Skarbiec.Testing.Containers;
@@ -29,6 +30,55 @@ public sealed class StartupSyncTests(SkarbiecContainersFixture containers) : Mar
             var runs = await db.SyncRuns.AsNoTracking().OrderBy(r => r.StartedAt).ToListAsync(cancellationToken);
             Assert.Equal([SyncRunKind.Fx, SyncRunKind.Prices, SyncRunKind.BondCatalog], runs.Select(r => r.Kind));
             Assert.All(runs, r => Assert.Equal(SyncRunSource.Startup, r.Source));
+        }
+        finally
+        {
+            await SyncHost.CleanUpAsync(host, cancellationToken);
+        }
+    }
+
+    [Fact]
+    public async Task FxGapStoredBeforePricesEventPublished()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var lastDay = today.AddDays(-5);
+        var gapDay = today.AddDays(-3);
+        string[] codes = ["EUR", "USD", "GBP", "CHF"];
+
+        Guid instrumentId;
+        await using (var seedDb = CreateDbContext())
+        {
+            await seedDb.SeedCurrencyCatalogAsync(cancellationToken);
+            foreach (var code in codes)
+            {
+                await seedDb.SeedFxRateAsync($"{code}PLN", lastDay, 4m, cancellationToken);
+            }
+
+            instrumentId = await seedDb.SeedInstrumentAsync("AAPL.US", "Apple", PriceSource.Yahoo, "USD", cancellationToken);
+            seedDb.InstrumentUsages.Add(new InstrumentUsage { InstrumentId = instrumentId, AssetCount = 1, FirstUsedAt = DateTimeOffset.UtcNow });
+            await seedDb.SaveChangesAsync(cancellationToken);
+            await seedDb.SeedQuoteAsync(instrumentId, lastDay, 100m, cancellationToken);
+        }
+
+        var fxSource = new ScriptedFxRateSource(
+            PriceFetchResult<FxRateQuote>.Success(codes.Select(c => new FxRateQuote($"{c}PLN", today, 4m)).ToList()),
+            historyResultsByCode: codes.ToDictionary(
+                c => c,
+                c => PriceFetchResult<FxRateQuote>.Success([new FxRateQuote($"{c}PLN", gapDay, 4.1m)])));
+
+        await using var probeDb = CreateDbContext();
+        var priceSource = new ProbingPriceSource(
+            async () => await probeDb.FxRates.AsNoTracking().CountAsync(r => r.Date == gapDay, cancellationToken) == codes.Length,
+            _ => [new InstrumentQuote(instrumentId, gapDay, 101m)]);
+
+        var host = await SyncHost.StartAsync(
+            _containers, fxSource, FakeMfBondSource.FromFixture(), cancellationToken, priceSources: [priceSource]);
+        try
+        {
+            var fxGapAlreadyStored = await priceSource.ProbeResult.WaitAsync(TimeSpan.FromSeconds(30), cancellationToken);
+
+            Assert.True(fxGapAlreadyStored, "the prices run fetched before the FX gap was stored.");
         }
         finally
         {

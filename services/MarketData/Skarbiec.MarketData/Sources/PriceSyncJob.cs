@@ -21,6 +21,8 @@ public sealed class PriceSyncJob(
     // Registered in Program.cs: ServiceDefaults adds only the app's own and MassTransit's sources.
     public const string ActivitySourceName = "Skarbiec.MarketData.PriceSyncJob";
 
+    internal const int MaxGapDays = 30;
+
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
     public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken) =>
@@ -63,6 +65,11 @@ public sealed class PriceSyncJob(
         var (instruments, skipped) = await GetInstrumentsToSyncAsync(cancellationToken);
         var sourcesByType = priceSources.ToDictionary(s => s.Source);
 
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var lastQuoteDates = run.Source == SyncRunSource.Startup
+            ? await GetLastQuoteDatesAsync(instruments, cancellationToken)
+            : [];
+
         var synced = 0;
         var noData = 0;
         var failed = 0;
@@ -80,8 +87,62 @@ public sealed class PriceSyncJob(
                 continue;
             }
 
+            var latestInstruments = groupInstruments;
+
+            if (run.Source == SyncRunSource.Startup)
+            {
+                var gapInstruments = new List<(Instrument Instrument, DateOnly From)>();
+                latestInstruments = [];
+                foreach (var instrument in groupInstruments)
+                {
+                    if (lastQuoteDates.TryGetValue(instrument.Id, out var lastDate) && ClampGapStart(lastDate, today) is { } from)
+                    {
+                        gapInstruments.Add((instrument, from));
+                    }
+                    else
+                    {
+                        latestInstruments.Add(instrument);
+                    }
+                }
+
+                foreach (var (instrument, from) in gapInstruments)
+                {
+                    var gapResult = await SafeFetch.RunAsync(
+                        () => source.FetchHistoryAsync(instrument, from, today, cancellationToken),
+                        ex => $"{group.Key} history fetch for {instrument.Ticker} threw unexpectedly: {ex.Message}");
+
+                    switch (gapResult.Outcome)
+                    {
+                        case PriceFetchOutcome.Success when gapResult.Values.Count > 0:
+                            await QuoteUpsert.UpsertInstrumentQuotesAsync(db, gapResult.Values, cancellationToken);
+                            synced++;
+                            break;
+                        case PriceFetchOutcome.Success:
+                        case PriceFetchOutcome.NoData:
+                            noData++;
+                            break;
+                        case PriceFetchOutcome.Error:
+                            logger.LogWarning(
+                                "PriceSyncJob: {Source} history fetch for instrument {InstrumentId} failed: {Reason}",
+                                group.Key, instrument.Id, gapResult.ErrorReason);
+                            failed++;
+                            break;
+                    }
+
+                    if (source.RequestDelay > TimeSpan.Zero)
+                    {
+                        await Task.Delay(source.RequestDelay, cancellationToken);
+                    }
+                }
+            }
+
+            if (latestInstruments.Count == 0)
+            {
+                continue;
+            }
+
             var result = await SafeFetch.RunAsync(
-                () => source.FetchLatestAsync(groupInstruments, cancellationToken),
+                () => source.FetchLatestAsync(latestInstruments, cancellationToken),
                 ex => $"{group.Key} fetch threw unexpectedly: {ex.Message}");
 
             switch (result.Outcome)
@@ -89,14 +150,14 @@ public sealed class PriceSyncJob(
                 case PriceFetchOutcome.Success:
                     var returnedIds = await QuoteUpsert.UpsertInstrumentQuotesAsync(db, result.Values, cancellationToken);
                     synced += returnedIds.Count;
-                    failed += groupInstruments.Count(i => !returnedIds.Contains(i.Id));
+                    failed += latestInstruments.Count(i => !returnedIds.Contains(i.Id));
                     break;
                 case PriceFetchOutcome.NoData:
-                    noData += groupInstruments.Count;
+                    noData += latestInstruments.Count;
                     break;
                 case PriceFetchOutcome.Error:
                     logger.LogWarning("PriceSyncJob: {Source} fetch failed: {Reason}", group.Key, result.ErrorReason);
-                    failed += groupInstruments.Count;
+                    failed += latestInstruments.Count;
                     break;
             }
 
@@ -135,6 +196,27 @@ public sealed class PriceSyncJob(
         logger.LogInformation(
             "PriceSyncJob run {RunId} finished: {Status} (synced={Synced}, noData={NoData}, failed={Failed}, skipped={Skipped}).",
             run.Id, run.Status, synced, noData, failed, skipped);
+    }
+
+    // Null when the last quote is already today: nothing is missing, so the latest fetch keeps the run's value fresh.
+    internal static DateOnly? ClampGapStart(DateOnly lastQuote, DateOnly today)
+    {
+        var from = lastQuote.AddDays(1);
+        var earliest = today.AddDays(-MaxGapDays);
+        from = from < earliest ? earliest : from;
+        return from > today ? null : from;
+    }
+
+    private async Task<Dictionary<Guid, DateOnly>> GetLastQuoteDatesAsync(
+        List<Instrument> instruments, CancellationToken cancellationToken)
+    {
+        var ids = instruments.Select(i => i.Id).ToList();
+        return await db.PriceQuotes
+            .AsNoTracking()
+            .Where(q => ids.Contains(q.InstrumentId))
+            .GroupBy(q => q.InstrumentId)
+            .Select(g => new { InstrumentId = g.Key, Last = g.Max(q => q.Date) })
+            .ToDictionaryAsync(x => x.InstrumentId, x => x.Last, cancellationToken);
     }
 
     // No exception for Unverified instruments: HistoryBackfillJob resolves those on creation and on first use.
