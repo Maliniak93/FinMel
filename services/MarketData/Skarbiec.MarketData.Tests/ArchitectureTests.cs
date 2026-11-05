@@ -30,6 +30,23 @@ public sealed class ArchitectureTests
                 "Skarbiec.MarketData.Sources.MfBonds.IMfBondSource")
             .Should()
             .ResideInNamespaceStartingWith("Skarbiec.MarketData.Sources")
+            .Or()
+            .ResideInNamespaceStartingWith("Skarbiec.MarketData.Features.GetFxRate")
+            .GetResult();
+
+        Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void OnlyGetFxRateSlice_DependsOn_FxRateSource_InAFeature()
+    {
+        var result = Types.InAssembly(typeof(Program).Assembly)
+            .That()
+            .ResideInNamespaceStartingWith("Skarbiec.MarketData.Features")
+            .And()
+            .DoNotResideInNamespaceStartingWith("Skarbiec.MarketData.Features.GetFxRate")
+            .ShouldNot()
+            .HaveDependencyOn("Skarbiec.MarketData.Sources.IFxRateSource")
             .GetResult();
 
         Assert.True(result.IsSuccessful, string.Join(", ", result.FailingTypeNames ?? []));
