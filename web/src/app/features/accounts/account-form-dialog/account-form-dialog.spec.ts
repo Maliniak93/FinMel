@@ -8,6 +8,7 @@ import { assetGroups, blueGroupId, isGroupListRequest } from '../../groups/testi
 import { AccountFormDialog, type AccountFormDialogData } from './account-form-dialog';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { labelsOf, restoreEnglish } from '../../../../testing/i18n';
+import { bankAccountResponse } from '../../../../testing/bank-account-fixtures';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -253,7 +254,111 @@ describe('AccountFormDialog', () => {
       variant: 0,
       bankName: 'mBank',
       annualInterestRatePercent: 4,
+      outsideNetWorth: false,
       groupId: null,
+    });
+  });
+
+  describe('outside net worth switch', () => {
+    function switchToggle(): HTMLButtonElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+        '[data-testid="outside-net-worth"] button',
+      );
+    }
+
+    function groupField(): HTMLElement | null {
+      return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('app-group-select');
+    }
+
+    it('outside net worth switch: off by default with the group select shown', async () => {
+      await setup({});
+      component['form'].controls.type.setValue(2);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component['form'].get('outsideNetWorth')?.value).toBe(false);
+      expect(switchToggle()).not.toBeNull();
+      expect(groupField()).not.toBeNull();
+    });
+
+    it('outside net worth switch: on hides the group select and creates with outsideNetWorth and no group', async () => {
+      await setup({});
+      fetchSpy.mockResolvedValue(jsonResponse({ ...existingAccount, type: 2 }, 201));
+      component['form'].controls.name.setValue('Revolut ROR');
+      component['form'].controls.type.setValue(2);
+      component['form'].controls.currency.setValue('PLN');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      await pickSelectOption(fixture, 'groupId', 'Emerytura');
+
+      switchToggle()!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(groupField()).toBeNull();
+
+      await component['onSubmit']();
+
+      const request = writes()[0];
+      expect(request.method).toBe('POST');
+      expect(JSON.parse(await request.text())).toMatchObject({
+        name: 'Revolut ROR',
+        type: 2,
+        currency: 'PLN',
+        outsideNetWorth: true,
+        groupId: null,
+      });
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
+    });
+
+    it('outside net worth switch: absent for Brokerage and Bonds', async () => {
+      await setup({});
+      expect(switchToggle()).toBeNull();
+
+      component['form'].controls.type.setValue(1);
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(switchToggle()).toBeNull();
+    });
+
+    it('edit flagged account', async () => {
+      const flagged = bankAccountResponse({
+        id: existingAccount.id,
+        name: 'Revolut ROR',
+        cashBalance: 3200,
+        outsideNetWorth: true,
+        groupId: blueGroupId,
+        bank: { variant: 0, bankName: 'Revolut', annualInterestRatePercent: 0 },
+      });
+      await setup({ account: flagged });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(component['form'].get('outsideNetWorth')?.value).toBe(true);
+      expect(groupField()).toBeNull();
+
+      switchToggle()!.click();
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      expect(groupField()).not.toBeNull();
+      expect(component['form'].controls.groupId.value).toBeNull();
+
+      fetchSpy.mockResolvedValue(jsonResponse(flagged));
+      await component['onSubmit']();
+
+      const request = writes()[0];
+      expect(request.method).toBe('PUT');
+      expect(JSON.parse(await request.text())).toEqual({
+        name: 'Revolut ROR',
+        variant: 0,
+        bankName: 'Revolut',
+        annualInterestRatePercent: 0,
+        outsideNetWorth: false,
+        groupId: null,
+      });
+      expect(dialogRef.close).toHaveBeenCalledWith(true);
     });
   });
 

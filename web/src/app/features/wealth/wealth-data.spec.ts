@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { IDS, mockWealthApi } from '../../../testing/wealth-fixtures';
+import { IDS, account, mockWealthApi, wealthApiData } from '../../../testing/wealth-fixtures';
 import { WealthData } from './wealth-data';
 
 describe('WealthData', () => {
@@ -69,5 +69,36 @@ describe('WealthData', () => {
 
     expect(names()).toContain('Old Corp');
     expect(data.rows().filter((row) => row.isArchived).length).toBe(2);
+  });
+
+  it('omits flagged bank accounts', async () => {
+    const flaggedCashId = 'b5555555-5555-5555-5555-555555555555';
+    const data = wealthApiData();
+    data.accounts.push(
+      account({
+        id: '55555555-5555-5555-5555-555555555555',
+        name: 'Revolut ROR',
+        type: 2,
+        cashBalance: 300,
+        cashBalancePln: 300,
+        outsideNetWorth: true,
+        groupId: null,
+        cashAssetId: flaggedCashId,
+      }),
+    );
+    data.dashboard.byAsset.push({
+      assetId: flaggedCashId,
+      valuePln: 300,
+      priceDate: null,
+      isStale: false,
+    });
+    fetchSpy.mockRestore();
+    fetchSpy = mockWealthApi({ data });
+
+    const wealth = await loaded();
+
+    expect(wealth.rows().map((row) => row.name)).not.toContain('Revolut ROR');
+    expect(wealth.typeSums().bank).toBe(45000);
+    expect(wealth.total()).toBe(115800);
   });
 });

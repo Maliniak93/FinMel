@@ -200,13 +200,24 @@ export class AccountDetail {
     const account = this.accountResource.value();
     const totals = this.totals();
     const currency = account.currency;
+    const balance: SummaryItem = {
+      labelKey: account.bank ? 'bankAccounts.balance' : 'accounts.balances.cash',
+      amount: Number(account.cashBalance),
+      currency,
+      testId: 'account-cash',
+    };
+    if (account.bank && account.outsideNetWorth) {
+      return [
+        balance,
+        {
+          labelKey: 'bankAccounts.interestCredited',
+          amount: Number(account.bank.interestCreditedNet),
+          currency,
+        },
+      ];
+    }
     return [
-      {
-        labelKey: account.bank ? 'bankAccounts.balance' : 'accounts.balances.cash',
-        amount: Number(account.cashBalance),
-        currency,
-        testId: 'account-cash',
-      },
+      balance,
       account.bank
         ? {
             labelKey: 'bankAccounts.interestCredited',

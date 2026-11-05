@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
@@ -49,6 +50,7 @@ export interface AccountFormDialogData {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
+    MatSlideToggleModule,
     GroupSelect,
     TranslocoPipe,
   ],
@@ -83,6 +85,11 @@ export class AccountFormDialog {
       Number(this.data.account?.bank?.annualInterestRatePercent ?? 0),
       [Validators.required, Validators.min(0), Validators.max(100)],
     ],
+    outsideNetWorth: [this.data.account?.outsideNetWorth ?? false],
+  });
+
+  protected readonly outsideNetWorth = toSignal(this.form.controls.outsideNetWorth.valueChanges, {
+    initialValue: this.form.controls.outsideNetWorth.value,
   });
 
   private readonly selectedType = toSignal(this.form.controls.type.valueChanges, {
@@ -92,6 +99,9 @@ export class AccountFormDialog {
   protected readonly isBank = computed(() => Number(this.selectedType()) === ACCOUNT_TYPE.Bank);
 
   constructor() {
+    this.form.controls.outsideNetWorth.valueChanges.subscribe(() =>
+      this.form.controls.groupId.setValue(null),
+    );
     if (this.isEdit) {
       this.form.controls.type.disable();
       this.form.controls.wrapper.disable();
@@ -119,12 +129,13 @@ export class AccountFormDialog {
       bankName: values.bankName.trim() || null,
       annualInterestRatePercent: Number(values.annualInterestRatePercent),
     };
-    const groupId = values.groupId;
+    const outsideNetWorth = values.outsideNetWorth;
+    const groupId = bank && outsideNetWorth ? null : values.groupId;
     const result = this.data.account
       ? await putApiPortfolioAccountsById({
           path: { id: this.data.account.id },
           body: bank
-            ? { name: values.name, ...bankTerms, groupId }
+            ? { name: values.name, ...bankTerms, outsideNetWorth, groupId }
             : { name: values.name, groupId },
         })
       : await postApiPortfolioAccounts({
@@ -135,6 +146,7 @@ export class AccountFormDialog {
                 wrapper: TAX_WRAPPER.Regular,
                 currency: values.currency,
                 ...bankTerms,
+                outsideNetWorth,
                 groupId,
               }
             : { name: values.name, type: values.type, wrapper: values.wrapper, groupId },

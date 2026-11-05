@@ -203,6 +203,9 @@ export class WealthData {
 
     if (this.accounts.hasValue()) {
       for (const account of this.accounts.value()) {
+        if (account.outsideNetWorth) {
+          continue;
+        }
         const isBank = Number(account.type) === ACCOUNT_TYPE.Bank;
         const valued = line(account.cashAssetId);
         rows.push({

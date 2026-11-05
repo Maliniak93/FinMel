@@ -2,10 +2,11 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNativeDateAdapter } from '@angular/material/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
-import { restoreEnglish, translationValues } from '../../../../testing/i18n';
+import { restoreEnglish, switchLanguage, translationValues } from '../../../../testing/i18n';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { jsonResponse, renderedText } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { pickSelectOption, selectOptionLabels } from '../../deposits/testing/deposit-fixtures';
 import {
   CashBankTransferDialog,
   type CashBankTransferDialogData,
@@ -33,8 +34,24 @@ const bankAnchored: CashBankTransferDialogData = {
   anchorBalance: 5000,
 };
 
-function account(name: string, currency: string, cashAssetId: string, isArchived = false) {
-  return { id: `acc-${name}`, name, currency, cashAssetId, cashBalance: 5000, isArchived };
+const flaggedMoneyId = '55555555-5555-5555-5555-555555555555';
+
+function account(
+  name: string,
+  currency: string,
+  cashAssetId: string,
+  isArchived = false,
+  outsideNetWorth = false,
+) {
+  return {
+    id: `acc-${name}`,
+    name,
+    currency,
+    cashAssetId,
+    cashBalance: 5000,
+    isArchived,
+    outsideNetWorth,
+  };
 }
 
 describe('CashBankTransferDialog', () => {
@@ -54,7 +71,14 @@ describe('CashBankTransferDialog', () => {
     await restoreEnglish();
   });
 
-  async function setup(data: CashBankTransferDialogData): Promise<void> {
+  async function setup(
+    data: CashBankTransferDialogData,
+    accounts: unknown[] = [
+      account('mBank', 'PLN', bankMoneyId),
+      account('mBank USD', 'USD', otherBankMoneyId),
+      account('Old bank', 'PLN', '44444444-4444-4444-4444-444444444444', true),
+    ],
+  ): Promise<void> {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 9, 20));
     dialogRef = { close: vi.fn() };
@@ -67,11 +91,7 @@ describe('CashBankTransferDialog', () => {
       if (request.url.includes('/transfer-candidates')) {
         return jsonResponse([{ assetId: placeBalanceId, name: 'Safe', balance: 700 }]);
       }
-      return jsonResponse([
-        account('mBank', 'PLN', bankMoneyId),
-        account('mBank USD', 'USD', otherBankMoneyId),
-        account('Old bank', 'PLN', '44444444-4444-4444-4444-444444444444', true),
-      ]);
+      return jsonResponse(accounts);
     });
 
     await TestBed.configureTestingModule({
@@ -105,6 +125,21 @@ describe('CashBankTransferDialog', () => {
     await setup(placeAnchored);
 
     expect(counterparts().map((c) => c.name)).toEqual(['mBank']);
+  });
+
+  it('labels flagged accounts and keeps them selectable', async () => {
+    await setup(placeAnchored, [
+      account('mBank', 'PLN', bankMoneyId),
+      account('Revolut ROR', 'PLN', flaggedMoneyId, false, true),
+    ]);
+    await switchLanguage(fixture, 'pl');
+
+    await pickSelectOption(fixture, 'counterpartAssetId', 'Revolut ROR');
+    expect(component['form'].controls.counterpartAssetId.value).toBe(flaggedMoneyId);
+
+    const labels = await selectOptionLabels(fixture, 'counterpartAssetId');
+    expect(labels.find((label) => label.includes('Revolut ROR'))).toMatch(/·\s*Poza majątkiem$/);
+    expect(labels.find((label) => label.includes('mBank'))).not.toMatch(/Poza majątkiem/);
   });
 
   it('offers from a bank account the place balances in its currency', async () => {

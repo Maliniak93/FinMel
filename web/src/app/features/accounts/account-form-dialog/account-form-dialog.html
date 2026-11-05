@@ -66,6 +66,15 @@
           <mat-error>{{ form.controls.annualInterestRatePercent.getError('server') }}</mat-error>
         }
       </mat-form-field>
+
+      <div data-testid="outside-net-worth" class="account-form-dialog__field">
+        <mat-slide-toggle formControlName="outsideNetWorth">
+          {{ 'accounts.form.outsideNetWorth' | transloco }}
+        </mat-slide-toggle>
+        <p class="account-form-dialog__hint">
+          {{ 'accounts.form.outsideNetWorthHint' | transloco }}
+        </p>
+      </div>
     } @else {
       <mat-form-field appearance="outline" class="account-form-dialog__field">
         <mat-label>{{ 'accounts.wrapper' | transloco }}</mat-label>
@@ -77,10 +86,12 @@
       </mat-form-field>
     }
 
-    <app-group-select
-      formControlName="groupId"
-      [labelKey]="isBank() ? 'groups.field.group' : 'groups.field.defaultGroup'"
-    />
+    @if (!(isBank() && outsideNetWorth())) {
+      <app-group-select
+        formControlName="groupId"
+        [labelKey]="isBank() ? 'groups.field.group' : 'groups.field.defaultGroup'"
+      />
+    }
 
     @if (isEdit) {
       <p class="account-form-dialog__hint">{{ 'accounts.form.fixedHint' | transloco }}</p>

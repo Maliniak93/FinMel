@@ -470,4 +470,23 @@ describe('AccountDetail', () => {
     expect(dialogType).toBe(ContributionLimitDialog);
     expect(config.data).toMatchObject({ accountId, year: 2026, limitPln: 26000 });
   });
+
+  it('flagged account shows balance only', async () => {
+    await setup({
+      type: 2,
+      wrapper: 0,
+      currency: 'PLN',
+      bank: bankTerms(),
+      outsideNetWorth: true,
+      cashBalance: 3200,
+    });
+    await switchLanguage(fixture, 'pl');
+
+    expect(text()).toContain(formatMoney(3200, 'PLN').replace(/\s+/g, ' '));
+    expect(root().querySelector('.account-detail__meta')?.textContent).toContain('Poza majątkiem');
+    const strip = root().querySelector('app-summary-strip')?.textContent ?? '';
+    expect(strip).toContain('Saldo');
+    expect(strip).not.toContain('Razem');
+    expect(strip).not.toContain(formatMoney(5000, 'PLN').replace(/\s+/g, ' '));
+  });
 });

@@ -20,6 +20,9 @@
         @for (counterpart of counterparts; track counterpart.assetId) {
           <mat-option [value]="counterpart.assetId">
             {{ counterpart.name }} ({{ formatMoney(counterpart.balance, data.currency) }})
+            @if (counterpart.outsideNetWorth) {
+              · {{ 'accounts.outsideNetWorthLabel' | transloco }}
+            }
           </mat-option>
         }
       </mat-select>

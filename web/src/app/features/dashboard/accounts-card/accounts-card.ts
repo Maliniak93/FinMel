@@ -69,7 +69,7 @@ export class AccountsCard {
           return [{ id: null, name: null, isBank: false, entry }];
         }
         const account = accounts.get(entry.accountId);
-        return account && !account.isArchived
+        return account && !account.isArchived && !account.outsideNetWorth
           ? [
               {
                 id: account.id,

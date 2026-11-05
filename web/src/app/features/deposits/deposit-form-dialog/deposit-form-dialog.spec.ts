@@ -25,9 +25,19 @@ import {
   selectOptionLabels,
   TERM_UNIT,
 } from '../testing/deposit-fixtures';
+import { bankAccountResponse } from '../../../../testing/bank-account-fixtures';
 import { DepositFormDialog, type DepositFormDialogData } from './deposit-form-dialog';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { labelsOf, polishProblems, restoreEnglish, switchLanguage } from '../../../../testing/i18n';
+
+const flaggedAccount = bankAccountResponse({
+  id: 'e5e5e5e5-e5e5-e5e5-e5e5-e5e5e5e5e5e5',
+  name: 'Revolut ROR',
+  cashAssetId: 'e5e5e5e5-0000-0000-0000-000000000005',
+  cashBalance: 3200,
+  outsideNetWorth: true,
+  bank: { variant: 0, bankName: 'Revolut', annualInterestRatePercent: 0 },
+});
 
 describe('DepositFormDialog', () => {
   let fixture: ComponentFixture<DepositFormDialog>;
@@ -51,6 +61,7 @@ describe('DepositFormDialog', () => {
   async function setup(
     data: DepositFormDialogData,
     writeResponse: () => Response = () => jsonResponse(depositResponse(), 201),
+    accounts: unknown[] = bankAccountsForDeposits,
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -58,7 +69,7 @@ describe('DepositFormDialog', () => {
         return jsonResponse(assetGroups);
       }
       if (method(input) === 'GET' && requestUrl(input).includes('/api/portfolio/accounts')) {
-        return jsonResponse(bankAccountsForDeposits);
+        return jsonResponse(accounts);
       }
       return writeResponse();
     });
@@ -394,6 +405,30 @@ describe('DepositFormDialog', () => {
       expect(hasControl(form(), 'taxExempt')).toBe(false);
       expect(element.querySelector('mat-slide-toggle')).toBeNull();
       expect(element.querySelector('mat-select[formcontrolname="currency"]')).toBeNull();
+    });
+
+    it('labels flagged accounts in the source list and keeps them selectable', async () => {
+      await setup({}, undefined, [mBankAccount, flaggedAccount]);
+      await switchLanguage(fixture, 'pl');
+
+      await pickSelectOption(fixture, 'sourceAccountId', 'Revolut ROR');
+      expect(form().controls['sourceAccountId'].value).toBe(flaggedAccount.id);
+
+      const labels = await optionLabels('sourceAccountId');
+      expect(labels.find((label) => label.includes('Revolut ROR'))).toMatch(/·\s*Poza majątkiem$/);
+      expect(labels.find((label) => label.includes('mBank'))).not.toMatch(/Poza majątkiem/);
+    });
+
+    it('labels flagged accounts in the return list and keeps them selectable', async () => {
+      await setup({}, undefined, [mBankAccount, flaggedAccount]);
+      await switchLanguage(fixture, 'pl');
+      await fill({ sourceAccountId: mBankAccount.id });
+
+      await pickSelectOption(fixture, 'returnAccountId', 'Revolut ROR');
+      expect(form().controls['returnAccountId'].value).toBe(flaggedAccount.id);
+
+      const labels = await optionLabels('returnAccountId');
+      expect(labels.find((label) => label.includes('Revolut ROR'))).toMatch(/·\s*Poza majątkiem$/);
     });
 
     it('a source account is required to submit', async () => {

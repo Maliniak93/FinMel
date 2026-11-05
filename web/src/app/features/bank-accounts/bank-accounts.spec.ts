@@ -57,6 +57,35 @@ const archived = bankAccountResponse({
   outsideNetWorth: false,
 });
 
+const ror = bankAccountResponse({
+  id: '66666666-6666-6666-6666-666666666666',
+  name: 'mBank ROR',
+  cashBalance: 3200,
+  cashBalancePln: 3200,
+  outsideNetWorth: true,
+  bank: { variant: BANK_VARIANT.Current, bankName: 'mBank', annualInterestRatePercent: 0 },
+});
+
+const revolut = bankAccountResponse({
+  id: '77777777-7777-7777-7777-777777777777',
+  name: 'Revolut EUR',
+  currency: 'EUR',
+  cashBalance: 100,
+  cashBalancePln: 400,
+  outsideNetWorth: true,
+  bank: { variant: BANK_VARIANT.Current, bankName: 'Revolut', annualInterestRatePercent: 0 },
+});
+
+const revolutUsd = bankAccountResponse({
+  id: '88888888-8888-8888-8888-888888888888',
+  name: 'Revolut USD',
+  currency: 'USD',
+  cashBalance: 50,
+  cashBalancePln: null,
+  outsideNetWorth: true,
+  bank: { variant: BANK_VARIANT.Current, bankName: 'Revolut', annualInterestRatePercent: 0 },
+});
+
 describe('BankAccounts', () => {
   let fixture: ComponentFixture<BankAccounts>;
   let component: BankAccounts;
@@ -307,5 +336,61 @@ describe('BankAccounts', () => {
     for (const [message] of snackBar.open.mock.calls) {
       expect(message).toBe('Na to konto wróci otwarta lokata');
     }
+  });
+
+  function currentSection(): HTMLElement | null {
+    return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '[data-testid="current-accounts"]',
+    );
+  }
+
+  function mainTable(): HTMLElement {
+    return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      'table.bank-accounts__table',
+    )!;
+  }
+
+  it('konta bieżące section', async () => {
+    await setup([mBank, ror, revolut]);
+    await switchLanguage(fixture, 'pl');
+
+    const section = currentSection();
+    expect(section).not.toBeNull();
+    expect(section!.textContent).toContain('Konta bieżące');
+    expect(section!.textContent).toContain('mBank ROR');
+    expect(section!.textContent).toContain('Revolut EUR');
+    expect(section!.textContent).toContain(formatMoney(3600, 'PLN'));
+    expect(section!.textContent).not.toContain('niepełna suma');
+
+    expect(mainTable().textContent).toContain('mBank');
+    expect(mainTable().textContent).not.toContain('mBank ROR');
+    expect(mainTable().textContent).not.toContain('Revolut EUR');
+  });
+
+  it('marks the sum of the konta bieżące section incomplete when an account has no PLN value', async () => {
+    await setup([mBank, ror, revolutUsd]);
+    await switchLanguage(fixture, 'pl');
+
+    expect(currentSection()!.textContent).toContain('Revolut USD');
+    expect(currentSection()!.textContent).toContain('niepełna suma');
+  });
+
+  it('no section without flagged accounts', async () => {
+    await setup([mBank, nest]);
+    await switchLanguage(fixture, 'pl');
+
+    expect(currentSection()).toBeNull();
+    expect(pageText()).not.toContain('Konta bieżące');
+  });
+
+  it('variant chips do not filter the section', async () => {
+    await setup([mBank, nest, ror]);
+    await switchLanguage(fixture, 'pl');
+
+    await pickVariant('Oszczędnościowe');
+
+    expect(currentSection()!.textContent).toContain('mBank ROR');
+    expect(currentSection()!.textContent).toContain(formatMoney(3200, 'PLN'));
+    expect(mainTable().textContent).not.toContain('mBank ROR');
   });
 });

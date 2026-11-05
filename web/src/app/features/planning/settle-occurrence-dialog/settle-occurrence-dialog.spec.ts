@@ -5,7 +5,9 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
+import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
 import { jsonResponse } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { pickSelectOption, selectOptionLabels } from '../../deposits/testing/deposit-fixtures';
 import { SettleOccurrenceDialog } from './settle-occurrence-dialog';
 
 const plnAccountId = '11111111-1111-1111-1111-111111111111';
@@ -13,7 +15,13 @@ const otherPlnAccountId = '44444444-4444-4444-4444-444444444444';
 const eurAccountId = '22222222-2222-2222-2222-222222222222';
 const archivedAccountId = '33333333-3333-3333-3333-333333333333';
 
-function account(id: string, name: string, currency: string, isArchived = false) {
+function account(
+  id: string,
+  name: string,
+  currency: string,
+  isArchived = false,
+  outsideNetWorth = false,
+) {
   return {
     id,
     name,
@@ -23,7 +31,7 @@ function account(id: string, name: string, currency: string, isArchived = false)
     isArchived,
     cashAssetId: `cash-${id}`,
     cashBalance: 0,
-    outsideNetWorth: false,
+    outsideNetWorth,
   };
 }
 
@@ -64,15 +72,22 @@ describe('SettleOccurrenceDialog', () => {
     vi.setSystemTime(new Date(2026, 9, 20, 12));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.useRealTimers();
     fetchSpy.mockRestore();
+    await restoreEnglish();
   });
 
   async function setup(
     data: Record<string, unknown> = occurrence,
     putResponse: () => Response = () => new Response(null, { status: 204 }),
     dataKey: 'occurrence' | 'oneOffIncome' = 'occurrence',
+    accounts: unknown[] = [
+      account(plnAccountId, 'mBank ROR', 'PLN'),
+      account(otherPlnAccountId, 'Konto firmowe', 'PLN'),
+      account(eurAccountId, 'Revolut EUR', 'EUR'),
+      account(archivedAccountId, 'Stare konto', 'PLN', true),
+    ],
   ): Promise<void> {
     dialogRef = { close: vi.fn() };
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
@@ -80,12 +95,7 @@ describe('SettleOccurrenceDialog', () => {
       if (request.method === 'PUT') {
         return putResponse();
       }
-      return jsonResponse([
-        account(plnAccountId, 'mBank ROR', 'PLN'),
-        account(otherPlnAccountId, 'Konto firmowe', 'PLN'),
-        account(eurAccountId, 'Revolut EUR', 'EUR'),
-        account(archivedAccountId, 'Stare konto', 'PLN', true),
-      ]);
+      return jsonResponse(accounts);
     });
 
     await TestBed.configureTestingModule({
@@ -213,6 +223,21 @@ describe('SettleOccurrenceDialog', () => {
       createDeposit: true,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('labels flagged accounts and keeps them selectable', async () => {
+    await setup(occurrence, undefined, 'occurrence', [
+      account(plnAccountId, 'mBank ROR', 'PLN'),
+      account(otherPlnAccountId, 'Konto firmowe', 'PLN', false, true),
+    ]);
+    await switchLanguage(fixture, 'pl');
+
+    await pickSelectOption(fixture, 'accountId', 'Konto firmowe');
+    expect(component['form'].controls.accountId.value).toBe(otherPlnAccountId);
+
+    const labels = await selectOptionLabels(fixture, 'accountId');
+    expect(labels.find((label) => label.includes('Konto firmowe'))).toMatch(/·\s*Poza majątkiem$/);
+    expect(labels.find((label) => label.includes('mBank ROR'))).not.toMatch(/Poza majątkiem/);
   });
 
   it('checks the deposit box for a new settlement and sends the unticked choice', async () => {
