@@ -75,27 +75,29 @@
               />
             </li>
           }
-          <li>
-            <article class="groups-page__ungrouped" data-testid="ungrouped-card">
-              <h2>{{ 'groups.field.none' | transloco }}</h2>
-              <p class="groups-page__ungrouped-value" data-testid="ungrouped-value">
-                <app-money [amount]="summary().ungrouped" />
-              </p>
-              <p class="groups-page__ungrouped-count" data-testid="ungrouped-count">
-                {{ 'groups.assetCount' | transloco: { count: summary().ungroupedCount } }}
-              </p>
-              <button
-                mat-stroked-button
-                type="button"
-                class="groups-page__ungrouped-assets"
-                data-testid="ungrouped-assets"
-                (click)="openAssets(null)"
-              >
-                {{ 'groups.assets.manage' | transloco }}
-              </button>
-            </article>
-          </li>
         </ul>
+
+        @if (summary().ungroupedCount > 0) {
+          <article class="groups-page__ungrouped" data-testid="ungrouped-card">
+            <span class="groups-page__ungrouped-dot" aria-hidden="true"></span>
+            <h2>{{ 'groups.field.none' | transloco }}</h2>
+            <p class="groups-page__ungrouped-value" data-testid="ungrouped-value">
+              <app-money [amount]="summary().ungrouped" />
+            </p>
+            <p class="groups-page__ungrouped-count" data-testid="ungrouped-count">
+              {{ 'groups.assetCount' | transloco: { count: summary().ungroupedCount } }}
+            </p>
+            <button
+              mat-stroked-button
+              type="button"
+              class="groups-page__ungrouped-assets"
+              data-testid="ungrouped-assets"
+              (click)="openAssets(null)"
+            >
+              {{ 'groups.assets.manage' | transloco }}
+            </button>
+          </article>
+        }
       </mat-drawer-content>
     </mat-drawer-container>
   }

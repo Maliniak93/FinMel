@@ -1,5 +1,9 @@
-<article class="group-card" [class.group-card--selected]="selected()" data-testid="group-card">
-  <div class="group-card__bar" [style.background-color]="color()"></div>
+<article
+  class="group-card"
+  [class.group-card--selected]="selected()"
+  [style.border-top-color]="color()"
+  data-testid="group-card"
+>
   <div class="group-card__body">
     <header class="group-card__header">
       <h2 class="group-card__name" data-testid="group-name">{{ group().name }}</h2>
@@ -62,19 +66,22 @@
     </p>
 
     @if (allocationRows().length > 0) {
-      <app-allocation-bar
-        [rows]="allocationRows()"
-        [targetLabel]="targetLabel()"
-        [actualLabel]="actualLabel()"
-      />
-      @if (flagged()) {
-        <p class="group-card__flag" data-testid="group-deviation-flag">
-          <mat-icon class="group-card__flag-icon" aria-hidden="true">warning</mat-icon>
-          {{
-            'groups.card.deviation' | transloco: { pp: formatPercentNumber(metrics().maxDeviation) }
-          }}
-        </p>
-      }
+      <div class="group-card__allocation" data-testid="group-allocation">
+        <app-allocation-bar
+          [rows]="allocationRows()"
+          [targetLabel]="targetLabel()"
+          [actualLabel]="actualLabel()"
+        />
+        @if (flagged()) {
+          <p class="group-card__flag" data-testid="group-deviation-flag">
+            <mat-icon class="group-card__flag-icon" aria-hidden="true">warning</mat-icon>
+            {{
+              'groups.card.deviation'
+                | transloco: { pp: formatPercentNumber(metrics().maxDeviation) }
+            }}
+          </p>
+        }
+      </div>
     }
 
     @if (metrics().value === null) {

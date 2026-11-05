@@ -42,22 +42,28 @@
 
 .groups-page__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-  margin: 0 0 24px;
+  grid-template-columns: 1fr;
+  gap: var(--sk-space-6);
+  margin: 0 0 var(--sk-space-6);
   padding: 0;
   list-style: none;
 }
 
+@media (width >= 720px) {
+  .groups-page__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .groups-page__ungrouped {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sk-space-3);
   box-sizing: border-box;
-  height: 100%;
-  padding: 16px 20px;
+  padding: var(--sk-space-4);
   border: 1px dashed var(--mat-sys-outline);
-  border-radius: 8px;
+  border-radius: var(--sk-radius-md);
 
   h2 {
     margin: 0;
@@ -67,6 +73,14 @@
   p {
     margin: 0;
   }
+}
+
+.groups-page__ungrouped-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: var(--sk-g-none);
 }
 
 .groups-page__ungrouped-value {
@@ -79,8 +93,7 @@
 }
 
 .groups-page__ungrouped-assets {
-  align-self: flex-start;
-  margin-top: auto;
+  margin-inline-start: auto;
 }
 
 @media (width <= 600px) {
@@ -91,10 +104,6 @@
 }
 
 @media (width <= 600px) {
-  .groups-page__list {
-    grid-template-columns: 1fr;
-  }
-
   .groups-page__header {
     flex-wrap: wrap;
   }
