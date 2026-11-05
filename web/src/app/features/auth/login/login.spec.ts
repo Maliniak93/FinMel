@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 
@@ -89,7 +92,7 @@ describe('Login', () => {
     expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard');
   });
 
-  it('shows a form-level error for invalid credentials, without navigating', async () => {
+  it('shows one error line with an icon when sign-in fails', async () => {
     authService.login.mockResolvedValue({
       success: false,
       problem: { detail: 'Invalid email or password.' },
@@ -104,8 +107,31 @@ describe('Login', () => {
     const submit = element.querySelector('button[type="submit"]')!;
     expect(messageOf(alert)).toBe('Invalid email or password.');
     expect(alert.querySelector('mat-icon')).not.toBeNull();
+    expect(element.querySelectorAll('[role="alert"]')).toHaveLength(1);
     expect(alert.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('styles the error line with --sk-negative and a 14 px icon', () => {
+    const scss = readFileSync(
+      resolve(process.cwd(), 'src/app/features/auth/_auth-page.scss'),
+      'utf8',
+    );
+
+    expect(scss).toMatch(/\.auth-page__error\s*\{[^}]*color:\s*var\(--sk-negative\)/);
+    expect(scss).toMatch(/\.auth-page__error\s*\{[^}]*font-size:\s*13px/);
+    expect(scss).toMatch(/\.auth-page__error mat-icon\s*\{[^}]*font-size:\s*14px/);
+  });
+
+  it('colours the field labels with on-surface-variant', () => {
+    const scss = readFileSync(
+      resolve(process.cwd(), 'src/app/features/auth/_auth-page.scss'),
+      'utf8',
+    );
+
+    expect(scss).toMatch(
+      /\.auth-page__label\s*\{[^}]*color:\s*var\(--mat-sys-on-surface-variant\)/,
+    );
   });
 
   it('disables the button while submitting', async () => {

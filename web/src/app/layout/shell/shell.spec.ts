@@ -87,6 +87,10 @@ function linkHrefs(scope: ParentNode): (string | null)[] {
   return Array.from(scope.querySelectorAll('a'), (a) => a.getAttribute('href'));
 }
 
+beforeAll(() => {
+  portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+});
+
 beforeEach(() => {
   localStorage.clear();
   fetchItems = [];
@@ -102,10 +106,6 @@ afterEach(async () => {
 });
 
 describe.each(LAYOUTS)('Shell planning badge (%s layout)', (layout) => {
-  beforeAll(() => {
-    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
-  });
-
   function badgeOf(element: HTMLElement): Element | null {
     return element
       .querySelector('a[href="/planning"]')!
@@ -228,6 +228,14 @@ describe('Shell bottom layout', () => {
     expect(linkHrefs(bottom)).toEqual(['/dashboard', '/wealth', '/planning', '/groups']);
     expect(bottom.querySelector('button')).toBeNull();
   });
+
+  it('renders the bottom nav with the badge', async () => {
+    fetchItems = [todoItem('800+'), todoItem('Premia')];
+    const element = root(await mount('bottom'));
+
+    const bottom = element.querySelector<HTMLElement>('[data-testid="bottom-nav"]')!;
+    expect(textOf(bottom.querySelector('[data-testid="todo-badge"]'))).toBe('2');
+  });
 });
 
 describe.each(LAYOUTS)('Shell active item (%s layout)', (layout) => {
@@ -261,7 +269,7 @@ describe.each(LAYOUTS)('Shell active item (%s layout)', (layout) => {
     expect(await activeHrefs('/planning')).toEqual(['/planning']);
   });
 
-  it('highlights Dashboard on its route', async () => {
+  it('marks the active link', async () => {
     expect(await activeHrefs('/dashboard')).toEqual(['/dashboard']);
   });
 });

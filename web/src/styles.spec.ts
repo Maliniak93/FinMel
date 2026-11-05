@@ -76,4 +76,24 @@ describe('global styles', () => {
     expect(styles).toMatch(/progress-bar/);
     expect(styles).toMatch(/focus-visible|outline-offset/);
   });
+
+  it('tokens define the spacing and radius scale', () => {
+    const tokens = read('src/skarbiec-tokens.css');
+
+    expect(tokens).toMatch(/--sk-space-2:\s*9\.2px;/);
+    expect(tokens).toMatch(/--sk-space-3:\s*13\.8px;/);
+    expect(tokens).toMatch(/--sk-space-4:\s*18\.4px;/);
+    expect(tokens).toMatch(/--sk-space-6:\s*27\.6px;/);
+    expect(tokens).toMatch(/--sk-space-8:\s*36\.8px;/);
+    expect(tokens).toMatch(/--sk-radius-md:\s*4px;/);
+    expect(tokens).toMatch(/--sk-radius-lg:\s*7px;/);
+  });
+
+  it('the global h1 is headline-large with no margin', () => {
+    const styles = read('src/styles.scss');
+    const block = styles.match(/^h1\s*\{[^}]*\}/m)?.[0] ?? '';
+
+    expect(block).toMatch(/--mat-sys-headline-large/);
+    expect(block).toMatch(/margin:\s*0\b/);
+  });
 });

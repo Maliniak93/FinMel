@@ -8,6 +8,7 @@
     margin-bottom: 6px;
     font-size: 14px;
     font-weight: 500;
+    color: var(--mat-sys-on-surface-variant);
   }
 
   .auth-page__field {
@@ -31,7 +32,14 @@
 
   .auth-page__error {
     margin: 0 0 16px;
-    color: var(--mat-sys-error);
+    color: var(--sk-negative);
+    font-size: 13px;
+  }
+
+  .auth-page__error mat-icon {
+    width: 14px;
+    height: 14px;
+    font-size: 14px;
   }
 
   .auth-page__submit {

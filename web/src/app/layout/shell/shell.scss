@@ -9,22 +9,33 @@
 
 .shell__nav {
   width: 232px;
+  border-right: 1px solid var(--mat-sys-outline-variant);
 }
 
 .shell__nav--rail {
   width: 72px;
 }
 
+.shell__nav mat-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+}
+
 .shell__nav-body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  padding: var(--sk-space-6) 0 var(--sk-space-4);
 }
 
 .shell__brand {
-  padding: 20px 20px 12px;
+  padding: 0 var(--sk-space-6) var(--sk-space-6);
+  color: var(--mat-sys-on-surface);
   font-family: var(--mat-sys-brand-family);
   font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   line-height: 1.1;
 }
 
@@ -43,14 +54,19 @@
   box-sizing: border-box;
   gap: 12px;
   min-height: 44px;
-  padding: 0 20px;
+  padding: 0 var(--sk-space-6);
   border: 0;
   border-left: 2px solid transparent;
   background: transparent;
   color: var(--mat-sys-on-surface);
   font: inherit;
+  font-size: 15px;
   text-decoration: none;
   cursor: pointer;
+}
+
+.shell__nav-link mat-icon {
+  color: var(--mat-sys-on-surface-variant);
 }
 
 .shell__nav-link:hover {
@@ -58,9 +74,15 @@
 }
 
 .shell__nav-link--active {
+  margin-right: var(--sk-space-3);
+  border-radius: 0 var(--sk-radius-md) var(--sk-radius-md) 0;
   border-left-color: var(--sk-accent-stroke);
   background: var(--sk-accent-tint);
   color: var(--mat-sys-primary);
+}
+
+.shell__nav-link--active mat-icon {
+  color: inherit;
 }
 
 .shell__nav-label {
@@ -77,18 +99,25 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: var(--sk-space-3) 12px 8px;
   border-top: 1px solid var(--mat-sys-outline-variant);
+
+  ::ng-deep app-language-switch button.mat-mdc-button {
+    height: 36px;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+  }
 }
 
 .shell__badge {
   min-width: 20px;
+  height: 20px;
   padding: 0 6px;
   box-sizing: border-box;
   border: 1px solid var(--sk-negative);
   border-radius: 10px;
   color: var(--sk-negative);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 18px;
   text-align: center;
 }
@@ -99,7 +128,9 @@
     justify-content: center;
     gap: 2px;
     min-height: 56px;
+    margin-right: 0;
     padding: 6px 2px;
+    border-radius: 0;
     font-size: 11px;
     text-align: center;
   }
@@ -166,6 +197,7 @@
 .shell__bottom-nav {
   display: flex;
   flex: 0 0 auto;
+  height: 68px;
   border-top: 1px solid var(--mat-sys-outline-variant);
   background: var(--mat-sys-surface);
 
@@ -175,10 +207,11 @@
     justify-content: center;
     gap: 2px;
     min-height: 56px;
+    margin-right: 0;
     padding: 6px 4px;
     border-top: 2px solid transparent;
     border-left: 0;
-    font-size: 11px;
+    border-radius: 0;
   }
 
   .shell__nav-link--active {
@@ -187,6 +220,13 @@
 
   .shell__nav-label {
     flex: 0 0 auto;
+    font-size: 12px;
+  }
+
+  mat-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
   }
 
   .shell__badge {
@@ -194,7 +234,9 @@
     top: 4px;
     left: calc(50% + 4px);
     min-width: 16px;
+    height: 16px;
     padding: 0 4px;
+    border-radius: 8px;
     background: var(--mat-sys-surface);
     font-size: 10px;
     line-height: 14px;

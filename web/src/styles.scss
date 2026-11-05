@@ -123,6 +123,12 @@ body {
   height: 100%;
 }
 
+h1 {
+  margin: 0;
+  font: var(--mat-sys-headline-large);
+  letter-spacing: -0.015em;
+}
+
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;

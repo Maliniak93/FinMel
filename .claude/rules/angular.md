@@ -22,6 +22,7 @@ Angular Material + CDK (ADR-010, decided). Use Material components and the CDK f
 - Colours, type and shape come from the Classical tokens in `web/src/skarbiec-tokens.css`, loaded after `styles.scss` (`mat.theme()`) in `angular.json`, so its `--mat-sys-*` and `--sk-*` win. Use the tokens, never literal colours.
 - `<html data-theme="light|dark">` always holds the resolved theme: `ThemeService` (and the pre-paint script in `index.html`) resolve `system` through `matchMedia`; no inline `color-scheme`.
 - Fonts (Cormorant Garamond, Lora, Material Symbols Outlined) are self-hosted from `@fontsource/*` woff2 files declared in `styles.scss`; no Google Fonts, Roboto or Material Icons. Icons are Material Symbols ligatures in `<mat-icon>` (default font set `material-symbols-outlined`); every ligature name must exist in the `material-symbols` package (`icons.spec.ts`).
+- Spacing and shape tokens: `--sk-space-2/3/4/6/8` (9.2 / 13.8 / 18.4 / 27.6 / 36.8 px) and `--sk-radius-md/lg` (4 / 7 px); use them instead of literal pixel values for prototype-matched spacing and corners. A global `h1` rule in `styles.scss` sets `headline-large`; components do not size their own page `h1`.
 - Figures are tabular (`body { font-variant-numeric: tabular-nums lining-nums }`, `.sk-num`).
 
 ## Forms
