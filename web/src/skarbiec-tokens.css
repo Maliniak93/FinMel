@@ -146,6 +146,16 @@
   --mat-sys-corner-full: 999px;
 }
 
+:root {
+  --sk-space-2: 9.2px;
+  --sk-space-3: 13.8px;
+  --sk-space-4: 18.4px;
+  --sk-space-6: 27.6px;
+  --sk-space-8: 36.8px;
+  --sk-radius-md: 4px;
+  --sk-radius-lg: 7px;
+}
+
 body {
   background: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
