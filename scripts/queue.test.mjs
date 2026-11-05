@@ -49,14 +49,39 @@ test("queue orders In progress then Todo by position", () => {
   assert.deepEqual(numbers(queue), [12, 16, 11, 13, 17]);
 });
 
-test("P0 lifts above In progress", () => {
+test("In progress comes before Todo P0 regardless of priority", () => {
   const queue = queueOf([
-    card(10, "In progress", { priority: "P2", autobuild: true }),
-    card(11, "Todo", { priority: "P1" }),
-    card(12, "Todo", { priority: "P0" }),
+    card(10, "In progress", { priority: "P3", autobuild: true }),
+    card(11, "Todo", { priority: "P0" }),
+    card(12, "Todo", { priority: "P1" }),
+  ]);
+  assert.deepEqual(numbers(queue), [10, 11, 12]);
+
+  const started = queueOf([
+    card(20, "In progress", { priority: "P0", autobuild: true }),
+    card(21, "In progress", { priority: "P2", autobuild: true }),
+  ]);
+  assert.deepEqual(numbers(started), [20, 21]);
+});
+
+test("Todo P0 stays FIFO by board position", () => {
+  const queue = queueOf([
+    card(30, "Todo", { priority: "P1" }),
+    card(31, "Todo", { priority: "P0" }),
+    card(32, "Todo", { priority: "P2" }),
+    card(33, "Todo", { priority: "P0" }),
   ]);
 
-  assert.deepEqual(numbers(queue), [12, 10, 11]);
+  assert.deepEqual(numbers(queue), [31, 33, 30, 32]);
+});
+
+test("a Todo P0 stays behind running work", () => {
+  const queue = queueOf([
+    card(40, "Todo", { priority: "P0" }),
+    card(41, "In progress", { priority: "P2", autobuild: true }),
+  ]);
+
+  assert.deepEqual(numbers(queue), [41, 40]);
 });
 
 test("manual is In progress without autobuild", () => {

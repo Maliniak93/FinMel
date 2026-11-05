@@ -111,26 +111,59 @@ const flowCards = () => [
 const urgent = { number: 450, title: "Fire", status: "Todo", epic: false, parent: null, priority: "P0", area: "Scripts", tier: "1" };
 const setStatus = (cards, number, status) => cards.map((c) => (c.number === number ? { ...c, status } : c));
 
-test("pickNext takes a new P0 between parts", () => {
-  const started = new Set([434]);
-  let cards = [...flowCards(), urgent];
-  assert.equal(pickNext(queueOf(cards), { started, items: Infinity })?.number, 450);
+test("pickNext takes the first Todo P0 when nothing is started", () => {
+  const second = { ...urgent, number: 451 };
+  const idle = [...flowCards().filter((c) => c.parent !== 434 && c.number !== 434), second, urgent];
+  assert.equal(pickNext(queueOf(idle), { started: new Set(), items: Infinity })?.number, 451);
 
-  cards = setStatus(cards, 450, "Done");
-  assert.equal(pickNext(queueOf(cards), { started, items: Infinity })?.number, 434);
+  const running = [...flowCards(), urgent];
+  assert.equal(pickNext(queueOf(running), { started: new Set([434]), items: Infinity })?.number, 434);
 });
 
 test("pickNext respects items and manual", () => {
   const cards = [...flowCards(), urgent];
   assert.equal(pickNext(queueOf(cards), { started: new Set([434]), items: 1 })?.number, 434);
-  assert.equal(pickNext(queueOf(cards), { started: new Set([434, 450]), items: 1 })?.number, 450);
+  assert.equal(pickNext(queueOf(cards), { started: new Set([434, 450]), items: 1 })?.number, 434);
 
   const manual = [{ number: 2, title: "manual", status: "In progress", epic: false, parent: null, autobuild: false }, ...flowCards().slice(3)];
   assert.equal(pickNext(queueOf(manual), { started: new Set(), items: Infinity })?.number, 440);
   assert.equal(pickNext(queueOf(manual), { started: new Set(), items: Infinity, includeManual: true })?.number, 2);
 });
 
-test("queue re-read before each part", async () => {
+test("manual In progress is logged and does not block a fix", async () => {
+  let cards = [{ number: 2, title: "manual", status: "In progress", epic: false, parent: null, autobuild: false, tier: "1" }, urgent];
+  const built = [];
+  const logs = [];
+  await runQueue({
+    readCards: async () => cards,
+    buildPart: async (item, part) => {
+      built.push(part);
+      cards = setStatus(cards, part, "Done");
+    },
+    log: (line) => logs.push(line),
+  });
+
+  assert.deepEqual(built, [450]);
+  assert.equal(logs.filter((l) => l.includes("pominięto ręczną kartę #2")).length, 1, logs.join("\n"));
+});
+
+test("a started item is logged as continued", async () => {
+  let cards = flowCards();
+  const logs = [];
+  await runQueue({
+    readCards: async () => cards,
+    buildPart: async (item, part) => {
+      logs.push(`build ${part}`);
+      cards = setStatus(cards, part, "Done");
+      if (part === 437) cards = setStatus(cards, 434, "Done");
+    },
+    log: (line) => logs.push(line),
+  });
+
+  assert.ok(logs.indexOf("kontynuuję rozpoczęte: #434") === 0, logs.join("\n"));
+});
+
+test("queue re-read before each part keeps the started epic first", async () => {
   let cards = flowCards();
   let reads = 0;
   const built = [];
@@ -151,9 +184,9 @@ test("queue re-read before each part", async () => {
     log: (line) => logs.push(line),
   });
 
-  assert.deepEqual(built, [436, 450, 437, 440]);
+  assert.deepEqual(built, [436, 437, 450, 440]);
   assert.ok(reads >= built.length, "the queue is read before every part");
-  assert.ok(logs.some((l) => l.includes("kolejka zmieniona: #450 (P0) przed #434")), logs.join("\n"));
+  assert.ok(!logs.some((l) => l.includes("kolejka zmieni")), logs.join("\n"));
 });
 
 test("a merged part is not built again while its card lags behind the closed issue", async () => {
