@@ -56,6 +56,7 @@ if (!OpenApiBuildTime.IsActive)
     builder.AddFxSyncJob();
     builder.AddHistoryBackfillJob();
     builder.AddBondCatalogSyncJob();
+    builder.AddStartupSync();
     builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing
         .AddSource(PriceSyncJob.ActivitySourceName)
         .AddSource(FxSyncJob.ActivitySourceName)

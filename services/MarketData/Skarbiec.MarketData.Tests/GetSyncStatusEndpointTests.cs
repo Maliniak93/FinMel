@@ -112,6 +112,30 @@ public sealed class GetSyncStatusEndpointTests(SkarbiecContainersFixture contain
     }
 
     [Fact]
+    public async Task ReturnsBondCatalogRunAndSource()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var seedDb = CreateDbContext();
+        var now = DateTimeOffset.UtcNow;
+        var pricesRun = await seedDb.SeedSyncRunAsync(SyncRunKind.Prices, SyncRunStatus.Completed, now.AddHours(-3), cancellationToken, SyncRunSource.Schedule);
+        var fxRun = await seedDb.SeedSyncRunAsync(SyncRunKind.Fx, SyncRunStatus.Completed, now.AddHours(-2), cancellationToken, SyncRunSource.Startup);
+        var bondRun = await seedDb.SeedSyncRunAsync(SyncRunKind.BondCatalog, SyncRunStatus.Completed, now.AddHours(-1), cancellationToken, SyncRunSource.Manual);
+
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var response = await client.GetAsync(StatusUri, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<SyncStatusResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(bondRun.Id, body.BondCatalog!.RunId);
+        Assert.Equal(SyncRunSource.Manual, body.BondCatalog.Source);
+        Assert.Equal(pricesRun.Id, body.Prices!.RunId);
+        Assert.Equal(SyncRunSource.Schedule, body.Prices.Source);
+        Assert.Equal(fxRun.Id, body.Fx!.RunId);
+        Assert.Equal(SyncRunSource.Startup, body.Fx.Source);
+    }
+
+    [Fact]
     public async Task Get_WithoutToken_ReturnsUnauthorized()
     {
         using var client = Factory.CreateClient();

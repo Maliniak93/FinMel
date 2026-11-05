@@ -22,13 +22,12 @@ public sealed class MarketDataModelTests
     }
 
     [Fact]
-    public void Migrations_AreSquashedToOneInitialCreate()
+    public void Migrations_StartFromInitialCreate()
     {
         using var db = CreateContext();
 
         var migrations = ((IInfrastructure<IServiceProvider>)db).Instance.GetService(typeof(IMigrationsAssembly)) as IMigrationsAssembly;
 
-        var only = Assert.Single(migrations!.Migrations);
-        Assert.EndsWith("InitialCreate", only.Key, StringComparison.Ordinal);
+        Assert.EndsWith("InitialCreate", migrations!.Migrations.Keys.First(), StringComparison.Ordinal);
     }
 }

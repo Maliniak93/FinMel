@@ -7,10 +7,10 @@ public static class FxSyncJobExtensions
 {
     private const string DisableBackgroundJobsConfigKey = "Testing:DisableBackgroundJobs";
 
-    private const string FxSyncCronConfigKey = "FxSync:Cron";
+    internal const string FxSyncCronConfigKey = "FxSync:Cron";
 
     // Business days, after NBP table A's midday publish and well before PriceSync's 18:30.
-    private const string DefaultProductionCron = "0 0 13 ? * MON-FRI";
+    internal const string DefaultProductionCron = "0 0 13 ? * MON-FRI";
 
     // Call after AddPriceSyncJob: this adds only the job and its trigger, and the scheduler that call configures runs it.
     public static TBuilder AddFxSyncJob<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder

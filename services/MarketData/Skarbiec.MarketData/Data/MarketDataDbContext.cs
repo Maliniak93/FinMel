@@ -61,6 +61,11 @@ public sealed class MarketDataDbContext(DbContextOptions<MarketDataDbContext> op
                 .HasMaxLength(20)
                 .HasDefaultValue(SyncRunKind.Prices);
 
+            run.Property(r => r.Source)
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(SyncRunSource.Schedule);
+
             // GetSyncStatus reads the latest run per kind.
             run.HasIndex(r => new { r.Kind, r.StartedAt }).IsDescending(false, true);
         });

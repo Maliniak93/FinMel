@@ -15,6 +15,7 @@ public sealed class SyncRun
     public required DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public required SyncRunStatus Status { get; set; }
+    public SyncRunSource Source { get; init; }
     public int SyncedCount { get; set; }
     public int NoDataCount { get; set; }
     public int FailedCount { get; set; }

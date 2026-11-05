@@ -101,11 +101,14 @@ export type MetalPriceResponse = {
 
 export type PriceSource = number;
 
+export type SyncRunSource = number;
+
 export type SyncRunStatus = number;
 
 export type SyncRunSummary = {
     runId: string;
     status: SyncRunStatus;
+    source: SyncRunSource;
     startedAt: string;
     finishedAt?: null | string;
     syncedCount: number | string;
@@ -118,6 +121,7 @@ export type SyncStatusResponse = {
     prices?: null | SyncRunSummary;
     fx?: null | SyncRunSummary;
     backfill?: null | SyncRunSummary;
+    bondCatalog?: null | SyncRunSummary;
 };
 
 export type TreasuryBondType = number;

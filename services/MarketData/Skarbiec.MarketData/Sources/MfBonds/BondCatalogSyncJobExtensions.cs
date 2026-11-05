@@ -7,10 +7,10 @@ public static class BondCatalogSyncJobExtensions
 {
     private const string DisableBackgroundJobsConfigKey = "Testing:DisableBackgroundJobs";
 
-    private const string BondCatalogSyncCronConfigKey = "BondCatalogSync:Cron";
+    internal const string BondCatalogSyncCronConfigKey = "BondCatalogSync:Cron";
 
     // Daily, early: MF replaces the file roughly monthly, and a new month's offer starts on its first day.
-    private const string DefaultProductionCron = "0 0 7 * * ?";
+    internal const string DefaultProductionCron = "0 0 7 * * ?";
 
     // Call after AddPriceSyncJob, whose scheduler runs this job; the IMfBondSource comes from AddMfBondSource.
     public static TBuilder AddBondCatalogSyncJob<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
@@ -32,8 +32,6 @@ public static class BondCatalogSyncJobExtensions
                 .WithIdentity("bond-catalog-sync-trigger", "market-data")
                 .WithCronSchedule(cron));
         });
-
-        builder.Services.AddHostedService<BondCatalogStartupTrigger>();
 
         return builder;
     }

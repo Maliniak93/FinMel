@@ -125,6 +125,28 @@ internal static class MarketDataApi
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public static async Task<SyncRun> SeedSyncRunAsync(
+        this MarketDataDbContext db,
+        SyncRunKind kind,
+        SyncRunStatus status,
+        DateTimeOffset startedAt,
+        CancellationToken cancellationToken,
+        SyncRunSource source = SyncRunSource.Schedule)
+    {
+        var run = new SyncRun
+        {
+            Id = Guid.NewGuid(),
+            Kind = kind,
+            StartedAt = startedAt,
+            FinishedAt = status == SyncRunStatus.Running ? null : startedAt.AddSeconds(30),
+            Status = status,
+            Source = source,
+        };
+        db.SyncRuns.Add(run);
+        await db.SaveChangesAsync(cancellationToken);
+        return run;
+    }
+
     public static async Task SeedBondCatalogFromFixtureAsync(this MarketDataDbContext db, CancellationToken cancellationToken)
     {
         var job = new BondCatalogSyncJob(

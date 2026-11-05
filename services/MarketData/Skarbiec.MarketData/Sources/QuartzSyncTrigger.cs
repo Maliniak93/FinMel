@@ -1,4 +1,5 @@
 using Quartz;
+using Skarbiec.MarketData.Data;
 
 namespace Skarbiec.MarketData.Sources;
 
@@ -14,6 +15,7 @@ public sealed class QuartzSyncTrigger(ISchedulerFactory schedulerFactory) : ISyn
         var trigger = TriggerBuilder.Create()
             .ForJob(PriceSyncJob.Key)
             .WithIdentity(ManualTriggerKey)
+            .UsingJobData(SyncJobData.SourceKey, nameof(SyncRunSource.Manual))
             .StartNow()
             .Build();
 

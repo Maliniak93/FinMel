@@ -210,6 +210,41 @@ public sealed class PriceSyncJobTests(SkarbiecContainersFixture containers) : Ma
     }
 
     // The job syncs only instruments in use, so every instrument a fact expects synced needs a usage row.
+    [Fact]
+    public async Task RecordsSource()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var job = new PriceSyncJob(db, [], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await job.RunAsync(cancellationToken);
+        await job.RunAsync(cancellationToken, SyncRunSource.Startup);
+
+        var runs = await db.SyncRuns.AsNoTracking().OrderBy(r => r.StartedAt).ToListAsync(cancellationToken);
+        Assert.Equal([SyncRunSource.Schedule, SyncRunSource.Startup], runs.Select(r => r.Source));
+    }
+
+    [Fact]
+    public async Task UnexpectedException_FinishesRunFailed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var provider = HostlessOutboxProvider.Build<MarketDataDbContext>(_containers, _ => { });
+        await using var scope = provider.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<MarketDataDbContext>();
+        var publishEndpoint = scope.ServiceProvider.GetRequiredService<IPublishEndpoint>();
+
+        var job = new PriceSyncJob(db, [new ThrowingPriceSource()], publishEndpoint, TimeProvider.System, NullLogger<PriceSyncJob>.Instance);
+        await Record.ExceptionAsync(() => job.RunAsync(cancellationToken));
+
+        await using var readDb = CreateDbContext();
+        var run = await readDb.SyncRuns.AsNoTracking().SingleAsync(cancellationToken);
+        Assert.Equal(SyncRunStatus.Failed, run.Status);
+        Assert.NotNull(run.FinishedAt);
+    }
+
     private static Instrument NewUsedInstrument(
         MarketDataDbContext db, string ticker, PriceSource source, string quoteCurrency, AssetClass assetClass)
     {

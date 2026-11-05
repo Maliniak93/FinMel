@@ -25,10 +25,11 @@ public sealed class FxSyncJob(
 
     private static readonly ActivitySource ActivitySource = new(ActivitySourceName);
 
-    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken) => await RunAsync(cancellationToken);
+    public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken) =>
+        await RunAsync(cancellationToken, SyncJobData.ReadSource(context));
 
     // Quartz-independent entry point, so tests drive a run without faking IJobExecutionContext.
-    public async Task RunAsync(CancellationToken cancellationToken)
+    public async Task RunAsync(CancellationToken cancellationToken, SyncRunSource source = SyncRunSource.Schedule)
     {
         using var activity = ActivitySource.StartActivity("FxSyncJob.Run");
 
@@ -38,10 +39,29 @@ public sealed class FxSyncJob(
             Kind = SyncRunKind.Fx,
             StartedAt = timeProvider.GetUtcNow(),
             Status = SyncRunStatus.Running,
+            Source = source,
         };
         db.SyncRuns.Add(run);
         await db.SaveChangesAsync(cancellationToken);
 
+        try
+        {
+            await SyncAsync(run, activity, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            db.ChangeTracker.Clear();
+            db.SyncRuns.Attach(run);
+            run.Finish(timeProvider.GetUtcNow(), synced: 0, noData: 0, failed: 1);
+            await db.SaveChangesAsync(cancellationToken);
+
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            logger.LogWarning(ex, "FxSyncJob run {RunId} failed: {Reason}", run.Id, ex.Message);
+        }
+    }
+
+    private async Task SyncAsync(SyncRun run, Activity? activity, CancellationToken cancellationToken)
+    {
         var codes = await db.Currencies
             .AsNoTracking()
             .Where(c => c.Code != BaseCurrency)
