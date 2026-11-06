@@ -110,6 +110,40 @@ public sealed class MarketDataPriceClient(HttpClient httpClient) : IPriceQuoteCl
         return result;
     }
 
+    public async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>> GetBondSeriesRatesAsync(
+        IReadOnlyList<string> seriesCodes, CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<string, IReadOnlyDictionary<int, decimal>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var batch in seriesCodes.Distinct(StringComparer.OrdinalIgnoreCase).Chunk(BatchSize))
+        {
+            using var response = await httpClient.PostAsJsonAsync(
+                "/internal/bond-series/rates-batch",
+                new BondSeriesRatesBatchRequest(batch),
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+
+            var body = await response.Content.ReadFromJsonAsync<BondSeriesRatesBatchResponse>(cancellationToken)
+                ?? throw new InvalidOperationException("MarketData returned an empty bond series rates response.");
+
+            // MarketData counts periods from 0; the bond schedule counts them from 1.
+            foreach (var series in body.Series)
+            {
+                result[series.Code] = series.PeriodRates.ToDictionary(r => r.PeriodIndex + 1, r => r.RatePercent);
+            }
+        }
+
+        return result;
+    }
+
+    private sealed record BondSeriesRatesBatchRequest(IReadOnlyList<string> Codes);
+
+    private sealed record BondSeriesRatesBatchResponse(IReadOnlyList<BondSeriesRatesResult> Series);
+
+    private sealed record BondSeriesRatesResult(string Code, IReadOnlyList<BondSeriesPeriodRateResult> PeriodRates);
+
+    private sealed record BondSeriesPeriodRateResult(int PeriodIndex, decimal RatePercent);
+
     private sealed record LatestPricesBatchRequest(IReadOnlyList<Guid> InstrumentIds, DateOnly AsOfDate);
 
     private sealed record LatestPricesBatchResponse

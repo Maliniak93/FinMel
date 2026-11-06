@@ -1,4 +1,6 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
+using Skarbiec.Contracts.Events;
 
 namespace Skarbiec.Reporting.Valuation;
 
@@ -12,7 +14,8 @@ public static class ValuationAlgorithm
         IReadOnlyList<ValuationPosition> positions,
         IReadOnlyDictionary<Guid, InstrumentPriceLookup> pricesByInstrument,
         IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,
-        DateOnly snapshotDate)
+        DateOnly snapshotDate,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>? bondRatesBySeries = null)
     {
         var lines = new List<ValuedPosition>(positions.Count);
 
@@ -21,6 +24,8 @@ public static class ValuationAlgorithm
             lines.Add(position.ValuationMode switch
             {
                 AssetValuationMode.Market => ValueMarketAsset(position, pricesByInstrument, fxRatesByPair, snapshotDate),
+                AssetValuationMode.CurrencyValued when position.BondTerms is { } terms =>
+                    ValueBond(position, terms, bondRatesBySeries, snapshotDate),
                 AssetValuationMode.CurrencyValued => ValueCurrencyValuedAsset(position, fxRatesByPair, snapshotDate),
                 _ => throw new ArgumentOutOfRangeException(nameof(positions), position.ValuationMode, "Unmapped AssetValuationMode."),
             });
@@ -74,6 +79,39 @@ public static class ValuationAlgorithm
         return rate is null
             ? Line(position, valuePln: 0m, isStale: true)
             : Line(position, position.Quantity * rate.Value, fxIsStale, fxRateUsed: rate);
+    }
+
+    // Bonds are PLN. A missing catalogue rate keeps the book value and marks the line stale, never zero.
+    private static ValuedPosition ValueBond(
+        ValuationPosition position,
+        PositionBondTerms terms,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>? bondRatesBySeries,
+        DateOnly snapshotDate)
+    {
+        if (terms.IsRedeemed)
+        {
+            return Line(position, position.Quantity, isStale: false, fxRateUsed: 1m);
+        }
+
+        var bondCount = terms.BondCountHistory
+            .Where(e => e.Key <= snapshotDate)
+            .OrderBy(e => e.Key)
+            .Select(e => e.Value)
+            .LastOrDefault();
+        IReadOnlyDictionary<int, decimal> catalogRates = bondRatesBySeries is not null
+            && bondRatesBySeries.TryGetValue(terms.SeriesCode, out var rates)
+                ? rates
+                : new Dictionary<int, decimal>();
+
+        var interest = BondAccrual.Unsettled(
+            new BondTerms(terms.Type, terms.PurchaseDate, bondCount, terms.FirstPeriodRatePercent),
+            terms.SettledPeriodRates,
+            catalogRates,
+            snapshotDate);
+
+        return interest is null
+            ? Line(position, position.Quantity, isStale: true, fxRateUsed: 1m)
+            : Line(position, position.Quantity + interest.Value, isStale: false, fxRateUsed: 1m);
     }
 
     private static ValuedPosition Line(

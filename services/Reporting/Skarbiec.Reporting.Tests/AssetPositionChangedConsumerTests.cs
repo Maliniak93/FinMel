@@ -942,6 +942,49 @@ public sealed class AssetPositionChangedConsumerTests(SkarbiecContainersFixture 
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task BondTerms_Change_RequestsRebuild()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var purchaseDate = Today.AddDays(-300);
+        var sameUserId = Guid.NewGuid();
+        var changedUserId = Guid.NewGuid();
+        var sameStored = PositionEvents.BondPositionEvent(sameUserId, Guid.NewGuid(), purchaseDate);
+        var changedStored = PositionEvents.BondPositionEvent(changedUserId, Guid.NewGuid(), purchaseDate);
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedBondPositionAsync(sameStored, cancellationToken);
+            await db.SeedBondPositionAsync(changedStored, cancellationToken);
+        }
+
+        await RunConsumerAsync(async provider =>
+        {
+            var bus = provider.GetRequiredService<IBus>();
+
+            await bus.Publish(
+                PositionEvents.BondPositionEvent(sameUserId, sameStored.AccountId, purchaseDate, sameStored.AssetId, version: 1),
+                cancellationToken);
+            await bus.Publish(
+                PositionEvents.BondPositionEvent(
+                    changedUserId, changedStored.AccountId, purchaseDate, changedStored.AssetId, version: 1, firstPeriodRatePercent: 7m),
+                cancellationToken);
+
+            var request = await WaitForRebuildRequestAsync(provider, changedUserId, cancellationToken);
+            Assert.Equal(purchaseDate, request.FromDate);
+
+            await WaitForPositionAsync(provider, sameStored.AssetId, cancellationToken, p => p.Version == 1);
+            var updated = await WaitForPositionAsync(provider, changedStored.AssetId, cancellationToken, p => p.Version == 1);
+            Assert.Equal(7m, updated.BondTerms?.FirstPeriodRatePercent);
+
+            // Nothing signals an absent request, so give a late outbox delivery time to land before asserting none.
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken);
+
+            Assert.Null(await GetRebuildRequestAsync(containers, sameUserId, cancellationToken));
+            Assert.DoesNotContain(sameUserId, RequestedUsers);
+        }, cancellationToken);
+    }
+
     private static AssetPositionChanged Event(
         Guid assetId,
         Guid accountId,

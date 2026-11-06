@@ -150,6 +150,13 @@ builder.Services.AddValidation();
 builder.Services.TryAddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<PositionEventPublisher>();
+
+// Off in test hosts: a startup republish would race the per-fact database reset.
+if (!OpenApiBuildTime.IsActive && !builder.Configuration.GetValue<bool>("Testing:DisableBackgroundJobs"))
+{
+    builder.Services.AddHostedService<BondTermsRepublishService>();
+}
+
 builder.Services.AddScoped<CreateAccountHandler>();
 builder.Services.AddScoped<UpdateAccountHandler>();
 builder.Services.AddScoped<ListAccountsHandler>();

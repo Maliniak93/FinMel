@@ -2,13 +2,15 @@ using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Skarbiec.Reporting.Data;
+using Skarbiec.Reporting.MarketData;
 using Skarbiec.Testing.Containers;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
-public abstract class ReportingEndpointTests(SkarbiecContainersFixture containers) : ServiceEndpointTests<Program>
+public abstract class ReportingEndpointTests(SkarbiecContainersFixture containers, IPriceQuoteClient? priceQuoteClient = null)
+    : ServiceEndpointTests<Program>
 {
-    protected override ReportingApiFactory Factory { get; } = new(containers);
+    protected override ReportingApiFactory Factory { get; } = new(containers, priceQuoteClient);
 
     protected IBus Bus => Factory.Services.GetRequiredService<IBus>();
 

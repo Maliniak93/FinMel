@@ -1,0 +1,31 @@
+{
+  "assetId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "userId": "9c858901-8a57-4791-81fe-4c455b099bc9",
+  "assetClass": 4,
+  "valuationMode": 1,
+  "currency": "PLN",
+  "quantity": 5000,
+  "quoteUnitsPerQuantity": 1,
+  "quantityHistory": [
+    { "date": "2025-02-10", "quantity": 5000 }
+  ],
+  "classHistory": [],
+  "isArchived": false,
+  "outsideNetWorth": false,
+  "bondTerms": {
+    "seriesCode": "EDO0235",
+    "type": 5,
+    "purchaseDate": "2025-02-10",
+    "purchasePricePerBond": 100,
+    "firstPeriodRatePercent": 6.5,
+    "marginPercent": 2,
+    "bondCountHistory": { "2025-02-10": 50 },
+    "settledPeriodRates": { "1": 6.5 },
+    "isRedeemed": false,
+    "termsHint": "this field does not exist yet and must not break deserialization"
+  },
+  "version": 3,
+  "occurredAtUtc": "2026-01-15T10:00:00+00:00",
+  "schemaHint": "this field does not exist yet and must not break deserialization"
+}

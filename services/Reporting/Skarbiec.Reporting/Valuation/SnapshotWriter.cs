@@ -1,11 +1,13 @@
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Reporting.Data;
+using Skarbiec.Reporting.MarketData;
 
 namespace Skarbiec.Reporting.Valuation;
 
 // Not a service layer: a stateless helper so the upsert logic exists once, writing through the caller's DbContext.
-public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvider)
+public sealed class SnapshotWriter(
+    ReportingDbContext db, IPriceQuoteClient priceQuoteClient, TimeProvider timeProvider, ILogger<SnapshotWriter> logger)
 {
     private const string BaseCurrency = "PLN";
 
@@ -20,6 +22,13 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
             .Where(c => !string.Equals(c, BaseCurrency, StringComparison.OrdinalIgnoreCase))
             .Select(c => c.ToUpperInvariant() + BaseCurrency)
             .Distinct()
+            .ToList();
+
+    // Only bonds that still accrue need the catalogue: a redeemed one is worth its book value.
+    public static IReadOnlyList<string> RequiredBondSeries(IEnumerable<Position> positions) =>
+        positions.Where(p => p.BondTerms is { IsRedeemed: false })
+            .Select(p => p.BondTerms!.SeriesCode)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
     // Values from the stored last prices and rates only, and drops today's lines of assets that are gone.
@@ -38,6 +47,7 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
 
         var pricesByInstrument = await LoadLatestPricesAsync(positions, cancellationToken);
         var fxRatesByPair = await LoadLatestFxRatesAsync(RequiredFxPairs(positions, pricesByInstrument), cancellationToken);
+        var bondRatesBySeries = await FetchBondRatesSoftAsync(positions, cancellationToken);
 
         // IgnoreQueryFilters: the snapshot belongs to the event's user, not to a request user.
         var existingSnapshot = await db.ValuationSnapshots
@@ -50,7 +60,7 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
             .Where(l => l.UserId == userId && l.Date == today)
             .ToDictionaryAsync(l => l.AssetId, cancellationToken);
 
-        UpsertUser(userId, positions, pricesByInstrument, fxRatesByPair, today, existingSnapshot, existingLines);
+        UpsertUser(userId, positions, pricesByInstrument, fxRatesByPair, today, existingSnapshot, existingLines, bondRatesBySeries);
 
         var heldAssetIds = positions.Select(p => p.AssetId).ToHashSet();
         db.AssetValuations.RemoveRange(existingLines.Values.Where(l => !heldAssetIds.Contains(l.AssetId)));
@@ -73,7 +83,8 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
         IReadOnlyDictionary<string, FxRateLookup> fxRatesByPair,
         DateOnly snapshotDate,
         ValuationSnapshot? existingSnapshot,
-        IReadOnlyDictionary<Guid, AssetValuation> existingLines)
+        IReadOnlyDictionary<Guid, AssetValuation> existingLines,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>? bondRatesBySeries = null)
     {
         var valuationPositions = positions
             .Select(p => new ValuationPosition
@@ -85,10 +96,12 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
                 Quantity = p.Quantity,
                 QuoteUnitsPerQuantity = p.QuoteUnitsPerQuantity,
                 InstrumentId = p.InstrumentId,
+                BondTerms = p.BondTerms,
             })
             .ToList();
 
-        var result = ValuationAlgorithm.Calculate(valuationPositions, pricesByInstrument, fxRatesByPair, snapshotDate);
+        var result = ValuationAlgorithm.Calculate(
+            valuationPositions, pricesByInstrument, fxRatesByPair, snapshotDate, bondRatesBySeries);
 
         var accountByAsset = positions.ToDictionary(p => p.AssetId, p => p.AccountId);
 
@@ -150,6 +163,27 @@ public sealed class SnapshotWriter(ReportingDbContext db, TimeProvider timeProvi
             ValuePln = valued.ValuePln,
             IsStale = valued.IsStale,
         });
+    }
+
+    // A position event must not fail because MarketData is down: the line holds the book value and the daily sync fixes it.
+    private async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>> FetchBondRatesSoftAsync(
+        IReadOnlyList<Position> positions, CancellationToken cancellationToken)
+    {
+        var seriesCodes = RequiredBondSeries(positions);
+        if (seriesCodes.Count == 0)
+        {
+            return new Dictionary<string, IReadOnlyDictionary<int, decimal>>();
+        }
+
+        try
+        {
+            return await priceQuoteClient.GetBondSeriesRatesAsync(seriesCodes, cancellationToken);
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "SnapshotWriter: bond series rates are unavailable, valuing bonds at book value.");
+            return new Dictionary<string, IReadOnlyDictionary<int, decimal>>();
+        }
     }
 
     private async Task<IReadOnlyDictionary<Guid, InstrumentPriceLookup>> LoadLatestPricesAsync(

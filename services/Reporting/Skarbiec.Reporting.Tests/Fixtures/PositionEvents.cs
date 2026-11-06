@@ -1,6 +1,7 @@
 using MassTransit;
 using Skarbiec.Contracts;
 using Skarbiec.Contracts.Events;
+using Skarbiec.Reporting.Data;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
@@ -43,6 +44,69 @@ internal static class PositionEvents
         }, cancellationToken);
 
         return id;
+    }
+
+    public static AssetPositionChanged BondPositionEvent(
+        Guid userId,
+        Guid? accountId,
+        DateOnly purchaseDate,
+        Guid? assetId = null,
+        long version = 0,
+        int bondCount = 50,
+        decimal pricePerBond = 100m,
+        decimal firstPeriodRatePercent = 6.5m,
+        TreasuryBondType type = TreasuryBondType.Edo,
+        string seriesCode = "EDO0235",
+        IReadOnlyDictionary<int, decimal>? settledPeriodRates = null) => new()
+        {
+            AssetId = assetId ?? Guid.NewGuid(),
+            AccountId = accountId,
+            UserId = userId,
+            AssetClass = AssetClass.Bond,
+            ValuationMode = AssetValuationMode.CurrencyValued,
+            Currency = "PLN",
+            Quantity = bondCount * pricePerBond,
+            QuoteUnitsPerQuantity = 1m,
+            QuantityHistory = [new QuantityPoint { Date = purchaseDate, Quantity = bondCount * pricePerBond }],
+            ClassHistory = [],
+            IsArchived = false,
+            OutsideNetWorth = false,
+            BondTerms = new()
+            {
+                SeriesCode = seriesCode,
+                Type = type,
+                PurchaseDate = purchaseDate,
+                PurchasePricePerBond = pricePerBond,
+                FirstPeriodRatePercent = firstPeriodRatePercent,
+                MarginPercent = 2m,
+                BondCountHistory = new Dictionary<DateOnly, int> { [purchaseDate] = bondCount },
+                SettledPeriodRates = settledPeriodRates ?? new Dictionary<int, decimal>(),
+                IsRedeemed = false,
+            },
+            Version = version,
+            OccurredAtUtc = DateTimeOffset.UtcNow,
+        };
+
+    public static async Task SeedBondPositionAsync(
+        this ReportingDbContext db, AssetPositionChanged evt, CancellationToken cancellationToken)
+    {
+        db.Positions.Add(new Position
+        {
+            AssetId = evt.AssetId,
+            UserId = evt.UserId,
+            AccountId = evt.AccountId,
+            AssetClass = evt.AssetClass,
+            ValuationMode = evt.ValuationMode,
+            Currency = evt.Currency,
+            Quantity = evt.Quantity,
+            IsArchived = false,
+            Version = evt.Version,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            QuantityHistory = [.. evt.QuantityHistory.Select(p => new PositionQuantityPoint { Date = p.Date, Quantity = p.Quantity })],
+            BondTerms = evt.BondTerms,
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public static AssetRemoved AssetRemovedEvent(Guid assetId, Guid? accountId, Guid userId) => new()

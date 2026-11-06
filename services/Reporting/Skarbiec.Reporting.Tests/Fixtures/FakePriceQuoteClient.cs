@@ -9,6 +9,7 @@ public sealed class FakePriceQuoteClient : IPriceQuoteClient
     private readonly Dictionary<string, FxRateLookup> _fxRates = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<Guid, List<InstrumentPriceLookup>> _priceHistory = [];
     private readonly Dictionary<string, List<FxRateLookup>> _fxHistory = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<int, decimal>> _bondRates = new(StringComparer.OrdinalIgnoreCase);
     private int _historyCalls;
     private bool _unavailable;
     private Func<Task>? _historyHook;
@@ -39,6 +40,18 @@ public sealed class FakePriceQuoteClient : IPriceQuoteClient
         _fxHistory[pair] = [.. points.OrderBy(p => p.Date).Select(p => new FxRateLookup(p.Date, p.Rate))];
         return this;
     }
+
+    public FakePriceQuoteClient WithBondRates(string seriesCode, params (int PeriodIndex, decimal RatePercent)[] rates)
+    {
+        _bondRates[seriesCode] = rates.ToDictionary(r => r.PeriodIndex, r => r.RatePercent);
+        return this;
+    }
+
+    public Task<IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>> GetBondSeriesRatesAsync(
+        IReadOnlyList<string> seriesCodes, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>>(
+            _bondRates.Where(s => seriesCodes.Contains(s.Key, StringComparer.OrdinalIgnoreCase))
+                .ToDictionary(s => s.Key, s => (IReadOnlyDictionary<int, decimal>)s.Value, StringComparer.OrdinalIgnoreCase));
 
     public FakePriceQuoteClient Unavailable()
     {

@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
@@ -35,8 +36,10 @@ public sealed class PositionEventPublisher(
             .ToList();
         var trackedIds = tracked.Select(e => e.Entity.Id).ToList();
 
+        // IgnoreQueryFilters: the ids come from assets already resolved for their owner, and the bond republish runs with no request user.
         var stored = await dbContext.Transactions
             .AsNoTracking()
+            .IgnoreQueryFilters()
             .Where(t => assetIds.Contains(t.AssetId) && !trackedIds.Contains(t.Id))
             .ToListAsync(cancellationToken);
 
@@ -69,7 +72,7 @@ public sealed class PositionEventPublisher(
         {
             AssetId = asset.Id,
             AccountId = asset.AccountId,
-            UserId = dbContext.CurrentUserId,
+            UserId = asset.UserId == Guid.Empty ? dbContext.CurrentUserId : asset.UserId,
             AssetClass = assetClass,
             ValuationMode = asset.ValuationMode,
             InstrumentId = asset.InstrumentId,
@@ -82,9 +85,71 @@ public sealed class PositionEventPublisher(
             IsArchived = asset.IsArchived,
             GroupId = asset.GroupId,
             OutsideNetWorth = await IsOutsideNetWorthAsync(asset, cancellationToken),
+            BondTerms = await BondTermsAsync(asset, cancellationToken),
             Version = asset.Version,
             OccurredAtUtc = timeProvider.GetUtcNow()
         }, cancellationToken);
+    }
+
+    // Tracked rows win over stored ones, like the transactions: a handler stages them before publishing.
+    private async Task<PositionBondTerms?> BondTermsAsync(Asset asset, CancellationToken cancellationToken)
+    {
+        if (asset.AssetClass != AssetClass.Bond)
+        {
+            return null;
+        }
+
+        var assetId = asset.Id;
+        var terms = (await LoadForAssetAsync(dbContext.TreasuryBonds, t => t.AssetId == assetId, t => t.AssetId, cancellationToken))
+            .FirstOrDefault();
+        if (terms is null)
+        {
+            return null;
+        }
+
+        var settlements = await LoadForAssetAsync(
+            dbContext.BondInterestSettlements, s => s.AssetId == assetId, s => s.Id, cancellationToken);
+        var redemptions = await LoadForAssetAsync(
+            dbContext.BondRedemptions, r => r.AssetId == assetId, r => r.Id, cancellationToken);
+
+        var early = redemptions.Where(r => r.Kind == BondRedemptionKind.Early).OrderBy(r => r.Date).ToList();
+        var count = terms.BondCount + early.Sum(r => r.BondCount);
+        var countHistory = new Dictionary<DateOnly, int> { [terms.PurchaseDate] = count };
+        foreach (var redemption in early)
+        {
+            count -= redemption.BondCount;
+            countHistory[redemption.Date] = count;
+        }
+
+        return new PositionBondTerms
+        {
+            SeriesCode = terms.SeriesCode,
+            Type = terms.Type,
+            PurchaseDate = terms.PurchaseDate,
+            PurchasePricePerBond = terms.PurchasePricePerBond,
+            FirstPeriodRatePercent = terms.FirstPeriodRatePercent,
+            MarginPercent = terms.MarginPercent,
+            BondCountHistory = countHistory,
+            SettledPeriodRates = settlements.ToDictionary(s => s.PeriodIndex, s => s.RatePercent),
+            IsRedeemed = terms.BondCount == 0 || redemptions.Any(r => r.Kind != BondRedemptionKind.Early),
+        };
+    }
+
+    // IgnoreQueryFilters: the asset id comes from an asset already resolved for its owner, and the bond republish runs with no request user.
+    private async Task<List<T>> LoadForAssetAsync<T>(
+        DbSet<T> set, Expression<Func<T, bool>> forAsset, Func<T, Guid> keyOf, CancellationToken cancellationToken)
+        where T : class
+    {
+        var isForAsset = forAsset.Compile();
+        var tracked = dbContext.ChangeTracker.Entries<T>()
+            .Where(e => isForAsset(e.Entity))
+            .ToList();
+        var trackedKeys = tracked.Select(e => keyOf(e.Entity)).ToHashSet();
+
+        var stored = (await set.AsNoTracking().IgnoreQueryFilters().Where(forAsset).ToListAsync(cancellationToken))
+            .Where(e => !trackedKeys.Contains(keyOf(e)));
+
+        return [.. stored.Concat(tracked.Where(e => e.State != EntityState.Deleted).Select(e => e.Entity))];
     }
 
     // Local first, like AccountTypeAsync: the flag may be staged but not saved yet.

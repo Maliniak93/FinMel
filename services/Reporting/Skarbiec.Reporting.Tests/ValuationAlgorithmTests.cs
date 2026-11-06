@@ -1,5 +1,7 @@
 using Skarbiec.Contracts;
+using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Reporting.Valuation;
+using static Skarbiec.Reporting.Tests.Fixtures.PositionEvents;
 
 namespace Skarbiec.Reporting.Tests;
 
@@ -45,6 +47,57 @@ public sealed class ValuationAlgorithmTests
         Assert.False(result.IsStale);
         Assert.Equal(1000m, Assert.Single(result.Lines).ValuePln);
     }
+
+    [Fact]
+    public void Bond_AddsUnsettledInterest()
+    {
+        var purchaseDate = SnapshotDate.AddMonths(-18);
+        var evt = BondPositionEvent(Guid.NewGuid(), null, purchaseDate);
+        var position = BondPosition(evt);
+        var catalogRates = new Dictionary<int, decimal> { [2] = 5m };
+        var bondRates = new Dictionary<string, IReadOnlyDictionary<int, decimal>> { ["EDO0235"] = catalogRates };
+
+        var result = ValuationAlgorithm.Calculate([position], Prices(), FxRates(), SnapshotDate, bondRatesBySeries: bondRates);
+
+        var interest = Skarbiec.Contracts.Bonds.BondAccrual.Unsettled(
+            new Skarbiec.Contracts.Bonds.BondTerms(TreasuryBondType.Edo, purchaseDate, 50, 6.5m),
+            new Dictionary<int, decimal>(), catalogRates, SnapshotDate);
+        Assert.NotNull(interest);
+        Assert.True(interest > 0m);
+        var expected = Math.Round(5_000m + interest.Value, 2, MidpointRounding.AwayFromZero);
+
+        var line = Assert.Single(result.Lines);
+        Assert.Equal(expected, line.ValuePln);
+        Assert.Equal(expected, result.TotalPln);
+        Assert.Equal(5_000m, line.Quantity);
+        Assert.False(line.IsStale);
+    }
+
+    [Fact]
+    public void Bond_MissingRate_BookValueStale()
+    {
+        var evt = BondPositionEvent(Guid.NewGuid(), null, SnapshotDate.AddMonths(-18));
+        var position = BondPosition(evt);
+
+        var result = ValuationAlgorithm.Calculate(
+            [position], Prices(), FxRates(), SnapshotDate,
+            bondRatesBySeries: new Dictionary<string, IReadOnlyDictionary<int, decimal>>());
+
+        var line = Assert.Single(result.Lines);
+        Assert.Equal(5_000m, line.ValuePln);
+        Assert.True(line.IsStale);
+        Assert.True(result.IsStale);
+    }
+
+    private static ValuationPosition BondPosition(Skarbiec.Contracts.Events.AssetPositionChanged evt) => new()
+    {
+        AssetId = evt.AssetId,
+        AssetClass = AssetClass.Bond,
+        ValuationMode = AssetValuationMode.CurrencyValued,
+        Currency = "PLN",
+        Quantity = evt.Quantity,
+        BondTerms = evt.BondTerms,
+    };
 
     [Fact]
     public void Market_AppliesQuoteUnitsPerQuantity()

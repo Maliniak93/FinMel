@@ -293,9 +293,12 @@ erDiagram
 asset value (PLN) =
   if Market:            Quantity × last PriceQuote × FxRate(quote currency → PLN, same date)
   if Currency-valued:   Quantity × FxRate(currency → PLN, snapshot date)
+  if Bond (BondTerms):  Quantity + BondAccrual.Unsettled(terms, settled rates, catalogue rates, snapshot date)
 
 account value = Σ its assets ; net worth = Σ all assets (accounts + outside)
 ```
+
+A bond line adds the gross interest no settlement has credited yet (ADR-047): Reporting reads the unfinished period rates from MarketData's `/internal/bond-series/rates-batch`, and a missing rate keeps the book value (`Quantity`) with `IsStale`, never 0. Lines of past days keep their book value until the history rebuild learns the terms.
 
 No price for a given day → use the last known one (weekends, holidays); mark `IsStale` when the price or rate used is more than 7 days old. No quote or rate on or before the day → a zero-valued stale line, so the total is partial; the net-worth history flags such a day `IsIncomplete` (derived at read time from lines that are stale, worth 0 and held, `Quantity > 0`; nothing is stored), while a line carried from an old price keeps its value and is not flagged. An FX backfill (`FxHistoryBackfilled`) makes Reporting rebuild each affected user's snapshots from the added range, which rewrites those lines with real values. Unchanged by the redesign — only *where* it runs moves, from Reporting querying Portfolio/MarketData live to Reporting valuing its own `Position` rows against a daily price/FX batch.
 

@@ -36,6 +36,9 @@ public sealed record AssetPositionChanged
     /// <summary>True only for the money asset of a Bank account the user keeps outside net worth.</summary>
     public required bool OutsideNetWorth { get; init; }
 
+    /// <summary>Treasury bond terms for Reporting's accrued-interest valuation; null for every asset that is not a bond.</summary>
+    public PositionBondTerms? BondTerms { get; init; }
+
     /// <summary>Strictly increasing per AssetId from 0; xmin would not move when only the archive flag changes.</summary>
     public required long Version { get; init; }
 
