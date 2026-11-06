@@ -1,0 +1,19 @@
+.gain {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--sk-space-2);
+}
+
+.gain--zero,
+.gain--empty {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.gain--positive {
+  color: var(--sk-positive);
+}
+
+.gain--negative {
+  color: var(--sk-negative);
+}

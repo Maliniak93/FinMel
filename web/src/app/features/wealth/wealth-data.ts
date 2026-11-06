@@ -31,8 +31,8 @@ export interface WealthSubtitle {
   params?: Record<string, string | number>;
 }
 
-export interface WealthChange {
-  amountPln: number;
+export interface WealthGain {
+  amount: number;
   percent: number | null;
 }
 
@@ -45,7 +45,8 @@ export interface WealthRow {
   accountLabel: string | null;
   groupId: string | null;
   valuePln: number | null;
-  change: WealthChange | null;
+  gain: WealthGain | null;
+  cost: number | null;
   flags: WealthFlag[];
   maturityDate: string | null;
   isArchived: boolean;
@@ -145,6 +146,38 @@ export function sumPln(rows: readonly { valuePln: number | null }[]): number | n
   return any ? grosze / 100 : null;
 }
 
+function percentOfCost(gain: number, cost: number): number {
+  return Math.round((gain * 10000) / cost) / 100;
+}
+
+function costBasedGain(
+  value: number | null,
+  costPln: number | string | null | undefined,
+  paidInterestPln: number | string,
+): { gain: WealthGain | null; cost: number | null } {
+  const costValue = toNumber(costPln);
+  if (value === null || costValue === null || costValue <= 0) {
+    return { gain: null, cost: null };
+  }
+  const cost = Math.round(costValue * 100);
+  const amount = Math.round(value * 100) - cost + Math.round(Number(paidInterestPln) * 100);
+  return { gain: { amount, percent: percentOfCost(amount, cost) }, cost };
+}
+
+function sumGain(rows: readonly WealthRow[]): WealthGain | null {
+  let amount = 0;
+  let cost = 0;
+  let any = false;
+  for (const row of rows) {
+    if (row.gain !== null && row.cost !== null) {
+      amount += row.gain.amount;
+      cost += row.cost;
+      any = true;
+    }
+  }
+  return any ? { amount, percent: percentOfCost(amount, cost) } : null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class WealthData {
   private readonly groupList = inject(GroupList);
@@ -217,7 +250,8 @@ export class WealthData {
           accountLabel: null,
           groupId: account.groupId ?? null,
           valuePln: isBank ? valued.value : Number(account.cashBalance),
-          change: null,
+          gain: null,
+          cost: null,
           flags: isBank && valued.stale ? ['stale'] : [],
           maturityDate: null,
           isArchived: account.isArchived,
@@ -239,7 +273,8 @@ export class WealthData {
           accountLabel: null,
           groupId: place.groupId ?? null,
           valuePln: value,
-          change: null,
+          gain: null,
+          cost: null,
           flags: value === null ? ['rateUnavailable'] : [],
           maturityDate: null,
           isArchived: place.isArchived,
@@ -275,7 +310,8 @@ export class WealthData {
           accountLabel: deposit.bankName ?? null,
           groupId: deposit.groupId ?? null,
           valuePln: valued.value,
-          change: null,
+          gain: null,
+          cost: null,
           flags,
           maturityDate: due ? deposit.maturityDate : null,
           isArchived: deposit.isArchived,
@@ -307,7 +343,7 @@ export class WealthData {
           accountLabel: bond.accountName,
           groupId: bond.groupId ?? null,
           valuePln: valued.value,
-          change: null,
+          ...costBasedGain(valued.value, bond.costPln, bond.paidInterestPln),
           flags,
           maturityDate: null,
           isArchived: bond.isArchived,
@@ -338,7 +374,7 @@ export class WealthData {
           accountLabel: null,
           groupId: metal.groupId ?? null,
           valuePln: valued.value,
-          change: null,
+          ...costBasedGain(valued.value, metal.costPln, 0),
           flags: valued.stale ? ['stale'] : [],
           maturityDate: null,
           isArchived: metal.isArchived,
@@ -356,6 +392,8 @@ export class WealthData {
         const valued = line(holding.assetId);
         const value = toNumber(holding.valuePln);
         const gain = toNumber(holding.unrealizedPlPln);
+        const costPln = toNumber(holding.costPln);
+        const cost = costPln === null || costPln <= 0 ? null : Math.round(costPln * 100);
         rows.push({
           type: 'securities',
           id: holding.assetId,
@@ -365,10 +403,14 @@ export class WealthData {
           accountLabel: holding.accountName,
           groupId: holding.groupId,
           valuePln: value,
-          change:
-            gain === null
+          gain:
+            gain === null || cost === null
               ? null
-              : { amountPln: gain, percent: toNumber(holding.unrealizedPlPercent) },
+              : {
+                  amount: Math.round(gain * 100),
+                  percent: toNumber(holding.unrealizedPlPercent),
+                },
+          cost: gain === null || cost === null ? null : cost,
           flags:
             holding.priceUnavailableReason !== null || holding.lastPrice === null || valued.stale
               ? ['stale']
@@ -397,6 +439,20 @@ export class WealthData {
     }
     return sums;
   });
+
+  readonly totalGain = computed(() => sumGain(this.rows()));
+
+  private readonly typeGains = computed(() => {
+    const gains = {} as Record<WealthType, WealthGain | null>;
+    for (const section of WEALTH_SECTIONS) {
+      gains[section.type] = sumGain(this.rows().filter((row) => row.type === section.type));
+    }
+    return gains;
+  });
+
+  sectionGain(type: WealthType): WealthGain | null {
+    return this.typeGains()[type];
+  }
 
   readonly accountsCount = computed(
     () => this.rows().filter((row) => row.type === 'accounts').length,

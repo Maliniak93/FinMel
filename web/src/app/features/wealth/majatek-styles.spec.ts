@@ -8,6 +8,7 @@ const MAJATEK_DIRS = [
   'src/app/features/accounts',
   'src/app/features/cash',
   'src/app/shared/summary-strip',
+  'src/app/shared/gain',
 ];
 
 function scssFiles(dir: string): string[] {
@@ -65,6 +66,9 @@ describe('Majątek stylesheets', () => {
     const strip = readStylesheet('src/app/shared/summary-strip/summary-strip.scss');
     expect(strip).toMatch(/var\(--sk-space-3\)/);
     expect(strip).toMatch(/var\(--sk-space-4\)/);
+
+    const gain = readStylesheet('src/app/shared/gain/gain.scss');
+    expect(gain).toMatch(/var\(--sk-space-2\)/);
   });
 
   it('summary strip cells are equal grid tracks with 14 px phone values', () => {

@@ -62,6 +62,10 @@
     "groupAll": "All",
     "groupNone": "No group",
     "open": "open →",
+    "section": {
+      "expand": "Expand section",
+      "collapse": "Collapse section"
+    },
     "asOf": "As of {{ date }}",
     "accountsCount": {
       "one": "{{ count }} account",

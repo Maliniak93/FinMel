@@ -455,8 +455,21 @@ describe('Transactions', () => {
       expect(tiles['Profit/loss']).toContain('25');
       expect(tiles['Dividends']).toBe('PLN150.00');
       expect(
-        (fixture.nativeElement as HTMLElement).querySelector('dl .money--positive'),
+        (fixture.nativeElement as HTMLElement).querySelector('dl app-gain .gain--positive'),
       ).not.toBeNull();
+    });
+
+    it('profit tile', async () => {
+      await setup(jsonResponse(pagedResponse([transaction])), jsonResponse(stock), undefined, {
+        byAsset: [stockLine],
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const tile = (fixture.nativeElement as HTMLElement).querySelector('dl app-gain');
+      expect(tile).not.toBeNull();
+      expect(tile!.querySelector('mat-icon')).toBeNull();
+      expect(kpis()['Profit/loss']).toMatch(/^\+PLN2,500\.00\(\+?25%\)$/);
     });
 
     it.each([

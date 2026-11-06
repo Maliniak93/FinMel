@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
+import en from '../../../../i18n/en.json';
 import { menuItemLabel, rowMenuItems, showArchived } from '../../../../testing/archive';
 import { readStylesheet, rulesFor } from '../../../../testing/stylesheet';
 import {
@@ -26,7 +27,7 @@ import { BondPurchaseDialog } from '../../bonds/bond-purchase-dialog/bond-purcha
 import { CashPlaceFormDialog } from '../../cash/cash-place-form-dialog/cash-place-form-dialog';
 import { DepositFormDialog } from '../../deposits/deposit-form-dialog/deposit-form-dialog';
 import { MetalFormDialog } from '../../metals/metal-form-dialog/metal-form-dialog';
-import { formatDate, formatMoney, formatSignedMoney } from '../../../shared/format';
+import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../../shared/format';
 import { WealthAll } from './wealth-all';
 
 const SECTION_ORDER = [
@@ -89,6 +90,29 @@ describe('WealthAll', () => {
     return root().querySelector<HTMLElement>(`[data-section="${type}"]`);
   }
 
+  function toggle(type: string): HTMLButtonElement {
+    return section(type)!.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+  }
+
+  function toggles(): HTMLButtonElement[] {
+    return Array.from(
+      root().querySelectorAll<HTMLButtonElement>('[data-section] button[aria-expanded]'),
+    );
+  }
+
+  function rowCount(): number {
+    return root().querySelectorAll('tr.wealth-all__row').length;
+  }
+
+  async function expandAll(): Promise<void> {
+    for (const button of toggles()) {
+      if (button.getAttribute('aria-expanded') === 'false') {
+        button.click();
+      }
+    }
+    await settle();
+  }
+
   function row(name: string): HTMLElement | undefined {
     return Array.from(root().querySelectorAll<HTMLElement>('tr')).find((candidate) =>
       candidate.querySelector('td')?.textContent?.includes(name),
@@ -101,6 +125,7 @@ describe('WealthAll', () => {
 
   it('renders sections and total', async () => {
     await setup();
+    await expandAll();
 
     const order = Array.from(root().querySelectorAll('[data-section]')).map((element) =>
       element.getAttribute('data-section'),
@@ -110,6 +135,7 @@ describe('WealthAll', () => {
     expect(root().textContent).toContain(`As of ${formatDate(ASOF)}`);
     expect(section('securities')!.textContent).toContain(formatMoney(14000));
     expect(section('cash')!.textContent).toContain(formatMoney(800));
+    expect(root().textContent).toContain(formatSignedMoney(1150));
 
     const security = row('CD Projekt')!;
     expect(security.textContent).toContain('XTB IKE');
@@ -118,21 +144,93 @@ describe('WealthAll', () => {
     expect(row('Lokata bez wyceny')!.textContent).toContain('—');
   });
 
-  it('search', async () => {
+  it('starts collapsed', async () => {
+    await setup();
+
+    expect(rowCount()).toBe(0);
+    expect(toggles()).toHaveLength(SECTION_ORDER.length);
+    for (const button of toggles()) {
+      expect(button.getAttribute('aria-expanded')).toBe('false');
+    }
+    expect(section('securities')!.textContent).toContain(formatMoney(14000));
+    expect(section('securities')!.textContent).toContain(formatSignedMoney(500));
+    expect(section('bonds')!.textContent).toContain(formatSignedMoney(150));
+    expect(section('metals')!.textContent).toContain(formatSignedMoney(500));
+  });
+
+  it('section toggle label comes from the translations', async () => {
+    await setup();
+
+    expect(toggle('bonds').getAttribute('aria-label')).toBe(en.wealth.section.expand);
+    toggle('bonds').click();
+    await settle();
+    expect(toggle('bonds').getAttribute('aria-label')).toBe(en.wealth.section.collapse);
+  });
+
+  it('toggles a section', async () => {
+    await setup();
+
+    expect(toggle('bonds').tagName).toBe('BUTTON');
+    toggle('bonds').click();
+    await settle();
+    expect(toggle('bonds').getAttribute('aria-expanded')).toBe('true');
+    expect(row('EDO0935')).toBeDefined();
+    expect(toggle('securities').getAttribute('aria-expanded')).toBe('false');
+
+    toggle('bonds').click();
+    await settle();
+    expect(toggle('bonds').getAttribute('aria-expanded')).toBe('false');
+    expect(row('EDO0935')).toBeUndefined();
+  });
+
+  it('search expands matches and resets', async () => {
     await setup();
 
     component['search'].set('SAN');
     await settle();
 
+    expect(toggle('bank').getAttribute('aria-expanded')).toBe('true');
     expect(row('Santander')).toBeDefined();
     expect(row('XTB IKE')).toBeUndefined();
     expect(section('bank')!.textContent).toContain(formatMoney(45000));
     expect(section('securities')).toBeNull();
     expect(total()).toContain(formatMoney(115800));
+
+    toggle('bank').click();
+    await settle();
+    expect(row('Santander')).toBeUndefined();
+
+    component['search'].set('SANT');
+    await settle();
+    expect(toggle('bank').getAttribute('aria-expanded')).toBe('true');
+    expect(row('Santander')).toBeDefined();
+
+    component['search'].set('');
+    await settle();
+    expect(rowCount()).toBe(0);
+    for (const button of toggles()) {
+      expect(button.getAttribute('aria-expanded')).toBe('false');
+    }
+  });
+
+  it('stock gain', async () => {
+    await setup();
+    await expandAll();
+
+    const valueCell = row('CD Projekt')!.querySelectorAll('td')[4];
+    const gain = valueCell.querySelector('app-gain');
+    expect(gain).not.toBeNull();
+    expect(gain!.querySelector('mat-icon')).toBeNull();
+    expect(valueCell.textContent).toContain(formatSignedMoney(500));
+    const percent = formatPercent(3.7);
+    expect(
+      [`(${percent})`, `(+${percent})`].some((part) => valueCell.textContent!.includes(part)),
+    ).toBe(true);
   });
 
   it('group filter', async () => {
     await setup();
+    await expandAll();
 
     component['groupFilter'].set(GROUP_ID);
     await settle();
@@ -147,6 +245,7 @@ describe('WealthAll', () => {
 
   it('archived toggle', async () => {
     await setup();
+    await expandAll();
     expect(row('Old broker')).toBeUndefined();
 
     await showArchived(fixture);
@@ -154,6 +253,7 @@ describe('WealthAll', () => {
       fixture.detectChanges();
       expect(row('Old broker')).toBeDefined();
     });
+    await expandAll();
 
     expect(row('Old Corp')).toBeDefined();
     expect(row('Old broker')!.textContent).toContain('Archived');
@@ -221,6 +321,7 @@ describe('WealthAll', () => {
       fixture.detectChanges();
       expect(root().querySelector('app-section-error')).not.toBeNull();
     });
+    await expandAll();
 
     expect(row('Portfel')).toBeDefined();
     expect(row('Lokata Alior')).toBeUndefined();
@@ -267,6 +368,7 @@ describe('WealthAll', () => {
 
   it('renders ruled rows and a total row', async () => {
     await setup();
+    await expandAll();
 
     expect(root().querySelectorAll('tr.wealth-all__row').length).toBeGreaterThan(0);
     expect(total()).toContain(formatMoney(115800));
@@ -284,6 +386,7 @@ describe('WealthAll', () => {
     const data = wealthApiData();
     data.bonds = data.bonds.map((bond) => ({ ...bond, status: BOND_STATUS.InterestDue }));
     await setup({ data });
+    await expandAll();
 
     const bondRow = row('EDO0935')!;
     expect(bondRow.querySelector('.status-chip--negative')?.textContent).toContain(
@@ -296,6 +399,7 @@ describe('WealthAll', () => {
     const data = wealthApiData();
     data.bonds = data.bonds.map((bond) => ({ ...bond, status: BOND_STATUS.InterestDue }));
     await setup({ data });
+    await expandAll();
 
     for (const column of ['place', 'group', 'status']) {
       expect(root().querySelector(`thead .wealth-all__col--${column}`), column).not.toBeNull();
@@ -311,6 +415,7 @@ describe('WealthAll', () => {
 
   it('row links', async () => {
     await setup();
+    await expandAll();
     const href = (name: string) =>
       row(name)!.querySelector<HTMLAnchorElement>('a')!.getAttribute('href');
 

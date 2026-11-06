@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { IDS, account, mockWealthApi, wealthApiData } from '../../../testing/wealth-fixtures';
+import { ASOF, IDS, account, mockWealthApi, wealthApiData } from '../../../testing/wealth-fixtures';
+import { BOND_STATUS } from '../bonds/bond-interest';
 import { WealthData } from './wealth-data';
 
 describe('WealthData', () => {
@@ -100,5 +101,67 @@ describe('WealthData', () => {
     expect(wealth.rows().map((row) => row.name)).not.toContain('Revolut ROR');
     expect(wealth.typeSums().bank).toBe(45000);
     expect(wealth.total()).toBe(115800);
+  });
+
+  it('bond and metal gains', async () => {
+    const data = wealthApiData();
+    const COI_ID = 'b0000000-0000-0000-0000-000000000002';
+    const REDEEMED_ID = 'b0000000-0000-0000-0000-000000000003';
+    const SILVER_ID = 'm0000000-0000-0000-0000-000000000002';
+    data.bonds[0] = { ...data.bonds[0], costPln: 10000, paidInterestPln: 0 };
+    data.bonds.push(
+      {
+        ...data.bonds[0],
+        assetId: COI_ID,
+        name: 'COI0928',
+        seriesCode: 'COI0928',
+        costPln: 10000,
+        paidInterestPln: 150,
+      },
+      {
+        ...data.bonds[0],
+        assetId: REDEEMED_ID,
+        name: 'EDO0730',
+        seriesCode: 'EDO0730',
+        costPln: 0,
+        paidInterestPln: 0,
+        status: BOND_STATUS.Redeemed,
+      },
+    );
+    data.metals[0] = { ...data.metals[0], costPln: 2000 };
+    data.metals.push({ ...data.metals[0], assetId: SILVER_ID, name: 'Srebro', costPln: null });
+    data.dashboard.byAsset.push(
+      { assetId: IDS.bond, valuePln: 10450, priceDate: null, isStale: false },
+      { assetId: COI_ID, valuePln: 10200, priceDate: null, isStale: false },
+      { assetId: REDEEMED_ID, valuePln: 0, priceDate: null, isStale: false },
+      { assetId: IDS.metal, valuePln: 2300, priceDate: ASOF, isStale: false },
+      { assetId: SILVER_ID, valuePln: 500, priceDate: null, isStale: false },
+    );
+    fetchSpy.mockRestore();
+    fetchSpy = mockWealthApi({ data });
+
+    const wealth = await loaded();
+    const byName = (name: string) => wealth.rows().find((row) => row.name === name)!;
+
+    expect(byName('EDO0935').gain).toEqual({ amount: 45000, percent: 4.5 });
+    expect(byName('EDO0935').cost).toBe(1000000);
+    expect(byName('COI0928').gain).toEqual({ amount: 35000, percent: 3.5 });
+    expect(byName('Krugerrand').gain).toEqual({ amount: 30000, percent: 15 });
+    expect(byName('Srebro').gain).toBeNull();
+    expect(byName('Srebro').cost).toBeNull();
+    expect(byName('EDO0730').gain).toBeNull();
+    expect(byName('EDO0730').cost).toBeNull();
+  });
+
+  it('gain sums', async () => {
+    const data = await loaded();
+
+    expect(data.sectionGain('securities')).toEqual({ amount: 50000, percent: 3.7 });
+    expect(data.sectionGain('bonds')).toEqual({ amount: 15000, percent: 16.67 });
+    expect(data.sectionGain('metals')).toEqual({ amount: 50000, percent: 20 });
+    for (const type of ['bank', 'accounts', 'deposits', 'cash'] as const) {
+      expect(data.sectionGain(type), type).toBeNull();
+    }
+    expect(data.totalGain()).toEqual({ amount: 115000, percent: 6.8 });
   });
 });
