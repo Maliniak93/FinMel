@@ -265,6 +265,8 @@ export type BondResponse = {
     maturityDate: string;
     nominalValue: number | string;
     bookValue: number | string;
+    costPln: number | string;
+    paidInterestPln: number | string;
     status: BondStatus;
     duePeriodCount: number | string;
     lastSettlement?: null | BondSettlementResponse;
@@ -602,6 +604,7 @@ export type MetalResponse = {
     fineWeightGramsPerPiece: number | string;
     pieces: number | string;
     totalFineGrams: number | string;
+    costPln?: null | number | string;
 };
 
 export type OccurrenceStatus = 'Pending' | 'Settled' | 'Skipped';

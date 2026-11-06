@@ -27,7 +27,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const today = toDateOnly(new Date());
 const staleDate = toDateOnly(new Date(Date.now() - 30 * DAY_MS));
 
-const gain = { ...vwce, name: 'Gain holding', lastPriceDate: today };
+const gain = { ...vwce, name: 'Gain holding', lastPriceDate: today, unrealizedPlPercent: 14.16 };
 const loss = { ...cdr, name: 'Loss holding', lastPriceDate: staleDate };
 
 describe('SecuritiesTable', () => {
@@ -106,10 +106,19 @@ describe('SecuritiesTable', () => {
   }
 
   it('change and unavailable price', async () => {
+    const quoteOnly = {
+      ...vwce,
+      name: 'Quote only holding',
+      lastPriceDate: today,
+      unrealizedPl: 50,
+      unrealizedPlPercent: 12.5,
+      unrealizedPlPln: null,
+    };
     await setup({
       holdings: [
         gain,
         loss,
+        quoteOnly,
         unavailable('a3', 'Unpriced holding', PRICE_UNAVAILABLE_REASON.NoQuote),
       ],
       totals: empty.totals,
@@ -119,12 +128,16 @@ describe('SecuritiesTable', () => {
     expect(gainCell.querySelector('.money--positive')).not.toBeNull();
     expect(textOf(gainCell)).toContain(collapsed(formatSignedMoney(960, 'PLN')));
     expect(textOf(gainCell)).toContain('trending_up');
-    expect(textOf(gainCell)).toContain(collapsed(formatPercent(9.09)));
+    expect(textOf(gainCell)).toContain(collapsed(formatPercent(14.16)));
 
     const lossCell = cellOf(rowFor('Loss holding'), 'Zysk/strata');
     expect(lossCell.querySelector('.money--negative')).not.toBeNull();
     expect(textOf(lossCell)).toContain(collapsed(formatSignedMoney(-500, 'PLN')));
     expect(textOf(lossCell)).toContain('trending_down');
+
+    const quoteOnlyCell = cellOf(rowFor('Quote only holding'), 'Zysk/strata');
+    expect(textOf(quoteOnlyCell)).toContain(collapsed(formatSignedMoney(50, 'EUR')));
+    expect(textOf(quoteOnlyCell)).not.toContain(collapsed(formatPercent(12.5)));
 
     expect(textOf(cellOf(rowFor('Gain holding'), 'Wartość'))).toContain(
       collapsed(formatMoney(7740, 'PLN')),

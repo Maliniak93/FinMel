@@ -21,12 +21,15 @@ public sealed record MetalResponse
 
     /// <summary>Pieces × FineWeightGramsPerPiece.</summary>
     public required decimal TotalFineGrams { get; init; }
+
+    /// <summary>PLN paid for the pieces held, from the cash legs of the purchases; null when a purchase has none.</summary>
+    public decimal? CostPln { get; init; }
 }
 
 public static class MetalMappingExtensions
 {
     public static MetalResponse ToResponse(
-        this MetalHolding holding, Asset asset) => new()
+        this MetalHolding holding, Asset asset, decimal? costPln = null) => new()
         {
             AssetId = asset.Id,
             IsArchived = asset.IsArchived,
@@ -35,6 +38,7 @@ public static class MetalMappingExtensions
             Metal = holding.Metal,
             FineWeightGramsPerPiece = holding.FineWeightGramsPerPiece,
             Pieces = asset.Quantity,
-            TotalFineGrams = MetalWeight.TotalFineGrams(asset.Quantity, holding.FineWeightGramsPerPiece)
+            TotalFineGrams = MetalWeight.TotalFineGrams(asset.Quantity, holding.FineWeightGramsPerPiece),
+            CostPln = costPln
         };
 }

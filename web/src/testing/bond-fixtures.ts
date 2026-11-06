@@ -22,6 +22,8 @@ export interface BondFixture {
   maturityDate: string;
   nominalValue: number;
   bookValue: number;
+  costPln: number;
+  paidInterestPln: number;
   status: number;
   duePeriodCount: number;
   lastSettlement: BondSettlementFixture | null;
@@ -89,6 +91,8 @@ export function bondResponse(overrides: Partial<BondFixture> = {}): BondFixture 
     maturityDate: '2036-10-01',
     nominalValue: 5000,
     bookValue: 5000,
+    costPln: 5000,
+    paidInterestPln: 0,
     status: BOND_STATUS.Active,
     duePeriodCount: 0,
     lastSettlement: null,

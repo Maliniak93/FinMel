@@ -190,7 +190,7 @@ describe('Securities page', () => {
     const text = textOf(rowFor('Xetra ETF bought early'));
 
     expect(text).toContain(money(150, 'EUR'));
-    expect(text).toContain(formatPercent(9.09).replace(/\s+/g, ' '));
+    expect(text).not.toContain(formatPercent(9.09).replace(/\s+/g, ' '));
   });
 
   it('shows the empty state of each tab with the add button', async () => {

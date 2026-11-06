@@ -55,7 +55,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
             () => Assert.Equal(new DateOnly(2026, 1, 30), euro.LastPriceDate),
             () => Assert.Equal(7740.00m, euro.ValuePln),
             () => Assert.Equal(150.00m, euro.UnrealizedPl),
-            () => Assert.Equal(9.09m, euro.UnrealizedPlPercent),
+            () => Assert.Equal(14.16m, euro.UnrealizedPlPercent),
             () => Assert.Equal(960m, euro.UnrealizedPlPln),
             () => Assert.Null(euro.PriceUnavailableReason));
         var zloty = body.Holdings[1];
@@ -141,6 +141,7 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
             () => Assert.Null(second.LastPrice),
             () => Assert.Null(second.ValuePln),
             () => Assert.Null(second.UnrealizedPlPln),
+            () => Assert.Null(second.UnrealizedPlPercent),
             () => Assert.Null(third.PriceUnavailableReason));
         Assert.Multiple(
             () => Assert.Equal(800.00m, body.Totals.ValuePln),
@@ -308,7 +309,34 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
             () => Assert.Equal(432m, holding.AverageBuyPricePln),
             () => Assert.Equal(5_160.00m, holding.ValuePln),
             () => Assert.Equal(840m, holding.UnrealizedPlPln),
+            () => Assert.Equal(19.44m, holding.UnrealizedPlPercent),
             () => Assert.Equal(4_320m, body.Totals.CostPln));
+    }
+
+    [Fact]
+    public async Task Percent_IsPlnOverPlnCost()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
+        Factory.FxRateLookupClient.WithRate("EUR", new DateOnly(2026, 1, 10), 4.00m);
+        Factory.InstrumentQuoteLookupClient.WithRate("EUR", 3.80m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await client.CreateAccountAsync(cancellationToken, name: "Main");
+        await client.FundAccountAsync(accountId, cancellationToken);
+        var etf = await AddQuotedHoldingAsync(
+            client, accountId, cancellationToken, AssetClass.Etf, "EUR", "IUSQ", "IUSQ", 105m, "XETRA", new DateOnly(2026, 1, 30));
+        await client.RecordTransactionAsync(etf, TransactionType.Buy, 10m, new DateOnly(2026, 1, 10), cancellationToken, unitPrice: 100m);
+
+        var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Etf), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var holding = Assert.Single((await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!.Holdings);
+        Assert.Multiple(
+            () => Assert.Equal(4_000m, holding.CostPln),
+            () => Assert.Equal(50m, holding.UnrealizedPl),
+            () => Assert.Equal(3_990m, holding.ValuePln),
+            () => Assert.Equal(-10m, holding.UnrealizedPlPln),
+            () => Assert.Equal(-0.25m, holding.UnrealizedPlPercent));
     }
 
     [Fact]

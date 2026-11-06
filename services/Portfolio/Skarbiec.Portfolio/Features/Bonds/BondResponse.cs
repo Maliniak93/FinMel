@@ -112,6 +112,12 @@ public sealed record BondResponse
     /// <summary>The asset's quantity in PLN; starts at the purchase cost.</summary>
     public required decimal BookValue { get; init; }
 
+    /// <summary>Bonds held now × purchase price per bond, PLN.</summary>
+    public required decimal CostPln { get; init; }
+
+    /// <summary>Gross interest of the settled periods of a coupon type, PLN; 0 for a capitalising type.</summary>
+    public required decimal PaidInterestPln { get; init; }
+
     public required BondStatus Status { get; init; }
 
     /// <summary>Ended periods not settled yet.</summary>
@@ -182,6 +188,8 @@ public static class BondMappingExtensions
             MaturityDate = terms.MaturityDate,
             NominalValue = terms.BondCount * NominalPerBond,
             BookValue = asset.Quantity,
+            CostPln = terms.BondCount * terms.PurchasePricePerBond,
+            PaidInterestPln = BondSchedule.IsCoupon(terms.Type) ? settlements.Sum(s => s.GrossInterest) : 0m,
             // Maturity and swap redeem the holding whole; early redemptions only once they took every bond.
             Status = terms.BondCount == 0 || redemptions.Any(r => r.Kind != BondRedemptionKind.Early) ? BondStatus.Redeemed
                 : terms.MaturityDate <= today ? BondStatus.Matured
