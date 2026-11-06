@@ -13,7 +13,7 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AccountResponse } from '../../api/portfolio';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import type { DashboardResponse } from '../../api/reporting';
-import { formatMoney } from '../../shared/format';
+import { formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
 import { Accounts } from './accounts';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -137,6 +137,213 @@ describe('Accounts', () => {
       );
   }
 
+  interface Performance {
+    netContributionsPln: number | null;
+    positionsCostPln: number | null;
+    paidInterestPln: number | null;
+  }
+
+  function withPerformance(
+    base: AccountResponse,
+    overrides: Partial<AccountResponse> & Performance,
+  ): AccountResponse {
+    return { ...base, ...overrides } as AccountResponse;
+  }
+
+  function dashboardOf(
+    entries: { id: string; valuePln: number; isStale?: boolean }[],
+  ): DashboardResponse {
+    const total = entries.reduce((sum, entry) => sum + entry.valuePln, 0);
+    return {
+      ...emptyDashboard,
+      netWorthPln: total,
+      asOf: '2026-08-10',
+      byAccount: entries.map((entry) => ({
+        accountId: entry.id,
+        valuePln: entry.valuePln,
+        percentage: 0,
+        snapshotDate: '2026-08-10',
+        isStale: entry.isStale ?? false,
+      })),
+    };
+  }
+
+  function rowCells(name: string): HTMLTableCellElement[] {
+    const row = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('tr')).find(
+      (candidate) => (candidate.textContent ?? '').includes(name),
+    );
+    return Array.from(row!.querySelectorAll('td'));
+  }
+
+  function normalized(text: string | null | undefined): string {
+    return (text ?? '').replace(/\s+/g, ' ');
+  }
+
+  const signed = (amount: number): string => normalized(formatSignedMoney(amount));
+  const pct = (percent: number): string => normalized(formatPercent(percent));
+  const zero = (): string => normalized(formatMoney(0));
+
+  function stripText(): string {
+    const strip = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="summary-strip"]',
+    );
+    return normalized(strip?.textContent);
+  }
+
+  const eMakler = (overrides: Partial<Performance> = {}): AccountResponse =>
+    withPerformance(brokerage, {
+      name: 'IKE eMakler',
+      cashBalance: 2000,
+      netContributionsPln: 7000,
+      positionsCostPln: 4000,
+      paidInterestPln: 0,
+      ...overrides,
+    });
+
+  const ikeBonds = (overrides: Partial<Performance> = {}): AccountResponse =>
+    withPerformance(bonds, {
+      name: 'IKE-Obligacje',
+      cashBalance: 0,
+      netContributionsPln: 5500,
+      positionsCostPln: 5500,
+      paidInterestPln: 50,
+      ...overrides,
+    });
+
+  async function resetAndSetup(
+    accounts: AccountResponse[],
+    dashboard: DashboardResponse,
+  ): Promise<void> {
+    fetchSpy.mockRestore();
+    TestBed.resetTestingModule();
+    await setup(jsonResponse(accounts), jsonResponse(dashboard));
+  }
+
+  it('total gain from net contributions', async () => {
+    const dashboard = dashboardOf([
+      { id: brokerage.id, valuePln: 7130.68 },
+      { id: bonds.id, valuePln: 5500 },
+    ]);
+    await setup(jsonResponse([eMakler(), ikeBonds()]), jsonResponse(dashboard));
+
+    const emaklerValue = rowCells('IKE eMakler')[5];
+    const bondsValue = rowCells('IKE-Obligacje')[5];
+    expect(normalized(emaklerValue.textContent)).toContain(`${signed(130.68)}(${pct(1.87)})`);
+    expect(emaklerValue.querySelector('.gain--positive')).not.toBeNull();
+    expect(normalized(bondsValue.textContent)).toContain(`${zero()}(${pct(0)})`);
+    expect(bondsValue.querySelector('.gain--zero')).not.toBeNull();
+    expect(bondsValue.querySelector('.gain--positive, .gain--negative')).toBeNull();
+    expect(stripText()).toContain(`${signed(130.68)}(${pct(1.05)})`);
+
+    await switchLanguage(fixture, 'pl');
+    expect(stripText()).toContain('od wpłat');
+    const headers = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('th'),
+      (th) => normalized(th.textContent).trim(),
+    );
+    expect(headers.find((header) => header.startsWith('Wartość'))).toContain('od wpłat');
+
+    await restoreEnglish();
+    await resetAndSetup(
+      [eMakler({ netContributionsPln: 8000 })],
+      dashboardOf([{ id: brokerage.id, valuePln: 7000 }]),
+    );
+    const lossValue = rowCells('IKE eMakler')[5];
+    expect(lossValue.querySelector('.gain--negative')).not.toBeNull();
+    expect(normalized(lossValue.textContent)).toContain(signed(-1000));
+  });
+
+  it('securities gain', async () => {
+    const dashboard = dashboardOf([
+      { id: brokerage.id, valuePln: 7130.68 },
+      { id: bonds.id, valuePln: 5500 },
+    ]);
+    await setup(jsonResponse([eMakler(), ikeBonds()]), jsonResponse(dashboard));
+
+    const emaklerSecurities = rowCells('IKE eMakler')[4];
+    const bondsSecurities = rowCells('IKE-Obligacje')[4];
+    expect(normalized(emaklerSecurities.textContent)).toContain(
+      `${signed(1130.68)}(${pct(28.27)})`,
+    );
+    expect(normalized(bondsSecurities.textContent)).toContain(`${signed(50)}(${pct(0.91)})`);
+    expect(stripText()).toContain(`${signed(1180.68)}(${pct(12.43)})`);
+
+    await switchLanguage(fixture, 'pl');
+    expect(stripText()).toContain('niezrealizowany');
+    const headers = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll('th'),
+      (th) => normalized(th.textContent).trim(),
+    );
+    expect(headers.find((header) => header.startsWith('Papiery'))).toContain('niezrealizowany');
+  });
+
+  it('gain edge cases', async () => {
+    await setup(
+      jsonResponse([eMakler({ netContributionsPln: -500 })]),
+      jsonResponse(dashboardOf([{ id: brokerage.id, valuePln: 1000 }])),
+    );
+    const nonPositiveContributions = normalized(rowCells('IKE eMakler')[5].textContent);
+    expect(nonPositiveContributions).toContain(`${signed(1500)}(—)`);
+    expect(nonPositiveContributions).not.toContain('%');
+
+    await resetAndSetup(
+      [eMakler({ netContributionsPln: 1000 })],
+      dashboardOf([{ id: brokerage.id, valuePln: 0 }]),
+    );
+    expect(normalized(rowCells('IKE eMakler')[5].textContent)).toContain(
+      `${signed(-1000)}(${pct(-100)})`,
+    );
+
+    const staleAccount = withPerformance(bonds, {
+      name: 'Stale IKE',
+      cashBalance: 0,
+      netContributionsPln: 1000,
+      positionsCostPln: 1000,
+      paidInterestPln: 0,
+    });
+    const missingAccount = withPerformance(archived, {
+      name: 'Missing IKE',
+      isArchived: false,
+      cashBalance: 0,
+      netContributionsPln: 1000,
+      positionsCostPln: 1000,
+      paidInterestPln: 0,
+    });
+    await resetAndSetup(
+      [eMakler(), staleAccount, missingAccount],
+      dashboardOf([
+        { id: brokerage.id, valuePln: 7130.68 },
+        { id: bonds.id, valuePln: 900, isStale: true },
+      ]),
+    );
+    expect(normalized(rowCells('Stale IKE')[5].textContent)).toContain('—');
+    expect(normalized(rowCells('Stale IKE')[4].textContent)).toContain('—');
+    expect(rowCells('Stale IKE')[5].querySelector('app-gain .gain:not(.gain--empty)')).toBeNull();
+    expect(normalized(rowCells('Missing IKE')[5].textContent)).toContain('—');
+    expect(normalized(rowCells('Missing IKE')[4].textContent)).toContain('—');
+    expect(stripText()).toContain(`${signed(130.68)}(${pct(1.87)})`);
+    await switchLanguage(fixture, 'pl');
+    expect(stripText()).toContain('bez 2 rachunków');
+    await restoreEnglish();
+
+    await resetAndSetup(
+      [eMakler({ positionsCostPln: null })],
+      dashboardOf([{ id: brokerage.id, valuePln: 7130.68 }]),
+    );
+    expect(normalized(rowCells('IKE eMakler')[4].textContent)).toContain('—');
+    expect(normalized(rowCells('IKE eMakler')[5].textContent)).toContain(signed(130.68));
+
+    await resetAndSetup(
+      [staleAccount],
+      dashboardOf([{ id: bonds.id, valuePln: 900, isStale: true }]),
+    );
+    const strip = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid="summary-strip"]',
+    );
+    expect(strip!.querySelector('app-gain .gain:not(.gain--empty)')).toBeNull();
+    expect(stripText()).toContain('—');
+  });
+
   it('loads accounts into the resource', async () => {
     await setup(jsonResponse([brokerage, bonds]));
 
@@ -176,15 +383,15 @@ describe('Accounts', () => {
 
     await switchLanguage(fixture, 'pl');
     const headers = Array.from(element.querySelectorAll('th'), (th) =>
-      (th.textContent ?? '').trim(),
+      normalized(th.textContent).trim(),
     );
     expect(headers.slice(0, 6)).toEqual([
       'Nazwa',
       'Typ',
       'Opakowanie podatkowe',
       'Wolne środki',
-      'Papiery',
-      'Wartość',
+      'Papiery niezrealizowany',
+      'Wartość od wpłat',
     ]);
   });
 

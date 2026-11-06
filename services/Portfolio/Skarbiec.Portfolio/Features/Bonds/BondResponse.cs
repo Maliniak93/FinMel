@@ -190,7 +190,7 @@ public static class BondMappingExtensions
             NominalValue = terms.BondCount * NominalPerBond,
             BookValue = asset.Quantity,
             CostPln = terms.BondCount * terms.PurchasePricePerBond,
-            PaidInterestPln = BondSchedule.IsCoupon(terms.Type) ? settlements.Sum(s => s.GrossInterest) : 0m,
+            PaidInterestPln = PaidInterest(terms.Type, settlements),
             // Maturity and swap redeem the holding whole; early redemptions only once they took every bond.
             Status = terms.BondCount == 0 || redemptions.Any(r => r.Kind != BondRedemptionKind.Early) ? BondStatus.Redeemed
                 : terms.MaturityDate <= today ? BondStatus.Matured
@@ -203,6 +203,9 @@ public static class BondMappingExtensions
             SwappedFrom = swappedFrom
         };
     }
+
+    public static decimal PaidInterest(TreasuryBondType type, IEnumerable<BondInterestSettlement> settlements)
+        => BondSchedule.IsCoupon(type) ? settlements.Sum(s => s.GrossInterest) : 0m;
 
     public static BondSettlementResponse ToResponse(this BondInterestSettlement settlement) => new()
     {

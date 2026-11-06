@@ -28,6 +28,15 @@ public sealed record AccountResponse
     /// <summary>Set only by the account reads, for an IKE or IKZE account; null for a Regular one.</summary>
     public ContributionResponse? Contribution { get; init; }
 
+    /// <summary>Set only by the account reads, for a Brokerage or Bonds account: external deposits less withdrawals up to today, PLN.</summary>
+    public decimal? NetContributionsPln { get; init; }
+
+    /// <summary>Set only by the account reads, for a Brokerage or Bonds account: purchase cost of the open positions, PLN; null when a position has no PLN cost.</summary>
+    public decimal? PositionsCostPln { get; init; }
+
+    /// <summary>Set only by the account reads, for a Brokerage or Bonds account: gross coupons paid on the open bonds, PLN.</summary>
+    public decimal? PaidInterestPln { get; init; }
+
     /// <summary>Set only for a Bank account.</summary>
     public BankTermsResponse? Bank { get; init; }
 }

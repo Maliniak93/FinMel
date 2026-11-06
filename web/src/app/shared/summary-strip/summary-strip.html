@@ -5,6 +5,17 @@
       <dd class="summary-strip__value sk-num" [attr.data-testid]="item.testId ?? null">
         <app-money [amount]="item.amount" [currency]="item.currency ?? 'PLN'" />
       </dd>
+      @if (item.gain; as gain) {
+        <dd class="summary-strip__gain sk-num">
+          <app-gain [amount]="gain.amount" [percent]="gain.percent" />
+          <span class="summary-strip__caption">{{ gain.captionKey | transloco }}</span>
+          @if (gain.excluded; as excluded) {
+            <span class="summary-strip__caption">{{
+              excluded.key | transloco: { count: excluded.count }
+            }}</span>
+          }
+        </dd>
+      }
       @if (item.link; as link) {
         <a class="summary-strip__link" [routerLink]="link.route">{{ link.labelKey | transloco }}</a>
       }

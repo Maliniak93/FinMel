@@ -41,6 +41,28 @@ public sealed class GetAccountEndpointTests(SkarbiecContainersFixture containers
     }
 
     [Fact]
+    public async Task NetContributions_Returned()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var scenario = await client.CreateNetContributionsScenarioAsync(cancellationToken);
+
+        var ike = await client.GetAsync(AccountUri(scenario.IkeId), cancellationToken);
+        var bank = await client.GetAsync(AccountUri(scenario.BankId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, ike.StatusCode);
+        var ikeBody = await ike.ReadJsonAsync(cancellationToken);
+        Assert.Multiple(
+            () => Assert.Equal(7_300m, ikeBody.GetProperty("netContributionsPln").GetDecimal()),
+            () => Assert.Equal(1_200m, ikeBody.GetProperty("positionsCostPln").GetDecimal()),
+            () => Assert.Equal(0m, ikeBody.GetProperty("paidInterestPln").GetDecimal()),
+            () => Assert.Equal(8_500m, ikeBody.GetProperty("contribution").GetProperty("contributedPln").GetDecimal()));
+        var bankBody = await bank.ReadJsonAsync(cancellationToken);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, bankBody.GetProperty("netContributionsPln").ValueKind);
+    }
+
+    [Fact]
     public async Task ReturnsGroupId()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -28,6 +28,9 @@ public sealed class GetAccountHandler(
         var bank = await dbContext.LoadBankInterestAsync(
             [account], money, WarsawCalendar.Today(timeProvider), cancellationToken);
 
+        var performance = await dbContext.LoadPerformanceAsync(
+            [account], money, WarsawCalendar.Today(timeProvider), cancellationToken);
+
         var pln = await AccountOutsideNetWorthValuation.ValueAsync(
             quoteLookup, timeProvider, [(account, cash)], cancellationToken);
 
@@ -35,6 +38,9 @@ public sealed class GetAccountHandler(
         {
             CashBalancePln = pln.GetValueOrDefault(id),
             Contribution = contributions.GetValueOrDefault(id),
+            NetContributionsPln = performance.GetValueOrDefault(id)?.NetContributionsPln,
+            PositionsCostPln = performance.GetValueOrDefault(id)?.PositionsCostPln,
+            PaidInterestPln = performance.GetValueOrDefault(id)?.PaidInterestPln,
             Bank = bank.GetValueOrDefault(id)?.ToResponse()
         };
     }

@@ -8,6 +8,7 @@ type Inputs = Partial<{
   amount: number | null;
   percent: number | null;
   currency: string;
+  dashWithoutPercent: boolean;
 }>;
 
 const collapse = (text: string) => text.replace(/\s+/g, ' ').trim();
@@ -76,5 +77,12 @@ describe('Gain', () => {
 
     expect(text()).toContain(collapse(formatSignedMoney(50, 'EUR')));
     expect(text()).not.toContain('%');
+  });
+
+  it('renders a dash in place of a missing percent when asked to', async () => {
+    await render({ amount: 50, percent: null, dashWithoutPercent: true });
+
+    expect(text()).toContain(collapse(formatSignedMoney(50, 'PLN')));
+    expect(text()).toContain('(—)');
   });
 });
