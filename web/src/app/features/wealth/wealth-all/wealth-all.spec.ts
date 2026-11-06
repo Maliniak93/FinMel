@@ -7,7 +7,7 @@ import { of } from 'rxjs';
 
 import en from '../../../../i18n/en.json';
 import { menuItemLabel, rowMenuItems, showArchived } from '../../../../testing/archive';
-import { readStylesheet, rulesFor } from '../../../../testing/stylesheet';
+import { mediaBlock, readStylesheet, rulesFor } from '../../../../testing/stylesheet';
 import {
   ASOF,
   GROUP_ID,
@@ -123,6 +123,22 @@ describe('WealthAll', () => {
     return root().querySelector('[data-testid="total"]')?.textContent ?? '';
   }
 
+  function columnIndex(cell: HTMLTableCellElement): number {
+    let index = 0;
+    for (
+      let sibling = cell.previousElementSibling;
+      sibling;
+      sibling = sibling.previousElementSibling
+    ) {
+      index += (sibling as HTMLTableCellElement).colSpan;
+    }
+    return index;
+  }
+
+  function declared(rules: string, property: string): string | undefined {
+    return rules.match(new RegExp(`(?:^|[\\s;{])${property}:\\s*([^;]+);`))?.[1].trim();
+  }
+
   it('renders sections and total', async () => {
     await setup();
     await expandAll();
@@ -181,6 +197,25 @@ describe('WealthAll', () => {
     await settle();
     expect(toggle('bonds').getAttribute('aria-expanded')).toBe('false');
     expect(row('EDO0935')).toBeUndefined();
+  });
+
+  it('rapid toggles end in a consistent state', async () => {
+    await setup();
+
+    toggle('bonds').click();
+    toggle('bonds').click();
+    await settle();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(section('bonds')!.querySelectorAll('tr.wealth-all__row')).toHaveLength(0);
+    });
+    expect(toggle('bonds').getAttribute('aria-expanded')).toBe('false');
+
+    toggle('bonds').click();
+    await settle();
+    expect(toggle('bonds').getAttribute('aria-expanded')).toBe('true');
+    expect(section('bonds')!.querySelectorAll('tr.wealth-all__row')).toHaveLength(1);
+    expect(row('EDO0935')).toBeDefined();
   });
 
   it('search expands matches and resets', async () => {
@@ -380,6 +415,98 @@ describe('WealthAll', () => {
     expect(rulesFor(css, /__row|tbody tr/)).toMatch(
       /border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/,
     );
+  });
+
+  it('section row keeps its sum in the value column', async () => {
+    await setup();
+    const headers = Array.from(root().querySelectorAll<HTMLTableCellElement>('thead th'));
+    const valueHeader = headers.find(
+      (cell) => cell.textContent?.trim() === en.wealth.column.value,
+    )!;
+    const actionsHeader = headers[headers.length - 1];
+
+    const sectionSum = () =>
+      Array.from(
+        section('securities')!.querySelectorAll<HTMLTableCellElement>(
+          'tr.wealth-all__section > th',
+        ),
+      ).find((cell) => cell.querySelector('app-money'))!;
+    expect(columnIndex(sectionSum())).toBe(columnIndex(valueHeader));
+    const trailing = sectionSum().nextElementSibling as HTMLTableCellElement;
+    expect(trailing.textContent?.trim()).toBe('');
+    expect(columnIndex(trailing)).toBe(columnIndex(actionsHeader));
+
+    toggle('securities').click();
+    await settle();
+    const valueCell = section('securities')!.querySelector<HTMLTableCellElement>(
+      'tr.wealth-all__row td.wealth-all__num',
+    )!;
+    expect(columnIndex(valueCell)).toBe(columnIndex(valueHeader));
+    expect(columnIndex(sectionSum())).toBe(columnIndex(valueCell));
+  });
+
+  it('columns have fixed widths and right-aligned values', () => {
+    const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+
+    expect(css).toMatch(/\.wealth-all__table\s*\{[^}]*table-layout:\s*fixed/);
+    for (const selector of [
+      /__col--name|first-child/,
+      /__col--place/,
+      /__col--group/,
+      /__col--status/,
+      /__num/,
+      /__actions/,
+    ]) {
+      expect(rulesFor(css, selector)).toMatch(/(?:^|[\s;])width:\s*\S+/);
+    }
+    expect(rulesFor(css, /__name|__col--place|th,\s*td/)).toMatch(/text-overflow:\s*ellipsis/);
+    expect(rulesFor(css, /__num/)).toMatch(/text-align:\s*right/);
+    expect(rulesFor(css, /th,\s*td/)).not.toMatch(/text-align:\s*left/);
+  });
+
+  it('section rows animate with the shared motion tokens', () => {
+    const tokens = readStylesheet('src/skarbiec-tokens.css');
+    expect(tokens).toMatch(/--sk-motion-duration:\s*500ms;/);
+    expect(tokens).toMatch(/--sk-motion-easing:\s*cubic-bezier\(0\.35,\s*0,\s*0\.25,\s*1\);/);
+
+    const html = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.html');
+    const enter = html.match(/animate\.enter="([^"]+)"/)?.[1];
+    const leave = html.match(/animate\.leave="([^"]+)"/)?.[1];
+    expect(enter).toBeDefined();
+    expect(leave).toBeDefined();
+
+    const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    const media = css.indexOf('@media (prefers-reduced-motion: no-preference)');
+    expect(media).toBeGreaterThanOrEqual(0);
+    expect(css.slice(0, media)).not.toMatch(/var\(--sk-motion-/);
+    const motion = mediaBlock(css, '(prefers-reduced-motion: no-preference)');
+    expect(motion).toContain('var(--sk-motion-duration)');
+    expect(motion).toContain('var(--sk-motion-easing)');
+    expect(motion).toContain(`.${enter}`);
+    expect(motion).toContain(`.${leave}`);
+    expect(motion).toMatch(/transform/);
+  });
+
+  it('section header line is centred on one axis', async () => {
+    await setup();
+    const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    const button = toggle('securities');
+    const line = button.parentElement!;
+    const link = section('securities')!.querySelector<HTMLElement>('.wealth-all__section-link')!;
+
+    expect(link.parentElement).toBe(line);
+    const lineClass = line.classList[0];
+    expect(lineClass).toBeDefined();
+    const lineRules = rulesFor(css, new RegExp(`\\.${lineClass}\\s*$`));
+    expect(lineRules).toMatch(/display:\s*(inline-)?flex/);
+    expect(lineRules).toMatch(/align-items:\s*center/);
+
+    expect(button.querySelector('mat-icon')).not.toBeNull();
+    const chevronRules = rulesFor(css, /__toggle\s+mat-icon|__chevron/);
+    const size = declared(chevronRules, 'width');
+    expect(size).toBeDefined();
+    expect(declared(chevronRules, 'height')).toBe(size);
+    expect(declared(chevronRules, 'font-size')).toBe(size);
   });
 
   it('shows interest to settle in the error tone', async () => {

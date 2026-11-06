@@ -96,7 +96,7 @@
     <table class="wealth-all__table">
       <thead>
         <tr>
-          <th scope="col">{{ 'wealth.column.name' | transloco }}</th>
+          <th scope="col" class="wealth-all__col--name">{{ 'wealth.column.name' | transloco }}</th>
           <th scope="col" class="wealth-all__col--place">
             {{ 'wealth.column.place' | transloco }}
           </th>
@@ -107,7 +107,7 @@
             {{ 'wealth.column.status' | transloco }}
           </th>
           <th scope="col" class="wealth-all__num">{{ 'wealth.column.value' | transloco }}</th>
-          <th scope="col"></th>
+          <th scope="col" class="wealth-all__actions"></th>
         </tr>
       </thead>
       @for (section of sections(); track section.type) {
@@ -115,23 +115,24 @@
           isExpanded(section.type) ? 'wealth.section.collapse' : 'wealth.section.expand';
         <tbody [attr.data-section]="section.type">
           <tr class="wealth-all__section">
-            <th scope="colgroup" colspan="5">
-              <button
-                type="button"
-                class="wealth-all__toggle"
-                [attr.aria-expanded]="isExpanded(section.type)"
-                [attr.aria-label]="toggleLabel | transloco"
-                (click)="toggle(section.type)"
-              >
-                <mat-icon aria-hidden="true">{{
-                  isExpanded(section.type) ? 'keyboard_arrow_down' : 'chevron_right'
-                }}</mat-icon>
-                <span class="wealth-all__swatch" [style.background-color]="section.color"></span>
-                <span class="wealth-all__section-name">{{ section.labelKey | transloco }}</span>
-              </button>
-              <a class="wealth-all__section-link" [routerLink]="section.link">{{
-                'wealth.open' | transloco
-              }}</a>
+            <th scope="colgroup" colspan="4">
+              <span class="wealth-all__section-line">
+                <button
+                  type="button"
+                  class="wealth-all__toggle"
+                  [class.wealth-all__toggle--open]="isExpanded(section.type)"
+                  [attr.aria-expanded]="isExpanded(section.type)"
+                  [attr.aria-label]="toggleLabel | transloco"
+                  (click)="toggle(section.type)"
+                >
+                  <mat-icon aria-hidden="true">chevron_right</mat-icon>
+                  <span class="wealth-all__swatch" [style.background-color]="section.color"></span>
+                  <span class="wealth-all__section-name">{{ section.labelKey | transloco }}</span>
+                </button>
+                <a class="wealth-all__section-link" [routerLink]="section.link">{{
+                  'wealth.open' | transloco
+                }}</a>
+              </span>
             </th>
             <th scope="colgroup" class="wealth-all__num">
               <app-money [amount]="section.sum" />
@@ -141,10 +142,16 @@
                 </div>
               }
             </th>
+            <th scope="colgroup" class="wealth-all__actions"></th>
           </tr>
           @for (row of isExpanded(section.type) ? section.rows : []; track row.id) {
-            <tr class="wealth-all__row" [class.wealth-all__row--archived]="row.isArchived">
-              <td>
+            <tr
+              class="wealth-all__row"
+              animate.enter="wealth-all__row--enter"
+              animate.leave="wealth-all__row--leave"
+              [class.wealth-all__row--archived]="row.isArchived"
+            >
+              <td class="wealth-all__col--name">
                 <a class="wealth-all__name" [routerLink]="row.link">{{ row.name }}</a>
                 @if (row.isArchived) {
                   <span class="wealth-all__tag">{{ 'common.archived' | transloco }}</span>

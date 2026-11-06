@@ -43,12 +43,46 @@
 .wealth-all__table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 
   th,
   td {
     padding: 8px 12px;
-    text-align: left;
+    text-align: start;
     vertical-align: top;
+  }
+
+  .wealth-all__col--name,
+  .wealth-all__col--place {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wealth-all__col--name {
+    width: 28%;
+  }
+
+  .wealth-all__col--place {
+    width: 20%;
+  }
+
+  .wealth-all__col--group {
+    width: 14%;
+  }
+
+  .wealth-all__col--status {
+    width: 14%;
+  }
+
+  .wealth-all__num {
+    width: 160px;
+    text-align: right;
+  }
+
+  .wealth-all__actions {
+    width: 48px;
+    padding: 0;
   }
 
   thead th {
@@ -74,6 +108,11 @@
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
+.wealth-all__section-line {
+  display: flex;
+  align-items: center;
+}
+
 .wealth-all__toggle {
   display: inline-flex;
   align-items: center;
@@ -83,6 +122,16 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+
+.wealth-all__toggle mat-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+}
+
+.wealth-all__toggle--open mat-icon {
+  transform: rotate(90deg);
 }
 
 .wealth-all__total-gain {
@@ -127,17 +176,36 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
-.wealth-all__num {
-  text-align: right;
-}
-
 .wealth-all__change {
   font-size: 0.8125rem;
 }
 
-.wealth-all__actions {
-  width: 48px;
-  padding: 0;
+@media (prefers-reduced-motion: no-preference) {
+  .wealth-all__toggle mat-icon {
+    transition: transform var(--sk-motion-duration) var(--sk-motion-easing);
+  }
+
+  .wealth-all__row--enter {
+    animation: wealth-all-row-in var(--sk-motion-duration) var(--sk-motion-easing);
+  }
+
+  .wealth-all__row--leave {
+    animation: wealth-all-row-out var(--sk-motion-duration) var(--sk-motion-easing) forwards;
+  }
+
+  @keyframes wealth-all-row-in {
+    from {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+  }
+
+  @keyframes wealth-all-row-out {
+    to {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+  }
 }
 
 @media (width < 720px) {
@@ -151,6 +219,22 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto 48px;
     border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+
+  .wealth-all__table .wealth-all__col--name,
+  .wealth-all__table .wealth-all__col--place,
+  .wealth-all__table .wealth-all__col--group,
+  .wealth-all__table .wealth-all__col--status,
+  .wealth-all__table .wealth-all__num {
+    width: auto;
+  }
+
+  .wealth-all__table .wealth-all__col--name {
+    white-space: normal;
+  }
+
+  .wealth-all__table .wealth-all__actions {
+    width: 48px;
   }
 
   .wealth-all__col--place,
