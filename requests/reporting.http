@@ -26,6 +26,14 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y&groupId=00000000-0000-0000-0000-000000000000
 Authorization: Bearer {{authToken}}
 
+### Net worth history — custom range: from and to together (yyyy-MM-dd, never with range; to is clamped to today); range comes back as CUSTOM, firstDate / lastDate are the user's first and last snapshot dates
+GET {{baseUrl}}/api/reporting/net-worth-history?from=2025-01-01&to=2025-12-31
+Authorization: Bearer {{authToken}}
+
+### Net worth history — custom range with one asset class
+GET {{baseUrl}}/api/reporting/net-worth-history?from=2025-03-15&to=2026-06-30&assetClass=3
+Authorization: Bearer {{authToken}}
+
 ### Net worth history — assets in no group (ungrouped=true cannot be combined with groupId: 400 Validation.InvalidGroupFilter)
 GET {{baseUrl}}/api/reporting/net-worth-history?range=1Y&ungrouped=true
 Authorization: Bearer {{authToken}}

@@ -445,6 +445,17 @@
     "title": "Pulpit",
     "netWorth": "Wartość majątku",
     "changeForRange": "· zmiana za {{ range }}",
+    "range": {
+      "title": "Zakres wykresu",
+      "from": "Od",
+      "to": "Do",
+      "placeholder": "dd.mm.rrrr",
+      "apply": "Zastosuj",
+      "invalidDate": "Podaj prawdziwą datę w formacie dd.mm.rrrr.",
+      "fromAfterTo": "Data Od jest późniejsza niż Do.",
+      "outsideHistory": "Brak danych w tym okresie. Historia: {{ from }} – {{ to }}.",
+      "yearToDate": "{{ year }} (do dziś)"
+    },
     "staleCount": "Wycena {{ count }} pozycji od dawna się nie odświeżyła",
     "addAccount": "Dodaj rachunek",
     "allocation": "Struktura majątku",
@@ -518,6 +529,7 @@
   },
   "netWorthChart": {
     "rangeLabel": "Zakres wykresu",
+    "customRange": "Zakres",
     "allClasses": "Wszystko",
     "chartLabelForClass": "Wykres historii wartości, {{ class }}, {{ range }}: od {{ from }} do {{ to }}",
     "chartLabel": "Wykres historii wartości majątku, {{ range }}: od {{ from }} do {{ to }}",

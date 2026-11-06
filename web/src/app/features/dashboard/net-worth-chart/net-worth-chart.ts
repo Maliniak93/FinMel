@@ -1,6 +1,6 @@
-import { Component, computed, input, model, output, signal } from '@angular/core';
+import { Component, computed, input, model, output, signal, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatButtonToggleGroup, MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -20,6 +20,7 @@ import {
 import { niceTicks, xTickUnit, xTicks, type ChartRange } from './chart-scale';
 
 const RANGES: readonly ChartRange[] = ['1M', '1Y', 'YTD', 'MAX'];
+const CUSTOM_RANGE: ChartRange = 'CUSTOM';
 
 const WIDTH = 640;
 const HEIGHT = 280;
@@ -67,6 +68,9 @@ interface ChartBand {
 export class NetWorthChart {
   readonly points = input<readonly NetWorthHistoryPoint[]>([]);
   readonly range = model<ChartRange>('1Y');
+  readonly rangeLabel = input<string | null>(null);
+  readonly firstDate = input<string | null>(null);
+  readonly customRangeRequested = output<void>();
   readonly classes = input<readonly AssetClass[]>([]);
   readonly assetClass = model<AssetClass | null>(null);
   readonly groups = input<readonly NetWorthChartGroup[]>([]);
@@ -75,7 +79,10 @@ export class NetWorthChart {
   readonly loadError = input<string | null>(null);
   readonly retry = output<void>();
 
+  private readonly rangeGroup = viewChild.required(MatButtonToggleGroup);
+
   protected readonly ranges = RANGES;
+  protected readonly customRange = CUSTOM_RANGE;
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly assetClassColor = assetClassColor;
   protected readonly width = WIDTH;
@@ -184,6 +191,11 @@ export class NetWorthChart {
     const index = this.hoveredIndex();
     return chart && index !== null ? chart.coordinates[index] : null;
   });
+
+  protected requestCustomRange(): void {
+    this.rangeGroup().value = this.range();
+    this.customRangeRequested.emit();
+  }
 
   protected selectAll(): void {
     this.assetClass.set(null);

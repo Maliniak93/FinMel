@@ -43,9 +43,24 @@ internal static class ReportingApi
     }
 
     public static string NetWorthHistoryUri(
-        string? range = null, AssetClass? assetClass = null, Guid? groupId = null, bool? ungrouped = null)
+        string? range = null,
+        AssetClass? assetClass = null,
+        Guid? groupId = null,
+        bool? ungrouped = null,
+        DateOnly? from = null,
+        DateOnly? to = null)
     {
         var parameters = new List<string>();
+        if (from is not null)
+        {
+            parameters.Add($"from={from.Value:yyyy-MM-dd}");
+        }
+
+        if (to is not null)
+        {
+            parameters.Add($"to={to.Value:yyyy-MM-dd}");
+        }
+
         if (assetClass is not null)
         {
             parameters.Add($"assetClass={assetClass}");

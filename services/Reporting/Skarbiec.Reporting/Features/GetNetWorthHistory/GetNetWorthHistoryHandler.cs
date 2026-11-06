@@ -6,12 +6,16 @@ namespace Skarbiec.Reporting.Features.GetNetWorthHistory;
 
 public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvider timeProvider)
 {
+    private const string CustomRange = "CUSTOM";
+
     public async Task<Result<NetWorthHistoryResponse>> HandleAsync(
-        string range,
+        string? range,
         AssetClass? assetClass,
         CancellationToken cancellationToken,
         Guid? groupId = null,
-        bool ungrouped = false)
+        bool ungrouped = false,
+        DateOnly? from = null,
+        DateOnly? to = null)
     {
         if (groupId is not null && ungrouped)
         {
@@ -23,17 +27,39 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             return NetWorthHistoryErrors.InvalidAssetClass(requestedClass);
         }
 
-        var startResult = ResolveRangeStart(range);
-        if (startResult.IsFailure)
+        var windowResult = ResolveWindow(range, from, to);
+        if (windowResult.IsFailure)
         {
-            return startResult.Error;
+            return windowResult.Error;
         }
 
-        var start = startResult.Value;
+        var (rangeName, start, end) = windowResult.Value;
+
+        var firstDate = await db.ValuationSnapshots
+            .AsNoTracking()
+            .Select(s => (DateOnly?)s.Date)
+            .MinAsync(cancellationToken);
+        var lastDate = await db.ValuationSnapshots
+            .AsNoTracking()
+            .Select(s => (DateOnly?)s.Date)
+            .MaxAsync(cancellationToken);
+
+        DateOnly? baselineDate = null;
+        if (start is { } windowStart)
+        {
+            baselineDate = await db.ValuationSnapshots
+                .AsNoTracking()
+                .Where(s => s.Date < windowStart)
+                .Select(s => (DateOnly?)s.Date)
+                .MaxAsync(cancellationToken);
+        }
+
+        var lower = baselineDate ?? start;
 
         var points = await db.ValuationSnapshots
             .AsNoTracking()
-            .Where(s => start == null || s.Date >= start)
+            .Where(s => lower == null || s.Date >= lower)
+            .Where(s => end == null || s.Date <= end)
             .OrderBy(s => s.Date)
             .Select(s => new { s.Date, NetWorthPln = s.TotalPln, IsIncomplete = false })
             .ToListAsync(cancellationToken);
@@ -43,7 +69,8 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             var flaggedDates = (await db.AssetValuations
                     .AsNoTracking()
                     .Where(v => v.IsStale && v.ValuePln == 0m && v.Quantity > 0m)
-                    .Where(v => start == null || v.Date >= start)
+                    .Where(v => lower == null || v.Date >= lower)
+                    .Where(v => end == null || v.Date <= end)
                     .Select(v => v.Date)
                     .Distinct()
                     .ToListAsync(cancellationToken))
@@ -58,7 +85,8 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             var classTotals = await db.AssetValuations
                 .AsNoTracking()
                 .Where(v => v.AssetClass == filterClass)
-                .Where(v => start == null || v.Date >= start)
+                .Where(v => lower == null || v.Date >= lower)
+                .Where(v => end == null || v.Date <= end)
                 .GroupBy(v => v.Date)
                 .Select(g => new
                 {
@@ -82,7 +110,8 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
             // The group is the position's current one, read at query time; a line with no position has no match.
             var lines = db.AssetValuations
                 .AsNoTracking()
-                .Where(v => start == null || v.Date >= start)
+                .Where(v => lower == null || v.Date >= lower)
+                .Where(v => end == null || v.Date <= end)
                 .Join(db.Positions, v => v.AssetId, p => p.AssetId, (v, p) => new
                 {
                     v.Date,
@@ -113,50 +142,84 @@ public sealed class GetNetWorthHistoryHandler(ReportingDbContext db, TimeProvide
                 .ToList();
         }
 
+        var baseline = baselineDate is null ? null : points.FirstOrDefault(p => p.Date == baselineDate);
+        var windowPoints = baseline is null ? points : points.Where(p => p.Date != baselineDate).ToList();
+
         decimal? changePln = null;
         decimal? changePercent = null;
-        if (points.Count >= 2)
+        decimal? baselineValue = null;
+        if (windowPoints.Count > 0)
         {
-            var first = points[0].NetWorthPln;
-            changePln = points[^1].NetWorthPln - first;
-            changePercent = first == 0m ? null : Math.Round(changePln.Value / first * 100m, 2);
+            baselineValue = baseline is not null
+                ? baseline.NetWorthPln
+                : windowPoints.Count >= 2 ? windowPoints[0].NetWorthPln : null;
+        }
+
+        if (baselineValue is { } baselineAmount)
+        {
+            changePln = windowPoints[^1].NetWorthPln - baselineAmount;
+            changePercent = baselineAmount == 0m ? null : Math.Round(changePln.Value / baselineAmount * 100m, 2);
         }
 
         return new NetWorthHistoryResponse
         {
-            Range = range.ToUpperInvariant(),
-            Points = points
+            Range = rangeName,
+            Points = windowPoints
                 .Select(p => new NetWorthHistoryPoint { Date = p.Date, NetWorthPln = p.NetWorthPln, IsIncomplete = p.IsIncomplete })
                 .ToList(),
             ChangePln = changePln,
             ChangePercent = changePercent,
+            FirstDate = firstDate,
+            LastDate = lastDate,
         };
     }
 
     // Resolved against today, not the latest snapshot, so a stale sync never shrinks the window; MAX has no lower bound.
-    private Result<DateOnly?> ResolveRangeStart(string range)
+    private Result<(string Range, DateOnly? Start, DateOnly? End)> ResolveWindow(string? range, DateOnly? from, DateOnly? to)
     {
-        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        if (from is not null || to is not null)
+        {
+            if (range is not null)
+            {
+                return NetWorthHistoryErrors.RangeWithDates;
+            }
+
+            if (from is not { } customFrom || to is not { } customTo)
+            {
+                return NetWorthHistoryErrors.IncompleteDates;
+            }
+
+            if (customFrom > customTo)
+            {
+                return NetWorthHistoryErrors.FromAfterTo;
+            }
+
+            var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+            return (CustomRange, customFrom, customTo < today ? customTo : today);
+        }
+
+        var presetToday = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var preset = range ?? "1Y";
         DateOnly? start;
 
-        switch (range.ToUpperInvariant())
+        switch (preset.ToUpperInvariant())
         {
             case "1M":
-                start = today.AddMonths(-1);
+                start = presetToday.AddMonths(-1);
                 break;
             case "1Y":
-                start = today.AddYears(-1);
+                start = presetToday.AddYears(-1);
                 break;
             case "YTD":
-                start = new DateOnly(today.Year, 1, 1);
+                start = new DateOnly(presetToday.Year, 1, 1);
                 break;
             case "MAX":
                 start = null;
                 break;
             default:
-                return NetWorthHistoryErrors.InvalidRange(range);
+                return NetWorthHistoryErrors.InvalidRange(preset);
         }
 
-        return start;
+        return (preset.ToUpperInvariant(), start, null);
     }
 }

@@ -1,0 +1,73 @@
+<h2 mat-dialog-title>{{ 'dashboard.range.title' | transloco }}</h2>
+
+<form [formGroup]="form" novalidate>
+  <mat-dialog-content class="range-dialog__content">
+    <div class="range-dialog__years">
+      @for (year of years; track year) {
+        <button
+          mat-stroked-button
+          type="button"
+          class="range-dialog__year"
+          (click)="pickYear(year)"
+        >
+          {{ year }}
+        </button>
+      }
+    </div>
+
+    <div class="range-dialog__fields">
+      <mat-form-field appearance="outline" class="range-dialog__field">
+        <mat-label>{{ 'dashboard.range.from' | transloco }}</mat-label>
+        <input
+          matInput
+          [matDatepicker]="fromPicker"
+          formControlName="from"
+          [placeholder]="'dashboard.range.placeholder' | transloco"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="fromPicker"></mat-datepicker-toggle>
+        <mat-datepicker #fromPicker></mat-datepicker>
+        @if (form.controls.from.hasError('matDatepickerParse')) {
+          <mat-error>{{ 'dashboard.range.invalidDate' | transloco }}</mat-error>
+        } @else if (form.controls.from.hasError('required')) {
+          <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
+        } @else if (form.controls.from.hasError('rangeOrder')) {
+          <mat-error>{{ 'dashboard.range.fromAfterTo' | transloco }}</mat-error>
+        } @else if (form.controls.from.hasError('rangeOutside')) {
+          <mat-error>{{
+            'dashboard.range.outsideHistory'
+              | transloco: { from: formatDate(firstDateText), to: formatDate(lastDateText) }
+          }}</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="range-dialog__field">
+        <mat-label>{{ 'dashboard.range.to' | transloco }}</mat-label>
+        <input
+          matInput
+          [matDatepicker]="toPicker"
+          formControlName="to"
+          [placeholder]="'dashboard.range.placeholder' | transloco"
+        />
+        <mat-datepicker-toggle matIconSuffix [for]="toPicker"></mat-datepicker-toggle>
+        <mat-datepicker #toPicker></mat-datepicker>
+        @if (form.controls.to.hasError('matDatepickerParse')) {
+          <mat-error>{{ 'dashboard.range.invalidDate' | transloco }}</mat-error>
+        } @else if (form.controls.to.hasError('required')) {
+          <mat-error>{{ 'common.dateRequired' | transloco }}</mat-error>
+        } @else if (form.controls.to.hasError('rangeOutside')) {
+          <mat-error>{{
+            'dashboard.range.outsideHistory'
+              | transloco: { from: formatDate(firstDateText), to: formatDate(lastDateText) }
+          }}</mat-error>
+        }
+      </mat-form-field>
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" mat-dialog-close>{{ 'common.cancel' | transloco }}</button>
+    <button mat-flat-button type="button" class="range-dialog__apply" (click)="apply()">
+      {{ 'dashboard.range.apply' | transloco }}
+    </button>
+  </mat-dialog-actions>
+</form>

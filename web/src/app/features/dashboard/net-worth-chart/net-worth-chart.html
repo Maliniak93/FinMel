@@ -3,12 +3,19 @@
     <mat-button-toggle-group
       class="net-worth-chart__ranges"
       [value]="range()"
-      (change)="range.set($event.value)"
       [attr.aria-label]="'netWorthChart.rangeLabel' | transloco"
     >
       @for (option of ranges; track option) {
-        <mat-button-toggle [value]="option">{{ option }}</mat-button-toggle>
+        <mat-button-toggle [value]="option" (change)="range.set(option)">{{
+          option
+        }}</mat-button-toggle>
       }
+      <mat-button-toggle
+        [value]="customRange"
+        [disabled]="firstDate() === null"
+        (change)="requestCustomRange()"
+        >{{ 'netWorthChart.customRange' | transloco }}</mat-button-toggle
+      >
     </mat-button-toggle-group>
 
     @if (classes().length > 0 || groups().length > 0) {
@@ -90,7 +97,7 @@
           chartLabelKey()
             | transloco
               : {
-                  range: range(),
+                  range: rangeLabel() ?? range(),
                   from: formatMoney(view.first.value),
                   to: formatMoney(view.last.value),
                   class: classLabelKey() | transloco,

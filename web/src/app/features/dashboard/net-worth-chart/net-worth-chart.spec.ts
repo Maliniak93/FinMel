@@ -97,6 +97,7 @@ describe('NetWorthChart', () => {
     range = '1Y',
     classes?: readonly number[],
     assetClass?: number | null,
+    firstDate?: string | null,
   ): Promise<HTMLElement> {
     await TestBed.configureTestingModule({
       imports: [NetWorthChart],
@@ -112,9 +113,60 @@ describe('NetWorthChart', () => {
     if (assetClass !== undefined) {
       fixture.componentRef.setInput('assetClass', assetClass);
     }
+    if (firstDate !== undefined) {
+      fixture.componentRef.setInput('firstDate', firstDate);
+    }
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
   }
+
+  function radios(element: HTMLElement): HTMLButtonElement[] {
+    return [
+      ...element.querySelectorAll<HTMLButtonElement>('mat-button-toggle button[role="radio"]'),
+    ];
+  }
+
+  it('range control has a Zakres option beside the presets', async () => {
+    const element = await setup(yearPoints, '1Y', undefined, undefined, '2025-01-10');
+
+    const options = radios(element);
+
+    expect(options).toHaveLength(5);
+    expect(options.slice(0, 4).map((option) => option.textContent?.trim())).toEqual([
+      '1M',
+      '1Y',
+      'YTD',
+      'MAX',
+    ]);
+    expect(options.map((option) => option.getAttribute('aria-checked'))).toEqual([
+      'false',
+      'true',
+      'false',
+      'false',
+      'false',
+    ]);
+    expect(options[4].disabled).toBe(false);
+
+    fixture.componentRef.setInput('range', 'CUSTOM');
+    await fixture.whenStable();
+
+    expect(radios(element).map((option) => option.getAttribute('aria-checked'))).toEqual([
+      'false',
+      'false',
+      'false',
+      'false',
+      'true',
+    ]);
+  });
+
+  it('Zakres is disabled without history', async () => {
+    const element = await setup([], '1Y', undefined, undefined, null);
+
+    const options = radios(element);
+
+    expect(options).toHaveLength(5);
+    expect(options[4].disabled).toBe(true);
+  });
 
   it('renders axes and gridlines', async () => {
     const element = await setup(yearPoints);
@@ -247,7 +299,7 @@ describe('NetWorthChart', () => {
     await switchLanguage(fixture, 'pl');
 
     expect(polishProblems(english, labels())).toEqual([]);
-    expect(textsOf(element, 'mat-button-toggle')).toEqual(['1M', '1Y', 'YTD', 'MAX']);
+    expect(textsOf(element, 'mat-button-toggle')).toEqual(['1M', '1Y', 'YTD', 'MAX', 'Zakres']);
   });
 
   it('filter menu picks one value at a time', async () => {

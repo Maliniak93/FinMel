@@ -445,6 +445,17 @@
     "title": "Dashboard",
     "netWorth": "Net worth",
     "changeForRange": "· change for {{ range }}",
+    "range": {
+      "title": "Chart range",
+      "from": "From",
+      "to": "To",
+      "placeholder": "dd.mm.yyyy",
+      "apply": "Apply",
+      "invalidDate": "Enter a real date as dd.mm.yyyy.",
+      "fromAfterTo": "The From date is later than To.",
+      "outsideHistory": "No data in this period. History: {{ from }} – {{ to }}.",
+      "yearToDate": "{{ year }} (to date)"
+    },
     "staleCount": "The valuation of {{ count }} holdings hasn't refreshed in a while",
     "addAccount": "Add account",
     "allocation": "Allocation",
@@ -518,6 +529,7 @@
   },
   "netWorthChart": {
     "rangeLabel": "Chart range",
+    "customRange": "Range",
     "allClasses": "All",
     "chartLabelForClass": "Net worth history chart for {{ class }}, {{ range }}: from {{ from }} to {{ to }}",
     "chartLabel": "Net worth history chart, {{ range }}: from {{ from }} to {{ to }}",

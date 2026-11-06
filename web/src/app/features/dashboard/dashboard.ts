@@ -1,6 +1,7 @@
-import { Component, computed, linkedSignal, resource, signal } from '@angular/core';
+import { Component, computed, inject, linkedSignal, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatDialog } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
@@ -31,6 +32,12 @@ import { TodoCard } from './todo-card/todo-card';
 import { UpcomingCard } from './upcoming-card/upcoming-card';
 import type { ChartRange } from './net-worth-chart/chart-scale';
 import { NetWorthChart, type NetWorthChartGroup } from './net-worth-chart/net-worth-chart';
+import {
+  RangeDialog,
+  type RangeDialogData,
+  type RangeDialogResult,
+} from './range-dialog/range-dialog';
+import { customRangeLabel, type CustomRange } from './range-label';
 
 const UNGROUPED_KEY = 'ungrouped';
 const MAX_BAR_PERCENT = 100;
@@ -125,7 +132,17 @@ export class Dashboard {
     },
   });
 
+  private readonly dialog = inject(MatDialog);
+
   protected readonly range = signal<ChartRange>('1Y');
+
+  private readonly customRange = signal<CustomRange | null>(null);
+
+  protected readonly rangeLabel = computed(() => {
+    activeLocale();
+    const custom = this.customRange();
+    return this.range() === 'CUSTOM' && custom !== null ? customRangeLabel(custom) : this.range();
+  });
 
   protected readonly assetClass = signal<AssetClass | null>(null);
 
@@ -146,13 +163,16 @@ export class Dashboard {
   protected readonly historyResource = resource({
     params: () => ({
       range: this.range(),
+      custom: this.range() === 'CUSTOM' ? this.customRange() : null,
       assetClass: this.assetClass(),
       group: this.group(),
     }),
     loader: async ({ params, abortSignal }) => {
       const result = await getApiReportingNetWorthHistory({
         query: {
-          range: params.range,
+          ...(params.custom === null
+            ? { range: params.range }
+            : { from: params.custom.from, to: params.custom.to }),
           ...(params.assetClass === null ? {} : { assetClass: params.assetClass }),
           ...(params.group === null
             ? {}
@@ -170,6 +190,39 @@ export class Dashboard {
       return result.data;
     },
   });
+
+  protected readonly historyBounds = linkedSignal<
+    { first: string; last: string } | null,
+    { first: string; last: string } | null
+  >({
+    source: () => {
+      const history = this.historyResource.hasValue() ? this.historyResource.value() : null;
+      return history?.firstDate && history.lastDate
+        ? { first: history.firstDate, last: history.lastDate }
+        : null;
+    },
+    computation: (bounds, previous) => bounds ?? previous?.value ?? null,
+  });
+
+  protected openRangeDialog(): void {
+    const bounds = this.historyBounds();
+    if (bounds === null) {
+      return;
+    }
+    this.dialog
+      .open<RangeDialog, RangeDialogData, RangeDialogResult>(RangeDialog, {
+        data: { firstDate: bounds.first, lastDate: bounds.last, current: this.customRange() },
+        width: '420px',
+        maxWidth: '95vw',
+      })
+      .afterClosed()
+      .subscribe((result) => {
+        if (result) {
+          this.customRange.set(result);
+          this.range.set('CUSTOM');
+        }
+      });
+  }
 
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly formatMoney = formatMoney;
