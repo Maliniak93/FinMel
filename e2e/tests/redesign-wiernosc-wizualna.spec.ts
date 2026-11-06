@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import {
   createAccountThroughApi,
   depositCashThroughApi,
+  expandWealthSections,
   expect,
   openSelect,
   test,
@@ -553,6 +554,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
 
   await test.step('Krok 5: Majątek has tabs with a 2 px accent underline and a rule under the tab bar, a 36 px Cormorant heading, a table header with a rule under it, rows separated by rules and a rule over "Razem"', async () => {
     await page.goto('/wealth');
+    await expandWealthSections(page);
     const heading = page.locator('h1.wealth__title');
     await expect(heading).toHaveText('Majątek');
     await expectPx(heading, 'font-size', 36);
@@ -594,6 +596,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await expectPx(page.locator('.cash-place__name').first(), 'font-size', 22);
 
     await page.goto('/wealth');
+    await expandWealthSections(page);
     await expectPx(page.locator('.wealth-all__actions mat-icon').first(), 'width', 16);
     await expectPx(page.locator('.wealth-all__actions mat-icon').first(), 'font-size', 16);
   });
@@ -756,6 +759,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
 
   await test.step('Krok 13: at 390 px Majątek, Planowanie and Grupy keep the same rules as on the desktop and do not scroll sideways', async () => {
     await page.goto('/wealth');
+    await expandWealthSections(page);
     await expect(page.locator('h1.wealth__title')).toBeVisible();
     await expectRules(page, WEALTH_RULES);
     await expectUnderline(page);
@@ -786,6 +790,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await expectRules(page, PULPIT_RULES);
 
     await page.goto('/wealth');
+    await expandWealthSections(page);
     await expect(page.locator('h1.wealth__title')).toBeVisible();
     await expectRules(page, WEALTH_RULES);
     await expectUnderline(page);

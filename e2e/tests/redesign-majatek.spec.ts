@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { expect, openSelect, test } from './fixtures';
+import { expandWealthSections, expect, openSelect, test } from './fixtures';
 import { expectProjected } from './projection';
 
 function pln(amount: string): RegExp {
@@ -110,6 +110,7 @@ async function depositOnAccountPage(page: Page, account: string, amount: string)
 async function refetchWealth(page: Page): Promise<void> {
   await page.goto('/wealth');
   await expect(page.getByRole('heading', { name: 'Majątek', exact: true })).toBeVisible();
+  await expandWealthSections(page);
 }
 
 async function syncNow(page: Page): Promise<void> {
@@ -160,6 +161,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
     await expect(page).toHaveURL(/\/wealth$/);
+    await expandWealthSections(page);
     await expect(allRow(page, 'XTB IKE')).toBeVisible();
 
     await allRow(page, 'XTB IKE').getByRole('link', { name: 'XTB IKE', exact: true }).click();
@@ -219,6 +221,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
 
+    await expandWealthSections(page);
     const stocks = section(page, 'Akcje i ETF');
     await expect(allRow(page, /CD Projekt/)).toBeVisible();
     await expect(stocks).toContainText(/CD Projekt/);
@@ -281,6 +284,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
 
+    await expandWealthSections(page);
     await expect(
       section(page, 'Konta bankowe').getByRole('row', { name: /Santander oszczędnościowe/ }),
     ).toBeVisible();
@@ -328,6 +332,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await expect(eur).toContainText(/≈\s?.*zł|Kurs niedostępny/);
 
     await openWealth(page);
+    await expandWealthSections(page);
     await expect(section(page, 'Gotówka').getByRole('row', { name: /Portfel/ })).toBeVisible();
   });
 
@@ -362,6 +367,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
 
+    await expandWealthSections(page);
     await expect(section(page, 'Obligacje').getByRole('row', { name: /EDO0136/ })).toBeVisible();
 
     await clickTab(page, 'Obligacje');
@@ -381,6 +387,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await dialog.getByLabel('Waga kruszcu w sztuce').fill('31.10');
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
+    await expandWealthSections(page);
     await expect(
       section(page, 'Metale szlachetne').getByRole('row', { name: /Krugerrand 1 oz/ }),
     ).toBeVisible();
@@ -393,11 +400,13 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
 
   await test.step('Krok 12: typing "Cd" in "Szukaj" leaves only CD Projekt, clearing the field brings all rows back', async () => {
     await openWealth(page);
+    await expandWealthSections(page);
     await expect(allRow(page, 'XTB IKE')).toBeVisible();
     await page.getByLabel('Szukaj').fill('Cd');
     await expect(allRow(page, /CD Projekt/)).toBeVisible();
     await expect(page.locator('tr.wealth-all__row')).toHaveCount(1);
     await page.getByLabel('Szukaj').fill('');
+    await expandWealthSections(page);
     await expect(allRow(page, 'XTB IKE')).toBeVisible();
     await expect(allRow(page, 'Lokata Santander')).toBeVisible();
     await expect(allRow(page, 'Krugerrand 1 oz')).toBeVisible();
@@ -432,6 +441,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await expect(panel.getByTestId('assets-panel-title')).toHaveCount(0);
 
     await openWealth(page);
+    await expandWealthSections(page);
     await expect(allRow(page, 'XTB IKE')).toBeVisible();
     const totalBefore = await total.innerText();
     const accountsTabBefore = (await tab(page, 'Rachunki inwestycyjne').textContent()) ?? '';
@@ -449,6 +459,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await dialog.getByLabel('Nazwa').fill('IKE do archiwum');
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
+    await expandWealthSections(page);
     await expect(allRow(page, 'IKE do archiwum')).toBeVisible();
     await expect(tab(page, 'Rachunki inwestycyjne')).toContainText('3 rachunki');
 
@@ -464,6 +475,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
       async () => {
         await refetchWealth(page);
         await clickTab(page, 'Wszystko');
+        await expandWealthSections(page);
       },
       async () => {
         await expect(allRow(page, 'Lokata Santander')).toBeVisible({ timeout: 3_000 });
@@ -478,6 +490,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
   await test.step('Krok 15: "Pokaż zarchiwizowane" brings IKE do archiwum back dimmed with the "Zarchiwizowany" mark and in the count under the tab; switching it off hides it again', async () => {
     const toggle = page.getByRole('switch', { name: 'Pokaż zarchiwizowane' });
     await toggle.click();
+    await expandWealthSections(page);
     const row = allRow(page, 'IKE do archiwum');
     await expect(row).toBeVisible();
     await expect(row).toContainText('Zarchiwizowany');
@@ -500,6 +513,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await expect(accountRow(page, 'IKE do archiwum')).not.toContainText('Zarchiwizowany');
 
     await clickTab(page, 'Wszystko');
+    await expandWealthSections(page);
     const row = allRow(page, 'IKE do archiwum');
     await expect(row).toBeVisible();
     await expect(row).not.toHaveClass(/wealth-all__row--archived/);
