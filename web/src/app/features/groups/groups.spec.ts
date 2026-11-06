@@ -1,5 +1,6 @@
 import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { _getAnimationsState, MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { By } from '@angular/platform-browser';
@@ -10,6 +11,7 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { AssetGroupResponse, AssignableAssetResponse } from '../../api/portfolio';
 import type { DashboardResponse } from '../../api/reporting';
 import { client as reportingClient } from '../../api/reporting/client.gen';
+import { stubViewport } from '../../../testing/match-media';
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
@@ -51,6 +53,11 @@ describe('Groups', () => {
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
     reportingClient.setConfig({ baseUrl: 'https://example.test' });
+    // Material caches reduced motion per module: resolve it as enabled, as an earlier spec can.
+    const viewport = stubViewport(1280);
+    TestBed.runInInjectionContext(() => _getAnimationsState());
+    viewport.restore();
+    TestBed.resetTestingModule();
   });
 
   const originalMatchMedia = window.matchMedia;
@@ -136,6 +143,7 @@ describe('Groups', () => {
         provideRouter([]),
         { provide: MatDialog, useValue: dialog },
         { provide: MatSnackBar, useValue: { open: vi.fn() } },
+        { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
       ],
     }).compileComponents();
 
@@ -635,6 +643,44 @@ describe('Groups', () => {
     expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('Poduszka');
     expect(checkbox('Free Stock').checked).toBe(false);
     expect(checkbox('Cushion Cash').checked).toBe(true);
+  });
+
+  it('GroupsPanel_ReopenAfterTransitionsEnabled_TakesFocus', async () => {
+    const transitionTimers: (() => void)[] = [];
+    const realSetTimeout = globalThis.setTimeout;
+    const timers = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+      handler: () => void,
+      delay?: number,
+    ) => {
+      if (delay !== 200) {
+        return realSetTimeout(handler, delay);
+      }
+      transitionTimers.push(handler);
+      return 0;
+    }) as never);
+    try {
+      setViewport(1280);
+      await setup();
+      const opener = byTestId(groupCard('Emerytura'), 'select-group');
+
+      opener.click();
+      await settle();
+      await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true), {
+        timeout: 5000,
+      });
+
+      byTestId(panel(), 'close-assets-panel').click();
+      await settle();
+      expect(panelOpen()).toBe(false);
+      transitionTimers.splice(0).forEach((run) => run());
+
+      await selectGroup('Emerytura');
+      await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true), {
+        timeout: 5000,
+      });
+    } finally {
+      timers.mockRestore();
+    }
   });
 
   it('panel mode follows the breakpoint', async () => {
