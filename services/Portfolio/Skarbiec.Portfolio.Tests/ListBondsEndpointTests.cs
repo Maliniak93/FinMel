@@ -83,6 +83,41 @@ public sealed class ListBondsEndpointTests(SkarbiecContainersFixture containers)
     }
 
     [Fact]
+    public async Task Returns_CostAndPaidInterest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 6, 20, 10, 0, 0, TimeSpan.Zero));
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var edo = await client.CreateEdoYearOneSettledAsync(cancellationToken);
+        var coi = await client.CreateFundedBondAsync(
+            cancellationToken,
+            request: NewBondRequest(
+                name: "Coi", seriesCode: "COI0630", type: TreasuryBondType.Coi,
+                purchaseDate: new DateOnly(2025, 6, 10), marginPercent: null),
+            cashToppedUpOn: new DateOnly(2025, 6, 1),
+            accountName: "Coi");
+        await client.SettleBondInterestAsync(coi.Bond.AssetId, [(1, null)], cancellationToken);
+        await client.RedeemBondEarlyAsync(
+            coi.Bond.AssetId, new DateOnly(2026, 6, 15), 10, cancellationToken, runningPeriodRatePercent: 5.00m);
+
+        var response = await client.GetAsync(AllBondsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bonds = (await response.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken))!
+            .ToDictionary(b => b.AssetId);
+        var edoBond = bonds[edo.Bond.AssetId];
+        var coiBond = bonds[coi.Bond.AssetId];
+        Assert.Multiple(
+            () => Assert.Equal(edoBond.BondCount * edoBond.PurchasePricePerBond, edoBond.CostPln),
+            () => Assert.Equal(0m, edoBond.PaidInterestPln),
+            () => Assert.Equal(40 * coiBond.PurchasePricePerBond, coiBond.CostPln),
+            () => Assert.Equal(
+                coiBond.Periods.Where(p => p.Settlement is not null).Sum(p => p.Settlement!.GrossInterest),
+                coiBond.PaidInterestPln),
+            () => Assert.True(coiBond.PaidInterestPln > 0m));
+    }
+
+    [Fact]
     public async Task List_EstimatesWithOneBatchCall()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

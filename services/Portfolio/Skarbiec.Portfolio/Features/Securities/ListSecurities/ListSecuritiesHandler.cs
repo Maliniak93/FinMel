@@ -136,6 +136,7 @@ public sealed class ListSecuritiesHandler(
         var lastPrice = instrument!.LastPrice!.Value;
         var valuePln = Round(basis.Quantity * lastPrice * rate!.Value);
         var unrealizedPl = Round(basis.Quantity * lastPrice - basis.CostQuote);
+        var unrealizedPlPln = costPln is null ? (decimal?)null : valuePln - costPln;
 
         return holding with
         {
@@ -143,8 +144,10 @@ public sealed class ListSecuritiesHandler(
             LastPriceDate = instrument.LastPriceDate,
             ValuePln = valuePln,
             UnrealizedPl = unrealizedPl,
-            UnrealizedPlPercent = basis.CostQuote == 0 ? null : Round(unrealizedPl / basis.CostQuote * 100),
-            UnrealizedPlPln = costPln is null ? null : valuePln - costPln
+            UnrealizedPlPercent = unrealizedPlPln is { } pl && costPln is { } plnCost && plnCost != 0
+                ? Round(pl / plnCost * 100)
+                : null,
+            UnrealizedPlPln = unrealizedPlPln
         };
     }
 

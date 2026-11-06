@@ -4438,6 +4438,8 @@
           "maturityDate",
           "nominalValue",
           "bookValue",
+          "costPln",
+          "paidInterestPln",
           "status",
           "duePeriodCount",
           "periods",
@@ -4536,6 +4538,22 @@
             "format": "double"
           },
           "bookValue": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "costPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "paidInterestPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -6216,6 +6234,15 @@
           "totalFineGrams": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "costPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
               "number",
               "string"
             ],

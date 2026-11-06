@@ -30,6 +30,26 @@ public sealed class MetalTenancyIsolationTests(SkarbiecContainersFixture contain
     }
 
     [Fact]
+    public async Task List_DoesNotLeakCost()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerCashId = await owner.AddCashAssetWithBalanceAsync(cancellationToken);
+        var ownerMetal = await owner.AddMetalAsync(cancellationToken);
+        await owner.RecordMetalTransactionWithCashAsync(ownerMetal.AssetId, ownerCashId, cancellationToken, totalAmount: 2_000m);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await stranger.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Stranger's own"));
+
+        var response = await stranger.GetAsync(AllMetalsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var listed = Assert.Single((await response.Content.ReadFromJsonAsync<List<MetalResponse>>(cancellationToken))!);
+        Assert.Equal("Stranger's own", listed.Name);
+        Assert.Equal(0m, listed.CostPln);
+    }
+
+    [Fact]
     public async Task Get_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

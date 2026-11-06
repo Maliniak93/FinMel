@@ -40,6 +40,23 @@ public sealed class ListMetalsEndpointTests(SkarbiecContainersFixture containers
     }
 
     [Fact]
+    public async Task List_ReturnsCostFromCashLeg()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken);
+        var gold = await client.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Gold bar", metal: Metal.Gold));
+        await client.RecordMetalTransactionWithCashAsync(gold.AssetId, cashId, cancellationToken, pieces: 2m, totalAmount: 2_000m);
+
+        var response = await client.GetAsync(AllMetalsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var listed = Assert.Single((await response.Content.ReadFromJsonAsync<List<MetalResponse>>(cancellationToken))!);
+        Assert.Equal(2_000.00m, listed.CostPln);
+    }
+
+    [Fact]
     public async Task List_WithoutHoldings_ReturnsEmpty()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
