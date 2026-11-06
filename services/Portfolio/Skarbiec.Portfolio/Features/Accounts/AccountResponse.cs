@@ -22,9 +22,6 @@ public sealed record AccountResponse
     /// <summary>True when the Bank account is kept outside net worth.</summary>
     public bool OutsideNetWorth { get; init; }
 
-    /// <summary>Set only by the list and get reads, for a flagged account: the balance at the latest rate in PLN; null when MarketData has no rate.</summary>
-    public decimal? CashBalancePln { get; init; }
-
     /// <summary>Set only by the account reads, for an IKE or IKZE account; null for a Regular one.</summary>
     public ContributionResponse? Contribution { get; init; }
 

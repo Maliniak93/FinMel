@@ -18,7 +18,7 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class GetAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task OutsideNetWorth_ValuesInPln()
+    public async Task OutsideNetWorth_OmitsCashBalancePln()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AccountCashTodayUtc);
@@ -26,18 +26,14 @@ public sealed class GetAccountEndpointTests(SkarbiecContainersFixture containers
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var flagged = await client.CreateBankAccountAsync(
             cancellationToken, "Konto EUR", currency: "EUR", balance: 100m, outsideNetWorth: true);
-        var plain = await client.CreateBankAccountAsync(cancellationToken, "Zwykle EUR", currency: "EUR", balance: 50m);
 
-        var flaggedResponse = await client.GetAsync(AccountUri(flagged.AccountId), cancellationToken);
-        var plainResponse = await client.GetAsync(AccountUri(plain.AccountId), cancellationToken);
+        var response = await client.GetAsync(AccountUri(flagged.AccountId), cancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, flaggedResponse.StatusCode);
-        var flaggedBody = await flaggedResponse.ReadJsonAsync(cancellationToken);
-        Assert.True(flaggedBody.GetProperty("outsideNetWorth").GetBoolean());
-        Assert.Equal(430m, flaggedBody.GetProperty("cashBalancePln").GetDecimal());
-        var plainBody = await plainResponse.ReadJsonAsync(cancellationToken);
-        Assert.False(plainBody.GetProperty("outsideNetWorth").GetBoolean());
-        Assert.Equal(System.Text.Json.JsonValueKind.Null, plainBody.GetProperty("cashBalancePln").ValueKind);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.ReadJsonAsync(cancellationToken);
+        Assert.True(body.GetProperty("outsideNetWorth").GetBoolean());
+        Assert.False(body.TryGetProperty("cashBalancePln", out _));
+        Assert.Empty(Factory.InstrumentQuoteLookupClient.RateCalls);
     }
 
     [Fact]
