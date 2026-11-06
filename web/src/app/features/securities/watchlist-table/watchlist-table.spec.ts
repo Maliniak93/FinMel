@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
@@ -146,6 +149,41 @@ describe('WatchlistTable', () => {
     ]);
   });
 
+  it('classes the daily change by sign', async () => {
+    await setup([
+      watchlistItem({
+        id: '00000000-0000-0000-0000-000000000001',
+        instrumentId: '00000000-0000-0000-0000-00000000a001',
+        ticker: 'GAIN',
+        dailyChange: 1.5,
+        dailyChangePercent: 1.27,
+      }),
+      watchlistItem({
+        id: '00000000-0000-0000-0000-000000000002',
+        instrumentId: '00000000-0000-0000-0000-00000000a002',
+        ticker: 'LOSS',
+        dailyChange: -2,
+        dailyChangePercent: -1.5,
+      }),
+      watchlistItem({
+        id: '00000000-0000-0000-0000-000000000003',
+        instrumentId: '00000000-0000-0000-0000-00000000a003',
+        ticker: 'FLAT',
+        dailyChange: 0,
+        dailyChangePercent: 0,
+      }),
+    ]);
+
+    const classesOf = (ticker: string): string[] =>
+      Array.from(rowFor(ticker).querySelector('[data-testid="daily-change"]')?.classList ?? []);
+
+    expect(classesOf('GAIN')).toContain('positive');
+    expect(classesOf('LOSS')).toContain('negative');
+    expect(classesOf('FLAT')).toContain('neutral');
+    expect(classesOf('FLAT')).not.toContain('positive');
+    expect(classesOf('FLAT')).not.toContain('negative');
+  });
+
   it('states', async () => {
     await setup(new Promise<Response>(() => undefined), false);
     expect(element().querySelector('app-skeleton')).not.toBeNull();
@@ -291,5 +329,25 @@ describe('WatchlistTable', () => {
     expect(dialog.open.mock.calls.map((call: unknown[]) => call[0])).not.toContain(
       TransactionFormDialog,
     );
+  });
+});
+
+describe('watchlist-table stylesheet', () => {
+  it('colours the daily change with tokens', () => {
+    const scss = readFileSync(
+      resolve(process.cwd(), 'src/app/features/securities/watchlist-table/watchlist-table.scss'),
+      'utf8',
+    );
+
+    expect(scss).toMatch(
+      /\.watchlist-table__change\.positive\s*\{[^}]*color:\s*var\(--sk-positive\)/,
+    );
+    expect(scss).toMatch(
+      /\.watchlist-table__change\.negative\s*\{[^}]*color:\s*var\(--sk-negative\)/,
+    );
+    expect(scss).toMatch(
+      /\.watchlist-table__change\.neutral\s*\{[^}]*color:\s*var\(--mat-sys-on-surface-variant\)/,
+    );
+    expect(scss).not.toMatch(/#[0-9a-fA-F]{3,6}\b|rgb\(/);
   });
 });

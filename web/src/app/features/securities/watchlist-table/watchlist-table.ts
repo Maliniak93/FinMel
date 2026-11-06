@@ -16,6 +16,7 @@ import {
   type WatchlistItemResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
+import { changeDirection, type ChangeDirection } from '../../../shared/change-direction';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
@@ -113,9 +114,12 @@ export class WatchlistTable {
     return value === null || value === undefined ? null : Number(value);
   }
 
-  protected sign(value: number | string | null): 'positive' | 'negative' | '' {
-    const amount = Number(value);
-    return amount > 0 ? 'positive' : amount < 0 ? 'negative' : '';
+  protected direction(item: WatchlistItemResponse): ChangeDirection {
+    return changeDirection(
+      this.toNumber(item.dailyChange),
+      this.toNumber(item.dailyChangePercent),
+      4,
+    );
   }
 
   protected isHeld(item: WatchlistItemResponse): boolean {

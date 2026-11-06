@@ -48,10 +48,7 @@
       </th>
       <td mat-cell *matCellDef="let item">
         @if (item.dailyChange !== null) {
-          <span
-            data-testid="daily-change"
-            [class]="'watchlist-table__change ' + sign(item.dailyChange)"
-          >
+          <span data-testid="daily-change" [class]="'watchlist-table__change ' + direction(item)">
             {{ formatMoney(item.dailyChange, item.quoteCurrency) }}
             @if (item.dailyChangePercent !== null) {
               ({{ formatPercent(item.dailyChangePercent) }})
