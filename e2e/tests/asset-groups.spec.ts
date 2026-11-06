@@ -735,15 +735,15 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await expect(dialog).toBeHidden();
   });
 
-  await test.step('Krok 20: on a phone width Wg grup and Struktura majątku are stacked in that order', async () => {
+  await test.step('Krok 20: on a phone width Struktura majątku and Wg grup are stacked in that order', async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await dashboardRefetch(page);
     const classes = page.getByRole('heading', { name: 'Struktura majątku' });
     const groups = page.getByRole('heading', { name: 'Wg grup' });
     await expect(groups).toBeVisible();
     await expect(async () => {
-      const first = await groups.boundingBox();
-      const second = await classes.boundingBox();
+      const first = await classes.boundingBox();
+      const second = await groups.boundingBox();
       expect(first).not.toBeNull();
       expect(second).not.toBeNull();
       expect(second?.y ?? 0).toBeGreaterThan((first?.y ?? 0) + (first?.height ?? 0));
