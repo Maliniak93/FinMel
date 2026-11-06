@@ -47,30 +47,6 @@
           tableClass: 'bank-accounts__table',
         }"
       />
-
-      @if (currentAccounts().length > 0) {
-        <section class="bank-accounts__current" data-testid="current-accounts">
-          <h2 class="bank-accounts__current-title">
-            {{ 'bankAccounts.current.title' | transloco }}
-          </h2>
-          <p class="bank-accounts__current-sum">
-            {{ 'bankAccounts.current.sum' | transloco }}:
-            <app-money [amount]="currentSumPln()" currency="PLN" />
-            @if (currentSumIncomplete()) {
-              <span class="bank-accounts__current-incomplete">
-                ({{ 'bankAccounts.current.incomplete' | transloco }})
-              </span>
-            }
-          </p>
-          <ng-container
-            [ngTemplateOutlet]="accountsTable"
-            [ngTemplateOutletContext]="{
-              $implicit: currentAccounts(),
-              tableClass: 'bank-accounts__current-table',
-            }"
-          />
-        </section>
-      }
     }
   }
 </div>
@@ -132,6 +108,13 @@
     <ng-container matColumnDef="status">
       <th mat-header-cell *matHeaderCellDef>{{ 'common.status' | transloco }}</th>
       <td mat-cell *matCellDef="let account">
+        @if (account.outsideNetWorth) {
+          <app-status-chip
+            [label]="'accounts.outsideNetWorthLabel' | transloco"
+            icon="visibility_off"
+            tone="neutral"
+          />
+        }
         @if (account.bank.interestDue && !account.isArchived) {
           <app-status-chip
             [label]="'bankAccounts.interestDue' | transloco"

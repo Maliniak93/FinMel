@@ -57,6 +57,7 @@
   },
   "wealth": {
     "tabsLabel": "Typy majątku",
+    "bankOutsideNote": "bez kont poza majątkiem",
     "search": "Szukaj",
     "groupFilter": "Grupa: {{ name }}",
     "groupAll": "Wszystkie",
@@ -1263,11 +1264,6 @@
     "interestCredited": "Naliczone odsetki",
     "interestDue": "Odsetki do rozliczenia",
     "hasOpenDeposit": "Na to konto wróci otwarta lokata",
-    "current": {
-      "title": "Konta bieżące",
-      "sum": "Suma w PLN",
-      "incomplete": "niepełna suma"
-    },
     "interest": {
       "settle": "Rozlicz odsetki",
       "settleMonths": "Rozlicz odsetki (miesiące do rozliczenia: {{ count }})",

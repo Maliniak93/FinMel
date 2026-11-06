@@ -108,34 +108,10 @@ export class BankAccounts {
       .value()
       .filter(
         (account) =>
-          !account.outsideNetWorth &&
           (this.includeArchived() || !account.isArchived) &&
           (variant === ALL_VARIANTS || Number(account.bank?.variant) === variant),
       );
   });
-
-  protected readonly currentAccounts = computed(() => {
-    if (!this.accountsResource.hasValue()) {
-      return [];
-    }
-    return this.accountsResource
-      .value()
-      .filter(
-        (account) => account.outsideNetWorth && (this.includeArchived() || !account.isArchived),
-      );
-  });
-
-  protected readonly currentSumPln = computed(
-    () =>
-      this.currentAccounts().reduce(
-        (sum, account) => sum + Math.round(Number(account.cashBalancePln ?? 0) * 100),
-        0,
-      ) / 100,
-  );
-
-  protected readonly currentSumIncomplete = computed(() =>
-    this.currentAccounts().some((account) => account.cashBalancePln == null),
-  );
 
   protected readonly toNumber = Number;
   protected readonly formatPercent = formatPercent;
