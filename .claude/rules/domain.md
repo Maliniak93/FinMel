@@ -24,6 +24,8 @@ Target model. Items marked *(target — spec-0x)* are not implemented yet; do no
 | `Market` | Stock, Etf, PreciousMetal | `Quantity × QuoteUnitsPerQuantity × last PriceQuote(instrument, ≤ date) × FxRate(quoteCurrency→PLN, ≤ date)` — the multiplier is 1 except for PreciousMetal (fine grams per piece) |
 | `CurrencyValued` | Cash, Deposit, BankAccount, Bond | `Quantity × FxRate(assetCurrency→PLN, ≤ date)` — no instrument |
 
+A Bond position whose event carries `BondTerms` is the exception to the `CurrencyValued` row: Reporting values it as `Quantity + BondAccrual.Unsettled(...)` at the snapshot date, the book value with `IsStale` when a catalogue rate is missing (ADR-047).
+
 The default is a starting point the user may override; the mode, not the class, decides how a value is computed. An asset has exactly one mode, and `Market` requires an `InstrumentId`.
 
 ## Valuation algorithm

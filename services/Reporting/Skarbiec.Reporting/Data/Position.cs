@@ -1,4 +1,5 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Events;
 using Skarbiec.ServiceDefaults.Tenancy;
 
 namespace Skarbiec.Reporting.Data;
@@ -33,6 +34,9 @@ public sealed class Position : IUserOwned
 
     // A flagged position is left out of every valuation line and snapshot, today's and rebuilt ones.
     public bool OutsideNetWorth { get; set; }
+
+    // Treasury bond terms for the accrued-interest valuation; null for every other asset.
+    public PositionBondTerms? BondTerms { get; set; }
 
     // End-of-day quantity per transaction date, ascending; empty for a position with no transactions.
     public List<PositionQuantityPoint> QuantityHistory { get; set; } = [];

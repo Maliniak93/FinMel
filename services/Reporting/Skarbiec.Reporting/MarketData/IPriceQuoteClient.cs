@@ -16,4 +16,8 @@ public interface IPriceQuoteClient
 
     Task<IReadOnlyDictionary<string, IReadOnlyList<FxRateLookup>>> GetFxHistoryAsync(
         IReadOnlyList<string> pairs, DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
+    // Series code to period index (counted from 1) to annual rate in percent; a code MarketData does not know is absent.
+    Task<IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>> GetBondSeriesRatesAsync(
+        IReadOnlyList<string> seriesCodes, CancellationToken cancellationToken);
 }

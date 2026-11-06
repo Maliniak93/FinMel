@@ -43,6 +43,7 @@ public sealed class DailyPricesSyncedConsumer(
 
         var pricesByInstrument = await FetchPricesAsync(positions, snapshotDate, cancellationToken);
         var fxRatesByPair = await FetchFxRatesAsync(positions, pricesByInstrument, snapshotDate, cancellationToken);
+        var bondRatesBySeries = await FetchBondRatesAsync(positions, cancellationToken);
 
         await RememberLatestPricesAsync(pricesByInstrument, cancellationToken);
         await RememberLatestFxRatesAsync(fxRatesByPair, cancellationToken);
@@ -77,7 +78,8 @@ public sealed class DailyPricesSyncedConsumer(
                     fxRatesByPair,
                     snapshotDate,
                     existingSnapshots.GetValueOrDefault(group.Key),
-                    existingLines);
+                    existingLines,
+                    bondRatesBySeries);
                 computed++;
                 valued.Add(group.Key);
             }
@@ -177,6 +179,16 @@ public sealed class DailyPricesSyncedConsumer(
         return pairs.Count == 0
             ? new Dictionary<string, FxRateLookup>()
             : await priceQuoteClient.GetLatestFxRatesAsync(pairs, snapshotDate, cancellationToken);
+    }
+
+    private async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>> FetchBondRatesAsync(
+        IReadOnlyList<Position> positions, CancellationToken cancellationToken)
+    {
+        var seriesCodes = SnapshotWriter.RequiredBondSeries(positions);
+
+        return seriesCodes.Count == 0
+            ? new Dictionary<string, IReadOnlyDictionary<int, decimal>>()
+            : await priceQuoteClient.GetBondSeriesRatesAsync(seriesCodes, cancellationToken);
     }
 
     // Only moves forward: an older quote from a rerun leaves the stored row alone.

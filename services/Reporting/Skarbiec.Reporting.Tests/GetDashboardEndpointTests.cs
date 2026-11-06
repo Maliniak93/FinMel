@@ -7,10 +7,12 @@ using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Reporting.Tests.Fixtures.ReportingApi;
+using static Skarbiec.Reporting.Tests.Fixtures.ReportingConsumers;
 
 namespace Skarbiec.Reporting.Tests;
 
-public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
+public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containers)
+    : ReportingEndpointTests(containers, new FakePriceQuoteClient())
 {
     [Fact]
     public async Task NetWorthFromUserSnapshot()
@@ -254,6 +256,45 @@ public sealed class GetDashboardEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(400m, Assert.Single(body!.ByAssetClass, c => c.AssetClass == AssetClass.Etf).ValuePln);
         Assert.DoesNotContain(body.ByAssetClass, c => c.AssetClass == AssetClass.Cash);
+    }
+
+    [Fact]
+    public async Task Bond_ValueIncludesAccruedInterest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var purchaseDate = Today.AddMonths(-6);
+        var bond = PositionEvents.BondPositionEvent(userId, Guid.NewGuid(), purchaseDate);
+        var otherBond = PositionEvents.BondPositionEvent(otherUserId, Guid.NewGuid(), purchaseDate, bondCount: 10);
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        using var otherClient = Factory.CreateAuthenticatedClient(otherUserId);
+        await client.WaitUntilReadyAsync(cancellationToken);
+
+        await Bus.Publish(bond, cancellationToken);
+        await Bus.Publish(otherBond, cancellationToken);
+
+        using var response = await client.GetDashboardWhenAsync(d => d.NetWorthPln > 0m, cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        var interest = Skarbiec.Contracts.Bonds.BondAccrual.Unsettled(
+            new Skarbiec.Contracts.Bonds.BondTerms(TreasuryBondType.Edo, purchaseDate, 50, 6.5m),
+            new Dictionary<int, decimal>(), new Dictionary<int, decimal>(), Today);
+        Assert.NotNull(interest);
+        Assert.True(interest > 0m);
+        var expected = Math.Round(5_000m + interest.Value, 2, MidpointRounding.AwayFromZero);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(expected, body!.NetWorthPln);
+        var line = Assert.Single(body.ByAsset);
+        Assert.Equal(bond.AssetId, line.AssetId);
+        Assert.Equal(expected, line.ValuePln);
+        Assert.Equal(expected, Assert.Single(body.ByAssetClass, c => c.AssetClass == AssetClass.Bond).ValuePln);
+
+        using var otherResponse = await otherClient.GetDashboardWhenAsync(d => d.NetWorthPln > 0m, cancellationToken);
+        var otherBody = await otherResponse.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+        Assert.Equal(otherBond.AssetId, Assert.Single(otherBody!.ByAsset).AssetId);
     }
 
     [Fact]

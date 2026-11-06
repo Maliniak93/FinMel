@@ -1,5 +1,8 @@
+using System.Text.Json;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Skarbiec.Contracts.Events;
 using Skarbiec.ServiceDefaults.Authentication;
 using Skarbiec.ServiceDefaults.Tenancy;
 
@@ -33,6 +36,17 @@ public sealed class ReportingDbContext(DbContextOptions<ReportingDbContext> opti
             position.Property(p => p.Currency).HasMaxLength(3);
             position.Property(p => p.Quantity).HasPrecision(18, 8);
             position.Property(p => p.QuoteUnitsPerQuantity).HasPrecision(18, 8);
+
+            // A converter, not ToJson: the terms carry dictionaries, which a complex type cannot map.
+            position.Property(p => p.BondTerms)
+                .HasColumnType("jsonb")
+                .HasConversion(
+                    terms => JsonSerializer.Serialize(terms, JsonSerializerOptions.Default),
+                    json => JsonSerializer.Deserialize<PositionBondTerms>(json, JsonSerializerOptions.Default),
+                    new ValueComparer<PositionBondTerms?>(
+                        (a, b) => a == null ? b == null : a.SameAs(b),
+                        terms => terms == null ? 0 : terms.SeriesCode.GetHashCode(),
+                        terms => terms));
 
             position.ComplexCollection(p => p.QuantityHistory, history => history.ToJson());
             position.ComplexCollection(p => p.ClassHistory, history => history.ToJson());

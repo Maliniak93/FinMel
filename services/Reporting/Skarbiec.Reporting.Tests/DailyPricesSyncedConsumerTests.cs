@@ -533,6 +533,47 @@ public sealed class DailyPricesSyncedConsumerTests(SkarbiecContainersFixture con
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task Bond_AccruesWithoutPositionEvent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var firstDate = new DateOnly(2026, 8, 10);
+        var laterDate = new DateOnly(2026, 8, 11);
+        var purchaseDate = firstDate.AddMonths(-18);
+        var userId = Guid.NewGuid();
+        var catalogRates = new Dictionary<int, decimal> { [2] = 5m };
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedBondPositionAsync(
+                PositionEvents.BondPositionEvent(userId, Guid.NewGuid(), purchaseDate), cancellationToken);
+        }
+
+        var priceQuoteClient = new FakePriceQuoteClient().WithBondRates("EDO0235", (2, 5m));
+
+        await RunConsumerAsync(priceQuoteClient, async provider =>
+        {
+            await PublishSyncAsync(provider, firstDate, cancellationToken);
+            var first = await WaitForSnapshotAsync(provider, userId, firstDate, cancellationToken);
+
+            await PublishSyncAsync(provider, laterDate, cancellationToken);
+            var later = await WaitForSnapshotAsync(provider, userId, laterDate, cancellationToken);
+
+            var terms = new Skarbiec.Contracts.Bonds.BondTerms(TreasuryBondType.Edo, purchaseDate, 50, 6.5m);
+            var expectedFirst = Math.Round(
+                5_000m + Skarbiec.Contracts.Bonds.BondAccrual.Unsettled(terms, new Dictionary<int, decimal>(), catalogRates, firstDate)!.Value,
+                2, MidpointRounding.AwayFromZero);
+            var expectedLater = Math.Round(
+                5_000m + Skarbiec.Contracts.Bonds.BondAccrual.Unsettled(terms, new Dictionary<int, decimal>(), catalogRates, laterDate)!.Value,
+                2, MidpointRounding.AwayFromZero);
+
+            Assert.Equal(expectedFirst, first.TotalPln);
+            Assert.Equal(expectedLater, later.TotalPln);
+            Assert.True(later.TotalPln > first.TotalPln);
+            Assert.True(first.TotalPln > 5_000m);
+        }, cancellationToken);
+    }
+
     private static async Task PublishSyncAsync(ServiceProvider provider, DateOnly snapshotDate, CancellationToken cancellationToken)
     {
         var bus = provider.GetRequiredService<IBus>();

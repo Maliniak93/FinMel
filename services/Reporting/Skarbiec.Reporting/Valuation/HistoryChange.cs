@@ -30,6 +30,11 @@ public static class HistoryChange
             candidates.Add(Earlier(oldStart, newStart));
         }
 
+        if (stored.BondTerms is null ? incoming.BondTerms is not null : !stored.BondTerms.SameAs(incoming.BondTerms))
+        {
+            candidates.Add(Earlier(stored.BondTerms?.PurchaseDate, incoming.BondTerms?.PurchaseDate));
+        }
+
         candidates.Add(FirstClassDifference(stored, incoming, oldStart, newStart));
         candidates.Add(FirstQuantityDifference(stored.QuantityHistory, incoming.QuantityHistory));
 

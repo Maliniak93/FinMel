@@ -314,6 +314,9 @@ namespace Skarbiec.Reporting.Migrations
                     b.Property<int>("AssetClass")
                         .HasColumnType("integer");
 
+                    b.Property<string>("BondTerms")
+                        .HasColumnType("jsonb");
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)
