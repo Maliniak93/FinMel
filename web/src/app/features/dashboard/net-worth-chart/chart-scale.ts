@@ -1,5 +1,6 @@
-export type ChartRange = '1M' | '1Y' | 'YTD' | 'MAX';
+export type ChartRange = '1M' | '1Y' | 'YTD' | 'MAX' | 'CUSTOM';
 
+const MAX_DAY_UNIT_SPAN_DAYS = 31;
 const STEP_MANTISSAS = [1, 2, 2.5, 5];
 const MAX_X_LABELS = 7;
 const MAX_DAY_LABELS = 8;
@@ -75,12 +76,15 @@ function dayTicks(first: Date, last: Date): Date[] {
 export type XTickUnit = 'day' | 'month' | 'year';
 
 export function xTickUnit(range: ChartRange, first: Date, last: Date): XTickUnit {
-  if (range === '1M') {
+  const spanDays = Math.round((last.getTime() - first.getTime()) / 86_400_000);
+  if (range === '1M' || (range === 'CUSTOM' && spanDays <= MAX_DAY_UNIT_SPAN_DAYS)) {
     return 'day';
   }
   const months =
     (last.getFullYear() - first.getFullYear()) * 12 + last.getMonth() - first.getMonth();
-  return range === 'MAX' && months > MONTHS_BEFORE_YEARLY ? 'year' : 'month';
+  return (range === 'MAX' || range === 'CUSTOM') && months > MONTHS_BEFORE_YEARLY
+    ? 'year'
+    : 'month';
 }
 
 export function xTicks(range: ChartRange, first: Date, last: Date): Date[] {

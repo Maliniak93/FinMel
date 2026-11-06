@@ -15,13 +15,15 @@ public static class GetNetWorthHistoryEndpoint
         return app;
     }
 
-    // Defaulted params, so an omitted one binds instead of failing as missing; 1Y is the chart's default view.
+    // Defaulted params, so an omitted one binds instead of failing as missing; no range and no dates is the chart's default 1Y view.
     private static async Task<Results<Ok<NetWorthHistoryResponse>, ProblemHttpResult>> HandleAsync(
         GetNetWorthHistoryHandler handler,
         CancellationToken cancellationToken,
-        string range = "1Y",
+        string? range = null,
         AssetClass? assetClass = null,
         Guid? groupId = null,
-        bool ungrouped = false)
-        => (await handler.HandleAsync(range, assetClass, cancellationToken, groupId, ungrouped)).ToHttpResult();
+        bool ungrouped = false,
+        DateOnly? from = null,
+        DateOnly? to = null)
+        => (await handler.HandleAsync(range, assetClass, cancellationToken, groupId, ungrouped, from, to)).ToHttpResult();
 }

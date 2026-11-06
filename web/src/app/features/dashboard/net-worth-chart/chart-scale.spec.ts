@@ -1,5 +1,19 @@
 import { fromDateOnly } from '../../../shared/date-only';
-import { niceTicks, xTicks } from './chart-scale';
+import { niceTicks, xTickUnit, xTicks } from './chart-scale';
+
+describe('x ticks of a custom range', () => {
+  it('picks day, month or year ticks from the span of its points', () => {
+    const unit = (from: string, to: string) =>
+      xTickUnit('CUSTOM', fromDateOnly(from), fromDateOnly(to));
+
+    expect(unit('2026-03-01', '2026-03-21')).toBe('day');
+    expect(unit('2025-01-01', '2025-12-31')).toBe('month');
+    expect(unit('2020-01-01', '2026-01-01')).toBe('year');
+    expect(
+      xTicks('CUSTOM', fromDateOnly('2020-01-01'), fromDateOnly('2026-01-01')).length,
+    ).toBeGreaterThan(1);
+  });
+});
 
 function isRoundStep(step: number): boolean {
   const magnitude = 10 ** Math.floor(Math.log10(step));

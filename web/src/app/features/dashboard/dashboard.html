@@ -70,7 +70,7 @@
                   <span class="dashboard-page__change-class">{{ groupLabel }}</span>
                 }
                 <span class="dashboard-page__change-range">{{
-                  'dashboard.changeForRange' | transloco: { range: range() }
+                  'dashboard.changeForRange' | transloco: { range: rangeLabel() }
                 }}</span>
               </p>
             } @else {
@@ -91,6 +91,9 @@
             <app-net-worth-chart
               [points]="historyPoints()"
               [(range)]="range"
+              [rangeLabel]="rangeLabel()"
+              [firstDate]="historyBounds()?.first ?? null"
+              (customRangeRequested)="openRangeDialog()"
               [classes]="classes()"
               [(assetClass)]="assetClass"
               [groups]="groupOptions()"

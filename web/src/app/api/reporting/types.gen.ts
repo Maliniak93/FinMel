@@ -60,6 +60,8 @@ export type NetWorthHistoryResponse = {
     points: Array<NetWorthHistoryPoint>;
     changePln?: null | number | string;
     changePercent?: null | number | string;
+    firstDate?: null | string;
+    lastDate?: null | string;
 };
 
 export type GetApiReportingDashboardData = {
@@ -86,6 +88,8 @@ export type GetApiReportingNetWorthHistoryData = {
         assetClass?: AssetClass;
         groupId?: string;
         ungrouped?: boolean;
+        from?: string;
+        to?: string;
     };
     url: '/api/reporting/net-worth-history';
 };

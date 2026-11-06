@@ -162,6 +162,7 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
 
         await using (var db = CreateDbContext(userId))
         {
+            await db.SeedSnapshotAsync(userId, Today.AddYears(-1).AddDays(-5), 800m, cancellationToken);
             await db.SeedSnapshotAsync(userId, Today.AddDays(-30), 1000m, cancellationToken);
             await db.SeedSnapshotAsync(userId, Today.AddDays(-10), 5000m, cancellationToken);
             await db.SeedSnapshotAsync(userId, Today, 1250m, cancellationToken);
@@ -172,8 +173,295 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
         var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(250.00m, body!.ChangePln);
-        Assert.Equal(25.00m, body.ChangePercent);
+        Assert.Equal(450.00m, body!.ChangePln);
+        Assert.Equal(56.25m, body.ChangePercent);
+    }
+
+    [Fact]
+    public async Task Get_YtdRange_ChangeStartsFromPointBeforeJanuaryFirst()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, new DateOnly(Today.Year - 1, 12, 31), 1000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, new DateOnly(Today.Year, 1, 1), 1100m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 1500m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(NetWorthHistoryUri("YTD"), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(500m, body!.ChangePln);
+        Assert.Equal(50m, body.ChangePercent);
+    }
+
+    [Fact]
+    public async Task Get_CustomRange_ReturnsPointsFromThroughTo()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            foreach (var offset in new[] { 30, 20, 10, 5, 0 })
+            {
+                await db.SeedSnapshotAsync(userId, Today.AddDays(-offset), 1000m + offset, cancellationToken);
+            }
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(
+            NetWorthHistoryUri(from: Today.AddDays(-20), to: Today.AddDays(-10)), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("CUSTOM", body!.Range);
+        Assert.Equal([Today.AddDays(-20), Today.AddDays(-10)], body.Points.Select(p => p.Date).ToArray());
+    }
+
+    [Fact]
+    public async Task Get_CustomRange_ToInFuture_EndsAtToday()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-5), 100m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 200m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(3), 300m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(
+            NetWorthHistoryUri(from: Today.AddDays(-10), to: Today.AddDays(10)), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal([Today.AddDays(-5), Today], body!.Points.Select(p => p.Date).ToArray());
+    }
+
+    [Fact]
+    public async Task Get_CustomRange_ChangeStartsFromPointBeforeFrom()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-30), 1000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-20), 1200m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-10), 1500m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-5), 1800m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(
+            NetWorthHistoryUri(from: Today.AddDays(-15), to: Today.AddDays(-3)), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(600m, body!.ChangePln);
+        Assert.Equal(50m, body.ChangePercent);
+    }
+
+    [Fact]
+    public async Task Get_CustomRangeFromStartOfYear_EqualsYtd()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, new DateOnly(Today.Year - 1, 12, 31), 1000m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, new DateOnly(Today.Year, 1, 1), 1100m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 1500m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var ytd = await (await client.GetAsync(NetWorthHistoryUri("YTD"), cancellationToken))
+            .Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+        var custom = await (await client.GetAsync(
+                NetWorthHistoryUri(from: new DateOnly(Today.Year, 1, 1), to: Today), cancellationToken))
+            .Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(500m, custom!.ChangePln);
+        Assert.Equal(ytd!.ChangePln, custom.ChangePln);
+        Assert.Equal(ytd.ChangePercent, custom.ChangePercent);
+    }
+
+    [Fact]
+    public async Task Get_RangeWithFrom_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        using var response = await client.GetAsync(
+            NetWorthHistoryUri("1Y", from: Today.AddDays(-10), to: Today), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, "Validation.InvalidRange", cancellationToken);
+    }
+
+    [Fact]
+    public async Task Get_OnlyFrom_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        using var response = await client.GetAsync(NetWorthHistoryUri(from: Today.AddDays(-10)), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, "Validation.InvalidRange", cancellationToken);
+    }
+
+    [Fact]
+    public async Task Get_FromAfterTo_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        using var response = await client.GetAsync(
+            NetWorthHistoryUri(from: Today.AddDays(-1), to: Today.AddDays(-10)), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.BadRequest, "Validation.InvalidRange", cancellationToken);
+    }
+
+    [Fact]
+    public async Task Get_UnparsableDate_ReturnsBadRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        using var response = await client.GetAsync(
+            $"{NetWorthHistoryBaseUri}?from=2025-02-31&to=2025-03-10", cancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_ReturnsFirstAndLastSnapshotDate_RegardlessOfRangeAndFilter()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var first = Today.AddDays(-400);
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, first, 100m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-10), 150m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-2), 200m, cancellationToken);
+            await db.SeedValuationLineAsync(userId, null, Guid.NewGuid(), Today.AddDays(-2), 200m, cancellationToken, AssetClass.Etf);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var oneMonth = await (await client.GetAsync(NetWorthHistoryUri("1M", assetClass: AssetClass.Etf), cancellationToken))
+            .Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+        var custom = await (await client.GetAsync(
+                NetWorthHistoryUri(from: Today.AddDays(-12), to: Today.AddDays(-8)), cancellationToken))
+            .Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(first, oneMonth!.FirstDate);
+        Assert.Equal(Today.AddDays(-2), oneMonth.LastDate);
+        Assert.Equal(first, custom!.FirstDate);
+        Assert.Equal(Today.AddDays(-2), custom.LastDate);
+    }
+
+    [Fact]
+    public async Task Get_WithoutSnapshots_ReturnsNullDates()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+
+        var response = await client.GetAsync(NetWorthHistoryUri("MAX"), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(body!.FirstDate);
+        Assert.Null(body.LastDate);
+    }
+
+    [Fact]
+    public async Task Get_CustomRangeWithoutSnapshots_ReturnsEmptyPoints()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+
+        await using (var db = CreateDbContext(userId))
+        {
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-100), 100m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today, 200m, cancellationToken);
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(
+            NetWorthHistoryUri(from: Today.AddDays(-50), to: Today.AddDays(-40)), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Empty(body!.Points);
+        Assert.Null(body.ChangePln);
+        Assert.Null(body.ChangePercent);
+    }
+
+    [Fact]
+    public async Task Get_CustomRange_NeverIncludesAnotherUsersSnapshots()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userAId = Guid.NewGuid();
+        var userBId = Guid.NewGuid();
+
+        await using (var dbA = CreateDbContext(userAId))
+        {
+            await dbA.SeedSnapshotAsync(userAId, Today.AddDays(-400), 9000m, cancellationToken);
+            await dbA.SeedSnapshotAsync(userAId, Today.AddDays(-25), 9100m, cancellationToken);
+            await dbA.SeedSnapshotAsync(userAId, Today.AddDays(-5), 9900m, cancellationToken);
+        }
+
+        await using (var dbB = CreateDbContext(userBId))
+        {
+            await dbB.SeedSnapshotAsync(userBId, Today.AddDays(-30), 100m, cancellationToken);
+            await dbB.SeedSnapshotAsync(userBId, Today.AddDays(-10), 150m, cancellationToken);
+        }
+
+        using var userBClient = Factory.CreateAuthenticatedClient(userBId);
+        var response = await userBClient.GetAsync(
+            NetWorthHistoryUri(from: Today.AddDays(-20), to: Today), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        var point = Assert.Single(body!.Points);
+        Assert.Equal(150m, point.NetWorthPln);
+        Assert.Equal(50m, body.ChangePln);
+        Assert.Equal(Today.AddDays(-30), body.FirstDate);
+        Assert.Equal(Today.AddDays(-10), body.LastDate);
+    }
+
+    [Fact]
+    public async Task Get_CustomRange_WithAssetClass_ChangeUsesFilteredBaseline()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var days = new[] { Today.AddDays(-30), Today.AddDays(-10), Today };
+        var etf = new[] { 100m, 150m, 300m };
+
+        await using (var db = CreateDbContext(userId))
+        {
+            for (var i = 0; i < days.Length; i++)
+            {
+                await db.SeedSnapshotAsync(userId, days[i], etf[i] + 1000m, cancellationToken);
+                await db.SeedValuationLineAsync(userId, null, Guid.NewGuid(), days[i], etf[i], cancellationToken, AssetClass.Etf);
+                await db.SeedValuationLineAsync(userId, null, Guid.NewGuid(), days[i], 1000m, cancellationToken, AssetClass.Cash);
+            }
+        }
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var response = await client.GetAsync(
+            NetWorthHistoryUri(assetClass: AssetClass.Etf, from: Today.AddDays(-15), to: Today), cancellationToken);
+        var body = await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken);
+
+        Assert.Equal([150m, 300m], body!.Points.Select(p => p.NetWorthPln).ToArray());
+        Assert.Equal(200m, body.ChangePln);
+        Assert.Equal(200m, body.ChangePercent);
     }
 
     [Fact]
@@ -204,7 +492,8 @@ public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture co
 
         await using (var db = CreateDbContext(userId))
         {
-            await db.SeedSnapshotAsync(userId, Today.AddDays(-5), 0m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddYears(-1).AddDays(-3), 0m, cancellationToken);
+            await db.SeedSnapshotAsync(userId, Today.AddDays(-5), 100m, cancellationToken);
             await db.SeedSnapshotAsync(userId, Today, 500m, cancellationToken);
         }
 
