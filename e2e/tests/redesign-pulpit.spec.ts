@@ -504,10 +504,10 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
     await expect(heading(page, 'Wg grup')).toBeVisible();
     const order = [
       heading(page, 'Historia wartości majątku'),
+      heading(page, 'Struktura majątku'),
       heading(page, 'Do zrobienia'),
       monthCard(page).getByRole('heading', { name: /· plan$/ }),
       heading(page, 'Wg grup'),
-      heading(page, 'Struktura majątku'),
       heading(page, 'Rachunki'),
       heading(page, 'Gotówka'),
     ];
