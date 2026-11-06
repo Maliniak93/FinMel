@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Data;
 using Skarbiec.Reporting.Features.GetDashboard;
+using Skarbiec.Reporting.Features.GetNetWorthHistory;
 
 namespace Skarbiec.Reporting.Tests.Fixtures;
 
@@ -121,10 +122,12 @@ internal static class ReportingApi
         DateOnly? archivedOn = null,
         IReadOnlyList<(DateOnly Date, AssetClass AssetClass)>? classHistory = null,
         Guid? groupId = null,
-        bool outsideNetWorth = false)
+        bool outsideNetWorth = false,
+        Contracts.Events.PositionBondTerms? bondTerms = null)
     {
         db.Positions.Add(new Data.Position
         {
+            BondTerms = bondTerms,
             OutsideNetWorth = outsideNetWorth,
             GroupId = groupId,
             AssetId = assetId,
@@ -268,6 +271,25 @@ internal static class ReportingApi
         }
 
         throw new TimeoutException("The Reporting host never reported ready.");
+    }
+
+    public static async Task<NetWorthHistoryResponse?> GetNetWorthHistoryWhenAsync(
+        this HttpClient client, string uri, Func<NetWorthHistoryResponse, bool> predicate, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(20);
+        while (true)
+        {
+            using var response = await client.GetAsync(uri, cancellationToken);
+            var body = response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<NetWorthHistoryResponse>(cancellationToken)
+                : null;
+            if (DateTimeOffset.UtcNow >= deadline || (body is not null && predicate(body)))
+            {
+                return body;
+            }
+
+            await Task.Delay(TimeSpan.FromMilliseconds(200), cancellationToken);
+        }
     }
 
     // After 15 s returns the last response as-is, so the caller's assertion reports what the dashboard said.

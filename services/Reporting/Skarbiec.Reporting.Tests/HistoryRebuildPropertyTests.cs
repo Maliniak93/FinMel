@@ -1,5 +1,6 @@
 using Skarbiec.Contracts;
 using Skarbiec.Reporting.Data;
+using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Reporting.Valuation;
 
 namespace Skarbiec.Reporting.Tests;
@@ -134,6 +135,54 @@ public sealed class HistoryRebuildPropertyTests
                 Assert.Equal(positions.Single(p => p.AssetId == line.AssetId).ClassOn(day.Date), line.AssetClass);
             }
         }
+    }
+
+    [Fact]
+    public void Bond_ValueIsMonotonicWithAccrual()
+    {
+        var to = new DateOnly(2026, 9, 30);
+        var purchaseDate = to.AddMonths(-6);
+        var from = purchaseDate.AddDays(-5);
+        var terms = PositionEvents.NewBondTerms(purchaseDate, new Dictionary<DateOnly, int> { [purchaseDate] = 50 });
+        var position = new Position
+        {
+            AssetId = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            AccountId = Guid.NewGuid(),
+            AssetClass = AssetClass.Bond,
+            ValuationMode = AssetValuationMode.CurrencyValued,
+            Currency = "PLN",
+            Quantity = 5_000m,
+            QuoteUnitsPerQuantity = 1m,
+            IsArchived = false,
+            Version = 0,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            QuantityHistory = [new PositionQuantityPoint { Date = purchaseDate, Quantity = 5_000m }],
+            BondTerms = terms,
+        };
+
+        var days = HistoryRebuild.Compute(
+            [position],
+            new Dictionary<Guid, IReadOnlyList<InstrumentPriceLookup>>(),
+            new Dictionary<string, IReadOnlyList<FxRateLookup>>(),
+            from,
+            to,
+            bondRatesBySeries: new Dictionary<string, IReadOnlyDictionary<int, decimal>>());
+
+        Assert.Equal(purchaseDate, days.Min(d => d.Date));
+        var previous = 0m;
+        foreach (var day in days.OrderBy(d => d.Date))
+        {
+            var interest = Contracts.Bonds.BondAccrual.Unsettled(
+                new Contracts.Bonds.BondTerms(terms.Type, purchaseDate, 50, terms.FirstPeriodRatePercent),
+                new Dictionary<int, decimal>(), new Dictionary<int, decimal>(), day.Date);
+            Assert.NotNull(interest);
+            Assert.Equal(Math.Round(5_000m + interest.Value, 2, MidpointRounding.AwayFromZero), day.TotalPln);
+            Assert.True(day.TotalPln >= previous, $"{day.Date}: {day.TotalPln} < {previous}");
+            previous = day.TotalPln;
+        }
+
+        Assert.True(days.Max(d => d.TotalPln) > 5_000m);
     }
 
     private static Position NewPosition(Random random, DateOnly from, DateOnly to, bool market, Guid? instrumentId, string currency)

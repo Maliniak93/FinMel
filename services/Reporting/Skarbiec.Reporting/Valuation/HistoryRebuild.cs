@@ -1,4 +1,6 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
+using Skarbiec.Contracts.Events;
 using Skarbiec.Reporting.Data;
 
 namespace Skarbiec.Reporting.Valuation;
@@ -12,7 +14,8 @@ public static class HistoryRebuild
         IReadOnlyDictionary<Guid, IReadOnlyList<InstrumentPriceLookup>> priceSeries,
         IReadOnlyDictionary<string, IReadOnlyList<FxRateLookup>> fxSeries,
         DateOnly from,
-        DateOnly to)
+        DateOnly to,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<int, decimal>>? bondRatesBySeries = null)
     {
         var states = positions.Select(p => new PositionState(p)).ToList();
         var priceCursors = priceSeries.ToDictionary(s => s.Key, s => new Cursor<InstrumentPriceLookup>(s.Value, p => p.Date));
@@ -54,7 +57,7 @@ public static class HistoryRebuild
                 }
             }
 
-            var lines = ValuationAlgorithm.Calculate(valued, prices, fxRates, day).Lines;
+            var lines = ValuationAlgorithm.Calculate(valued, prices, fxRates, day, bondRatesBySeries).Lines;
 
             if (lines.Count == 0)
             {
@@ -102,7 +105,26 @@ public static class HistoryRebuild
             Quantity = quantity,
             QuoteUnitsPerQuantity = position.QuoteUnitsPerQuantity,
             InstrumentId = position.InstrumentId,
+            BondTerms = BondTermsOn(day),
         };
+
+        // A period counts as settled on a day only once it has ended: its credit is dated the period end and is already in the quantity from then on.
+        private PositionBondTerms? BondTermsOn(DateOnly day)
+        {
+            if (position.BondTerms is not { } terms)
+            {
+                return null;
+            }
+
+            _periodEnds ??= BondSchedule.Periods(terms.Type, terms.PurchaseDate).ToDictionary(p => p.Index, p => p.End);
+            var settled = terms.SettledPeriodRates
+                .Where(e => _periodEnds.TryGetValue(e.Key, out var end) && end <= day)
+                .ToDictionary(e => e.Key, e => e.Value);
+
+            return terms with { SettledPeriodRates = settled, IsRedeemed = false };
+        }
+
+        private Dictionary<int, DateOnly>? _periodEnds;
     }
 
     private sealed class Cursor<T>(IReadOnlyList<T> series, Func<T, DateOnly> date)
