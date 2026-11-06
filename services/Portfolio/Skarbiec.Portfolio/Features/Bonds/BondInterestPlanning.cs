@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Accounts;
 using Skarbiec.Portfolio.Features.Bonds.SettleBondInterest;
@@ -89,7 +90,7 @@ internal static class BondInterestPlanning
             var rate = fixedRate || period.Index == 1 ? terms.FirstPeriodRatePercent : requested[i].RatePercent!.Value;
             rates.Add(rate);
 
-            var amounts = BondInterestMath.Settle(
+            var amounts = BondSettlementMath.Settle(
                 terms.Type, rates, period.Start, period.End, terms.BondCount, taxExempt);
             planned.Add(new PlannedBondPeriod(period, rate, terms.BondCount, amounts));
         }

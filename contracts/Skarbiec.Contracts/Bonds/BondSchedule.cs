@@ -1,6 +1,4 @@
-using Skarbiec.Contracts;
-
-namespace Skarbiec.Portfolio.Features.Bonds;
+namespace Skarbiec.Contracts.Bonds;
 
 public sealed record BondPeriod(int Index, DateOnly Start, DateOnly End);
 

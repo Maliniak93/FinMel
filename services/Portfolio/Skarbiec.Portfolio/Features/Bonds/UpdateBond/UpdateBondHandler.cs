@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Transfers;

@@ -1,4 +1,5 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.Bonds;
@@ -15,7 +16,7 @@ public sealed class BondValuationTests
         var today = new DateOnly(2025, 5, 13);
         var catalog = new Dictionary<int, decimal> { [2] = 4.00m };
 
-        var outcome = BondValuation.Today(bond, taxExempt: false, settlements, catalog, today);
+        var outcome = BondValuation.Today(bond, bookValue: 1_053.50m, taxExempt: false, settlements, catalog, today);
 
         Assert.Null(outcome.Reason);
         var estimate = Assert.IsType<BondEstimateResponse>(outcome.Estimate);
@@ -35,7 +36,7 @@ public sealed class BondValuationTests
         var today = new DateOnly(2026, 9, 25);
         var catalog = new Dictionary<int, decimal> { [2] = 5.00m, [3] = 4.50m };
 
-        var outcome = BondValuation.Today(bond, taxExempt: false, settlements, catalog, today);
+        var outcome = BondValuation.Today(bond, bookValue: 1_000m, taxExempt: false, settlements, catalog, today);
 
         Assert.Null(outcome.Reason);
         var estimate = Assert.IsType<BondEstimateResponse>(outcome.Estimate);
@@ -52,7 +53,7 @@ public sealed class BondValuationTests
         var bond = NewBond(TreasuryBondType.Edo, new DateOnly(2024, 3, 1), bondCount: 10, firstPeriodRate: 5.35m, fee: 3.00m);
         var settlements = new[] { NewSettlement(bond, 1, 5.35m, 53.50m) };
 
-        var outcome = BondValuation.Today(bond, taxExempt: false, settlements, new Dictionary<int, decimal>(), new DateOnly(2025, 5, 13));
+        var outcome = BondValuation.Today(bond, bookValue: 1_053.50m, taxExempt: false, settlements, new Dictionary<int, decimal>(), new DateOnly(2025, 5, 13));
 
         Assert.Null(outcome.Estimate);
         Assert.Equal(BondEstimateUnavailableReason.RateMissing, outcome.Reason);

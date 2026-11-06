@@ -38,6 +38,7 @@ internal static class BondEstimates
                         ? BondValuationOutcome.Unavailable(BondEstimateUnavailableReason.MarketDataUnavailable)
                     : BondValuation.Today(
                         v.Bond.Terms,
+                        v.Bond.Response.BookValue,
                         BondTaxExemption.IsExempt(v.Bond.Response.TaxWrapper),
                         v.Bond.Settlements, lookup.Rates?.GetValueOrDefault(v.Bond.Terms.SeriesCode) ?? NoRates, today);
 

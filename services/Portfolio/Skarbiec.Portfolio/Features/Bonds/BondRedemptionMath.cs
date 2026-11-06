@@ -1,4 +1,5 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
 
 namespace Skarbiec.Portfolio.Features.Bonds;
 
@@ -43,16 +44,7 @@ public static class BondRedemptionMath
             return new BondEarlyPerBond(0m, 0m);
         }
 
-        var rate = ratesPercent[^1];
-        var elapsed = (decimal)(date.DayNumber - periodStart.DayNumber);
-        var length = (decimal)(periodEnd.DayNumber - periodStart.DayNumber);
-
-        var interest = type switch
-        {
-            TreasuryBondType.Ror or TreasuryBondType.Dor => Round(rate * elapsed / (12m * length)),
-            TreasuryBondType.Coi => Round(rate * elapsed / length),
-            _ => Round(CapitalAtPeriodStart(type, ratesPercent) * (1m + rate * elapsed / (100m * length))) - Nominal,
-        };
+        var interest = BondInterestMath.AccruedPerBond(type, ratesPercent, periodStart, periodEnd, date);
 
         // A coupon type's earlier coupons were paid out, so from period 2 on its fee is no longer capped at the accrued interest.
         var fee = BondSchedule.IsCoupon(type) && ratesPercent.Count > 1 ? feePerBond : Math.Min(feePerBond, interest);
@@ -86,21 +78,4 @@ public static class BondRedemptionMath
             bondCount * (Nominal + perBond.Interest - perBond.Fee) - tax);
     }
 
-    // C*_{k−1}: exact for EDO/ROS/ROD; the TOS letter rounds each period's capital to grosze.
-    private static decimal CapitalAtPeriodStart(TreasuryBondType type, IReadOnlyList<decimal> ratesPercent)
-    {
-        var capital = Nominal;
-        for (var i = 0; i < ratesPercent.Count - 1; i++)
-        {
-            capital *= 1m + ratesPercent[i] / 100m;
-            if (type is TreasuryBondType.Tos)
-            {
-                capital = Round(capital);
-            }
-        }
-
-        return capital;
-    }
-
-    private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
 }

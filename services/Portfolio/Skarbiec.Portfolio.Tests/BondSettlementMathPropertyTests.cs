@@ -1,10 +1,11 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
 using Skarbiec.Portfolio.Features;
 using Skarbiec.Portfolio.Features.Bonds;
 
 namespace Skarbiec.Portfolio.Tests;
 
-public sealed class BondInterestMathPropertyTests
+public sealed class BondSettlementMathPropertyTests
 {
     private const int CaseCount = 50;
 
@@ -68,7 +69,7 @@ public sealed class BondInterestMathPropertyTests
         var bondCount = random.Next(1, 500);
         var taxExempt = random.Next(2) == 0;
 
-        var amounts = BondInterestMath.Settle(type, rates, period.Start, period.End, bondCount, taxExempt);
+        var amounts = BondSettlementMath.Settle(type, rates, period.Start, period.End, bondCount, taxExempt);
 
         Assert.Equal(BondInterestMath.PerBond(type, rates, period.Start, period.End) * bondCount, amounts.Gross);
         Assert.Equal(BelkaTax.On(amounts.Gross, taxExempt), amounts.Tax);
