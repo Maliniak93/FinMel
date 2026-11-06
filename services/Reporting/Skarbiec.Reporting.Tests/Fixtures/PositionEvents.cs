@@ -87,6 +87,25 @@ internal static class PositionEvents
             OccurredAtUtc = DateTimeOffset.UtcNow,
         };
 
+    public static PositionBondTerms NewBondTerms(
+        DateOnly purchaseDate,
+        IReadOnlyDictionary<DateOnly, int> bondCountHistory,
+        TreasuryBondType type = TreasuryBondType.Edo,
+        string seriesCode = "EDO0235",
+        decimal firstPeriodRatePercent = 6.5m,
+        IReadOnlyDictionary<int, decimal>? settledPeriodRates = null) => new()
+        {
+            SeriesCode = seriesCode,
+            Type = type,
+            PurchaseDate = purchaseDate,
+            PurchasePricePerBond = 100m,
+            FirstPeriodRatePercent = firstPeriodRatePercent,
+            MarginPercent = 2m,
+            BondCountHistory = bondCountHistory,
+            SettledPeriodRates = settledPeriodRates ?? new Dictionary<int, decimal>(),
+            IsRedeemed = false,
+        };
+
     public static async Task SeedBondPositionAsync(
         this ReportingDbContext db, AssetPositionChanged evt, CancellationToken cancellationToken)
     {

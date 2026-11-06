@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Skarbiec.Contracts;
+using Skarbiec.Reporting.Features.GetDashboard;
 using Skarbiec.Reporting.Features.GetNetWorthHistory;
 using Skarbiec.Reporting.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
@@ -9,10 +10,36 @@ using static Skarbiec.Reporting.Tests.Fixtures.ReportingApi;
 
 namespace Skarbiec.Reporting.Tests;
 
-public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture containers) : ReportingEndpointTests(containers)
+public sealed class GetNetWorthHistoryEndpointTests(SkarbiecContainersFixture containers)
+    : ReportingEndpointTests(containers, new FakePriceQuoteClient())
 {
     // The real clock, as in production, so each fact derives its dates from today.
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    [Fact]
+    public async Task LastPoint_EqualsDashboardTotal_WithBonds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var bond = PositionEvents.BondPositionEvent(userId, Guid.NewGuid(), Today.AddMonths(-6));
+
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        await client.WaitUntilReadyAsync(cancellationToken);
+        await Bus.Publish(bond, cancellationToken);
+
+        using var dashboardResponse = await client.GetDashboardWhenAsync(d => d.NetWorthPln > 0m, cancellationToken);
+        var dashboard = await dashboardResponse.Content.ReadFromJsonAsync<DashboardResponse>(cancellationToken);
+
+        var history = await client.GetNetWorthHistoryWhenAsync(
+            NetWorthHistoryUri("1Y"), h => h.Points.Count > 30 && h.Points[^1].Date == Today, cancellationToken);
+
+        Assert.NotNull(history);
+        var last = history.Points[^1];
+        var previous = history.Points[^2];
+        Assert.Equal(Today, last.Date);
+        Assert.Equal(dashboard!.NetWorthPln, last.NetWorthPln);
+        Assert.True(Math.Abs(last.NetWorthPln - previous.NetWorthPln) < 5m, $"Jump from {previous.NetWorthPln} to {last.NetWorthPln}.");
+    }
 
     [Fact]
     public async Task Get_OneMonthRange_ExcludesPointsOlderThanOneMonth()

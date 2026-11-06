@@ -45,7 +45,15 @@ public sealed class HistoryRebuildPerformanceTests(SkarbiecContainersFixture con
                 client.WithPriceHistory(instrumentId, "USD", Series(from, today, i => 100m + i % 50));
             }
 
-            for (var i = 0; i < 10; i++)
+            for (var i = 0; i < 5; i++)
+            {
+                var purchase = from.AddDays(i);
+                await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                    assetClass: AssetClass.Bond, quantity: 5_000m, quantityHistory: [(purchase, 5_000m)],
+                    bondTerms: PositionEvents.NewBondTerms(purchase, new Dictionary<DateOnly, int> { [purchase] = 50 }));
+            }
+
+            for (var i = 0; i < 5; i++)
             {
                 await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
                     assetClass: AssetClass.Cash, valuationMode: AssetValuationMode.CurrencyValued,
@@ -56,6 +64,7 @@ public sealed class HistoryRebuildPerformanceTests(SkarbiecContainersFixture con
             await db.SeedHistoryRebuildRequestAsync(userId, from, cancellationToken);
         }
 
+        client.WithBondRates("EDO0235", (2, 5m), (3, 5m), (4, 5m));
         client.WithFxHistory("USDPLN", Series(from, today, i => 3.8m + i % 20 / 100m));
         client.WithFxHistory("EURPLN", Series(from, today, i => 4.2m + i % 20 / 100m));
 
@@ -71,6 +80,7 @@ public sealed class HistoryRebuildPerformanceTests(SkarbiecContainersFixture con
 
                 var snapshots = await GetAllSnapshotsAsync(containers, userId, cancellationToken);
                 Assert.Equal(Days, snapshots.Count);
+                Assert.Equal(1, client.BondRateCalls);
                 Assert.True(
                     stopwatch.ElapsedMilliseconds < 10_000,
                     $"The rebuild took {stopwatch.ElapsedMilliseconds} ms for 20 positions over {Days} days, expected < 10000 ms.");

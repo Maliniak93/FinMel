@@ -99,7 +99,17 @@ public sealed class HistoryRebuildConsumer(
             ? new Dictionary<string, IReadOnlyList<FxRateLookup>>()
             : await priceQuoteClient.GetFxHistoryAsync(pairs, from, to, cancellationToken);
 
-        var days = HistoryRebuild.Compute(positions, priceSeries, fxSeries, from, to);
+        // Every bond series, redeemed ones included: their days before the redemption still accrue.
+        var bondSeriesCodes = positions
+            .Where(p => p.BondTerms is { })
+            .Select(p => p.BondTerms!.SeriesCode)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var bondRatesBySeries = bondSeriesCodes.Count == 0
+            ? new Dictionary<string, IReadOnlyDictionary<int, decimal>>()
+            : await priceQuoteClient.GetBondSeriesRatesAsync(bondSeriesCodes, cancellationToken);
+
+        var days = HistoryRebuild.Compute(positions, priceSeries, fxSeries, from, to, bondRatesBySeries);
         var accountByAsset = positions.ToDictionary(p => p.AssetId, p => p.AccountId);
 
         // IgnoreQueryFilters: the rows being replaced belong to the request's user, not to a request user.

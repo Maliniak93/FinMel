@@ -858,6 +858,233 @@ public sealed class HistoryRebuildConsumerTests(SkarbiecContainersFixture contai
         }, cancellationToken);
     }
 
+    [Fact]
+    public async Task Bond_NoJumpAtSettlement()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var purchase = Today.AddMonths(-14);
+        var periodEnd = purchase.AddMonths(12);
+        var catalog = new Dictionary<int, decimal> { [2] = 5m };
+        var settled = new Dictionary<int, decimal> { [1] = 6.5m };
+        var terms = NewBondTerms(purchase, new Dictionary<DateOnly, int> { [purchase] = 50 }, settledPeriodRates: settled);
+        var credit = Math.Round(BondInterestOn(terms, 50, new Dictionary<int, decimal>(), catalog, periodEnd), 2, MidpointRounding.AwayFromZero);
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Bond, quantity: 5_000m + credit, bondTerms: terms,
+                quantityHistory: [(purchase, 5_000m), (periodEnd, 5_000m + credit)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, periodEnd.AddDays(-3), cancellationToken);
+        }
+
+        var client = new FakePriceQuoteClient().WithBondRates(terms.SeriesCode, (2, 5m));
+
+        await RunConsumerAsync(client, async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            var before = Assert.Single(await GetLinesAsync(containers, accountId, periodEnd.AddDays(-1), cancellationToken));
+            var onEnd = Assert.Single(await GetLinesAsync(containers, accountId, periodEnd, cancellationToken));
+            var after = Assert.Single(await GetLinesAsync(containers, accountId, periodEnd.AddDays(2), cancellationToken));
+
+            Assert.Equal(ExpectedBondValue(5_000m, terms, 50, new Dictionary<int, decimal>(), catalog, periodEnd.AddDays(-1)), before.ValuePln);
+            Assert.Equal(ExpectedBondValue(5_000m + credit, terms, 50, settled, catalog, periodEnd), onEnd.ValuePln);
+            Assert.Equal(ExpectedBondValue(5_000m + credit, terms, 50, settled, catalog, periodEnd.AddDays(2)), after.ValuePln);
+            Assert.True(Math.Abs(onEnd.ValuePln - before.ValuePln) < 3m, $"Jump of {onEnd.ValuePln - before.ValuePln} at the period end.");
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Coupon_ReturnsToBookAfterPayout()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var purchase = Today.AddMonths(-14);
+        var periodEnd = purchase.AddMonths(12);
+        var catalog = new Dictionary<int, decimal> { [2] = 5m };
+        var settled = new Dictionary<int, decimal> { [1] = 6.5m };
+        var terms = NewBondTerms(
+            purchase, new Dictionary<DateOnly, int> { [purchase] = 50 }, TreasuryBondType.Coi, "COI0235", settledPeriodRates: settled);
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Bond, quantity: 5_000m, bondTerms: terms, quantityHistory: [(purchase, 5_000m)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, periodEnd.AddDays(-2), cancellationToken);
+        }
+
+        var client = new FakePriceQuoteClient().WithBondRates(terms.SeriesCode, (2, 5m));
+
+        await RunConsumerAsync(client, async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            var before = Assert.Single(await GetLinesAsync(containers, accountId, periodEnd.AddDays(-1), cancellationToken));
+            var afterDate = periodEnd.AddDays(5);
+            var after = Assert.Single(await GetLinesAsync(containers, accountId, afterDate, cancellationToken));
+
+            Assert.True(before.ValuePln - 5_000m > 300m);
+            Assert.Equal(ExpectedBondValue(5_000m, terms, 50, settled, catalog, afterDate), after.ValuePln);
+            Assert.InRange(after.ValuePln - 5_000m, 0.01m, 10m);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Bond_BeforePurchase_NoValue()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var purchase = Today.AddDays(-10);
+        var terms = NewBondTerms(purchase, new Dictionary<DateOnly, int> { [purchase] = 50 });
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Bond, quantity: 5_000m, bondTerms: terms, quantityHistory: [(purchase, 5_000m)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, Today.AddDays(-20), cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            for (var offset = 20; offset > 10; offset--)
+            {
+                var lines = await GetLinesAsync(containers, accountId, Today.AddDays(-offset), cancellationToken);
+                Assert.All(lines, l => Assert.Equal(0m, l.ValuePln));
+            }
+
+            var onDay = Assert.Single(await GetLinesAsync(containers, accountId, Today.AddDays(-5), cancellationToken));
+            Assert.Equal(
+                ExpectedBondValue(5_000m, terms, 50, new Dictionary<int, decimal>(), new Dictionary<int, decimal>(), Today.AddDays(-5)),
+                onDay.ValuePln);
+            Assert.True(onDay.ValuePln > 5_000m);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Bond_EarlyRedemption_UsesRemainingCount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var purchase = Today.AddMonths(-6);
+        var redemption = Today.AddMonths(-3);
+        var terms = NewBondTerms(purchase, new Dictionary<DateOnly, int> { [purchase] = 50, [redemption] = 30 });
+        var none = new Dictionary<int, decimal>();
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Bond, quantity: 3_000m, bondTerms: terms,
+                quantityHistory: [(purchase, 5_000m), (redemption, 3_000m)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, redemption.AddDays(-2), cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            var beforeDate = redemption.AddDays(-1);
+            var afterDate = redemption.AddDays(3);
+            var before = Assert.Single(await GetLinesAsync(containers, accountId, beforeDate, cancellationToken));
+            var after = Assert.Single(await GetLinesAsync(containers, accountId, afterDate, cancellationToken));
+
+            Assert.Equal(ExpectedBondValue(5_000m, terms, 50, none, none, beforeDate), before.ValuePln);
+            Assert.Equal(ExpectedBondValue(3_000m, terms, 30, none, none, afterDate), after.ValuePln);
+            Assert.NotEqual(ExpectedBondValue(3_000m, terms, 50, none, none, afterDate), after.ValuePln);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Bond_MissingRate_BookValueStale()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var purchase = Today.AddMonths(-14);
+        var periodEnd = purchase.AddMonths(12);
+        var terms = NewBondTerms(purchase, new Dictionary<DateOnly, int> { [purchase] = 50 });
+
+        await using (var db = OpenDbContext(containers))
+        {
+            await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                assetClass: AssetClass.Bond, quantity: 5_000m, bondTerms: terms, quantityHistory: [(purchase, 5_000m)]);
+            await db.SeedHistoryRebuildRequestAsync(userId, periodEnd.AddDays(-5), cancellationToken);
+        }
+
+        await RunConsumerAsync(new FakePriceQuoteClient(), async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            var running = Assert.Single(await GetLinesAsync(containers, accountId, periodEnd.AddDays(-3), cancellationToken));
+            Assert.False(running.IsStale);
+            Assert.True(running.ValuePln > 5_000m);
+
+            var missing = Assert.Single(await GetLinesAsync(containers, accountId, Today.AddDays(-1), cancellationToken));
+            Assert.Equal(5_000m, missing.ValuePln);
+            Assert.True(missing.IsStale);
+            Assert.True((await GetSnapshotAsync(containers, userId, Today.AddDays(-1), cancellationToken))!.IsStale);
+        }, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Bond_FetchesRatesOncePerRebuild()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var purchase = Today.AddMonths(-14);
+
+        await using (var db = OpenDbContext(containers))
+        {
+            foreach (var (seriesCode, count) in new[] { ("EDO0235", 50), ("EDO0236", 20) })
+            {
+                var terms = NewBondTerms(purchase, new Dictionary<DateOnly, int> { [purchase] = count }, seriesCode: seriesCode);
+                await db.SeedPositionAsync(Guid.NewGuid(), userId, accountId, cancellationToken,
+                    assetClass: AssetClass.Bond, quantity: count * 100m, bondTerms: terms,
+                    quantityHistory: [(purchase, count * 100m)]);
+            }
+
+            await db.SeedHistoryRebuildRequestAsync(userId, purchase, cancellationToken);
+        }
+
+        var client = new FakePriceQuoteClient().WithBondRates("EDO0235", (2, 5m)).WithBondRates("EDO0236", (2, 5m));
+
+        await RunConsumerAsync(client, async provider =>
+        {
+            await provider.GetRequiredService<IBus>().PublishRebuildRequestedAsync(userId, cancellationToken);
+            await WaitForNoRebuildRequestAsync(provider, userId, cancellationToken);
+
+            Assert.Equal(1, client.BondRateCalls);
+            Assert.Equal(
+                Today.DayNumber - purchase.DayNumber,
+                (await GetAllSnapshotsAsync(containers, userId, cancellationToken)).Count(s => s.Date < Today));
+        }, cancellationToken);
+    }
+
+    private static decimal BondInterestOn(
+        PositionBondTerms terms, int count, IReadOnlyDictionary<int, decimal> settled, IReadOnlyDictionary<int, decimal> catalog, DateOnly day)
+    {
+        var interest = Contracts.Bonds.BondAccrual.Unsettled(
+            new Contracts.Bonds.BondTerms(terms.Type, terms.PurchaseDate, count, terms.FirstPeriodRatePercent), settled, catalog, day);
+        Assert.NotNull(interest);
+        return interest.Value;
+    }
+
+    private static decimal ExpectedBondValue(
+        decimal quantity, PositionBondTerms terms, int count, IReadOnlyDictionary<int, decimal> settled, IReadOnlyDictionary<int, decimal> catalog, DateOnly day) =>
+        Math.Round(quantity + BondInterestOn(terms, count, settled, catalog, day), 2, MidpointRounding.AwayFromZero);
+
     private Task RunFxChainAsync(
         IPriceQuoteClient priceQuoteClient, Func<ServiceProvider, Task> action, CancellationToken cancellationToken) =>
         RunAsync(
