@@ -2,6 +2,7 @@ import type { APIRequestContext, Locator, Page } from '@playwright/test';
 import {
   createAccountThroughApi,
   depositCashThroughApi,
+  expandWealthSections,
   expect,
   logInThroughApi,
   logInThroughUi,
@@ -520,6 +521,7 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
 
   await test.step('Krok 19: lista Majątek i karta rachunków na pulpicie nie pokazują żadnego z trzech kont poza majątkiem', async () => {
     await page.goto('/wealth');
+    await expandWealthSections(page);
     await expect(page.locator('.wealth-all__name', { hasText: SAVINGS })).toBeVisible();
     for (const name of [MBANK, JOINT, REVOLUT]) {
       await expect(page.locator('.wealth-all__name', { hasText: name })).toHaveCount(0);

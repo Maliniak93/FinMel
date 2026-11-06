@@ -29,6 +29,39 @@ export async function wealthTab(page: Page, name: string): Promise<void> {
   await page.keyboard.press('Enter');
 }
 
+// Majątek → Wszystko opens with every section collapsed, so a legacy scenario that reads its rows keeps every section expanded, also while the sections arrive late.
+function keepWealthSectionsExpanded(): void {
+  const flag = '__keepWealthSectionsExpanded';
+  const target = window as unknown as Record<string, boolean>;
+  if (target[flag]) {
+    return;
+  }
+  target[flag] = true;
+  const expand = (): void => {
+    document
+      .querySelectorAll<HTMLButtonElement>('.wealth-all__toggle[aria-expanded="false"]')
+      .forEach((button) => button.click());
+  };
+  new MutationObserver(expand).observe(document, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['aria-expanded'],
+  });
+  expand();
+}
+
+const expandingPages = new WeakSet<Page>();
+
+export async function expandWealthSections(page: Page): Promise<void> {
+  if (!expandingPages.has(page)) {
+    expandingPages.add(page);
+    await page.addInitScript(keepWealthSectionsExpanded);
+  }
+  await page.evaluate(keepWealthSectionsExpanded);
+  await expect(page.locator('.wealth-all__toggle[aria-expanded="false"]')).toHaveCount(0);
+}
+
 export const STUB_URL = 'http://localhost:18081';
 
 export interface Credentials {
