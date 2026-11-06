@@ -1306,6 +1306,16 @@
       "cash": "Wolne środki",
       "securities": "Papiery"
     },
+    "gain": {
+      "sinceContributions": "od wpłat",
+      "unrealized": "niezrealizowany",
+      "excluded": {
+        "one": "bez {{ count }} rachunku",
+        "few": "bez {{ count }} rachunków",
+        "many": "bez {{ count }} rachunków",
+        "other": "bez {{ count }} rachunku"
+      }
+    },
     "breadcrumb": {
       "back": "Majątek · {{ tab }}"
     },

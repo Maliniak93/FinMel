@@ -1306,6 +1306,16 @@
       "cash": "Free cash",
       "securities": "Securities"
     },
+    "gain": {
+      "sinceContributions": "since contributions",
+      "unrealized": "unrealized",
+      "excluded": {
+        "one": "excl. {{ count }} account",
+        "few": "excl. {{ count }} accounts",
+        "many": "excl. {{ count }} accounts",
+        "other": "excl. {{ count }} accounts"
+      }
+    },
     "breadcrumb": {
       "back": "Wealth · {{ tab }}"
     },

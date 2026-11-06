@@ -2,11 +2,20 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
+import { Gain } from '../gain/gain';
 import { Money } from '../money/money';
+
+export interface SummaryGain {
+  amount: number | null;
+  percent: number | null;
+  captionKey: string;
+  excluded?: { key: string; count: number };
+}
 
 export interface SummaryItem {
   labelKey: string;
   amount: number | null | undefined;
+  gain?: SummaryGain;
   currency?: string;
   testId?: string;
   link?: { labelKey: string; route: string };
@@ -14,7 +23,7 @@ export interface SummaryItem {
 
 @Component({
   selector: 'app-summary-strip',
-  imports: [Money, RouterLink, TranslocoPipe],
+  imports: [Gain, Money, RouterLink, TranslocoPipe],
   templateUrl: './summary-strip.html',
   styleUrl: './summary-strip.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

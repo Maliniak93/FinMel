@@ -11,6 +11,7 @@ export class Gain {
   readonly amount = input<number | null | undefined>();
   readonly percent = input<number | null | undefined>();
   readonly currency = input('PLN');
+  readonly dashWithoutPercent = input(false);
 
   protected readonly present = computed(() => {
     const amount = this.amount();
@@ -34,6 +35,9 @@ export class Gain {
 
   protected readonly percentText = computed(() => {
     const percent = this.percent();
-    return percent === null || percent === undefined ? null : `(${formatPercent(percent)})`;
+    if (percent === null || percent === undefined) {
+      return this.dashWithoutPercent() ? '(—)' : null;
+    }
+    return `(${formatPercent(percent)})`;
   });
 }

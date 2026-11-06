@@ -20,24 +20,55 @@ import {
 } from '../../api/portfolio';
 import { getApiReportingDashboard, type DashboardAccountValue } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { activeLocale } from '../../core/i18n/language';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/empty-state/empty-state';
+import { Gain } from '../../shared/gain/gain';
 import { Money } from '../../shared/money/money';
 import { SectionError } from '../../shared/section-error/section-error';
 import { Skeleton } from '../../shared/skeleton/skeleton';
 import { StatusChip } from '../../shared/status-chip/status-chip';
-import { SummaryStrip, type SummaryItem } from '../../shared/summary-strip/summary-strip';
+import {
+  SummaryStrip,
+  type SummaryGain,
+  type SummaryItem,
+} from '../../shared/summary-strip/summary-strip';
 import { ACCOUNT_TYPE, accountTypeLabel, taxWrapperLabel } from './account-type';
 import { AccountFormDialog } from './account-form-dialog/account-form-dialog';
 import { ContributionBar } from './contribution-bar/contribution-bar';
 
 const toGrosze = (amount: number | string): number => Math.round(Number(amount) * 100);
 
+const optionalGrosze = (amount: number | string | null | undefined): number | null =>
+  amount === null || amount === undefined ? null : toGrosze(amount);
+
+// Gain in grosze with the base the percent is taken from.
+interface RowGain {
+  amount: number;
+  denominator: number;
+  percent: number | null;
+}
+
+interface AccountGains {
+  total: RowGain | null;
+  securities: RowGain | null;
+}
+
+const percentOf = (amount: number, denominator: number): number | null =>
+  denominator > 0 ? Math.round((amount * 10000) / denominator) / 100 : null;
+
+const gainOf = (amount: number, denominator: number): RowGain => ({
+  amount,
+  denominator,
+  percent: percentOf(amount, denominator),
+});
+
 // MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
 @Component({
   selector: 'app-accounts',
   imports: [
     EmptyState,
+    Gain,
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
@@ -120,6 +151,36 @@ export class Accounts {
     return map;
   });
 
+  protected readonly gains = computed(() => {
+    const map = new Map<string, AccountGains>();
+    for (const account of this.visibleAccounts()) {
+      const entry = this.accountValues().get(account.id);
+      if (!entry || entry.isStale) {
+        continue;
+      }
+      const valueGrosze = toGrosze(entry.valuePln);
+      const netContributions = optionalGrosze(account.netContributionsPln);
+      const positionsCost = optionalGrosze(account.positionsCostPln);
+      map.set(account.id, {
+        total:
+          netContributions === null
+            ? null
+            : gainOf(valueGrosze - netContributions, netContributions),
+        securities:
+          positionsCost === null
+            ? null
+            : gainOf(
+                valueGrosze -
+                  toGrosze(account.cashBalance) -
+                  positionsCost +
+                  (optionalGrosze(account.paidInterestPln) ?? 0),
+                positionsCost,
+              ),
+      });
+    }
+    return map;
+  });
+
   protected readonly summary = computed<SummaryItem[]>(() => {
     let cash = 0;
     let total = 0;
@@ -135,10 +196,25 @@ export class Accounts {
         securities += toGrosze(entry.valuePln) - cashGrosze;
       }
     }
+    const rows = this.visibleAccounts().map((account) => this.gains().get(account.id));
     return [
-      { labelKey: 'accounts.summary.total', amount: valued ? total / 100 : null },
+      {
+        labelKey: 'accounts.summary.total',
+        amount: valued ? total / 100 : null,
+        gain: this.tileGain(
+          rows.map((row) => row?.total ?? null),
+          'accounts.gain.sinceContributions',
+        ),
+      },
       { labelKey: 'accounts.summary.cash', amount: cash / 100 },
-      { labelKey: 'accounts.summary.securities', amount: valued ? securities / 100 : null },
+      {
+        labelKey: 'accounts.summary.securities',
+        amount: valued ? securities / 100 : null,
+        gain: this.tileGain(
+          rows.map((row) => row?.securities ?? null),
+          'accounts.gain.unrealized',
+        ),
+      },
     ];
   });
 
@@ -155,6 +231,33 @@ export class Accounts {
     return entry
       ? Math.round((Number(entry.valuePln) - Number(account.cashBalance)) * 100) / 100
       : null;
+  }
+
+  protected totalGainOf(accountId: string): RowGain | null {
+    return this.gains().get(accountId)?.total ?? null;
+  }
+
+  protected securitiesGainOf(accountId: string): RowGain | null {
+    return this.gains().get(accountId)?.securities ?? null;
+  }
+
+  private tileGain(rows: (RowGain | null)[], captionKey: string): SummaryGain {
+    const counted = rows.filter((row): row is RowGain => row !== null);
+    const excluded = rows.length - counted.length;
+    const amount = counted.reduce((sum, row) => sum + row.amount, 0);
+    const denominator = counted.reduce((sum, row) => sum + row.denominator, 0);
+    return {
+      amount: counted.length > 0 ? amount / 100 : null,
+      percent: counted.length > 0 ? percentOf(amount, denominator) : null,
+      captionKey,
+      excluded:
+        excluded > 0
+          ? {
+              key: `accounts.gain.excluded.${new Intl.PluralRules(activeLocale()).select(excluded)}`,
+              count: excluded,
+            }
+          : undefined,
+    };
   }
 
   protected openCreateDialog(): void {

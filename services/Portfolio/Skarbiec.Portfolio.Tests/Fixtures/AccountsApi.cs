@@ -237,6 +237,43 @@ internal static class AccountsApi
         return (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
     }
 
+    public static readonly DateOnly NetContributionsFutureDay = new(2026, 11, 1);
+
+    public sealed record NetContributionsScenario(Guid IkeId, Guid RegularId, Guid ArchivedId, Guid BankId);
+
+    // Clock must be AccountCashTodayUtc: IKE nets 7 000 + 500 - 200, the future deposit is ignored.
+    public static async Task<NetContributionsScenario> CreateNetContributionsScenarioAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var bank = await client.CreateBankAccountAsync(cancellationToken, balance: 1_000m, depositedOn: CashDay1);
+        var ike = await client.CreateAccountWithCashAsync(
+            cancellationToken, balance: 7_000m, name: "IKE eMakler", depositedOn: CashDay1, wrapper: TaxWrapper.Ike);
+        await client.CreateTransferAsync(
+            cancellationToken,
+            new Skarbiec.Portfolio.Features.Transfers.CreateTransfer.CreateTransferRequest
+            {
+                SourceAssetId = bank.MoneyAssetId,
+                TargetAssetId = ike.CashAssetId,
+                Amount = 500m,
+                Date = CashDay2
+            });
+        (await client.PostCashTransactionAsync(ike.CashAssetId, TransactionType.Withdraw, 200m, CashDay2, cancellationToken))
+            .EnsureSuccessStatusCode();
+        var etfId = await client.AddMarketAssetAsync(
+            ike.AccountId, cancellationToken, AssetClass.Etf, "PLN", FakeInstrumentLookupClient.IdFor(AssetClass.Etf, "PLN"), "Holding");
+        await client.RecordBrokerageTradeAsync(etfId, cancellationToken, date: CashDay3);
+        await client.RecordBrokerageTradeAsync(
+            etfId, cancellationToken, TransactionType.Dividend, quantity: 37.40m, unitPrice: 1m, date: CashDay4);
+        (await client.PostCashTransactionAsync(
+            ike.CashAssetId, TransactionType.Deposit, 1_000m, NetContributionsFutureDay, cancellationToken)).EnsureSuccessStatusCode();
+
+        var regular = await client.CreateAccountWithCashAsync(cancellationToken, balance: 1_000m, name: "XTB zwykly", depositedOn: CashDay1);
+        var archived = await client.CreateAccountWithCashAsync(cancellationToken, balance: 300m, name: "Archiwum", depositedOn: CashDay1);
+        await client.ArchiveAccountAsync(archived.AccountId, cancellationToken);
+
+        return new NetContributionsScenario(ike.AccountId, regular.AccountId, archived.AccountId, bank.AccountId);
+    }
+
     public static string ContributionLimitUri(Guid accountId, int year) => $"{AccountUri(accountId)}/contribution-limits/{year}";
 
     public static string AccountContributionUri(Guid accountId, int year) => $"{AccountUri(accountId)}?year={year}";

@@ -40,6 +40,17 @@
   line-height: 1.2;
 }
 
+.summary-strip__gain {
+  margin: 0;
+  font-size: 14px;
+}
+
+.summary-strip__caption {
+  margin-left: var(--sk-space-2);
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-label-medium);
+}
+
 @media (width < 720px) {
   .summary-strip__item {
     padding-left: var(--sk-space-2);

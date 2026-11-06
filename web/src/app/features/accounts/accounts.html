@@ -75,19 +75,38 @@
         <ng-container matColumnDef="securities">
           <th mat-header-cell *matHeaderCellDef class="accounts-page__num">
             {{ 'accounts.balances.securities' | transloco }}
+            <span class="accounts-page__caption">{{ 'accounts.gain.unrealized' | transloco }}</span>
           </th>
           <td mat-cell *matCellDef="let account" class="accounts-page__num">
             <app-money [amount]="securitiesOf(account)" />
+            <div class="accounts-page__gain">
+              @let securitiesGain = securitiesGainOf(account.id);
+              <app-gain
+                [amount]="securitiesGain ? securitiesGain.amount / 100 : null"
+                [percent]="securitiesGain?.percent"
+              />
+            </div>
           </td>
         </ng-container>
 
         <ng-container matColumnDef="value">
           <th mat-header-cell *matHeaderCellDef class="accounts-page__num">
             {{ 'accounts.value' | transloco }}
+            <span class="accounts-page__caption">{{
+              'accounts.gain.sinceContributions' | transloco
+            }}</span>
           </th>
           <td mat-cell *matCellDef="let account" class="accounts-page__num">
             @if (valueEntryFor(account.id); as entry) {
               <app-money [amount]="toNumber(entry.valuePln)" />
+              <div class="accounts-page__gain">
+                @let totalGain = totalGainOf(account.id);
+                <app-gain
+                  [amount]="totalGain ? totalGain.amount / 100 : null"
+                  [percent]="totalGain?.percent"
+                  [dashWithoutPercent]="true"
+                />
+              </div>
             } @else {
               <span
                 class="accounts-page__value-placeholder"

@@ -68,6 +68,27 @@ public sealed class AccountTenancyIsolationTests(SkarbiecContainersFixture conta
     }
 
     [Fact]
+    public async Task List_DoesNotLeakPerformanceFields()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await owner.CreateNetContributionsScenarioAsync(cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerAccount = await stranger.CreateAccountWithCashAsync(cancellationToken, balance: 50m, name: "Obcy");
+
+        var response = await stranger.GetAsync(AccountsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var account = Assert.Single((await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList());
+        Assert.Multiple(
+            () => Assert.Equal(strangerAccount.AccountId, account.GetProperty("id").GetGuid()),
+            () => Assert.Equal(50m, account.GetProperty("netContributionsPln").GetDecimal()),
+            () => Assert.Equal(0m, account.GetProperty("positionsCostPln").GetDecimal()),
+            () => Assert.Equal(0m, account.GetProperty("paidInterestPln").GetDecimal()));
+    }
+
+    [Fact]
     public async Task OutsideNetWorthAccount_IsolatedFromOtherUser()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
