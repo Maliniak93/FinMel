@@ -121,19 +121,19 @@ describe('SecuritiesTable', () => {
         quoteOnly,
         unavailable('a3', 'Unpriced holding', PRICE_UNAVAILABLE_REASON.NoQuote),
       ],
-      totals: empty.totals,
+      totals: { valuePln: 7740, costPln: 6780, unrealizedPlPln: 960 },
     } as SecuritiesResponse);
 
     const gainCell = cellOf(rowFor('Gain holding'), 'Zysk/strata');
-    expect(gainCell.querySelector('.money--positive')).not.toBeNull();
+    expect(gainCell.querySelector('app-gain .gain--positive')).not.toBeNull();
+    expect(gainCell.querySelector('mat-icon')).toBeNull();
     expect(textOf(gainCell)).toContain(collapsed(formatSignedMoney(960, 'PLN')));
-    expect(textOf(gainCell)).toContain('trending_up');
     expect(textOf(gainCell)).toContain(collapsed(formatPercent(14.16)));
 
     const lossCell = cellOf(rowFor('Loss holding'), 'Zysk/strata');
-    expect(lossCell.querySelector('.money--negative')).not.toBeNull();
+    expect(lossCell.querySelector('app-gain .gain--negative')).not.toBeNull();
+    expect(lossCell.querySelector('mat-icon')).toBeNull();
     expect(textOf(lossCell)).toContain(collapsed(formatSignedMoney(-500, 'PLN')));
-    expect(textOf(lossCell)).toContain('trending_down');
 
     const quoteOnlyCell = cellOf(rowFor('Quote only holding'), 'Zysk/strata');
     expect(textOf(quoteOnlyCell)).toContain(collapsed(formatSignedMoney(50, 'EUR')));
@@ -150,6 +150,14 @@ describe('SecuritiesTable', () => {
 
     expect(textOf(cellOf(rowFor('Loss holding'), 'Kurs'))).toContain('Nieaktualna');
     expect(textOf(cellOf(rowFor('Gain holding'), 'Kurs'))).not.toContain('Nieaktualna');
+
+    const footerGain = Array.from(
+      element().querySelectorAll<HTMLElement>('.mat-mdc-footer-cell'),
+    ).find((cell) => cell.querySelector('app-gain'));
+    expect(footerGain).toBeDefined();
+    expect(footerGain!.querySelector('mat-icon')).toBeNull();
+    expect(textOf(footerGain!)).toContain(collapsed(formatSignedMoney(960, 'PLN')));
+    expect(textOf(footerGain!)).toContain(collapsed(formatPercent(14.16)));
   });
 
   it('row menu', async () => {

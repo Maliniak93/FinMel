@@ -3,6 +3,11 @@
     <div class="wealth-all__total sk-num" data-testid="total">
       <app-money [amount]="data.total()" />
     </div>
+    @if (data.totalGain(); as gain) {
+      <div class="wealth-all__total-gain" data-testid="total-gain">
+        <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
+      </div>
+    }
     @if (data.asOf(); as asOf) {
       <div class="wealth-all__as-of">
         {{ 'wealth.asOf' | transloco: { date: formatDate(asOf) } }}
@@ -106,20 +111,38 @@
         </tr>
       </thead>
       @for (section of sections(); track section.type) {
+        @let toggleLabel =
+          isExpanded(section.type) ? 'wealth.section.collapse' : 'wealth.section.expand';
         <tbody [attr.data-section]="section.type">
           <tr class="wealth-all__section">
             <th scope="colgroup" colspan="5">
-              <span class="wealth-all__swatch" [style.background-color]="section.color"></span>
-              <span class="wealth-all__section-name">{{ section.labelKey | transloco }}</span>
+              <button
+                type="button"
+                class="wealth-all__toggle"
+                [attr.aria-expanded]="isExpanded(section.type)"
+                [attr.aria-label]="toggleLabel | transloco"
+                (click)="toggle(section.type)"
+              >
+                <mat-icon aria-hidden="true">{{
+                  isExpanded(section.type) ? 'keyboard_arrow_down' : 'chevron_right'
+                }}</mat-icon>
+                <span class="wealth-all__swatch" [style.background-color]="section.color"></span>
+                <span class="wealth-all__section-name">{{ section.labelKey | transloco }}</span>
+              </button>
               <a class="wealth-all__section-link" [routerLink]="section.link">{{
                 'wealth.open' | transloco
               }}</a>
             </th>
             <th scope="colgroup" class="wealth-all__num">
               <app-money [amount]="section.sum" />
+              @if (data.sectionGain(section.type); as gain) {
+                <div class="wealth-all__change">
+                  <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
+                </div>
+              }
             </th>
           </tr>
-          @for (row of section.rows; track row.id) {
+          @for (row of isExpanded(section.type) ? section.rows : []; track row.id) {
             <tr class="wealth-all__row" [class.wealth-all__row--archived]="row.isArchived">
               <td>
                 <a class="wealth-all__name" [routerLink]="row.link">{{ row.name }}</a>
@@ -155,12 +178,9 @@
               </td>
               <td class="wealth-all__num">
                 <app-money [amount]="row.valuePln" />
-                @if (row.change; as change) {
+                @if (row.gain; as gain) {
                   <div class="wealth-all__change">
-                    <app-money kind="change" [amount]="change.amountPln" />
-                    @if (change.percent !== null) {
-                      <span class="sk-num">({{ formatPercent(change.percent) }})</span>
-                    }
+                    <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
                   </div>
                 }
               </td>

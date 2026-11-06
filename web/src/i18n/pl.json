@@ -62,6 +62,10 @@
     "groupAll": "Wszystkie",
     "groupNone": "Bez grupy",
     "open": "otwórz →",
+    "section": {
+      "expand": "Rozwiń sekcję",
+      "collapse": "Zwiń sekcję"
+    },
     "asOf": "Stan na {{ date }}",
     "accountsCount": {
       "one": "{{ count }} rachunek",

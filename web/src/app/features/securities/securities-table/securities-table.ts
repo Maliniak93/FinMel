@@ -16,7 +16,8 @@ import {
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { fromDateOnly } from '../../../shared/date-only';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
-import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
+import { formatDate, formatMoney, formatQuantity } from '../../../shared/format';
+import { Gain } from '../../../shared/gain/gain';
 import { Money } from '../../../shared/money/money';
 import { SectionError } from '../../../shared/section-error/section-error';
 import { Skeleton } from '../../../shared/skeleton/skeleton';
@@ -49,6 +50,7 @@ const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
   selector: 'app-securities-table',
   imports: [
     EmptyState,
+    Gain,
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
@@ -116,7 +118,6 @@ export class SecuritiesTable {
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatQuantity = formatQuantity;
-  protected readonly formatPercent = formatPercent;
   protected readonly formatDate = formatDate;
   protected readonly buyType = TRANSACTION_TYPE_BUY;
   protected readonly sellType = TRANSACTION_TYPE_SELL;
@@ -139,6 +140,13 @@ export class SecuritiesTable {
 
   protected toNumber(value: number | string | null | undefined): number | null {
     return value === null || value === undefined ? null : Number(value);
+  }
+
+  protected totalsPercent(totals: { costPln: number | string; unrealizedPlPln: number | string }) {
+    const cost = Math.round(Number(totals.costPln) * 100);
+    return cost > 0
+      ? Math.round((Math.round(Number(totals.unrealizedPlPln) * 100) * 10000) / cost) / 100
+      : null;
   }
 
   protected isStale(date: string): boolean {

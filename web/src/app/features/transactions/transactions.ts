@@ -23,13 +23,8 @@ import { readProblemDetails } from '../../core/auth/problem-details';
 import { groupColor } from '../../shared/colors';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/empty-state/empty-state';
-import {
-  formatDate,
-  formatMoney,
-  formatMonth,
-  formatPercent,
-  formatQuantity,
-} from '../../shared/format';
+import { formatDate, formatMoney, formatMonth, formatQuantity } from '../../shared/format';
+import { Gain } from '../../shared/gain/gain';
 import { GroupList } from '../../shared/group-select/group-list';
 import { Money } from '../../shared/money/money';
 import { SectionError } from '../../shared/section-error/section-error';
@@ -72,6 +67,7 @@ function toNumber(value: number | string | null | undefined): number | null {
   imports: [
     EmptyState,
     MatButtonModule,
+    Gain,
     MatIconModule,
     MatMenuModule,
     MatPaginatorModule,
@@ -296,7 +292,6 @@ export class Transactions {
   protected readonly transactionTypeLabel = transactionTypeLabel;
   protected readonly transactionTypeIcon = transactionTypeIcon;
   protected readonly transactionTypeSign = transactionTypeSign;
-  protected readonly formatPercent = formatPercent;
   protected readonly groupColor = groupColor;
   protected readonly sellType = TRANSACTION_TYPE_SELL;
   protected readonly separator = '·';

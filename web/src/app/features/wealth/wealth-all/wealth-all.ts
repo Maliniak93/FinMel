@@ -1,5 +1,5 @@
 import type { ComponentType } from '@angular/cdk/portal';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -11,9 +11,10 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 
-import { formatDate, formatPercent } from '../../../shared/format';
+import { formatDate } from '../../../shared/format';
 import { groupColor } from '../../../shared/colors';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
+import { Gain } from '../../../shared/gain/gain';
 import { GroupList } from '../../../shared/group-select/group-list';
 import { Money } from '../../../shared/money/money';
 import { SectionError } from '../../../shared/section-error/section-error';
@@ -33,6 +34,7 @@ import {
   sumPln,
   type WealthFlag,
   type WealthRow,
+  type WealthType,
 } from '../wealth-data';
 
 interface NewAssetEntry {
@@ -62,6 +64,7 @@ const FLAG_VIEWS: Record<WealthFlag, FlagView> = {
   selector: 'app-wealth-all',
   imports: [
     EmptyState,
+    Gain,
     MatButtonModule,
     MatFormFieldModule,
     MatIconModule,
@@ -87,9 +90,20 @@ export class WealthAll {
   protected readonly search = signal('');
   protected readonly groupFilter = signal('all');
 
+  protected readonly expanded = linkedSignal<string, ReadonlySet<WealthType>>({
+    source: () => this.search().trim().toLowerCase(),
+    computation: (term) =>
+      term === ''
+        ? new Set<WealthType>()
+        : new Set(
+            untracked(() => this.data.rows())
+              .filter((row) => row.name.toLowerCase().includes(term))
+              .map((row) => row.type),
+          ),
+  });
+
   protected readonly groups = this.groupList.groups;
   protected readonly formatDate = formatDate;
-  protected readonly formatPercent = formatPercent;
   protected readonly groupColor = groupColor;
   protected readonly flagViews = FLAG_VIEWS;
 
@@ -154,6 +168,20 @@ export class WealthAll {
       open: () => this.openDialog(MetalFormDialog, '560px', {}),
     },
   ];
+
+  protected isExpanded(type: WealthType): boolean {
+    return this.expanded().has(type);
+  }
+
+  protected toggle(type: WealthType): void {
+    this.expanded.update((current) => {
+      const next = new Set(current);
+      if (!next.delete(type)) {
+        next.add(type);
+      }
+      return next;
+    });
+  }
 
   protected onSearch(event: Event): void {
     this.search.set((event.target as HTMLInputElement).value);

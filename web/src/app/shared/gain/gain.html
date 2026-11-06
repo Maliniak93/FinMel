@@ -1,0 +1,10 @@
+@if (present()) {
+  <span class="gain" [class]="'gain gain--' + tone()">
+    <span class="sk-num">{{ text() }}</span>
+    @if (percentText(); as percentText) {
+      <span class="gain__percent sk-num">{{ percentText }}</span>
+    }
+  </span>
+} @else {
+  <span class="gain gain--empty">—</span>
+}

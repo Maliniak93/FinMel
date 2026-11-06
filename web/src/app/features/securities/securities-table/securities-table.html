@@ -108,20 +108,21 @@
       <th mat-header-cell *matHeaderCellDef>{{ 'securities.columns.gain' | transloco }}</th>
       <td mat-cell *matCellDef="let holding">
         @if (gainAmount(holding); as gain) {
-          <app-money kind="change" [amount]="gain.value" [currency]="gain.currency" />
-          @if (holding.unrealizedPlPln !== null && holding.unrealizedPlPercent !== null) {
-            <span class="securities-table__percent">
-              ({{ formatPercent(holding.unrealizedPlPercent) }})
-            </span>
-          }
+          <app-gain
+            [amount]="gain.value"
+            [percent]="
+              holding.unrealizedPlPln === null ? null : toNumber(holding.unrealizedPlPercent)
+            "
+            [currency]="gain.currency"
+          />
         } @else {
           <app-money [amount]="null" />
         }
       </td>
       <td mat-footer-cell *matFooterCellDef>
-        <app-money
-          kind="change"
+        <app-gain
           [amount]="toNumber(holdingsResource.value().totals.unrealizedPlPln)"
+          [percent]="totalsPercent(holdingsResource.value().totals)"
         />
       </td>
     </ng-container>

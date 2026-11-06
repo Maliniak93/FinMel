@@ -74,6 +74,21 @@
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
+.wealth-all__toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.wealth-all__total-gain {
+  font-size: 1rem;
+}
+
 .wealth-all__section-link {
   margin-left: 12px;
   font-weight: 400;

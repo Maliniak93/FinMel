@@ -99,10 +99,7 @@
       <div class="transactions-page__kpi">
         <dt>{{ 'transactions.kpi.profit' | transloco }}</dt>
         <dd>
-          <app-money kind="change" [amount]="profit()?.amountPln" />
-          @if (profit()?.percent; as percent) {
-            <span class="sk-num">({{ formatPercent(percent) }})</span>
-          }
+          <app-gain [amount]="profit()?.amountPln" [percent]="profit()?.percent" />
         </dd>
       </div>
       <div class="transactions-page__kpi">
