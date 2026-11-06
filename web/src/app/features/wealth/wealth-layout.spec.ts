@@ -3,8 +3,9 @@ import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
+import { restoreEnglish, switchLanguage } from '../../../testing/i18n';
 import { readStylesheet } from '../../../testing/stylesheet';
-import { mockWealthApi } from '../../../testing/wealth-fixtures';
+import { account, mockWealthApi, wealthApiData } from '../../../testing/wealth-fixtures';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
@@ -33,7 +34,10 @@ describe('WealthLayout', () => {
     reportingClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => fetchSpy.mockRestore());
+  afterEach(async () => {
+    fetchSpy.mockRestore();
+    await restoreEnglish();
+  });
 
   beforeEach(async () => {
     fetchSpy = mockWealthApi();
@@ -106,5 +110,46 @@ describe('WealthLayout', () => {
     expect(captions[5]).toContain(formatMoney(1000));
     expect(captions[6]).toContain(formatMoney(14000));
     expect(captions[7]).toContain(formatMoney(3000));
+  });
+
+  it('shows the note under the bank tab only with an off-wealth bank account', async () => {
+    const data = wealthApiData();
+    data.accounts.push(
+      account({
+        id: '56565656-5656-5656-5656-565656565656',
+        name: 'Revolut ROR',
+        type: 2,
+        cashBalance: 300,
+        outsideNetWorth: true,
+        groupId: null,
+        cashAssetId: 'b5656565-5656-5656-5656-565656565656',
+      }),
+    );
+    fetchSpy.mockRestore();
+    fetchSpy = mockWealthApi({ data });
+
+    await switchLanguage(harness.fixture, 'pl');
+    await harness.navigateByUrl('/wealth/cash', WealthLayout);
+    const element = harness.routeNativeElement as HTMLElement;
+    const bankTab = () => element.querySelectorAll<HTMLAnchorElement>('nav a')[2];
+
+    await vi.waitFor(() => {
+      harness.detectChanges();
+      expect(bankTab().textContent).toContain(formatMoney(45000));
+    });
+    expect(bankTab().textContent).toContain('bez kont poza majątkiem');
+  });
+
+  it('shows no note under the bank tab without an off-wealth bank account', async () => {
+    await switchLanguage(harness.fixture, 'pl');
+    await harness.navigateByUrl('/wealth/cash', WealthLayout);
+    const element = harness.routeNativeElement as HTMLElement;
+    const bankTab = () => element.querySelectorAll<HTMLAnchorElement>('nav a')[2];
+
+    await vi.waitFor(() => {
+      harness.detectChanges();
+      expect(bankTab().textContent).toContain(formatMoney(45000));
+    });
+    expect(bankTab().textContent).not.toContain('bez kont poza majątkiem');
   });
 });

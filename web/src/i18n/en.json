@@ -57,6 +57,7 @@
   },
   "wealth": {
     "tabsLabel": "Asset types",
+    "bankOutsideNote": "excluding off-wealth accounts",
     "search": "Search",
     "groupFilter": "Group: {{ name }}",
     "groupAll": "All",
@@ -1263,11 +1264,6 @@
     "interestCredited": "Interest credited",
     "interestDue": "Interest to settle",
     "hasOpenDeposit": "An open deposit will return to this account",
-    "current": {
-      "title": "Current accounts",
-      "sum": "Sum in PLN",
-      "incomplete": "incomplete sum"
-    },
     "interest": {
       "settle": "Settle interest",
       "settleMonths": "Settle interest ({{ count }} months due)",

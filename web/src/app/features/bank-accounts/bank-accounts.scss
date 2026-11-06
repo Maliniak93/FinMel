@@ -18,15 +18,6 @@
   width: 100%;
 }
 
-.bank-accounts__current {
-  margin-top: 32px;
-}
-
-.bank-accounts__current-table {
-  @include ruled.ruled-table;
-  width: 100%;
-}
-
 .bank-accounts__num {
   text-align: right;
 }

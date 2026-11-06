@@ -61,29 +61,31 @@ const ror = bankAccountResponse({
   id: '66666666-6666-6666-6666-666666666666',
   name: 'mBank ROR',
   cashBalance: 3200,
-  cashBalancePln: 3200,
   outsideNetWorth: true,
   bank: { variant: BANK_VARIANT.Current, bankName: 'mBank', annualInterestRatePercent: 0 },
 });
 
-const revolut = bankAccountResponse({
-  id: '77777777-7777-7777-7777-777777777777',
-  name: 'Revolut EUR',
-  currency: 'EUR',
-  cashBalance: 100,
-  cashBalancePln: 400,
+const erste = bankAccountResponse({
+  id: '44444444-4444-4444-4444-444444444444',
+  name: 'Erste Platinum',
+  cashBalance: 6400,
   outsideNetWorth: true,
-  bank: { variant: BANK_VARIANT.Current, bankName: 'Revolut', annualInterestRatePercent: 0 },
+  bank: {
+    variant: BANK_VARIANT.Current,
+    bankName: 'Erste',
+    annualInterestRatePercent: 0,
+    interestDue: true,
+    duePeriodCount: 1,
+  },
 });
 
-const revolutUsd = bankAccountResponse({
-  id: '88888888-8888-8888-8888-888888888888',
-  name: 'Revolut USD',
-  currency: 'USD',
-  cashBalance: 50,
-  cashBalancePln: null,
+const oldFlagged = bankAccountResponse({
+  id: '12121212-1212-1212-1212-121212121212',
+  name: 'Old flagged',
+  isArchived: true,
+  cashBalance: 0,
   outsideNetWorth: true,
-  bank: { variant: BANK_VARIANT.Current, bankName: 'Revolut', annualInterestRatePercent: 0 },
+  bank: { variant: BANK_VARIANT.Current, bankName: 'Erste', annualInterestRatePercent: 0 },
 });
 
 describe('BankAccounts', () => {
@@ -338,59 +340,92 @@ describe('BankAccounts', () => {
     }
   });
 
-  function currentSection(): HTMLElement | null {
-    return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
-      '[data-testid="current-accounts"]',
-    );
-  }
-
   function mainTable(): HTMLElement {
     return (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
       'table.bank-accounts__table',
     )!;
   }
 
-  it('konta bieżące section', async () => {
-    await setup([mBank, ror, revolut]);
+  function rowTexts(): string[] {
+    return Array.from(mainTable().querySelectorAll<HTMLElement>('tbody tr')).map(
+      (row) => row.textContent ?? '',
+    );
+  }
+
+  function rowFor(name: string): HTMLElement | undefined {
+    return Array.from(mainTable().querySelectorAll<HTMLElement>('tbody tr')).find((row) =>
+      (row.textContent ?? '').includes(name),
+    );
+  }
+
+  it('shows an off-wealth account in the single table', async () => {
+    await setup([ror, nest]);
     await switchLanguage(fixture, 'pl');
 
-    const section = currentSection();
-    expect(section).not.toBeNull();
-    expect(section!.textContent).toContain('Konta bieżące');
-    expect(section!.textContent).toContain('mBank ROR');
-    expect(section!.textContent).toContain('Revolut EUR');
-    expect(section!.textContent).toContain(formatMoney(3600, 'PLN'));
-    expect(section!.textContent).not.toContain('niepełna suma');
-
-    expect(mainTable().textContent).toContain('mBank');
-    expect(mainTable().textContent).not.toContain('mBank ROR');
-    expect(mainTable().textContent).not.toContain('Revolut EUR');
-  });
-
-  it('marks the sum of the konta bieżące section incomplete when an account has no PLN value', async () => {
-    await setup([mBank, ror, revolutUsd]);
-    await switchLanguage(fixture, 'pl');
-
-    expect(currentSection()!.textContent).toContain('Revolut USD');
-    expect(currentSection()!.textContent).toContain('niepełna suma');
-  });
-
-  it('no section without flagged accounts', async () => {
-    await setup([mBank, nest]);
-    await switchLanguage(fixture, 'pl');
-
-    expect(currentSection()).toBeNull();
+    expect(rowTexts()).toHaveLength(2);
+    expect(rowTexts()[0]).toContain('mBank ROR');
+    expect(rowTexts()[1]).toContain('Nest Oszczędnościowe');
     expect(pageText()).not.toContain('Konta bieżące');
+    expect(pageText()).not.toContain('Suma w PLN');
+    expect(
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid="current-accounts"]'),
+    ).toBeNull();
   });
 
-  it('variant chips do not filter the section', async () => {
-    await setup([mBank, nest, ror]);
+  it('labels an off-wealth row first in the status cell', async () => {
+    await setup([erste, mBank]);
+    await switchLanguage(fixture, 'pl');
+
+    const chips = Array.from(rowFor('Erste Platinum')!.querySelectorAll('app-status-chip')).map(
+      (chip) => chip.textContent ?? '',
+    );
+    expect(chips[0]).toContain('Poza majątkiem');
+    expect(chips[1]).toContain('Odsetki do rozliczenia');
+    expect(rowFor('mBank')!.textContent).not.toContain('Poza majątkiem');
+  });
+
+  it('variant chips filter off-wealth accounts too', async () => {
+    await setup([ror, nest]);
+    await switchLanguage(fixture, 'pl');
+
+    await pickVariant('Bieżące');
+    expect(rowTexts()).toHaveLength(1);
+    expect(rowTexts()[0]).toContain('mBank ROR');
+
+    await pickVariant('Oszczędnościowe');
+    expect(rowTexts()).toHaveLength(1);
+    expect(rowTexts()[0]).toContain('Nest Oszczędnościowe');
+
+    await pickVariant('Wszystkie');
+    expect(rowTexts()).toHaveLength(2);
+  });
+
+  it('shows the no-match message for a variant with no account', async () => {
+    await setup([ror, mBank]);
     await switchLanguage(fixture, 'pl');
 
     await pickVariant('Oszczędnościowe');
 
-    expect(currentSection()!.textContent).toContain('mBank ROR');
-    expect(currentSection()!.textContent).toContain(formatMoney(3200, 'PLN'));
-    expect(mainTable().textContent).not.toContain('mBank ROR');
+    expect(pageText()).toContain('Żadne konto bankowe nie pasuje do filtra.');
+    expect(pageText()).not.toContain('mBank ROR');
+  });
+
+  it('archived off-wealth row keeps its label', async () => {
+    await setup([mBank, oldFlagged]);
+    await switchLanguage(fixture, 'pl');
+    expect(pageText()).not.toContain('Old flagged');
+
+    component['includeArchived'].set(true);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const row = rowFor('Old flagged')!;
+    expect(row.getAttribute('data-archived')).toBe('true');
+    const chips = Array.from(row.querySelectorAll('app-status-chip')).map(
+      (chip) => chip.textContent ?? '',
+    );
+    expect(chips).toHaveLength(2);
+    expect(chips[0]).toContain('Poza majątkiem');
+    expect(chips[1]).toContain('Zarchiwizowany');
   });
 });
