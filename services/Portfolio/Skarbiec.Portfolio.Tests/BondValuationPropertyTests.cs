@@ -1,4 +1,5 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
 using Skarbiec.Portfolio.Features.Bonds;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -24,7 +25,7 @@ public sealed class BondValuationPropertyTests
 
     [Theory]
     [MemberData(nameof(Seeds))]
-    public void Today_AnyTypeRatesAndDate_KeepsGrossAboveNominalAndNetBelowGross(int seed)
+    public void Today_AnyTypeRatesAndDate_KeepsGrossAboveBookAndNetBelowGrossPlusDiscount(int seed)
     {
         var random = new Random(seed);
         var type = AllTypes[random.Next(AllTypes.Length)];
@@ -44,14 +45,16 @@ public sealed class BondValuationPropertyTests
         var catalog = new Dictionary<int, decimal>();
         var rates = new List<decimal>();
         var settlements = new List<Skarbiec.Portfolio.Data.BondInterestSettlement>();
+        var bookValue = bondCount * bond.PurchasePricePerBond;
         foreach (var p in periods.Where(p => p.Index <= period.Index))
         {
             var rate = BondSchedule.IsFixedRate(type) || p.Index == 1 ? bond.FirstPeriodRatePercent : random.Next(0, 2_001) / 100m;
             rates.Add(rate);
             if (p.Index < period.Index)
             {
-                var gross = BondInterestMath.Settle(type, rates, p.Start, p.End, bondCount, taxExempt).Gross;
+                var gross = BondSettlementMath.Settle(type, rates, p.Start, p.End, bondCount, taxExempt).Gross;
                 settlements.Add(BondValuationTests.NewSettlement(bond, p.Index, rate, gross));
+                bookValue += BondSchedule.IsCoupon(type) ? 0m : gross;
             }
             else
             {
@@ -59,14 +62,10 @@ public sealed class BondValuationPropertyTests
             }
         }
 
-        var outcome = BondValuation.Today(bond, taxExempt, settlements, catalog, today);
+        var outcome = BondValuation.Today(bond, bookValue, taxExempt, settlements, catalog, today);
 
         var estimate = Assert.IsType<BondEstimateResponse>(outcome.Estimate);
-        if (!BondSchedule.IsCoupon(type))
-        {
-            Assert.True(estimate.GrossValue >= bondCount * 100m);
-        }
-
-        Assert.True(estimate.NetValue <= estimate.GrossValue);
+        Assert.True(estimate.GrossValue >= bookValue);
+        Assert.True(estimate.NetValue <= estimate.GrossValue + bondCount * (100m - bond.PurchasePricePerBond));
     }
 }

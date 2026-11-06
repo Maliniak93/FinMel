@@ -1,4 +1,5 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
 using Skarbiec.Portfolio.Data;
 
 namespace Skarbiec.Portfolio.Features.Bonds;

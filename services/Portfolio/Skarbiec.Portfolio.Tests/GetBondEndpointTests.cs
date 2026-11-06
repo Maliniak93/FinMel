@@ -153,6 +153,21 @@ public sealed class GetBondEndpointTests(SkarbiecContainersFixture containers) :
     }
 
     [Fact]
+    public async Task Estimate_GrossValue_IsBookPlusUnsettled()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(BondPurchaseDayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var request = NewBondRequest(bondCount: 10, purchasePricePerBond: 90m);
+        var (accountId, bond) = await client.CreateAccountWithBondAsync(cancellationToken, request);
+
+        var body = await client.GetBondAsync(bond.AssetId, cancellationToken);
+
+        Assert.Equal(900m, body.BookValue);
+        Assert.Equal(body.BookValue, body.Estimate!.GrossValue);
+    }
+
+    [Fact]
     public async Task Get_MarketDataDown_EstimateNull()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

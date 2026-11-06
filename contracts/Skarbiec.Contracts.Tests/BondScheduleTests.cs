@@ -1,7 +1,6 @@
-using Skarbiec.Contracts;
-using Skarbiec.Portfolio.Features.Bonds;
+using Skarbiec.Contracts.Bonds;
 
-namespace Skarbiec.Portfolio.Tests;
+namespace Skarbiec.Contracts.Tests;
 
 public sealed class BondScheduleTests
 {

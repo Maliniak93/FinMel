@@ -1,4 +1,5 @@
 using Skarbiec.Contracts;
+using Skarbiec.Contracts.Bonds;
 using Skarbiec.Portfolio.Features.Bonds;
 
 namespace Skarbiec.Portfolio.Tests;
