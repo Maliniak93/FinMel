@@ -13,6 +13,7 @@ import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-for
 import { Planning } from './planning';
 import { RecurringExpenseFormDialog } from './recurring-expense-form-dialog/recurring-expense-form-dialog';
 import { RecurringIncomeFormDialog } from './recurring-income-form-dialog/recurring-income-form-dialog';
+import { SettleExpenseDialog } from './settle-expense-dialog/settle-expense-dialog';
 import { SettleOccurrenceDialog } from './settle-occurrence-dialog/settle-occurrence-dialog';
 
 const accountId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -964,7 +965,23 @@ describe('Planning', () => {
     amount: number,
     extra: Record<string, unknown> = {},
   ): Record<string, unknown> {
-    return { id: `one-off-expense-${name}`, name, date, amount, inMonth: true, ...extra };
+    return {
+      id: `one-off-expense-${name}`,
+      name,
+      date,
+      amount,
+      inMonth: true,
+      accountId: null,
+      accountName: null,
+      status: 'Pending',
+      currency: null,
+      actualAmount: null,
+      actualDate: null,
+      actualAmountPln: null,
+      difference: null,
+      withdrawalCreated: false,
+      ...extra,
+    };
   }
 
   function deleteRequests(): Request[] {
@@ -1049,7 +1066,7 @@ describe('Planning', () => {
     });
   });
 
-  it('one-off expense has no settlement', async () => {
+  it('pending one-off expense is settleable', async () => {
     responses['2026-10'] = month(
       {},
       {
@@ -1066,8 +1083,105 @@ describe('Planning', () => {
     expect(payments[0].textContent).toContain('Przegląd auta');
     expect(payments[0].textContent).toContain(formatMoney(1200, 'PLN'));
     expect(payments[0].querySelector('[data-testid="settle-occurrence"]')).toBeNull();
-    expect(payments[0].querySelector('[data-testid="occurrence-status"]')).toBeNull();
     expect(rows('occurrence-row')).toHaveLength(0);
+
+    payments[0].querySelector<HTMLElement>('[data-testid="settle-expense"]')!.click();
+    expect(TestBed.inject(MatDialog).open).toHaveBeenCalledWith(
+      SettleExpenseDialog,
+      expect.objectContaining({
+        data: { oneOffExpense: expect.objectContaining({ id: 'one-off-expense-Przegląd auta' }) },
+      }),
+    );
+  });
+
+  it('undoes a settled expense payment and a settled one-off expense', async () => {
+    const settled = {
+      status: 'Settled',
+      actualAmount: 2350,
+      actualDate: '2026-10-06',
+      actualAmountPln: 2350,
+      difference: -50,
+      withdrawalCreated: true,
+    };
+    responses['2026-10'] = month(
+      {},
+      {
+        payments: [
+          {
+            recurringExpenseId: 'expense-Czynsz',
+            nominalMonth: '2026-10',
+            date: '2026-10-05',
+            name: 'Czynsz',
+            amount: 2400,
+            accountId,
+            accountName: 'mBank ROR',
+            plannedAccountId: accountId,
+            currency: 'PLN',
+            ...settled,
+          },
+        ],
+        oneOffs: [oneOffExpense('Abonament', '2026-10-08', 100, settled)],
+      },
+    );
+    await setup();
+    vi.mocked(TestBed.inject(MatDialog).open).mockReturnValue({
+      afterClosed: () => of(true),
+    } as never);
+
+    for (const undo of Array.from(
+      element().querySelectorAll<HTMLElement>('[data-testid="undo-expense"]'),
+    )) {
+      undo.click();
+    }
+
+    await vi.waitFor(() => {
+      const urls = deleteRequests().map((request) => request.url);
+      expect(
+        urls.some((url) =>
+          url.includes('/recurring-expenses/expense-Czynsz/payments/2026-10/settlement'),
+        ),
+      ).toBe(true);
+      expect(
+        urls.some((url) => url.includes('/one-off-expenses/one-off-expense-Abonament/settlement')),
+      ).toBe(true);
+    });
+  });
+
+  it('settled one-off expense is locked', async () => {
+    responses['2026-10'] = month(
+      {},
+      {
+        oneOffs: [
+          oneOffExpense('Abonament', '2026-10-08', 100, {
+            status: 'Settled',
+            actualAmount: 25,
+            actualDate: '2026-10-08',
+            actualAmountPln: 100,
+            difference: -75,
+            withdrawalCreated: true,
+          }),
+          oneOffExpense('Przegląd auta', '2026-10-10', 1200),
+        ],
+      },
+    );
+    await setup();
+
+    const [settled, pending] = rows('one-off-expense-row');
+    const has = (row: HTMLElement, testId: string): boolean =>
+      row.querySelector(`[data-testid="${testId}"]`) !== null;
+
+    expect(settled.querySelector('[data-testid="expense-status"]')!.textContent).toMatch(
+      /settled/i,
+    );
+    expect(has(settled, 'edit-expense-settlement')).toBe(true);
+    expect(has(settled, 'undo-expense')).toBe(true);
+    expect(has(settled, 'settle-expense')).toBe(false);
+    expect(has(settled, 'edit-one-off-expense')).toBe(false);
+    expect(has(settled, 'delete-one-off-expense')).toBe(false);
+
+    expect(has(pending, 'settle-expense')).toBe(true);
+    expect(has(pending, 'edit-one-off-expense')).toBe(true);
+    expect(has(pending, 'delete-one-off-expense')).toBe(true);
   });
 
   it('locks a settled one-off income', async () => {

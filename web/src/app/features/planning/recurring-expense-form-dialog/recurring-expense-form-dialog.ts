@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import {
   AbstractControl,
@@ -14,9 +14,11 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
 
 import {
+  getApiPortfolioAccounts,
   postApiPortfolioOneOffExpenses,
   postApiPortfolioRecurringExpenses,
   putApiPortfolioOneOffExpensesById,
@@ -59,6 +61,7 @@ export type RecurringExpenseFormDialogData =
     MatFormFieldModule,
     MatInputModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
     RecurrenceRuleFields,
     TranslocoPipe,
   ],
@@ -122,7 +125,26 @@ export class RecurringExpenseFormDialog {
       [Validators.required, Validators.min(1), Validators.max(31)],
     ],
     shift: [this.editing?.shift ?? (SHIFT.None as number)],
+    accountId: [this.prefill?.accountId ?? (null as string | null)],
   });
+
+  protected readonly accountsResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioAccounts({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('planning.form.accountsLoadFailed'),
+        );
+      }
+      return (result.data ?? []).filter(
+        (account) => !account.isArchived || account.id === this.prefill?.accountId,
+      );
+    },
+  });
+
+  protected readonly accounts = computed(() =>
+    this.accountsResource.hasValue() ? this.accountsResource.value() : [],
+  );
 
   protected readonly dayKind = toSignal(this.form.controls.dayKind.valueChanges, {
     initialValue: this.form.controls.dayKind.value,
@@ -183,6 +205,7 @@ export class RecurringExpenseFormDialog {
       name: values.name.trim(),
       amount: Number(values.amount),
       date: toDateOnly(values.date!),
+      accountId: values.accountId,
     };
     return this.editingOneOff
       ? putApiPortfolioOneOffExpensesById({ path: { id: this.editingOneOff.id }, body })
@@ -201,6 +224,7 @@ export class RecurringExpenseFormDialog {
       dayKind: values.dayKind,
       dayOfMonth: usesDay ? Number(values.dayOfMonth) : null,
       shift: usesDay ? values.shift : SHIFT.None,
+      accountId: values.accountId,
     };
     return this.editing
       ? putApiPortfolioRecurringExpensesById({
@@ -249,6 +273,14 @@ export class RecurringExpenseFormDialog {
         server: translate('planning.expenses.errors.duplicateName'),
       });
       this.form.controls.name.markAsTouched();
+      return;
+    }
+
+    if (problem.errorCode === 'Conflict.AccountArchived') {
+      this.form.controls.accountId.setErrors({
+        server: translate('planning.errors.accountArchived'),
+      });
+      this.form.controls.accountId.markAsTouched();
       return;
     }
 

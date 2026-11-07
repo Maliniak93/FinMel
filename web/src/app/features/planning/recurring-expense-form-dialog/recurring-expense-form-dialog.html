@@ -74,6 +74,31 @@
       }
     </mat-form-field>
 
+    <mat-form-field
+      appearance="outline"
+      floatLabel="always"
+      class="recurring-expense-form-dialog__field"
+    >
+      <mat-label>{{ 'planning.account' | transloco }}</mat-label>
+      <mat-select formControlName="accountId">
+        <mat-option [value]="null">{{ 'planning.form.noAccount' | transloco }}</mat-option>
+        @for (account of accounts(); track account.id) {
+          <mat-option [value]="account.id"
+            >{{ account.name }} · {{ account.currency }}
+            @if (account.outsideNetWorth) {
+              · {{ 'accounts.outsideNetWorthLabel' | transloco }}
+            }
+          </mat-option>
+        }
+      </mat-select>
+      @if (accountsResource.error(); as loadError) {
+        <mat-hint>{{ loadError.message }}</mat-hint>
+      }
+      @if (form.controls.accountId.hasError('server')) {
+        <mat-error>{{ form.controls.accountId.getError('server') }}</mat-error>
+      }
+    </mat-form-field>
+
     @if (oneOff()) {
       <mat-form-field
         appearance="outline"

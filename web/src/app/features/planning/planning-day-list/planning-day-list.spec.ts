@@ -199,4 +199,130 @@ describe('PlanningDayList', () => {
     expect(lines[1].textContent).toContain(formatMoney(-1500, 'PLN'));
     expect(lines[1].innerHTML).toContain('var(--sk-g-none)');
   });
+
+  function expensePayment(extra: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      recurringExpenseId: 'expense-Czynsz',
+      nominalMonth: '2026-10',
+      date: '2026-10-05',
+      name: 'Czynsz',
+      amount: 2400,
+      status: 'Pending',
+      accountId,
+      accountName: 'mBank ROR',
+      plannedAccountId: accountId,
+      currency: 'PLN',
+      actualAmount: null,
+      actualDate: null,
+      actualAmountPln: null,
+      difference: null,
+      withdrawalCreated: false,
+      ...extra,
+    };
+  }
+
+  const settledPayment = {
+    status: 'Settled',
+    actualAmount: 2350,
+    actualDate: '2026-10-06',
+    actualAmountPln: 2350,
+    difference: -50,
+    withdrawalCreated: true,
+  };
+
+  it('shows settle for a pending expense payment', async () => {
+    const root = await render(
+      monthData([], {
+        payments: [expensePayment()],
+        oneOffs: [
+          {
+            id: 'one-off-expense-1',
+            name: 'Abonament',
+            date: '2026-10-07',
+            amount: 100,
+            inMonth: true,
+            accountId: null,
+            accountName: null,
+            status: 'Pending',
+            currency: null,
+            actualAmount: null,
+            actualDate: null,
+            actualAmountPln: null,
+            difference: null,
+            withdrawalCreated: false,
+          },
+        ],
+      }),
+    );
+    const settleRequests: unknown[] = [];
+    fixture.componentInstance.settleExpense.subscribe((row) => settleRequests.push(row));
+
+    const rows = all(root, 'expense-payment-row');
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.querySelector('[data-testid="settle-expense"]')).not.toBeNull();
+      expect(row.querySelector('[data-testid="edit-expense-settlement"]')).toBeNull();
+      expect(row.querySelector('[data-testid="undo-expense"]')).toBeNull();
+    }
+
+    rows[0].querySelector<HTMLElement>('[data-testid="settle-expense"]')!.click();
+    rows[1].querySelector<HTMLElement>('[data-testid="settle-expense"]')!.click();
+
+    expect(settleRequests).toEqual([
+      expect.objectContaining({
+        oneOff: false,
+        item: expect.objectContaining({ recurringExpenseId: 'expense-Czynsz' }),
+      }),
+      expect.objectContaining({
+        oneOff: true,
+        item: expect.objectContaining({ id: 'one-off-expense-1' }),
+      }),
+    ]);
+  });
+
+  it('shows settled expense', async () => {
+    const root = await render(monthData([], { payments: [expensePayment(settledPayment)] }));
+
+    const [row] = all(root, 'expense-payment-row');
+    expect(row.querySelector('[data-testid="expense-status"]')!.textContent).toMatch(/settled/i);
+    expect(row.querySelector('[data-testid="expense-actual"]')!.textContent).toContain(
+      formatMoney(2350, 'PLN'),
+    );
+    expect(row.querySelector('[data-testid="expense-difference"]')!.textContent).toContain(
+      formatMoney(-50, 'PLN'),
+    );
+    expect(row.querySelector('[data-testid="settle-expense"]')).toBeNull();
+    expect(row.querySelector('[data-testid="edit-expense-settlement"]')).not.toBeNull();
+    expect(row.querySelector('[data-testid="undo-expense"]')).not.toBeNull();
+  });
+
+  it('undo calls the endpoint', async () => {
+    const root = await render(monthData([], { payments: [expensePayment(settledPayment)] }));
+    const undone: unknown[] = [];
+    fixture.componentInstance.undoExpense.subscribe((row) => undone.push(row));
+
+    all(root, 'undo-expense')[0].click();
+
+    expect(undone).toEqual([
+      expect.objectContaining({
+        oneOff: false,
+        item: expect.objectContaining({ recurringExpenseId: 'expense-Czynsz' }),
+      }),
+    ]);
+  });
+
+  it('edit opens a filled dialog', async () => {
+    const root = await render(monthData([], { payments: [expensePayment(settledPayment)] }));
+    const requests: unknown[] = [];
+    fixture.componentInstance.settleExpense.subscribe((row) => requests.push(row));
+
+    all(root, 'edit-expense-settlement')[0].click();
+
+    expect(requests).toEqual([
+      expect.objectContaining({
+        oneOff: false,
+        item: expect.objectContaining({ status: 'Settled', actualAmount: 2350 }),
+      }),
+    ]);
+  });
 });

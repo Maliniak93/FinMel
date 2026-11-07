@@ -7,7 +7,9 @@ import type {
   AssetGroupResponse,
   BondResponse,
   DepositResponse,
+  ExpensePaymentResponse,
   IncomeOccurrenceResponse,
+  OneOffExpenseResponse,
   OneOffIncomeResponse,
   PlanningMonthResponse,
 } from '../../../api/portfolio';
@@ -22,6 +24,10 @@ export type IncomeRow =
   | { oneOff: false; key: string; item: IncomeOccurrenceResponse }
   | { oneOff: true; key: string; item: OneOffIncomeResponse };
 
+export type ExpenseRow =
+  | { oneOff: false; key: string; item: ExpensePaymentResponse }
+  | { oneOff: true; key: string; item: OneOffExpenseResponse };
+
 type IncomeStatus = 'pending' | 'overdue' | 'settled' | 'skipped';
 
 interface StatusView {
@@ -32,7 +38,7 @@ interface StatusView {
 
 type DayRow =
   | { kind: 'income'; key: string; row: IncomeRow }
-  | { kind: 'payment'; key: string; name: string; amount: number | string; oneOff: boolean }
+  | { kind: 'payment'; key: string; row: ExpenseRow }
   | { kind: 'deadline'; key: string; deadline: AssetDeadline };
 
 interface Day {
@@ -81,6 +87,8 @@ export class PlanningDayList {
   readonly settle = output<IncomeRow>();
   readonly skip = output<IncomeOccurrenceResponse>();
   readonly undo = output<IncomeRow>();
+  readonly settleExpense = output<ExpenseRow>();
+  readonly undoExpense = output<ExpenseRow>();
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
@@ -120,9 +128,11 @@ export class PlanningDayList {
       add(payment.date, {
         kind: 'payment',
         key: `payment-${payment.recurringExpenseId}-${payment.nominalMonth}`,
-        name: payment.name,
-        amount: payment.amount,
-        oneOff: false,
+        row: {
+          oneOff: false,
+          key: payment.recurringExpenseId + payment.nominalMonth,
+          item: payment,
+        },
       });
     }
 
@@ -130,9 +140,7 @@ export class PlanningDayList {
       add(oneOff.date, {
         kind: 'payment',
         key: `payment-one-off-${oneOff.id}`,
-        name: oneOff.name,
-        amount: oneOff.amount,
-        oneOff: true,
+        row: { oneOff: true, key: `one-off-${oneOff.id}`, item: oneOff },
       });
     }
 
@@ -168,6 +176,10 @@ export class PlanningDayList {
       return STATUS_VIEWS.skipped;
     }
     return item.overdue ? STATUS_VIEWS.overdue : STATUS_VIEWS.pending;
+  }
+
+  protected expenseStatusOf(item: Pick<ExpensePaymentResponse, 'status'>): StatusView {
+    return item.status === 'Settled' ? STATUS_VIEWS.settled : STATUS_VIEWS.pending;
   }
 
   protected kindKey(kind: AssetDeadline['kind']): string {
