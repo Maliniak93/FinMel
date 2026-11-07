@@ -132,6 +132,42 @@ internal sealed class PlanningForecast
             .ToList();
     }
 
+    public bool IsPaymentSettled(Guid recurringExpenseId, YearMonth nominalMonth) =>
+        settledPaymentKeys.Contains((recurringExpenseId, nominalMonth.FirstDay));
+
+    public IReadOnlyList<ExpensePaymentResponse> OverduePayments(DateOnly today)
+    {
+        if (Plans.Count == 0)
+        {
+            return [];
+        }
+
+        var last = YearMonth.From(today);
+        var overdue = new List<ExpensePaymentResponse>();
+        var seen = new HashSet<(Guid, string)>();
+        for (var month = Plans.Min(p => YearMonth.From(p.Plan.Start)); month <= last; month = month.AddMonths(1))
+        {
+            foreach (var payment in ExpensePaymentsIn(month).Where(p => p.Status == OccurrenceStatus.Pending && p.Date < today))
+            {
+                if (seen.Add((payment.RecurringExpenseId, payment.NominalMonth)))
+                {
+                    overdue.Add(payment);
+                }
+            }
+        }
+
+        return overdue;
+    }
+
+    public IReadOnlyList<OneOffExpenseResponse> OverdueOneOffs(DateOnly today) =>
+        OneOffExpenses
+            .Where(e => !e.IsSettled && e.Date < today)
+            .Select(e => YearMonth.From(e.Date))
+            .Distinct()
+            .SelectMany(month => OneOffExpensesIn(month)
+                .Where(e => e.InMonth && e.Status == OccurrenceStatus.Pending && e.Date < today))
+            .ToList();
+
     public IReadOnlyList<OneOffExpenseResponse> OneOffExpensesIn(YearMonth month) =>
         OneOffExpenses
             .OrderBy(e => e.Date)

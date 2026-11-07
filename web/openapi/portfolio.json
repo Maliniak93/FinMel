@@ -8175,7 +8175,8 @@
       "TodoItemKind": {
         "enum": [
           "OverdueIncome",
-          "UpcomingPayment"
+          "UpcomingPayment",
+          "OverdueExpense"
         ]
       },
       "TodoItemResponse": {
@@ -8186,7 +8187,9 @@
           "amount",
           "currency",
           "daysOverdue",
-          "daysUntil"
+          "daysUntil",
+          "expensePayment",
+          "oneOffExpense"
         ],
         "type": "object",
         "properties": {
@@ -8228,6 +8231,26 @@
               "string"
             ],
             "format": "int32"
+          },
+          "expensePayment": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ExpensePaymentResponse"
+              }
+            ]
+          },
+          "oneOffExpense": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OneOffExpenseResponse"
+              }
+            ]
           }
         }
       },

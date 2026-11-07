@@ -1,10 +1,11 @@
 using System.Text.Json.Serialization;
+using Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningTodo;
 
 public sealed record PlanningTodoResponse
 {
-    /// <summary>In the display order: overdue incomes, upcoming payments.</summary>
+    /// <summary>In the display order: overdue incomes and expenses by date, upcoming payments.</summary>
     public required IReadOnlyList<TodoItemResponse> Items { get; init; }
 
     /// <summary>Days ahead an upcoming payment is listed; 0 means payments are not listed.</summary>
@@ -28,6 +29,12 @@ public sealed record TodoItemResponse
 
     public required int? DaysOverdue { get; init; }
     public required int? DaysUntil { get; init; }
+
+    /// <summary>The unsettled recurring payment of an overdue expense; null for other kinds.</summary>
+    public required ExpensePaymentResponse? ExpensePayment { get; init; }
+
+    /// <summary>The unsettled one-off expense of an overdue expense; null for other kinds.</summary>
+    public required OneOffExpenseResponse? OneOffExpense { get; init; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<TodoItemKind>))]
@@ -35,4 +42,5 @@ public enum TodoItemKind
 {
     OverdueIncome,
     UpcomingPayment,
+    OverdueExpense,
 }

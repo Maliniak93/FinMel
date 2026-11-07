@@ -1,4 +1,4 @@
-import { Component, computed, resource } from '@angular/core';
+import { Component, computed, input, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -16,7 +16,10 @@ import { formatMoney } from '../../../shared/format';
   styleUrl: './cash-card.scss',
 })
 export class CashCard {
+  readonly version = input(0);
+
   protected readonly cashResource = resource({
+    params: () => this.version(),
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioCashPlaces({ signal: abortSignal });
       if (result.error) {

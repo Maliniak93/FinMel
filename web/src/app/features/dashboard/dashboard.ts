@@ -134,6 +134,14 @@ export class Dashboard {
 
   private readonly dialog = inject(MatDialog);
 
+  protected readonly balancesVersion = signal(0);
+
+  protected reloadAfterSettlement(): void {
+    this.dashboardResource.reload();
+    this.historyResource.reload();
+    this.balancesVersion.update((version) => version + 1);
+  }
+
   protected readonly range = signal<ChartRange>('1Y');
 
   private readonly customRange = signal<CustomRange | null>(null);

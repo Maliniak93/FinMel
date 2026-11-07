@@ -281,8 +281,18 @@ internal static class PlanningApi
 
     public const string UpcomingPaymentKind = "UpcomingPayment";
 
+    public const string OverdueExpenseKind = "OverdueExpense";
+
     public sealed record TodoItemView(
-        string Kind, string Name, DateOnly Date, decimal Amount, string Currency, int? DaysOverdue, int? DaysUntil);
+        string Kind,
+        string Name,
+        DateOnly Date,
+        decimal Amount,
+        string Currency,
+        int? DaysOverdue,
+        int? DaysUntil,
+        ExpensePaymentView? ExpensePayment = null,
+        OneOffExpenseView? OneOffExpense = null);
 
     public sealed record TodoView(List<TodoItemView> Items, int PaymentLeadDays);
 

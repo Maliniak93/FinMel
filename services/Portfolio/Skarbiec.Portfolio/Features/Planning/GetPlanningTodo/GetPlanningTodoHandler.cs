@@ -19,9 +19,7 @@ public sealed class GetPlanningTodoHandler(
         var current = YearMonth.From(today);
         var data = await loader.LoadAsync(current, current, cancellationToken);
 
-        var items = new List<TodoItemResponse>();
-
-        items.AddRange(overdueItems.Select(o => new TodoItemResponse
+        var overdueIncomes = overdueItems.Select(o => new TodoItemResponse
         {
             Kind = TodoItemKind.OverdueIncome,
             Name = o.Name,
@@ -29,13 +27,42 @@ public sealed class GetPlanningTodoHandler(
             Amount = o.Amount,
             Currency = o.Currency,
             DaysOverdue = today.DayNumber - o.Date.DayNumber,
-            DaysUntil = null
-        }));
+            DaysUntil = null,
+            ExpensePayment = null,
+            OneOffExpense = null
+        });
+
+        var overdueExpenses = data.Forecast.OverduePayments(today)
+            .Select(p => OverdueExpense(p.Name, p.Date, p.Amount, today, p, null))
+            .Concat(data.Forecast.OverdueOneOffs(today)
+                .Select(e => OverdueExpense(e.Name, e.Date, e.Amount, today, null, e)));
+
+        var items = overdueIncomes
+            .Concat(overdueExpenses)
+            .OrderBy(i => i.Date)
+            .ThenBy(i => i.Kind)
+            .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         items.AddRange(UpcomingPayments(data, today));
 
         return new PlanningTodoResponse { Items = items, PaymentLeadDays = data.PaymentLeadDays };
     }
+
+    private static TodoItemResponse OverdueExpense(
+        string name, DateOnly date, decimal amount, DateOnly today, ExpensePaymentResponse? payment, OneOffExpenseResponse? oneOff) =>
+        new()
+        {
+            Kind = TodoItemKind.OverdueExpense,
+            Name = name,
+            Date = date,
+            Amount = amount,
+            Currency = "PLN",
+            DaysOverdue = today.DayNumber - date.DayNumber,
+            DaysUntil = null,
+            ExpensePayment = payment,
+            OneOffExpense = oneOff
+        };
 
     private static IEnumerable<TodoItemResponse> UpcomingPayments(PlanningMonthData data, DateOnly today)
     {
@@ -55,7 +82,8 @@ public sealed class GetPlanningTodoHandler(
             .SelectMany(p => months
                 .SelectMany(month => ReserveSchedule.PaymentsIn(month, p.Plan))
                 .Where(payment => payment.Date >= today && payment.Date <= until
-                    && p.Expense.InForce(payment.NominalMonth).IntervalMonths > 1)
+                    && p.Expense.InForce(payment.NominalMonth).IntervalMonths > 1
+                    && !data.Forecast.IsPaymentSettled(p.Expense.Id, payment.NominalMonth))
                 .Select(payment => new TodoItemResponse
                 {
                     Kind = TodoItemKind.UpcomingPayment,
@@ -64,7 +92,9 @@ public sealed class GetPlanningTodoHandler(
                     Amount = payment.Amount,
                     Currency = "PLN",
                     DaysOverdue = null,
-                    DaysUntil = payment.Date.DayNumber - today.DayNumber
+                    DaysUntil = payment.Date.DayNumber - today.DayNumber,
+                    ExpensePayment = null,
+                    OneOffExpense = null
                 }))
             .OrderBy(i => i.Date)
             .ThenBy(i => i.Name, StringComparer.OrdinalIgnoreCase)
