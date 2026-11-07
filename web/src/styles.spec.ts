@@ -26,6 +26,24 @@ function darkBlock(tokens: string): string {
   return tokens.slice(start, tokens.indexOf('}', start));
 }
 
+function ruleBodies(text: string, selector: string): string[] {
+  const bodies: string[] = [];
+  let at = text.indexOf(selector);
+  while (at >= 0) {
+    const open = text.indexOf('{', at);
+    let depth = 0;
+    let close = -1;
+    for (let i = open; i >= 0 && i < text.length && close < 0; i++) {
+      if (text[i] === '{') depth++;
+      if (text[i] === '}' && --depth === 0) close = i;
+    }
+    if (close < 0) break;
+    bodies.push(text.slice(open, close + 1));
+    at = text.indexOf(selector, close);
+  }
+  return bodies;
+}
+
 describe('global styles', () => {
   it('loads the tokens after mat.theme', () => {
     const styles = read('src/styles.scss');
@@ -95,5 +113,34 @@ describe('global styles', () => {
 
     expect(block).toMatch(/--mat-sys-headline-large/);
     expect(block).toMatch(/margin:\s*0\b/);
+  });
+
+  it('rounds the outer corners of the first and last button toggle with the group radius', () => {
+    const styles = read('src/styles.scss');
+    const innerRadius =
+      'calc(var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px)';
+    const groupSelector =
+      '.mat-button-toggle-group-appearance-standard:not(.mat-button-toggle-vertical)';
+    const groupRules = ruleBodies(styles, groupSelector)
+      .join('\n')
+      .replace(/\s+/g, ' ')
+      .replace(/\( /g, '(')
+      .replace(/ \)/g, ')');
+
+    expect(styles).toMatch(
+      /\.mat-button-toggle-checked\s*\{[^}]*inset 0 0 0 1px var\(--sk-accent-stroke\)/,
+    );
+    expect(groupRules).toContain('mat-button-toggle-checked');
+    expect(groupRules).toContain(':first-child');
+    expect(groupRules).toContain(':last-child');
+    for (const corner of [
+      'border-start-start-radius',
+      'border-end-start-radius',
+      'border-start-end-radius',
+      'border-end-end-radius',
+    ]) {
+      expect(groupRules, corner).toContain(`${corner}: ${innerRadius}`);
+    }
+    expect(groupRules).not.toMatch(/\bborder-radius\s*:/);
   });
 });
