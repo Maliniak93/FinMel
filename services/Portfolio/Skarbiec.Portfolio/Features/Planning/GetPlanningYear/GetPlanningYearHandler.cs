@@ -77,7 +77,7 @@ public sealed class GetPlanningYearHandler(PlanningMonthLoader loader)
             };
         }
 
-        var read = PlanningMonthBuilder.Build(data, month);
+        var read = PlanningMonthBuilder.Build(data, month, []);
 
         return new PlanningYearMonthResponse
         {

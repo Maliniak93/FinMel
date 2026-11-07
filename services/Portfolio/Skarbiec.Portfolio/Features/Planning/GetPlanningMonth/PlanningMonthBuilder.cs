@@ -12,7 +12,8 @@ internal static class PlanningMonthBuilder
     // Twice the longest interval.
     private const int NextPaymentLookAheadMonths = 24;
 
-    public static PlanningMonthResponse Build(PlanningMonthData data, YearMonth viewed)
+    public static PlanningMonthResponse Build(
+        PlanningMonthData data, YearMonth viewed, IReadOnlyList<ContributionLimitWarningResponse> contributionLimitWarnings)
     {
         var forecast = data.Forecast;
         var accounts = data.Accounts;
@@ -100,7 +101,8 @@ internal static class PlanningMonthBuilder
             NonBusinessDays = Enumerable.Range(0, viewed.LastDay.Day)
                 .Select(offset => viewed.FirstDay.AddDays(offset))
                 .Where(day => !PolishHolidayCalendar.IsBusinessDay(day))
-                .ToList()
+                .ToList(),
+            ContributionLimitWarnings = contributionLimitWarnings
         };
     }
 

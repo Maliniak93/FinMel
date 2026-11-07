@@ -18,6 +18,26 @@ public sealed record PlanningMonthResponse
 
     /// <summary>The weekends and Polish holidays of the viewed month, each date once.</summary>
     public required IReadOnlyList<DateOnly> NonBusinessDays { get; init; }
+
+    /// <summary>IKE and IKZE accounts whose year contributions plus pending planned income exceed the limit, for the viewed month's calendar year.</summary>
+    public required IReadOnlyList<ContributionLimitWarningResponse> ContributionLimitWarnings { get; init; }
+}
+
+public sealed record ContributionLimitWarningResponse
+{
+    public required Guid AccountId { get; init; }
+    public required string AccountName { get; init; }
+    public required TaxWrapper Wrapper { get; init; }
+    public required int Year { get; init; }
+    public required decimal LimitPln { get; init; }
+
+    /// <summary>The account's actual contributions in the year.</summary>
+    public required decimal ContributedPln { get; init; }
+
+    /// <summary>The PLN sum of the year's pending planned incomes into the account.</summary>
+    public required decimal PlannedPln { get; init; }
+
+    public required decimal ExceededByPln { get; init; }
 }
 
 public sealed record PlanningExpensesResponse

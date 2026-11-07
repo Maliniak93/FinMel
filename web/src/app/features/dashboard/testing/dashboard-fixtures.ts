@@ -185,6 +185,7 @@ export function planningMonthResponse(
     },
     expenses: { payments: [], costPln: 0, definitions: [] },
     freeFunds: { planPln: 0, actualPln: 0, incomplete: false },
+    contributionLimitWarnings: [],
     ...overrides,
   };
 }

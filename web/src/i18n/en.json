@@ -522,6 +522,12 @@
       "outside": "Outside accounts",
       "loadFailed": "Failed to load accounts."
     },
+    "contributionLimits": {
+      "title": "Contribution limits",
+      "remaining": "Remaining {{ amount }}",
+      "exceeded": "Exceeded by {{ amount }}",
+      "loadFailed": "Failed to load contribution limits."
+    },
     "monthCard": {
       "title": "{{ month }} · plan",
       "setup": "Plan the month",
@@ -869,6 +875,7 @@
       "noItems": "Nothing planned for this day.",
       "deadlinesFailed": "Deposit and bond dates could not be loaded."
     },
+    "contributionLimitWarning": "Planned contributions to {{ account }} in {{ year }} will exceed the limit by {{ amount }}",
     "tabs": {
       "month": "Month",
       "year": "Year"
