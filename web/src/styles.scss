@@ -190,6 +190,26 @@ input.app-amount {
   box-shadow: inset 0 0 0 1px var(--sk-accent-stroke);
 }
 
+.mat-button-toggle-group-appearance-standard:not(.mat-button-toggle-vertical) {
+  > .mat-button-toggle-checked:first-child {
+    border-start-start-radius: calc(
+      var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px
+    );
+    border-end-start-radius: calc(
+      var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px
+    );
+  }
+
+  > .mat-button-toggle-checked:last-child {
+    border-start-end-radius: calc(
+      var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px
+    );
+    border-end-end-radius: calc(
+      var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px
+    );
+  }
+}
+
 @media (max-width: 719.98px) {
   .mat-mdc-dialog-panel.cdk-overlay-pane {
     width: 100vw !important;
