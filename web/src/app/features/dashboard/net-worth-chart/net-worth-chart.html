@@ -69,7 +69,9 @@
   </div>
 
   @if (loadError(); as message) {
-    <app-section-error [message]="message" (retry)="retry.emit()" />
+    <div class="net-worth-chart__state">
+      <app-section-error [message]="message" (retry)="retry.emit()" />
+    </div>
   } @else if (loading()) {
     <div class="net-worth-chart__state">
       <mat-spinner diameter="32" />
@@ -88,11 +90,11 @@
         }
       </p>
     }
-    <div class="net-worth-chart__canvas">
+    <div #canvas class="net-worth-chart__canvas">
       <svg
         class="net-worth-chart__svg"
         role="img"
-        [attr.viewBox]="'0 0 ' + width + ' ' + height"
+        [attr.viewBox]="'0 0 ' + width() + ' ' + height()"
         [attr.aria-label]="
           chartLabelKey()
             | transloco
@@ -108,7 +110,7 @@
           <line
             class="net-worth-chart__gridline"
             [attr.x1]="margin.left"
-            [attr.x2]="margin.left + plotWidth"
+            [attr.x2]="margin.left + plotWidth()"
             [attr.y1]="tick.y"
             [attr.y2]="tick.y"
           />
@@ -127,7 +129,7 @@
             class="net-worth-chart__x-label"
             text-anchor="middle"
             [attr.x]="tick.x"
-            [attr.y]="margin.top + plotHeight + 18"
+            [attr.y]="margin.top + plotHeight() + 18"
           >
             {{ formatAxisDate(tick.date, view.xTickUnit) }}
           </text>
@@ -139,7 +141,7 @@
             [attr.x]="band.x"
             [attr.y]="margin.top"
             [attr.width]="band.width"
-            [attr.height]="plotHeight"
+            [attr.height]="plotHeight()"
           />
         }
         <path class="net-worth-chart__area" [attr.d]="view.areaPath" [style.fill]="seriesColor()" />
@@ -165,7 +167,7 @@
             [attr.x1]="point.x"
             [attr.x2]="point.x"
             [attr.y1]="margin.top"
-            [attr.y2]="margin.top + plotHeight"
+            [attr.y2]="margin.top + plotHeight()"
           />
           <circle
             class="net-worth-chart__marker"
@@ -179,8 +181,8 @@
           class="net-worth-chart__plot"
           [attr.x]="margin.left"
           [attr.y]="margin.top"
-          [attr.width]="plotWidth"
-          [attr.height]="plotHeight"
+          [attr.width]="plotWidth()"
+          [attr.height]="plotHeight()"
           (pointermove)="onPointerMove($event)"
           (pointerleave)="onPointerLeave()"
         />
@@ -189,8 +191,8 @@
         <div
           class="net-worth-chart__tooltip"
           [attr.data-align]="tooltipAlignment(point)"
-          [style.left.%]="(point.x / width) * 100"
-          [style.top.%]="(point.y / height) * 100"
+          [style.left.%]="(point.x / width()) * 100"
+          [style.top.%]="(point.y / height()) * 100"
         >
           @if (selectedClass !== null) {
             <span class="net-worth-chart__tooltip-class">{{
