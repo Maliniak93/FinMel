@@ -351,6 +351,25 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
         {
             expense.Property(e => e.Name).HasMaxLength(200);
             expense.Property(e => e.Amount).HasPrecision(18, 2);
+            expense.Property(e => e.ActualAmount).HasPrecision(18, 2);
+            expense.Property(e => e.FxRateToPln).HasPrecision(18, 6);
+
+            // SetNull: deleting the default account only clears the expense's account.
+            expense.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(e => e.AccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            expense.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(e => e.ActualAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // SetNull: deleting the withdrawal by hand leaves the settlement in place.
+            expense.HasOne<Transaction>()
+                .WithMany()
+                .HasForeignKey(e => e.TransactionId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<ValuationReplica>(replica =>

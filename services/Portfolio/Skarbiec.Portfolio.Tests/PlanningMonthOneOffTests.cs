@@ -47,6 +47,29 @@ public sealed class PlanningMonthOneOffTests(SkarbiecContainersFixture container
     }
 
     [Fact]
+    public async Task SettledExpense_UsesActualAmountInCost()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        Factory.FxRateLookupClient.WithRate("EUR", ExpenseSettlementDay, 3.6m);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var eur = await client.CreateBankAccountAsync(cancellationToken, "Revolut EUR", currency: "EUR");
+        var pending = await client.CreateOneOffExpenseAsync(cancellationToken, "Remont", 100m, new DateOnly(2026, 11, 5));
+        var settled = await client.CreateOneOffExpenseAsync(cancellationToken, "Wakacje", 100m, new DateOnly(2026, 11, 10));
+        await client.SettleOneOffExpenseAsync(settled, eur.AccountId, 25m, ExpenseSettlementDay, cancellationToken);
+
+        var expenses = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).Expenses;
+
+        var settledRow = expenses.OneOff(settled);
+        Assert.Equal(("Settled", "EUR", 25m, 90m, -10m), (settledRow.Status, settledRow.Currency, settledRow.ActualAmount, settledRow.ActualAmountPln, settledRow.Difference));
+        Assert.Equal(100m, settledRow.Amount);
+        var pendingRow = expenses.OneOff(pending);
+        Assert.Equal("Pending", pendingRow.Status);
+        Assert.Null(pendingRow.ActualAmount);
+        Assert.Equal(190m, expenses.CostPln);
+    }
+
+    [Fact]
     public async Task ForeignIncome_UsesLatestRate()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -41,6 +41,24 @@ public sealed class PlanningMonthFreeFundsTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task SettledOneOffExpense_ChangesFreeFunds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Wypłata", 8_000m, dayOfMonth: 10);
+        var id = await client.CreateOneOffExpenseAsync(cancellationToken, "Wakacje", 1_200m, new DateOnly(2026, 11, 10));
+        var planned = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).FreeFunds;
+
+        await client.SettleOneOffExpenseAsync(id, account.AccountId, 1_000m, ExpenseSettlementDay, cancellationToken);
+
+        var settled = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).FreeFunds;
+        Assert.Equal(planned.PlanPln + 200m, settled.PlanPln);
+        Assert.Equal(planned.ForecastPln + 200m, settled.ForecastPln);
+    }
+
+    [Fact]
     public async Task IncomesNotSpread_DeficitIsNegative()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

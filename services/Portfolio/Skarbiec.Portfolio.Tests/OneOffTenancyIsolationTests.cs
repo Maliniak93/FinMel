@@ -85,6 +85,49 @@ public sealed class OneOffTenancyIsolationTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task Settle_OtherUsersExpense_Returns404()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await owner.CreateBankAccountAsync(cancellationToken, balance: 1_000m);
+        var settled = await owner.CreateOneOffExpenseAsync(cancellationToken, "Wakacje", 100m, new DateOnly(2026, 10, 10));
+        var pending = await owner.CreateOneOffExpenseAsync(cancellationToken, "Remont", 200m, new DateOnly(2026, 10, 12));
+        await owner.SettleOneOffExpenseAsync(settled, account.AccountId, 90m, ExpenseSettlementDay, cancellationToken, createWithdrawal: true);
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangersAccount = await stranger.CreateBankAccountAsync(cancellationToken, "Moje konto", balance: 1_000m);
+        var settleStored = await stranger.PutAsJsonAsync(
+            OneOffExpenseSettlementUri(settled),
+            SettleOneOffExpenseBody(strangersAccount.AccountId, 1m, ExpenseSettlementDay, createWithdrawal: true),
+            cancellationToken);
+        var settlePending = await stranger.PutAsJsonAsync(
+            OneOffExpenseSettlementUri(pending),
+            SettleOneOffExpenseBody(strangersAccount.AccountId, 1m, ExpenseSettlementDay, createWithdrawal: true),
+            cancellationToken);
+        var undo = await stranger.DeleteAsync(OneOffExpenseSettlementUri(settled), cancellationToken);
+        var strangersExpense = await stranger.CreateOneOffExpenseAsync(cancellationToken, "Własny", 100m, new DateOnly(2026, 10, 10));
+        var ontoOwnersAccount = await stranger.PutAsJsonAsync(
+            OneOffExpenseSettlementUri(strangersExpense),
+            SettleOneOffExpenseBody(account.AccountId, 100m, ExpenseSettlementDay, createWithdrawal: true),
+            cancellationToken);
+        var createOnOwnersAccount = await stranger.PostAsJsonAsync(
+            OneOffExpensesUri, NewOneOffExpenseBody(accountId: account.AccountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, settleStored.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, settlePending.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, undo.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, ontoOwnersAccount.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, createOnOwnersAccount.StatusCode);
+        var month = (await owner.GetPlanningMonthAsync("2026-10", cancellationToken)).Expenses;
+        Assert.Equal(90m, month.OneOff(settled).ActualAmount);
+        Assert.Equal("Pending", month.OneOff(pending).Status);
+        Assert.Equal(910m, await owner.GetCashBalanceAsync(account.AccountId, cancellationToken));
+        Assert.Equal(1_000m, await stranger.GetCashBalanceAsync(strangersAccount.AccountId, cancellationToken));
+        Assert.Equal("Pending", (await stranger.GetPlanningMonthAsync("2026-10", cancellationToken)).Expenses.OneOff(strangersExpense).Status);
+    }
+
+    [Fact]
     public async Task Create_OnStrangersAccount_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

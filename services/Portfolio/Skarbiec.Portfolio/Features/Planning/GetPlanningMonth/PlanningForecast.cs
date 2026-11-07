@@ -110,13 +110,28 @@ internal sealed class PlanningForecast
         OneOffExpenses
             .OrderBy(e => e.Date)
             .ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(e => new OneOffExpenseResponse
+            .Select(e =>
             {
-                Id = e.Id,
-                Name = e.Name,
-                Date = e.Date,
-                Amount = e.Amount,
-                InMonth = YearMonth.From(e.Date) == month
+                var account = accounts.GetValueOrDefault(e.ActualAccountId ?? e.AccountId ?? Guid.Empty);
+                decimal? actualAmountPln = e.IsSettled ? SettledCost(e) : null;
+
+                return new OneOffExpenseResponse
+                {
+                    Id = e.Id,
+                    Name = e.Name,
+                    Date = e.Date,
+                    Amount = e.Amount,
+                    InMonth = YearMonth.From(e.Date) == month,
+                    AccountId = account?.Id,
+                    AccountName = account?.Name,
+                    Status = e.IsSettled ? OccurrenceStatus.Settled : OccurrenceStatus.Pending,
+                    Currency = e.IsSettled ? account?.Currency : null,
+                    ActualAmount = e.ActualAmount,
+                    ActualDate = e.ActualDate,
+                    ActualAmountPln = actualAmountPln,
+                    Difference = actualAmountPln - e.Amount,
+                    WithdrawalCreated = e.TransactionId is not null
+                };
             })
             .ToList();
 
@@ -192,7 +207,7 @@ internal sealed class PlanningForecast
 
     public decimal CostIn(YearMonth month) =>
         Plans.Sum(p => ReserveSchedule.CostIn(month, p.Plan))
-        + OneOffExpenses.Where(e => YearMonth.From(e.Date) == month).Sum(e => e.Amount)
+        + OneOffExpenses.Where(e => YearMonth.From(e.Date) == month).Sum(e => e.IsSettled ? SettledCost(e) : e.Amount)
         + ContributingGroupsIn(month).Sum(g => g.MonthlyContributionPln);
 
     public MonthFigures FiguresIn(YearMonth month, IReadOnlyDictionary<string, decimal> rates, DateOnly today)
@@ -234,6 +249,8 @@ internal sealed class PlanningForecast
 
         return planned;
     }
+
+    private static decimal SettledCost(OneOffExpense expense) => Round(expense.ActualAmount!.Value * expense.FxRateToPln!.Value);
 
     private static decimal Round(decimal value) => Math.Round(value, 2, MidpointRounding.AwayFromZero);
 

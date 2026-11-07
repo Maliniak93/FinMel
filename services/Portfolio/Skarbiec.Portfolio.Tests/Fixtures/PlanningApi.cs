@@ -100,7 +100,21 @@ internal static class PlanningApi
         bool DepositCreated = false,
         bool Overdue = false);
 
-    public sealed record OneOffExpenseView(Guid Id, string Name, DateOnly Date, decimal Amount, bool InMonth);
+    public sealed record OneOffExpenseView(
+        Guid Id,
+        string Name,
+        DateOnly Date,
+        decimal Amount,
+        bool InMonth,
+        Guid? AccountId = null,
+        string? AccountName = null,
+        string? Status = null,
+        string? Currency = null,
+        decimal? ActualAmount = null,
+        DateOnly? ActualDate = null,
+        decimal? ActualAmountPln = null,
+        decimal? Difference = null,
+        bool WithdrawalCreated = false);
 
     public sealed record IncomesView(
         List<OccurrenceView> Occurrences,
@@ -717,12 +731,68 @@ internal static class PlanningApi
         };
 
     public static object NewOneOffExpenseBody(
-        string name = "Wakacje", decimal amount = 1_000m, DateOnly? date = null) => new
+        string name = "Wakacje", decimal amount = 1_000m, DateOnly? date = null, Guid? accountId = null) => new
         {
             name,
             amount,
-            date = date ?? new DateOnly(2026, 11, 15)
+            date = date ?? new DateOnly(2026, 11, 15),
+            accountId
         };
+
+    public const string OneOffExpenseSettledErrorCode = "Conflict.OneOffExpenseSettled";
+
+    public const string OneOffExpenseSettlementNotFoundErrorCode = "NotFound.OneOffExpenseSettlement";
+
+    public const string AccountHasExpenseSettlementsErrorCode = "Conflict.AccountHasExpenseSettlements";
+
+    public static string OneOffExpenseSettlementUri(Guid id) => $"{OneOffExpenseUri(id)}/settlement";
+
+    public static OneOffExpenseView OneOff(this ExpensesView expenses, Guid id) => expenses.OneOffs!.Single(o => o.Id == id);
+
+    public static object SettleOneOffExpenseBody(
+        Guid accountId,
+        decimal actualAmount,
+        DateOnly actualDate,
+        bool createWithdrawal = false,
+        bool rememberAccount = false) =>
+        new { actualAmount, actualDate, accountId, createWithdrawal, rememberAccount };
+
+    public static async Task SettleOneOffExpenseAsync(
+        this HttpClient client,
+        Guid id,
+        Guid accountId,
+        decimal actualAmount,
+        DateOnly actualDate,
+        CancellationToken cancellationToken,
+        bool createWithdrawal = false,
+        bool rememberAccount = false)
+    {
+        var response = await client.PutAsJsonAsync(
+            OneOffExpenseSettlementUri(id),
+            SettleOneOffExpenseBody(accountId, actualAmount, actualDate, createWithdrawal, rememberAccount),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public sealed record OneOffExpenseWithdrawal(BankAccountsApi.BankAccount Account, Guid ExpenseId, Guid TransactionId);
+
+    public static readonly DateOnly ExpenseSettlementDay = new(2026, 10, 15);
+
+    // Settles an October "Wakacje" of 100 as 90 on a fresh PLN "mBank ROR" holding 1 000 since 2026-10-12, with a withdrawal; the caller's clock must be past 2026-10-15.
+    public static async Task<OneOffExpenseWithdrawal> CreateOneOffExpenseWithdrawalAsync(
+        this HttpClient client, CancellationToken cancellationToken, decimal actualAmount = 90m)
+    {
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR", balance: 1_000m);
+        var expenseId = await client.CreateOneOffExpenseAsync(
+            cancellationToken, "Wakacje", 100m, new DateOnly(2026, 10, 10));
+        await client.SettleOneOffExpenseAsync(
+            expenseId, account.AccountId, actualAmount, ExpenseSettlementDay, cancellationToken, createWithdrawal: true);
+        var withdrawal = Assert.Single(
+            (await client.ListTransactionsAsync(account.MoneyAssetId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Withdraw);
+
+        return new OneOffExpenseWithdrawal(account, expenseId, withdrawal.Id);
+    }
 
     public static async Task<Guid> CreateOneOffIncomeAsync(
         this HttpClient client,
@@ -745,10 +815,11 @@ internal static class PlanningApi
         CancellationToken cancellationToken,
         string name = "Wakacje",
         decimal amount = 1_000m,
-        DateOnly? date = null)
+        DateOnly? date = null,
+        Guid? accountId = null)
     {
         var response = await client.PostAsJsonAsync(
-            OneOffExpensesUri, NewOneOffExpenseBody(name, amount, date), cancellationToken);
+            OneOffExpensesUri, NewOneOffExpenseBody(name, amount, date, accountId), cancellationToken);
         response.EnsureSuccessStatusCode();
         var created = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
 

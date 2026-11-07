@@ -33,6 +33,11 @@ public sealed class DeleteAccountHandler(
             return AccountErrors.HasOneOffIncomes(id);
         }
 
+        if (await dbContext.OneOffExpenses.AnyAsync(e => e.ActualAccountId == id, cancellationToken))
+        {
+            return AccountErrors.HasExpenseSettlements(id);
+        }
+
         if (await dbContext.RecurringIncomeOccurrences.AnyAsync(
                 o => o.PlannedAccountId == id || o.AccountId == id, cancellationToken))
         {

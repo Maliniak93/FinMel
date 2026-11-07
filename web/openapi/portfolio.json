@@ -2182,6 +2182,60 @@
         }
       }
     },
+    "/api/portfolio/one-off-expenses/{id}/settlement": {
+      "put": {
+        "tags": [
+          "SettleOneOffExpenseEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SettleOneOffExpenseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "UndoOneOffExpenseSettlementEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/recurring-incomes": {
       "post": {
         "tags": [
@@ -5046,6 +5100,13 @@
           "date": {
             "type": "string",
             "format": "date"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -6290,7 +6351,16 @@
           "name",
           "date",
           "amount",
-          "inMonth"
+          "inMonth",
+          "accountId",
+          "accountName",
+          "status",
+          "currency",
+          "actualAmount",
+          "actualDate",
+          "actualAmountPln",
+          "difference",
+          "withdrawalCreated"
         ],
         "type": "object",
         "properties": {
@@ -6314,6 +6384,65 @@
             "format": "double"
           },
           "inMonth": {
+            "type": "boolean"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/OccurrenceStatus"
+          },
+          "currency": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "actualAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "actualDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "actualAmountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "difference": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "withdrawalCreated": {
             "type": "boolean"
           }
         }
@@ -7530,6 +7659,40 @@
           }
         }
       },
+      "SettleOneOffExpenseRequest": {
+        "required": [
+          "actualAmount",
+          "actualDate",
+          "accountId"
+        ],
+        "type": "object",
+        "properties": {
+          "actualAmount": {
+            "maximum": 9999999999999999.99,
+            "minimum": 0.01,
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "actualDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "accountId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createWithdrawal": {
+            "type": "boolean"
+          },
+          "rememberAccount": {
+            "type": "boolean"
+          }
+        }
+      },
       "SettleOneOffIncomeRequest": {
         "required": [
           "actualAmount",
@@ -8380,6 +8543,13 @@
           "date": {
             "type": "string",
             "format": "date"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -9049,6 +9219,12 @@
     },
     {
       "name": "DeleteOneOffExpenseEndpoint"
+    },
+    {
+      "name": "SettleOneOffExpenseEndpoint"
+    },
+    {
+      "name": "UndoOneOffExpenseSettlementEndpoint"
     },
     {
       "name": "CreateRecurringIncomeEndpoint"
