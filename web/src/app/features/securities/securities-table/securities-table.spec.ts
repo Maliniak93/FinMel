@@ -7,7 +7,13 @@ import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import type { SecuritiesResponse } from '../../../api/portfolio';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { toDateOnly } from '../../../shared/date-only';
-import { formatMoney, formatPercent, formatSignedMoney } from '../../../shared/format';
+import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import {
+  formatMoney,
+  formatPercent,
+  formatQuantity,
+  formatSignedMoney,
+} from '../../../shared/format';
 import { clickRowMenuItem, menuItemLabel, rowMenuItems } from '../../../../testing/archive';
 import { restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
 import { ASSET_CLASS } from '../../assets/asset-class';
@@ -49,6 +55,13 @@ describe('SecuritiesTable', () => {
     settle = true,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const request = input as Request;
+      if (request.method === 'DELETE') {
+        return new Response(null, { status: 204 });
+      }
+      if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(request.url)) {
+        return jsonResponse({});
+      }
       if (!requestUrl(input).includes('/api/portfolio/securities')) {
         return jsonResponse({ detail: 'Not found.' }, 404);
       }
@@ -172,6 +185,8 @@ describe('SecuritiesTable', () => {
       'Sprzedaj',
       'Dywidenda',
       'Historia transakcji',
+      'Archiwizuj',
+      'Usuń',
     ]);
     const history = items.find((item) => menuItemLabel(item) === 'Historia transakcji');
     expect(history?.getAttribute('href')).toBe(`/wealth/assets/${vwce.assetId}/transactions`);
@@ -200,6 +215,43 @@ describe('SecuritiesTable', () => {
         }),
       );
     }
+  });
+
+  it('archives, restores and deletes a holding', async () => {
+    const archivedCdr = { ...cdr, isArchived: true, transactionCount: 2 };
+    await setup({ ...stocks, holdings: [vwce, archivedCdr] } as SecuritiesResponse);
+    const writes = () =>
+      fetchSpy.mock.calls
+        .map((call: unknown[]) => call[0] as Request)
+        .filter((request: Request) => request.method !== 'GET');
+    const listCalls = () =>
+      fetchSpy.mock.calls.filter((call: unknown[]) =>
+        requestUrl(call[0]).includes('/api/portfolio/securities'),
+      ).length;
+
+    await clickRowMenuItem(fixture, rowFor('CD Projekt'), /^przywróć$/i);
+    await vi.waitFor(() => expect(writes()).toHaveLength(1));
+    expect(writes()[0].method).toBe('POST');
+    expect(writes()[0].url).toContain(`/api/portfolio/assets/${cdr.assetId}/restore`);
+
+    const listsBeforeArchive = listCalls();
+    await clickRowMenuItem(fixture, rowFor('Vanguard FTSE All-World'), /^archiwizuj$/i);
+    await vi.waitFor(() => expect(writes()).toHaveLength(2));
+    expect(writes()[1].method).toBe('POST');
+    expect(writes()[1].url).toContain(`/api/portfolio/assets/${vwce.assetId}/archive`);
+    await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listsBeforeArchive));
+
+    const listsBeforeDelete = listCalls();
+    await clickRowMenuItem(fixture, rowFor('CD Projekt'), /^usuń$/i);
+    const deleteDialog = dialog.open.mock.calls.at(-1)!;
+    expect(deleteDialog[0]).toBe(ConfirmDialog);
+    expect(deleteDialog[1].data.destructive).toBe(true);
+    expect(deleteDialog[1].data.message).toContain('2');
+    expect(deleteDialog[1].data.message).toContain(`${formatQuantity(10)} szt.`);
+    await vi.waitFor(() => expect(writes()).toHaveLength(3));
+    expect(writes()[2].method).toBe('DELETE');
+    expect(writes()[2].url).toContain(`/api/portfolio/assets/${cdr.assetId}`);
+    await vi.waitFor(() => expect(listCalls()).toBeGreaterThan(listsBeforeDelete));
   });
 
   it('states', async () => {

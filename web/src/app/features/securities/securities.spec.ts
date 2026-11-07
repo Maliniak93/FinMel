@@ -11,6 +11,7 @@ import { clickRowMenuItem } from '../../../testing/archive';
 import { restoreEnglish, switchLanguage, textOf } from '../../../testing/i18n';
 import { ASSET_CLASS } from '../assets/asset-class';
 import { AssetFormDialog } from '../assets/asset-form/asset-form-dialog/asset-form-dialog';
+import { showArchived } from '../../../testing/archive';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { TransactionFormDialog } from '../transactions/transaction-form-dialog/transaction-form-dialog';
 import { Securities } from './securities';
@@ -315,6 +316,24 @@ describe('Securities page', () => {
 
     expect(rows().map((row) => textOf(row))).toHaveLength(1);
     expect(textOf(rowFor('CD Projekt'))).toContain('XTB zwykly');
+  });
+
+  it('toggle sends includeArchived', async () => {
+    await setup();
+    const includeArchivedOf = (assetClass: number, name: string) =>
+      fetchSpy.mock.calls
+        .map((call: unknown[]) => requestUrl(call[0]))
+        .filter((url: string) => isClass(url, assetClass, name))
+        .map((url: string) => new URL(url).searchParams.get('includeArchived'));
+
+    expect(includeArchivedOf(ASSET_CLASS.Stock, 'Stock')).toContain('false');
+    expect(includeArchivedOf(ASSET_CLASS.Stock, 'Stock')).not.toContain('true');
+
+    await showArchived(fixture);
+
+    await vi.waitFor(() => expect(includeArchivedOf(ASSET_CLASS.Stock, 'Stock')).toContain('true'));
+    await openEtfTab();
+    await vi.waitFor(() => expect(includeArchivedOf(ASSET_CLASS.Etf, 'Etf')).toContain('true'));
   });
 
   it('shows the average buy price in PLN', async () => {

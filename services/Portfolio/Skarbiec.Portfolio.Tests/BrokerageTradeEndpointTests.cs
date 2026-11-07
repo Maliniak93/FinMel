@@ -211,7 +211,9 @@ public sealed class BrokerageTradeEndpointTests(SkarbiecContainersFixture contai
         Assert.Equal(TransactionType.Deposit, cashLeg.Type);
         Assert.Equal(37.40m, cashLeg.Quantity);
         var basisAfter = await client.GetSecuritiesAsync(AssetClass.Stock, cancellationToken);
-        Assert.Equal(basisBefore.Holdings, basisAfter.Holdings);
+        Assert.Equal(
+            basisBefore.Holdings.Select(h => h with { TransactionCount = h.TransactionCount + 1 }),
+            basisAfter.Holdings);
     }
 
     [Fact]

@@ -48,3 +48,17 @@
 .metals-page__actions {
   text-align: end;
 }
+
+.metals-page__header mat-slide-toggle {
+  margin-left: auto;
+}
+
+.metals-page__no-data {
+  padding: 16px;
+  opacity: 0.7;
+}
+
+.metals-page__delete {
+  --mat-menu-item-label-text-color: var(--mat-sys-error);
+  --mat-menu-item-icon-color: var(--mat-sys-error);
+}

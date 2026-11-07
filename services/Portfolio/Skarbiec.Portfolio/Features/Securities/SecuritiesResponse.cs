@@ -51,6 +51,9 @@ public sealed record SecurityHoldingResponse
     public required decimal? UnrealizedPlPercent { get; init; }
     public required decimal? UnrealizedPlPln { get; init; }
     public required SecurityPriceUnavailableReason? PriceUnavailableReason { get; init; }
+
+    /// <summary>All transactions of the asset, dividends included.</summary>
+    public required int TransactionCount { get; init; }
 }
 
 /// <summary>Each total sums the holdings where that field is not null.</summary>

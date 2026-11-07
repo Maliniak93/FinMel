@@ -14,6 +14,7 @@ export function metalResponse(overrides: Partial<MetalResponse> = {}): MetalResp
     fineWeightGramsPerPiece: OUNCE_IN_GRAMS,
     pieces: 2,
     totalFineGrams: 2 * OUNCE_IN_GRAMS,
+    transactionCount: 2,
     ...overrides,
   };
 }

@@ -55,7 +55,7 @@ public sealed class ListSecuritiesHandler(
         var holdings = assets
             .Select(a => ToHolding(
                 a.AssetId, a.GroupId, a.IsArchived, a.AccountId, a.AccountName, a.Name, a.InstrumentId, a.Currency,
-                SecurityCostBasis.Compute(transactions[a.AssetId]), quotes))
+                SecurityCostBasis.Compute(transactions[a.AssetId]), quotes, transactions[a.AssetId].Count()))
             .ToList();
 
         var active = holdings.Where(h => !h.IsArchived).ToList();
@@ -82,7 +82,8 @@ public sealed class ListSecuritiesHandler(
         Guid instrumentId,
         string currency,
         SecurityCostBasisResult basis,
-        InstrumentQuoteLookupResult quotes)
+        InstrumentQuoteLookupResult quotes,
+        int transactionCount)
     {
         var costPln = basis.CostPln is { } cost ? Round(cost) : (decimal?)null;
         var instrument = quotes.Instruments?.GetValueOrDefault(instrumentId);
@@ -125,7 +126,8 @@ public sealed class ListSecuritiesHandler(
             UnrealizedPl = null,
             UnrealizedPlPercent = null,
             UnrealizedPlPln = null,
-            PriceUnavailableReason = reason
+            PriceUnavailableReason = reason,
+            TransactionCount = transactionCount
         };
 
         if (reason is not null)

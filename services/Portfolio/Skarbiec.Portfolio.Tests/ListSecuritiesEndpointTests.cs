@@ -314,6 +314,28 @@ public sealed class ListSecuritiesEndpointTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task List_ReturnsTransactionCount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(FixedTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var accountId = await client.CreateAccountAsync(cancellationToken, name: "Main");
+        await client.FundAccountAsync(accountId, cancellationToken);
+        var stock = await AddQuotedHoldingAsync(
+            client, accountId, cancellationToken, AssetClass.Stock, "PLN", "CDR", "CDR", 120m, "GPW", new DateOnly(2026, 1, 30));
+        await client.RecordBrokerageTradeAsync(
+            stock, cancellationToken, TransactionType.Buy, quantity: 10m, unitPrice: 100m, date: new DateOnly(2026, 1, 10));
+        await client.RecordBrokerageTradeAsync(
+            stock, cancellationToken, TransactionType.Dividend, quantity: 1m, unitPrice: 15m, date: new DateOnly(2026, 1, 12));
+
+        var response = await client.GetAsync(AllSecuritiesUri(AssetClass.Stock), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = (await response.Content.ReadFromJsonAsync<SecuritiesResponse>(cancellationToken))!;
+        Assert.Equal(2, Assert.Single(body.Holdings).TransactionCount);
+    }
+
+    [Fact]
     public async Task Percent_IsPlnOverPlnCost()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
