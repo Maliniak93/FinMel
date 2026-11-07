@@ -40,10 +40,10 @@ const VALUE_COLUMNS: ColumnDefinition[] = [
   { key: 'differencePln', label: 'planning.year.columns.difference', phone: false },
   { key: 'costPln', label: 'planning.year.columns.cost', phone: true },
   { key: 'freeFundsPlanPln', label: 'planning.year.columns.freeFundsPlan', phone: false },
-  { key: 'freeFundsForecastPln', label: 'planning.year.columns.freeFundsForecast', phone: true },
+  { key: 'freeFundsActualPln', label: 'planning.year.columns.freeFundsActual', phone: true },
 ];
 
-const FREE_FUNDS_KEYS: ValueColumn[] = ['freeFundsPlanPln', 'freeFundsForecastPln'];
+const FREE_FUNDS_KEYS: ValueColumn[] = ['freeFundsPlanPln', 'freeFundsActualPln'];
 
 interface YearCell {
   key: ValueColumn;
@@ -208,7 +208,7 @@ export class PlanningYear {
       ...base,
       text: formatMoney(value, 'PLN'),
       deficit: FREE_FUNDS_KEYS.includes(column.key) && Number(value) < 0,
-      actual: past && column.key === 'freeFundsForecastPln',
+      actual: past && column.key === 'freeFundsActualPln',
     };
   }
 }

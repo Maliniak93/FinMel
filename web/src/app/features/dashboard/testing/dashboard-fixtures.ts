@@ -184,7 +184,7 @@ export function planningMonthResponse(
       oneOffs: [],
     },
     expenses: { payments: [], costPln: 0, definitions: [] },
-    freeFunds: { planPln: 0, forecastPln: 0, incomplete: false },
+    freeFunds: { planPln: 0, actualPln: 0, incomplete: false },
     ...overrides,
   };
 }

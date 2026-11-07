@@ -12,7 +12,7 @@ const labels = {
   free: 'Free label',
   deficit: 'deficit word',
   plan: 'Plan label',
-  forecast: 'Forecast label',
+  actual: 'Actual label',
 };
 
 const groups = [
@@ -25,7 +25,7 @@ const groups = [
   template: `<app-free-funds-cascade
     [labels]="labels"
     [plan]="plan"
-    [forecast]="forecast"
+    [actual]="actual"
     [contributions]="contributions"
     [groups]="groups"
   />`,
@@ -33,8 +33,7 @@ const groups = [
 class Host {
   labels = labels;
   plan = { incomes: 13600, expenses: 5679.99, contributions: 3000, free: 4920.01 };
-  forecast: { incomes: number; expenses: number; contributions: number; free: number } | null =
-    null;
+  actual: { incomes: number; expenses: number; contributions: number; free: number } | null = null;
   contributions = [
     { groupId: 'g-1', name: 'Emerytura', amountPln: 2000 },
     { groupId: 'g-2', name: 'Inwestycje', amountPln: 1000 },
@@ -74,7 +73,7 @@ describe('FreeFundsCascade', () => {
     expect(free.textContent).toContain(formatMoney(4920.01, 'PLN'));
 
     expect(contributions.querySelectorAll('app-split-bar .split-bar__segment')).toHaveLength(2);
-    expect(byId(element, 'cascade-forecast-incomes')).toBeNull();
+    expect(byId(element, 'cascade-actual-incomes')).toBeNull();
 
     const width = (testId: string) => parseFloat(byId(element, testId)!.style.width);
     expect(width('cascade-bar-plan-incomes')).toBeCloseTo(100, 1);
@@ -83,18 +82,18 @@ describe('FreeFundsCascade', () => {
     expect(width('cascade-bar-plan-free')).toBeCloseTo((4920.01 / 13600) * 100, 1);
   });
 
-  it('shows the Prognoza column when forecast values are given', async () => {
+  it('shows the Actual column when actual values are given', async () => {
     const element = await render((host) => {
-      host.forecast = { incomes: 10000, expenses: 5679.99, contributions: 3000, free: 1320.01 };
+      host.actual = { incomes: 10000, expenses: 5679.99, contributions: 3000, free: 1320.01 };
     });
 
-    expect(byId(element, 'cascade-forecast-incomes')!.textContent).toContain(
+    expect(byId(element, 'cascade-actual-incomes')!.textContent).toContain(
       formatMoney(10000, 'PLN'),
     );
-    expect(byId(element, 'cascade-forecast-free')!.textContent).toContain(
+    expect(byId(element, 'cascade-actual-free')!.textContent).toContain(
       formatMoney(1320.01, 'PLN'),
     );
-    expect(element.textContent).toContain('Forecast label');
+    expect(element.textContent).toContain('Actual label');
   });
 
   it('marks a deficit with icon and word', async () => {

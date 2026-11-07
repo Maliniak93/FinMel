@@ -35,7 +35,7 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
             Assert.Equal(month.Incomes.Balance.DifferencePln, row.DifferencePln);
             Assert.Equal(month.Expenses.CostPln, row.CostPln);
             Assert.Equal(month.FreeFunds.PlanPln, row.FreeFundsPlanPln);
-            Assert.Equal(month.FreeFunds.ForecastPln, row.FreeFundsForecastPln);
+            Assert.Equal(month.FreeFunds.ActualPln, row.FreeFundsActualPln);
         }
     }
 
@@ -87,7 +87,7 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
                 new[]
                 {
                     empty.IncomePlanPln, empty.IncomeActualPln, empty.DifferencePln, empty.CostPln,
-                    empty.FreeFundsPlanPln, empty.FreeFundsForecastPln
+                    empty.FreeFundsPlanPln, empty.FreeFundsActualPln
                 },
                 value => Assert.Null(value));
         }
@@ -120,7 +120,7 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
         Assert.Equal(ColumnSum(year, m => m.DifferencePln), year.Totals.DifferencePln);
         Assert.Equal(ColumnSum(year, m => m.CostPln), year.Totals.CostPln);
         Assert.Equal(ColumnSum(year, m => m.FreeFundsPlanPln), year.Totals.FreeFundsPlanPln);
-        Assert.Equal(ColumnSum(year, m => m.FreeFundsForecastPln), year.Totals.FreeFundsForecastPln);
+        Assert.Equal(ColumnSum(year, m => m.FreeFundsActualPln), year.Totals.FreeFundsActualPln);
     }
 
     [Fact]

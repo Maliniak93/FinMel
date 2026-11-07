@@ -151,7 +151,7 @@ function expenses(extra: Record<string, unknown> = {}): Record<string, unknown> 
 }
 
 function freeFunds(extra: Record<string, unknown> = {}): Record<string, unknown> {
-  return { planPln: 0, forecastPln: 0, incomplete: false, ...extra };
+  return { planPln: 0, actualPln: 0, incomplete: false, ...extra };
 }
 
 function month(
@@ -223,8 +223,13 @@ function splitView(extra: Record<string, unknown> = {}): Record<string, unknown>
 }
 
 const contributions = [
-  { groupId: retirementId, name: 'Emerytura', amountPln: 2000 },
-  { groupId: investingId, name: 'Inwestycje', amountPln: 1000 },
+  { groupId: retirementId, name: 'Emerytura', amountPln: 2000, fundedPln: 2500, status: 'Settled' },
+  { groupId: investingId, name: 'Inwestycje', amountPln: 1000, fundedPln: 600, status: 'Partial' },
+];
+
+const unfundedContributions = [
+  { groupId: retirementId, name: 'Emerytura', amountPln: 2000, fundedPln: null, status: null },
+  { groupId: investingId, name: 'Inwestycje', amountPln: 1000, fundedPln: null, status: null },
 ];
 
 function yearPage(year: number): Record<string, unknown> {
@@ -236,7 +241,7 @@ function yearPage(year: number): Record<string, unknown> {
     differencePln: 0,
     costPln: 4200,
     freeFundsPlanPln: 12300,
-    freeFundsForecastPln: 12300,
+    freeFundsActualPln: 12300,
     hasOverdue: false,
     incomplete: false,
   }));
@@ -252,7 +257,7 @@ function yearPage(year: number): Record<string, unknown> {
       differencePln: 0,
       costPln: 50400,
       freeFundsPlanPln: 147600,
-      freeFundsForecastPln: 147600,
+      freeFundsActualPln: 147600,
     },
   };
 }
@@ -915,7 +920,7 @@ describe('Planning', () => {
         balance: balance({ planPln: 6500, pendingPln: 4321.5 }),
       },
       {},
-      { planPln: 1234.5, forecastPln: 1234.5 },
+      { planPln: 1234.5, actualPln: 1234.5 },
     );
     await setup('/planning?month=2026-10&layout=calendar');
 
@@ -1248,23 +1253,25 @@ describe('Planning', () => {
     expect(rows('occurrence-row')[0].classList.contains('day-list__item--overdue')).toBe(true);
   });
 
-  it('shows the free funds plan and forecast, a negative value as a deficit and the incomplete marker', async () => {
+  it('shows the free funds plan and actual, a negative value as a deficit and the incomplete marker', async () => {
     responses['2026-10'] = month(
       { balance: balance({ planPln: 13600, actualPln: 9000.5, pendingPln: 1000.25 }) },
       { costPln: 5679.99 },
-      { planPln: 12300, forecastPln: 11443.27 },
+      { planPln: 12300, actualPln: 4400 },
     );
     await setup();
 
     expect(rows('cascade-plan-incomes')[0].textContent).toContain(formatMoney(13600, 'PLN'));
-    expect(rows('cascade-forecast-incomes')[0].textContent).toContain(formatMoney(10000.75, 'PLN'));
-    expect(rows('cascade-forecast-expenses')[0].textContent).toContain(formatMoney(5679.99, 'PLN'));
     expect(rows('free-funds-plan')[0].textContent).toContain(formatMoney(12300, 'PLN'));
-    expect(rows('free-funds-forecast')[0].textContent).toContain(formatMoney(11443.27, 'PLN'));
+    expect(rows('free-funds-actual')[0].textContent).toContain(formatMoney(4400, 'PLN'));
+    const section = rows('free-funds')[0].textContent!;
+    expect(section).toContain('Plan');
+    expect(section).toContain('Actual');
+    expect(section).not.toMatch(/forecast/i);
     expect(rows('free-funds-deficit')).toHaveLength(0);
     expect(rows('free-funds-incomplete')).toHaveLength(0);
 
-    responses['2026-11'] = month({}, {}, { planPln: -700, forecastPln: 50, incomplete: true });
+    responses['2026-11'] = month({}, {}, { planPln: -700, actualPln: 50, incomplete: true });
     click('next-month');
     await settle();
 
@@ -1280,7 +1287,7 @@ describe('Planning', () => {
     responses['2026-10'] = month(
       { occurrences: [occurrence('Wynagrodzenie', '2026-10-09', 11400)] },
       { groupContributions: contributions, costPln: 4000 },
-      { planPln: 4000, forecastPln: 4000 },
+      { planPln: 4000, actualPln: 4000 },
     );
     await setup();
 
@@ -1383,7 +1390,7 @@ describe('Planning', () => {
     responses['2026-10'] = month(
       {},
       { groupContributions: contributions, costPln: 4000 },
-      { planPln: 4000, forecastPln: 4000 },
+      { planPln: 4000, actualPln: 4000 },
       splitView(),
     );
     await setup();
@@ -1449,7 +1456,7 @@ describe('Planning', () => {
     responses['2026-10'] = month(
       {},
       { groupContributions: contributions, costPln: 4000 },
-      { planPln: 4000, forecastPln: 4000 },
+      { planPln: 4000, actualPln: 4000 },
       splitView(),
     );
     await setup();
@@ -1457,7 +1464,8 @@ describe('Planning', () => {
     const lines = rows('contribution-row');
     expect(lines).toHaveLength(2);
     expect(lines[0].textContent).toContain('Emerytura');
-    expect(lines[0].textContent).toContain(formatMoney(-2000, 'PLN'));
+    expect(lines[0].textContent).toContain(formatMoney(2500, 'PLN'));
+    expect(lines[0].textContent).toContain(formatMoney(2000, 'PLN'));
     expect(lines[1].textContent).toContain('Inwestycje');
 
     expect(rows('split-section')).toHaveLength(1);
@@ -1482,14 +1490,46 @@ describe('Planning', () => {
     expect(parts[1].textContent).toContain(formatMoney(2000, 'PLN'));
   });
 
+  it('shows funded over plan and a status chip per group in the current month and no chip in another month', async () => {
+    responses['2026-10'] = month(
+      {},
+      { groupContributions: contributions, costPln: 4000 },
+      { planPln: 4000, actualPln: 0 },
+    );
+    responses['2026-11'] = month(
+      {},
+      { groupContributions: unfundedContributions, costPln: 4000 },
+      { planPln: 4000, actualPln: 0 },
+    );
+    await setup();
+
+    const lines = rows('contribution-row');
+    expect(lines).toHaveLength(2);
+    expect(lines[0].textContent).toContain(formatMoney(2500, 'PLN'));
+    expect(lines[0].textContent).toContain(formatMoney(2000, 'PLN'));
+    expect(lines[1].textContent).toContain(formatMoney(600, 'PLN'));
+    expect(lines[1].textContent).toContain(formatMoney(1000, 'PLN'));
+    const chips = rows('contribution-status');
+    expect(chips).toHaveLength(2);
+    expect(chips[0].textContent!.trim()).not.toBe('');
+    expect(chips[0].textContent!.trim()).not.toBe(chips[1].textContent!.trim());
+
+    click('next-month');
+    await settle();
+
+    expect(requestedMonths().at(-1)).toBe('2026-11');
+    expect(rows('contribution-row')).toHaveLength(2);
+    expect(rows('contribution-status')).toHaveLength(0);
+  });
+
   it('shows neither contribution lines nor a split in a past month', async () => {
     responses['2026-10'] = month(
       {},
       { groupContributions: contributions, costPln: 4000 },
-      { planPln: 4000, forecastPln: 4000 },
+      { planPln: 4000, actualPln: 4000 },
       splitView(),
     );
-    responses['2026-09'] = month({}, {}, { planPln: 7000, forecastPln: 7000 }, null);
+    responses['2026-09'] = month({}, {}, { planPln: 7000, actualPln: 7000 }, null);
     await setup();
 
     expect(rows('contribution-row')).toHaveLength(2);
@@ -1508,7 +1548,7 @@ describe('Planning', () => {
     responses['2026-10'] = month(
       {},
       { groupContributions: contributions },
-      { planPln: -500, forecastPln: -500 },
+      { planPln: -500, actualPln: -500 },
       splitView({
         freeFundsPln: -500,
         deficitPln: 500,
@@ -1529,7 +1569,7 @@ describe('Planning', () => {
     responses['2026-10'] = month(
       {},
       { groupContributions: contributions },
-      { planPln: 4000, forecastPln: 4000 },
+      { planPln: 4000, actualPln: 4000 },
       splitView(),
     );
     await setup();

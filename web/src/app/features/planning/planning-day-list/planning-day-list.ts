@@ -8,6 +8,7 @@ import type {
   BondResponse,
   DepositResponse,
   ExpensePaymentResponse,
+  GroupContributionStatus,
   IncomeOccurrenceResponse,
   OneOffExpenseResponse,
   OneOffIncomeResponse,
@@ -66,6 +67,16 @@ const STATUS_VIEWS: Record<IncomeStatus, StatusView> = {
   skipped: { key: 'planning.calendar.status.skipped', icon: 'block', tone: 'neutral' },
 };
 
+const CONTRIBUTION_STATUS_VIEWS: Record<GroupContributionStatus, StatusView> = {
+  Unsettled: { key: 'planning.contribution.status.unsettled', icon: 'schedule', tone: 'neutral' },
+  Partial: { key: 'planning.contribution.status.partial', icon: 'pending', tone: 'warning' },
+  Settled: {
+    key: 'planning.contribution.status.settled',
+    icon: 'check_circle',
+    tone: 'positive',
+  },
+};
+
 const KIND_KEYS = {
   deposit: 'planning.calendar.kind.deposit',
   bond: 'planning.calendar.kind.bond',
@@ -92,6 +103,8 @@ export class PlanningDayList {
 
   protected readonly formatMoney = formatMoney;
   protected readonly formatDate = formatDate;
+
+  protected readonly contributionStatusViews = CONTRIBUTION_STATUS_VIEWS;
 
   protected readonly contributions = computed(() => this.data().expenses.groupContributions);
 

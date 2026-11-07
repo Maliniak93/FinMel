@@ -278,15 +278,15 @@ export class Planning {
       free: translate('dashboard.monthCard.free'),
       deficit: translate('planning.freeFunds.deficit'),
       plan: translate('planning.freeFunds.plan'),
-      forecast: translate('planning.freeFunds.forecast'),
+      actual: translate('planning.freeFunds.actual'),
     };
   });
 
   protected readonly cascadeTestIds = {
     'plan-free': 'free-funds-plan',
-    'forecast-free': 'free-funds-forecast',
+    'actual-free': 'free-funds-actual',
     'free-deficit': 'free-funds-deficit',
-    'forecast-free-deficit': 'free-funds-deficit',
+    'actual-free-deficit': 'free-funds-deficit',
   };
 
   protected readonly cascade = computed(() => {
@@ -301,6 +301,11 @@ export class Planning {
     const expenses = (toGrosze(data.expenses.costPln) - contributionsGrosze) / 100;
     const contributions = contributionsGrosze / 100;
     const balance = data.incomes.balance;
+    const fundedGrosze = data.expenses.groupContributions.reduce(
+      (sum, contribution) => sum + toGrosze(contribution.fundedPln ?? 0),
+      0,
+    );
+    const actualIncomesGrosze = toGrosze(balance.actualPln);
     return {
       plan: {
         incomes: Number(balance.planPln),
@@ -308,11 +313,11 @@ export class Planning {
         contributions,
         free: Number(data.freeFunds.planPln),
       },
-      forecast: {
-        incomes: (toGrosze(balance.actualPln) + toGrosze(balance.pendingPln)) / 100,
-        expenses,
-        contributions,
-        free: Number(data.freeFunds.forecastPln),
+      actual: {
+        incomes: actualIncomesGrosze / 100,
+        expenses: (actualIncomesGrosze - fundedGrosze - toGrosze(data.freeFunds.actualPln)) / 100,
+        contributions: fundedGrosze / 100,
+        free: Number(data.freeFunds.actualPln),
       },
     };
   });

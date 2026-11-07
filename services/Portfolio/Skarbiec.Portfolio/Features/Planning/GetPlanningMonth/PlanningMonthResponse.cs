@@ -163,8 +163,8 @@ public sealed record FreeFundsResponse
     /// <summary>Planned income minus the month's expense cost; negative is a deficit.</summary>
     public required decimal PlanPln { get; init; }
 
-    /// <summary>Settled income plus pending income minus the month's expense cost; negative is a deficit.</summary>
-    public required decimal ForecastPln { get; init; }
+    /// <summary>Settled income minus settled expenses and the funding of the groups; negative is a deficit.</summary>
+    public required decimal ActualPln { get; init; }
 
     /// <summary>True when a needed FX rate is missing, so the figures are incomplete.</summary>
     public required bool Incomplete { get; init; }
@@ -331,6 +331,20 @@ public sealed record GroupContributionResponse
     public required Guid GroupId { get; init; }
     public required string Name { get; init; }
     public required decimal AmountPln { get; init; }
+
+    /// <summary>PLN that entered the group this month net of what left it, at least 0; null outside the current month.</summary>
+    public required decimal? FundedPln { get; init; }
+
+    /// <summary>Null outside the current month.</summary>
+    public required GroupContributionStatus? Status { get; init; }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter<GroupContributionStatus>))]
+public enum GroupContributionStatus
+{
+    Unsettled,
+    Partial,
+    Settled,
 }
 
 /// <summary>How the viewed month's free funds would be divided between the groups; information only.</summary>

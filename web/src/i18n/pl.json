@@ -517,7 +517,7 @@
       "free": "= Wolne środki",
       "splitTarget": "→ {{ name }}",
       "splitGroup": "→ {{ name }} · {{ share }}",
-      "forecast": "Prognoza wolnych środków:",
+      "actual": "Faktyczne wolne środki:",
       "deficit": "deficyt",
       "settled": "Wpływy załatwione: {{ done }} z {{ total }}",
       "loadFailed": "Nie udało się wczytać miesiąca."
@@ -869,7 +869,7 @@
       "expand": "Pokaż szczegóły miesiąca",
       "collapse": "Ukryj szczegóły miesiąca",
       "chart": {
-        "label": "Wolne środki, plan i prognoza w {{ year }}"
+        "label": "Wolne środki, plan i faktyczne w {{ year }}"
       },
       "columns": {
         "month": "Miesiąc",
@@ -878,7 +878,7 @@
         "difference": "Różnica",
         "cost": "Wydatki",
         "freeFundsPlan": "Wolne środki plan",
-        "freeFundsForecast": "Wolne środki prognoza"
+        "freeFundsActual": "Wolne środki faktyczne"
       }
     },
     "add": "Dodaj wpływ",
@@ -1007,8 +1007,15 @@
     "freeFunds": {
       "title": "Wolne środki",
       "plan": "Plan",
-      "forecast": "Prognoza",
+      "actual": "Faktyczne",
       "deficit": "deficyt"
+    },
+    "contribution": {
+      "status": {
+        "unsettled": "Nierozliczona",
+        "partial": "Częściowa",
+        "settled": "Zrealizowana"
+      }
     },
     "split": {
       "title": "Podział wolnych środków",

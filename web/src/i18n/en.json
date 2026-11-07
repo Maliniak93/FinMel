@@ -517,7 +517,7 @@
       "free": "= Free funds",
       "splitTarget": "→ {{ name }}",
       "splitGroup": "→ {{ name }} · {{ share }}",
-      "forecast": "Free funds forecast:",
+      "actual": "Actual free funds:",
       "deficit": "deficit",
       "settled": "Incomes settled: {{ done }} of {{ total }}",
       "loadFailed": "Failed to load the month."
@@ -869,7 +869,7 @@
       "expand": "Show month details",
       "collapse": "Hide month details",
       "chart": {
-        "label": "Free funds, plan and forecast in {{ year }}"
+        "label": "Free funds, plan and actual in {{ year }}"
       },
       "columns": {
         "month": "Month",
@@ -878,7 +878,7 @@
         "difference": "Difference",
         "cost": "Expenses",
         "freeFundsPlan": "Free funds plan",
-        "freeFundsForecast": "Free funds forecast"
+        "freeFundsActual": "Free funds actual"
       }
     },
     "add": "Add income",
@@ -1007,8 +1007,15 @@
     "freeFunds": {
       "title": "Free funds",
       "plan": "Plan",
-      "forecast": "Forecast",
+      "actual": "Actual",
       "deficit": "deficit"
+    },
+    "contribution": {
+      "status": {
+        "unsettled": "Unsettled",
+        "partial": "Partial",
+        "settled": "Settled"
+      }
     },
     "split": {
       "title": "Split of free funds",

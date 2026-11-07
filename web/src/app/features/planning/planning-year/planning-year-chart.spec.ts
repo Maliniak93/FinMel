@@ -12,7 +12,7 @@ function month(index: number, overrides: Record<string, unknown> = {}): Record<s
     differencePln: null,
     costPln: 4200,
     freeFundsPlanPln: 6000 + index * 1000,
-    freeFundsForecastPln: 5000 + index * 1000,
+    freeFundsActualPln: 5000 + index * 1000,
     hasOverdue: false,
     incomplete: false,
     ...overrides,
@@ -52,13 +52,13 @@ describe('PlanningYearChart', () => {
     return parseFloat((node as HTMLElement).style.height);
   }
 
-  it('renders twelve columns with plan and forecast', async () => {
+  it('renders twelve columns with plan and actual', async () => {
     await render(Array.from({ length: 12 }, (_, index) => month(index)));
 
     expect(columns()).toHaveLength(12);
     for (const column of columns()) {
       expect(column.querySelector('[data-testid="year-chart-plan"]')).not.toBeNull();
-      expect(column.querySelector('[data-testid="year-chart-forecast"]')).not.toBeNull();
+      expect(column.querySelector('[data-testid="year-chart-actual"]')).not.toBeNull();
     }
     expect(columns()[0].textContent).toContain('Jan');
     expect(columns()[11].textContent).toContain('Dec');
@@ -70,14 +70,14 @@ describe('PlanningYearChart', () => {
     expect(plans[0]).toBeCloseTo((6000 / 17000) * 100, 0);
 
     const chart = element().querySelector('[role="img"]')!;
-    expect(chart.getAttribute('aria-label')).toContain('Free funds, plan and forecast in 2026');
+    expect(chart.getAttribute('aria-label')).toContain('Free funds, plan and actual in 2026');
     expect(chart.getAttribute('aria-label')).toContain('Jan');
   });
 
   it('marks a deficit month with outline and word', async () => {
     const months = Array.from({ length: 12 }, (_, index) =>
       index === 5
-        ? month(index, { freeFundsPlanPln: -3000, freeFundsForecastPln: -3000 })
+        ? month(index, { freeFundsPlanPln: -3000, freeFundsActualPln: -3000 })
         : month(index),
     );
     await render(months);
@@ -110,14 +110,14 @@ describe('PlanningYearChart', () => {
         ? month(index, {
             hasDefinitions: false,
             freeFundsPlanPln: null,
-            freeFundsForecastPln: null,
+            freeFundsActualPln: null,
           })
         : month(index),
     );
     await render(months);
 
     expect(columns()[0].querySelector('[data-testid="year-chart-plan"]')).toBeNull();
-    expect(columns()[0].querySelector('[data-testid="year-chart-forecast"]')).toBeNull();
+    expect(columns()[0].querySelector('[data-testid="year-chart-actual"]')).toBeNull();
     expect(columns()[0].querySelector('[data-testid="year-chart-empty"]')).not.toBeNull();
     expect(
       columns().filter((column) => column.getAttribute('data-current') === 'true'),

@@ -177,7 +177,8 @@ internal static class PlanningApi
         List<OneOffExpenseView>? OneOffs = null,
         List<GroupContributionView>? GroupContributions = null);
 
-    public sealed record GroupContributionView(Guid GroupId, string Name, decimal AmountPln);
+    public sealed record GroupContributionView(
+        Guid GroupId, string Name, decimal AmountPln, decimal? FundedPln = null, string? Status = null);
 
     public sealed record ClassAmountView(AssetClass AssetClass, decimal AmountPln);
 
@@ -200,7 +201,7 @@ internal static class PlanningApi
         decimal UnassignedPln,
         bool ValuationMissing);
 
-    public sealed record FreeFundsView(decimal PlanPln, decimal ForecastPln, bool Incomplete);
+    public sealed record FreeFundsView(decimal PlanPln, decimal ActualPln, bool Incomplete);
 
     public sealed record PlanningMonthView(
         IncomesView Incomes,
@@ -224,7 +225,7 @@ internal static class PlanningApi
         decimal? DifferencePln,
         decimal? CostPln,
         decimal? FreeFundsPlanPln,
-        decimal? FreeFundsForecastPln,
+        decimal? FreeFundsActualPln,
         bool HasOverdue,
         bool Incomplete);
 
@@ -234,9 +235,9 @@ internal static class PlanningApi
         decimal DifferencePln,
         decimal CostPln,
         decimal FreeFundsPlanPln,
-        decimal FreeFundsForecastPln);
+        decimal FreeFundsActualPln);
 
-    // Forecast 12 243.27 and cost 4 200 every month; returns the "Życie" expense id.
+    // Free funds plan 12 243.27 and cost 4 200 every month; returns the "Życie" expense id.
     public static async Task<Guid> CreateCushionSetupAsync(this HttpClient client, CancellationToken cancellationToken)
     {
         var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");

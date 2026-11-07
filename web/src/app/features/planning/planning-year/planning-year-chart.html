@@ -17,9 +17,9 @@
               [style.height.%]="column.planHeight"
             ></span>
             <span
-              class="year-chart__forecast"
-              data-testid="year-chart-forecast"
-              [style.bottom.%]="column.forecastBottom"
+              class="year-chart__actual"
+              data-testid="year-chart-actual"
+              [style.bottom.%]="column.actualBottom"
             ></span>
           }
         </div>
@@ -50,8 +50,8 @@
       {{ 'planning.freeFunds.plan' | transloco }}
     </span>
     <span class="year-chart__legend-item">
-      <span class="year-chart__swatch year-chart__swatch--forecast"></span>
-      {{ 'planning.freeFunds.forecast' | transloco }}
+      <span class="year-chart__swatch year-chart__swatch--actual"></span>
+      {{ 'planning.freeFunds.actual' | transloco }}
     </span>
     <span class="year-chart__legend-item">
       <span class="year-chart__swatch year-chart__swatch--deficit"></span>

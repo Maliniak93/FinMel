@@ -273,6 +273,10 @@ internal sealed class PlanningForecast
         + OneOffExpenses.Where(e => YearMonth.From(e.Date) == month).Sum(e => e.IsSettled ? SettledCost(e) : e.Amount)
         + ContributingGroupsIn(month).Sum(g => g.MonthlyContributionPln);
 
+    public decimal SettledCostIn(YearMonth month) =>
+        settledPayments.Where(o => YearMonth.From(o.PlannedDate) == month).Sum(SettledCost)
+        + OneOffExpenses.Where(e => e.IsSettled && YearMonth.From(e.Date) == month).Sum(SettledCost);
+
     public MonthFigures FiguresIn(YearMonth month, IReadOnlyDictionary<string, decimal> rates, DateOnly today)
     {
         var balance = BalanceOf(OccurrencesIn(month, rates, today), OneOffIncomesIn(month, rates, today));

@@ -27,15 +27,15 @@
         />
       </div>
 
-      <p class="month-card__line" data-testid="month-card-forecast">
-        {{ 'dashboard.monthCard.forecast' | transloco }}
-        @if (forecastPln() < 0) {
+      <p class="month-card__line" data-testid="month-card-actual">
+        {{ 'dashboard.monthCard.actual' | transloco }}
+        @if (actualPln() < 0) {
           <span class="month-card__deficit" data-testid="month-card-deficit">
-            {{ formatMoney(forecastPln(), 'PLN') }}
+            {{ formatMoney(actualPln(), 'PLN') }}
             {{ 'dashboard.monthCard.deficit' | transloco }}
           </span>
         } @else {
-          {{ formatMoney(forecastPln(), 'PLN') }}
+          {{ formatMoney(actualPln(), 'PLN') }}
         }
       </p>
 
