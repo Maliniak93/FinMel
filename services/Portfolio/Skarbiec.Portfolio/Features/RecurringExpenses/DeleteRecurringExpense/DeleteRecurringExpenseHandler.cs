@@ -14,6 +14,11 @@ public sealed class DeleteRecurringExpenseHandler(PortfolioDbContext dbContext)
             return RecurringExpenseErrors.NotFound(id);
         }
 
+        if (await dbContext.RecurringExpenseOccurrences.AnyAsync(o => o.RecurringExpenseId == id, cancellationToken))
+        {
+            return RecurringExpenseErrors.HasSettlements(id);
+        }
+
         // The versions go with it through the database cascade.
         dbContext.RecurringExpenses.Remove(expense);
         await dbContext.SaveChangesAsync(cancellationToken);

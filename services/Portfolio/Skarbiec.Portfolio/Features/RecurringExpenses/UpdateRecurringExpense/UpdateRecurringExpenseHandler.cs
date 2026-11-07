@@ -25,6 +25,15 @@ public sealed class UpdateRecurringExpenseHandler(PortfolioDbContext dbContext)
         var effective = request.EffectiveMonth;
         var inForce = expense.InForce(effective);
 
+        if (request.AccountId != inForce.AccountId)
+        {
+            var account = await dbContext.CheckPayingAccountAsync(request.AccountId, cancellationToken);
+            if (account.IsFailure)
+            {
+                return account.Error;
+            }
+        }
+
         expense.Name = request.Name;
         expense.StartDate = request.StartDate;
         expense.EndDate = request.EndDate;
@@ -34,14 +43,12 @@ public sealed class UpdateRecurringExpenseHandler(PortfolioDbContext dbContext)
             && inForce.IntervalMonths == request.IntervalMonths
             && inForce.DayKind == request.DayKind
             && inForce.DayOfMonth == dayOfMonth
-            && inForce.Shift == request.Shift;
+            && inForce.Shift == request.Shift
+            && inForce.AccountId == request.AccountId;
 
         if (!unchanged)
         {
-            var first = expense.Versions.OrderBy(v => v.EffectiveFrom).First();
-            var target = effective <= YearMonth.From(first.EffectiveFrom)
-                ? first
-                : expense.Versions.FirstOrDefault(v => v.EffectiveFrom == effective.FirstDay);
+            var target = expense.EditableFrom(effective);
 
             if (target is null)
             {
@@ -54,7 +61,8 @@ public sealed class UpdateRecurringExpenseHandler(PortfolioDbContext dbContext)
                     IntervalMonths = request.IntervalMonths,
                     DayKind = request.DayKind,
                     DayOfMonth = dayOfMonth,
-                    Shift = request.Shift
+                    Shift = request.Shift,
+                    AccountId = request.AccountId
                 });
             }
             else
@@ -64,6 +72,7 @@ public sealed class UpdateRecurringExpenseHandler(PortfolioDbContext dbContext)
                 target.DayKind = request.DayKind;
                 target.DayOfMonth = dayOfMonth;
                 target.Shift = request.Shift;
+                target.AccountId = request.AccountId;
             }
         }
 

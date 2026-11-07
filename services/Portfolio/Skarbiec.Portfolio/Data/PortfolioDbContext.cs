@@ -30,6 +30,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public DbSet<RecurringIncomeOccurrence> RecurringIncomeOccurrences => Set<RecurringIncomeOccurrence>();
     public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
     public DbSet<RecurringExpenseVersion> RecurringExpenseVersions => Set<RecurringExpenseVersion>();
+    public DbSet<RecurringExpenseOccurrence> RecurringExpenseOccurrences => Set<RecurringExpenseOccurrence>();
     public DbSet<OneOffIncome> OneOffIncomes => Set<OneOffIncome>();
     public DbSet<OneOffExpense> OneOffExpenses => Set<OneOffExpense>();
     public DbSet<ValuationReplica> ValuationReplicas => Set<ValuationReplica>();
@@ -320,6 +321,38 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             version.Property(v => v.Amount).HasPrecision(18, 2);
             version.Property(v => v.DayKind).HasConversion<string>().HasMaxLength(20);
             version.Property(v => v.Shift).HasConversion<string>().HasMaxLength(20);
+
+            // SetNull: deleting the default account only clears the version's account.
+            version.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(v => v.AccountId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<RecurringExpenseOccurrence>(occurrence =>
+        {
+            occurrence.Property(o => o.PlannedAmount).HasPrecision(18, 2);
+            occurrence.Property(o => o.ActualAmount).HasPrecision(18, 2);
+            occurrence.Property(o => o.FxRateToPln).HasPrecision(18, 6);
+
+            occurrence.HasIndex(o => new { o.RecurringExpenseId, o.NominalMonth }).IsUnique();
+
+            occurrence.HasOne<RecurringExpense>()
+                .WithMany()
+                .HasForeignKey(o => o.RecurringExpenseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict: an account that settled a payment is never deleted under it.
+            occurrence.HasOne<Account>()
+                .WithMany()
+                .HasForeignKey(o => o.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // SetNull: deleting the withdrawal by hand leaves the settlement in place.
+            occurrence.HasOne<Transaction>()
+                .WithMany()
+                .HasForeignKey(o => o.TransactionId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<OneOffIncome>(income =>

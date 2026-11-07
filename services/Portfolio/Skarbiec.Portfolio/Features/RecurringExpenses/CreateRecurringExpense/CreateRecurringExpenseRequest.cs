@@ -26,6 +26,9 @@ public sealed record CreateRecurringExpenseRequest : IValidatableObject
 
     public required BusinessDayShift Shift { get; init; }
 
+    /// <summary>The account the expense is usually paid from; none when absent.</summary>
+    public Guid? AccountId { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         RecurringIncomeValidation.Validate(DayKind, Shift, DayOfMonth, StartDate, EndDate);
 }

@@ -774,10 +774,64 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("RecurringExpenses");
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpenseOccurrence", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ActualAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("ActualDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("FxRateToPln")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<DateOnly>("NominalMonth")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("PlannedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<DateOnly>("PlannedDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("RecurringExpenseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("TransactionId");
+
+                    b.HasIndex("RecurringExpenseId", "NominalMonth")
+                        .IsUnique();
+
+                    b.ToTable("RecurringExpenseOccurrences");
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpenseVersion", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AccountId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Amount")
@@ -810,6 +864,8 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
 
                     b.HasIndex("RecurringExpenseId");
 
@@ -1305,8 +1361,33 @@ namespace Skarbiec.Portfolio.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpenseOccurrence", b =>
+                {
+                    b.HasOne("Skarbiec.Portfolio.Data.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Skarbiec.Portfolio.Data.RecurringExpense", null)
+                        .WithMany()
+                        .HasForeignKey("RecurringExpenseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Skarbiec.Portfolio.Data.Transaction", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("Skarbiec.Portfolio.Data.RecurringExpenseVersion", b =>
                 {
+                    b.HasOne("Skarbiec.Portfolio.Data.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Skarbiec.Portfolio.Data.RecurringExpense", null)
                         .WithMany("Versions")
                         .HasForeignKey("RecurringExpenseId")

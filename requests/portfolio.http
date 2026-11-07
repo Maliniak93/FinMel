@@ -1358,7 +1358,7 @@ Authorization: Bearer {{authToken}}
 
 ### --- Recurring expenses ---
 
-### Create a recurring expense: 1 200 PLN every 12 months on day 15 (no account or currency; 409 Conflict.DuplicateName among expenses)
+### Create a recurring expense: 1 200 PLN every 12 months on day 15, optional paying account (201; 404 for another user's account, 409 Conflict.AccountArchived, 409 Conflict.DuplicateName among expenses)
 # @name createRecurringExpense
 POST {{baseUrl}}/api/portfolio/recurring-expenses
 Authorization: Bearer {{authToken}}
@@ -1372,10 +1372,11 @@ Content-Type: application/json
   "intervalMonths": 12,
   "dayKind": 0,
   "dayOfMonth": 15,
-  "shift": 0
+  "shift": 0,
+  "accountId": "{{createMbankAccount.response.body.id}}"
 }
 
-### Update the expense from a month (204): name, start and end apply to every month; amount and rule from effectiveFrom (yyyy-MM, 2011-01 to 2099-12) on, later changes are kept (409 Conflict.DuplicateName)
+### Update the expense from a month (204): name, start and end apply to every month; amount, rule and account from effectiveFrom (yyyy-MM, 2011-01 to 2099-12) on, later changes are kept (409 Conflict.DuplicateName; a changed account is 404 / 409 Conflict.AccountArchived as on create)
 PUT {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -1389,8 +1390,26 @@ Content-Type: application/json
   "intervalMonths": 12,
   "dayKind": 0,
   "dayOfMonth": 15,
-  "shift": 0
+  "shift": 0,
+  "accountId": "{{createMbankAccount.response.body.id}}"
 }
+
+### Settle a recurring expense's payment of a nominal month (yyyy-MM), or edit its settlement: actual date not after today, an unarchived account in any currency, the FX rate of actualDate frozen (204; 400 Validation.ActualDateInFuture / Validation.FxRateMissing / Validation.InsufficientFunds; 404 NotFound.RecurringExpense / NotFound.ExpensePayment when the rule pays nothing that month; 409 Conflict.AccountArchived); createWithdrawal (default false) also writes, moves or removes an editable Withdraw on the account's cash; rememberAccount (default false) makes the account the expense's account from that month on
+PUT {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}/payments/2027-03/settlement
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "actualAmount": 1150,
+  "actualDate": "2027-03-15",
+  "accountId": "{{createMbankAccount.response.body.id}}",
+  "createWithdrawal": true,
+  "rememberAccount": true
+}
+
+### Undo a payment's settlement: pending again, its withdrawal removed when it still exists (204; 404 NotFound.ExpensePayment when it is not settled)
+DELETE {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}/payments/2027-03/settlement
+Authorization: Bearer {{authToken}}
 
 ### Delete the scheduled change starting in a month (204; 404 when no version starts there; 409 Conflict.FirstVersion for the first one)
 DELETE {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}/changes/2027-01
@@ -1405,7 +1424,7 @@ Content-Type: application/json
   "endDate": "2028-03-31"
 }
 
-### Delete the expense with its versions (204; always allowed)
+### Delete the expense with its versions (204; 409 Conflict.RecurringExpenseHasSettlements while a payment is settled)
 DELETE {{baseUrl}}/api/portfolio/recurring-expenses/{{createRecurringExpense.response.body.id}}
 Authorization: Bearer {{authToken}}
 

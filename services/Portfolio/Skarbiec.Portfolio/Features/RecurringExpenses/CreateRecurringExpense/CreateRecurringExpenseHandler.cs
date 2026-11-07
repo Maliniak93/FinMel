@@ -16,6 +16,12 @@ public sealed class CreateRecurringExpenseHandler(PortfolioDbContext dbContext, 
             return RecurringExpenseErrors.DuplicateName(request.Name);
         }
 
+        var account = await dbContext.CheckPayingAccountAsync(request.AccountId, cancellationToken);
+        if (account.IsFailure)
+        {
+            return account.Error;
+        }
+
         var createdOn = WarsawCalendar.Today(timeProvider);
         var firstMonth = YearMonth.From(request.StartDate);
         var createdMonth = YearMonth.From(createdOn);
@@ -37,7 +43,8 @@ public sealed class CreateRecurringExpenseHandler(PortfolioDbContext dbContext, 
             IntervalMonths = request.IntervalMonths,
             DayKind = request.DayKind,
             DayOfMonth = request.DayKind == RecurrenceDayKind.DayOfMonth ? request.DayOfMonth : null,
-            Shift = request.Shift
+            Shift = request.Shift,
+            AccountId = request.AccountId
         });
 
         dbContext.RecurringExpenses.Add(expense);

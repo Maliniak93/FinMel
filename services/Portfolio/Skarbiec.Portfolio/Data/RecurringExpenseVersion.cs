@@ -14,4 +14,5 @@ public sealed class RecurringExpenseVersion : IUserOwned
     public required RecurrenceDayKind DayKind { get; set; }
     public int? DayOfMonth { get; set; }
     public required BusinessDayShift Shift { get; set; }
+    public Guid? AccountId { get; set; }
 }

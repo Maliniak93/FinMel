@@ -6,6 +6,7 @@ using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.AccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PlanningApi;
 
@@ -141,5 +142,94 @@ public sealed class RecurringExpenseEndpointTests(SkarbiecContainersFixture cont
         Assert.Equal(1, await dbContext.Set<RecurringExpense>().CountAsync(cancellationToken));
         var version = await dbContext.Set<RecurringExpenseVersion>().SingleAsync(cancellationToken);
         Assert.NotEqual(expense, version.RecurringExpenseId);
+    }
+
+    [Fact]
+    public async Task Create_WithAccount_StoresOnVersion()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var mbank = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var archived = await client.CreateBankAccountAsync(cancellationToken, "Stare konto");
+        await client.ArchiveAccountAsync(archived.AccountId, cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangers = await stranger.CreateBankAccountAsync(cancellationToken, "Obce konto");
+
+        var created = await client.PostAsJsonAsync(
+            RecurringExpensesUri, NewRecurringExpenseBody("Czynsz", 2_000m, accountId: mbank.AccountId), cancellationToken);
+        var onStrangers = await client.PostAsJsonAsync(
+            RecurringExpensesUri, NewRecurringExpenseBody("Prąd", 100m, accountId: strangers.AccountId), cancellationToken);
+        var onArchived = await client.PostAsJsonAsync(
+            RecurringExpensesUri, NewRecurringExpenseBody("Gaz", 100m, accountId: archived.AccountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, onStrangers.StatusCode);
+        await onArchived.AssertProblemAsync(HttpStatusCode.Conflict, PortfolioAssertions.AccountArchivedErrorCode, cancellationToken);
+        var definition = Assert.Single((await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Expenses.Definitions);
+        Assert.Equal((mbank.AccountId, "mBank ROR"), (definition.AccountId, definition.AccountName));
+    }
+
+    [Fact]
+    public async Task Delete_WithSettlement_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var settled = await client.CreateExpensePaymentWithdrawalAsync(cancellationToken);
+
+        var response = await client.DeleteAsync(RecurringExpenseUri(settled.ExpenseId), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, RecurringExpenseHasSettlementsErrorCode, cancellationToken);
+        var payment = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Expenses.Payment(settled.ExpenseId, "2026-10");
+        Assert.Equal("Settled", payment.Status);
+    }
+
+    [Fact]
+    public async Task Delete_AfterUndo_Succeeds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var settled = await client.CreateExpensePaymentWithdrawalAsync(cancellationToken);
+        var undone = await client.DeleteAsync(ExpensePaymentSettlementUri(settled.ExpenseId, "2026-10"), cancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, undone.StatusCode);
+
+        var response = await client.DeleteAsync(RecurringExpenseUri(settled.ExpenseId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Empty((await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Expenses.Definitions);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_WithSettlement_Returns409()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var expense = await client.CreateRecurringExpenseAsync(cancellationToken, "Czynsz", 2_400m, dayOfMonth: 5);
+        await client.SettleExpensePaymentAsync(expense, "2026-10", account.AccountId, 2_350m, ExpenseSettlementDay, cancellationToken);
+
+        var response = await client.DeleteAsync(AccountUri(account.AccountId), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, AccountHasExpenseSettlementsErrorCode, cancellationToken);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_ClearsDefaultAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var expense = await client.CreateRecurringExpenseAsync(cancellationToken, "Czynsz", 2_000m, accountId: account.AccountId);
+
+        var response = await client.DeleteAsync(AccountUri(account.AccountId), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var definition = await client.ExpenseDefinitionAsync(expense, "2026-10", cancellationToken);
+        Assert.Null(definition.AccountId);
+        Assert.Null(definition.AccountName);
     }
 }

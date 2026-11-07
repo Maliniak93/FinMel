@@ -5,6 +5,7 @@ using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PlanningApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -203,5 +204,31 @@ public sealed class UpdateRecurringExpenseEndpointTests(SkarbiecContainersFixtur
 
             Assert.True(response.StatusCode == HttpStatusCode.BadRequest, $"{scenario} returned {(int)response.StatusCode}.");
         }
+    }
+
+    [Fact]
+    public async Task Update_ChangedAccount_WritesVersion()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var id = await client.CreateOcToyotaAsync(cancellationToken);
+
+        var response = await client.PutAsJsonAsync(
+            RecurringExpenseUri(id),
+            UpdateRecurringExpenseBody(
+                "2027-01", "OC Toyota", 1_200m, OcToyotaStart, intervalMonths: 12, dayOfMonth: 15, accountId: account.AccountId),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(2, await CountRecurringExpenseVersionsAsync(userId, id, cancellationToken));
+        var october = await client.ExpenseDefinitionAsync(id, "2026-10", cancellationToken);
+        Assert.Null(october.AccountId);
+        Assert.NotNull(october.NextChange);
+        Assert.Equal((account.AccountId, "mBank ROR"), (october.NextChange.AccountId, october.NextChange.AccountName));
+        var january = await client.ExpenseDefinitionAsync(id, "2027-01", cancellationToken);
+        Assert.Equal((account.AccountId, "mBank ROR"), (january.AccountId, january.AccountName));
     }
 }

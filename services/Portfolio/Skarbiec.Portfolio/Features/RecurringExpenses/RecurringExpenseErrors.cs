@@ -13,6 +13,12 @@ internal static class RecurringExpenseErrors
     public static Error ChangeNotFound(Guid id, string month) =>
         new("NotFound.RecurringExpenseChange", $"Recurring expense '{id}' has no change starting in {month}.");
 
+    public static Error PaymentNotFound(Guid id, string month) =>
+        new("NotFound.ExpensePayment", $"Recurring expense '{id}' has no payment settled or due in {month}.");
+
+    public static Error HasSettlements(Guid id) =>
+        new("Conflict.RecurringExpenseHasSettlements", $"Recurring expense '{id}' has settled payments — undo them first.");
+
     public static Error FirstVersion(string month) =>
         new("Conflict.FirstVersion", $"The change in {month} is the expense's first version — end or delete the expense instead.");
 }

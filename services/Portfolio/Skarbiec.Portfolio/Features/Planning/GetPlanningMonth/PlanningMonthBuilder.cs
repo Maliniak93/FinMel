@@ -188,18 +188,7 @@ internal static class PlanningMonthBuilder
     private static PlanningExpensesResponse BuildExpenses(YearMonth viewed, PlanningForecast forecast)
     {
         var plans = forecast.Plans;
-        var payments = plans
-            .SelectMany(p => ReserveSchedule.PaymentsIn(viewed, p.Plan).Select(payment => new ExpensePaymentResponse
-            {
-                RecurringExpenseId = p.Expense.Id,
-                NominalMonth = payment.NominalMonth.ToString(),
-                Date = payment.Date,
-                Name = p.Expense.Name,
-                Amount = payment.Amount
-            }))
-            .OrderBy(p => p.Date)
-            .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var payments = forecast.ExpensePaymentsIn(viewed);
 
         var definitions = plans
             .OrderBy(p => p.Expense.Name, StringComparer.OrdinalIgnoreCase)
@@ -210,6 +199,8 @@ internal static class PlanningMonthBuilder
                     .Where(v => v.EffectiveFrom > viewed.FirstDay)
                     .OrderBy(v => v.EffectiveFrom)
                     .FirstOrDefault();
+                var account = forecast.AccountOf(version.AccountId);
+                var nextAccount = forecast.AccountOf(next?.AccountId);
 
                 return new ExpenseDefinitionResponse
                 {
@@ -237,8 +228,12 @@ internal static class PlanningMonthBuilder
                             IntervalMonths = next.IntervalMonths,
                             DayKind = next.DayKind,
                             DayOfMonth = next.DayOfMonth,
-                            Shift = next.Shift
-                        }
+                            Shift = next.Shift,
+                            AccountId = nextAccount?.Id,
+                            AccountName = nextAccount?.Name
+                        },
+                    AccountId = account?.Id,
+                    AccountName = account?.Name
                 };
             })
             .ToList();

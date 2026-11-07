@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PlanningApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -54,6 +55,42 @@ public sealed class RecurringExpenseTenancyIsolationTests(SkarbiecContainersFixt
         Assert.Equal(1_200m, definition.Amount);
         Assert.NotNull(definition.NextChange);
         Assert.Equal(1_320m, definition.NextChange.Amount);
+    }
+
+    [Fact]
+    public async Task SettlePayment_OtherUsersExpense_Returns404()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var settled = await owner.CreateExpensePaymentWithdrawalAsync(cancellationToken);
+        var open = await owner.CreateRecurringExpenseAsync(cancellationToken, "Internet", 60m, dayOfMonth: 5);
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangersAccount = await stranger.CreateBankAccountAsync(cancellationToken, "Obce konto", balance: 5_000m);
+        var settle = await stranger.PutAsJsonAsync(
+            ExpensePaymentSettlementUri(open, "2026-10"),
+            SettleExpensePaymentBody(strangersAccount.AccountId, 60m, ExpenseSettlementDay),
+            cancellationToken);
+        var resettle = await stranger.PutAsJsonAsync(
+            ExpensePaymentSettlementUri(settled.ExpenseId, "2026-10"),
+            SettleExpensePaymentBody(strangersAccount.AccountId, 1m, ExpenseSettlementDay),
+            cancellationToken);
+        var undo = await stranger.DeleteAsync(ExpensePaymentSettlementUri(settled.ExpenseId, "2026-10"), cancellationToken);
+        var withStrangersAccount = await owner.PutAsJsonAsync(
+            ExpensePaymentSettlementUri(open, "2026-10"),
+            SettleExpensePaymentBody(strangersAccount.AccountId, 60m, ExpenseSettlementDay),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, settle.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, resettle.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, undo.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, withStrangersAccount.StatusCode);
+        var october = (await owner.GetPlanningMonthAsync("2026-10", cancellationToken)).Expenses;
+        var payment = october.Payment(settled.ExpenseId, "2026-10");
+        Assert.Equal(("Settled", 2_350m), (payment.Status, payment.ActualAmount));
+        Assert.Equal("Pending", october.Payment(open, "2026-10").Status);
+        Assert.Empty((await stranger.GetPlanningMonthAsync("2026-10", cancellationToken)).Expenses.Payments);
     }
 
     [Fact]
