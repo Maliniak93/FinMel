@@ -144,38 +144,11 @@ public sealed class ListAccountsEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
-    public async Task OutsideNetWorth_ValuesInPln()
+    public async Task OutsideNetWorth_OmitsCashBalancePln()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(AccountCashTodayUtc);
         Factory.InstrumentQuoteLookupClient.WithRate("EUR", 4.30m);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var flaggedEur = await client.CreateBankAccountAsync(
-            cancellationToken, "Konto EUR", currency: "EUR", balance: 100m, outsideNetWorth: true);
-        var flaggedPln = await client.CreateBankAccountAsync(
-            cancellationToken, "Konto PLN", balance: 250m, outsideNetWorth: true);
-        var unflaggedEur = await client.CreateBankAccountAsync(cancellationToken, "Zwykle EUR", currency: "EUR", balance: 50m);
-
-        var response = await client.GetAsync(AccountsUri, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var accounts = (await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList();
-        var eur = accounts.Single(a => a.GetProperty("id").GetGuid() == flaggedEur.AccountId);
-        Assert.True(eur.GetProperty("outsideNetWorth").GetBoolean());
-        Assert.Equal(430m, eur.GetProperty("cashBalancePln").GetDecimal());
-        var pln = accounts.Single(a => a.GetProperty("id").GetGuid() == flaggedPln.AccountId);
-        Assert.Equal(250m, pln.GetProperty("cashBalancePln").GetDecimal());
-        var plain = accounts.Single(a => a.GetProperty("id").GetGuid() == unflaggedEur.AccountId);
-        Assert.False(plain.GetProperty("outsideNetWorth").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, plain.GetProperty("cashBalancePln").ValueKind);
-    }
-
-    [Fact]
-    public async Task OutsideNetWorth_FxUnavailable_ReturnsNull()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(AccountCashTodayUtc);
-        Factory.InstrumentQuoteLookupClient.WithUnavailable();
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var flaggedEur = await client.CreateBankAccountAsync(
             cancellationToken, "Konto EUR", currency: "EUR", balance: 100m, outsideNetWorth: true);
@@ -186,7 +159,8 @@ public sealed class ListAccountsEndpointTests(SkarbiecContainersFixture containe
         var account = Assert.Single((await response.ReadJsonAsync(cancellationToken)).EnumerateArray().ToList());
         Assert.Equal(flaggedEur.AccountId, account.GetProperty("id").GetGuid());
         Assert.True(account.GetProperty("outsideNetWorth").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, account.GetProperty("cashBalancePln").ValueKind);
+        Assert.False(account.TryGetProperty("cashBalancePln", out _));
+        Assert.Empty(Factory.InstrumentQuoteLookupClient.RateCalls);
     }
 
     [Fact]

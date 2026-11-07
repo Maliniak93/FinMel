@@ -15,7 +15,6 @@ export type AccountResponse = {
     groupId?: null | string;
     cashBalance: number | string;
     outsideNetWorth?: boolean;
-    cashBalancePln?: null | number | string;
     contribution?: null | ContributionResponse;
     netContributionsPln?: null | number | string;
     positionsCostPln?: null | number | string;
