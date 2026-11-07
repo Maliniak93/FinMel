@@ -105,13 +105,13 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
     await addIncome(page, income);
   }
 
-  await test.step('Krok 1: the Wydatki section of the current month has no payments or definitions, cost 0 zł, free funds plan and forecast 16 500 zł', async () => {
+  await test.step('Krok 1: the Wydatki section of the current month has no payments or definitions, cost 0 zł, free funds plan 16 500 zł and Faktyczne 0 zł', async () => {
     await openMonth(page, m(0));
     await expect(page.getByTestId('expenses-section')).toBeVisible();
     await expect(page.getByText('Brak wydatków cyklicznych.')).toBeVisible();
     await expect(expensePayments(page)).toHaveCount(0);
     await expectCost(page, '0,00');
-    await expectFreeFunds(page, '16 500,00', '16 500,00');
+    await expectFreeFunds(page, '16 500,00', '0,00');
   });
 
   await test.step('Krok 2: Życie 3 000 zł on the 1st without an account or currency question gives a payment of 3 000 zł, cost 3 000 zł and plan 13 500 zł', async () => {
@@ -182,8 +182,8 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
     await expectCost(page, '4 200,00');
   });
 
-  await test.step('Krok 6: free funds of the current month are plan 12 300 zł and forecast 12 300 zł', async () => {
-    await expectFreeFunds(page, '12 300,00', '12 300,00');
+  await test.step('Krok 6: free funds of the current month are plan 12 300 zł and Faktyczne 0 zł', async () => {
+    await expectFreeFunds(page, '12 300,00', '0,00');
   });
 
   await test.step('Krok 7: M-1 has no OC reserve, Życie and Rachunki are charged in full and cost is 4 000 zł', async () => {
@@ -271,18 +271,18 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
     await expect(page.getByTestId('free-funds-deficit')).toHaveCount(0);
   });
 
-  await test.step('Krok 14: settling Wypłata Dominik at 9 143,27 zł and Wypłata żona at 6 500 zł keeps plan 11 966,67 zł and gives forecast 11 909,94 zł', async () => {
+  await test.step('Krok 14: settling Wypłata Dominik at 9 143,27 zł and Wypłata żona at 6 500 zł keeps plan 11 966,67 zł and gives Faktyczne 15 643,27 zł', async () => {
     await openMonth(page, m(0));
     await settle(page, DOMINIK, '9143.27');
     await settle(page, WIFE, '6500');
-    await expectFreeFunds(page, '11 966,67', '11 909,94');
+    await expectFreeFunds(page, '11 966,67', '15 643,27');
   });
 
-  await test.step('Krok 15: skipping 800+ gives forecast 11 109,94 zł and plan 11 966,67 zł', async () => {
+  await test.step('Krok 15: skipping 800+ keeps Faktyczne 15 643,27 zł and plan 11 966,67 zł', async () => {
     const row = occurrences(page, BENEFIT);
     await row.getByTestId('skip-occurrence').click();
     await expect(status(row)).toHaveText('pominięte');
-    await expectFreeFunds(page, '11 966,67', '11 109,94');
+    await expectFreeFunds(page, '11 966,67', '15 643,27');
   });
 
   await test.step('Krok 16: OC Toyota at 1 320 zł from M+3 reserves 200 zł in M..M+2, 240 zł in M+3..M+5, pays 1 320 zł in M+5 and shows the scheduled change in M', async () => {

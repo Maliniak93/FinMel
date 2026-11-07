@@ -249,11 +249,11 @@ async function openDashboard(page: Page): Promise<void> {
 
 async function expectCard(
   page: Page,
-  figures: { plan: string; forecast: string; settled: string },
+  figures: { plan: string; actual: string; settled: string },
 ): Promise<void> {
   const card = monthCard(page);
   await expect(card.getByTestId('month-card-free')).toContainText(pln(figures.plan));
-  await expect(card.getByTestId('month-card-forecast')).toContainText(pln(figures.forecast));
+  await expect(card.getByTestId('month-card-actual')).toContainText(pln(figures.actual));
   await expect(card.getByTestId('month-card-settled')).toHaveText(
     `Wpływy załatwione: ${figures.settled}`,
   );
@@ -314,7 +314,7 @@ interface YearValues {
   difference?: string;
   cost: string;
   freeFundsPlan: string;
-  freeFundsForecast: string;
+  freeFundsActual: string;
 }
 
 async function expectCells(cells: Locator, values: string | null, index: number): Promise<void> {
@@ -331,7 +331,7 @@ async function expectYearValues(cells: Locator, values: YearValues): Promise<voi
   }
   await expectCells(cells, values.cost, 3);
   await expectCells(cells, values.freeFundsPlan, 4);
-  await expectCells(cells, values.freeFundsForecast, 5);
+  await expectCells(cells, values.freeFundsActual, 5);
 }
 
 function calendarCell(page: Page, date: string): Locator {
@@ -461,36 +461,36 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     await expectBadge(page, 0);
   });
 
-  await test.step('Krok 4: the card shows free funds 12 300,00 zł / 12 300,00 zł, incomes 0 of 3 and Wszystko załatwione', async () => {
+  await test.step('Krok 4: the card shows free funds plan 12 300,00 zł / actual 0,00 zł, incomes 0 of 3 and Wszystko załatwione', async () => {
     await openDashboard(page);
     await expectCard(page, {
       plan: '12 300,00',
-      forecast: '12 300,00',
+      actual: '0,00',
       settled: '0 z 3',
     });
     await expectAllDone(page);
     await expectBadge(page, 0);
   });
 
-  await test.step('Krok 5: settling Wypłata Dominik at 9 143,27 zł and Wypłata żona at 6 500 zł gives 12 300,00 zł / 12 243,27 zł and 2 of 3', async () => {
+  await test.step('Krok 5: settling Wypłata Dominik at 9 143,27 zł and Wypłata żona at 6 500 zł gives 12 300,00 zł / 15 643,27 zł and 2 of 3', async () => {
     await openMonth(page, M);
     await settle(page, 'Wypłata Dominik', '9143.27');
     await settle(page, 'Wypłata żona', '6500');
     await openDashboard(page);
     await expectCard(page, {
       plan: '12 300,00',
-      forecast: '12 243,27',
+      actual: '15 643,27',
       settled: '2 z 3',
     });
   });
 
-  await test.step('Krok 6: settling 800+ at 1 000 zł gives 12 300,00 zł / 12 443,27 zł, incomes 3 of 3, Wszystko załatwione and no counter', async () => {
+  await test.step('Krok 6: settling 800+ at 1 000 zł gives 12 300,00 zł / 16 643,27 zł, incomes 3 of 3, Wszystko załatwione and no counter', async () => {
     await openMonth(page, M);
     await settle(page, '800+', '1000');
     await openDashboard(page);
     await expectCard(page, {
       plan: '12 300,00',
-      forecast: '12 443,27',
+      actual: '16 643,27',
       settled: '3 z 3',
     });
     await expectAllDone(page);
@@ -524,7 +524,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
       difference: plnText(DIFFERENCE),
       cost: plnText(COST_FROM),
       freeFundsPlan: plnText(PLAN - COST_FROM),
-      freeFundsForecast: plnText(ACTUAL - COST_FROM),
+      freeFundsActual: plnText(ACTUAL),
     });
   });
 
@@ -536,7 +536,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
         actual: plnText(0),
         cost: plnText(COST_BEFORE),
         freeFundsPlan: plnText(PLAN - COST_BEFORE),
-        freeFundsForecast: plnText(PLAN - COST_BEFORE),
+        freeFundsActual: plnText(0),
       });
     }
     for (let index = MONTH_NUMBER; index < 12; index++) {
@@ -545,7 +545,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
         actual: null,
         cost: plnText(COST_FROM),
         freeFundsPlan: plnText(PLAN - COST_FROM),
-        freeFundsForecast: plnText(PLAN - COST_FROM),
+        freeFundsActual: plnText(0),
       });
     }
   });
@@ -558,7 +558,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
       difference: plnText(DIFFERENCE),
       cost: plnText(totalCost),
       freeFundsPlan: plnText(totalFreeFunds),
-      freeFundsForecast: plnText(totalFreeFunds + DIFFERENCE),
+      freeFundsActual: plnText(ACTUAL),
     });
     await expect(cells).toHaveCount(6);
   });
@@ -731,7 +731,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     await expect(page.getByRole('heading', { name: 'Planning', level: 1 })).toBeVisible();
     await page.getByRole('tab', { name: 'Year', exact: true }).click();
     await expect(page.getByRole('columnheader', { name: 'Income plan' })).toBeVisible();
-    await expect(page.getByRole('columnheader', { name: 'Free funds forecast' })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Free funds actual' })).toBeVisible();
     await expect(page.getByTestId('year-total').locator('th')).toHaveText('Total');
 
     await page.getByRole('tab', { name: 'Month', exact: true }).click();

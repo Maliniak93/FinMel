@@ -339,8 +339,12 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
     await expect(block).toContainText('bez daty');
     const cushion = block.getByTestId('contribution-row').filter({ hasText: CUSHION });
     const pension = block.getByTestId('contribution-row').filter({ hasText: PENSION });
-    await expect(cushion).toContainText(pln('-1 000,00'));
-    await expect(pension).toContainText(pln('-1 500,00'));
+    await expect(cushion).toContainText(
+      new RegExp(`${pln('0,00').source}\\s/\\s${pln('1 000,00').source}`),
+    );
+    await expect(pension).toContainText(
+      new RegExp(`${pln('0,00').source}\\s/\\s${pln('1 500,00').source}`),
+    );
     await expect(cushion.locator('.day-list__dot')).toHaveAttribute('style', /--sk-g-/);
     await expect(pension.locator('.day-list__dot')).toHaveAttribute('style', /--sk-g-/);
   });
@@ -396,12 +400,12 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
     await expect(page.locator('.planning-layout__aside')).toHaveCSS('position', 'sticky');
   });
 
-  await test.step('Krok 9: the "Wolne środki" cascade has Plan and Prognoza columns with Wpływy, Wydatki, Wpłaty do grup with the group bar and Wolne środki, and the forecast keeps the same cost', async () => {
+  await test.step('Krok 9: the "Wolne środki" cascade has Plan and Faktyczne columns with Wpływy, Wydatki, Wpłaty do grup with the group bar and Wolne środki', async () => {
     const section = page.getByTestId('free-funds');
     await expect(section.getByRole('heading', { name: 'Wolne środki' })).toBeVisible();
     await expect(section.getByRole('heading', { name: 'Plan', exact: true })).toBeVisible();
-    await expect(section.getByRole('heading', { name: 'Prognoza', exact: true })).toBeVisible();
-    for (const column of ['plan', 'forecast']) {
+    await expect(section.getByRole('heading', { name: 'Faktyczne', exact: true })).toBeVisible();
+    for (const column of ['plan', 'actual']) {
       await expect(page.getByTestId(`cascade-${column}-incomes`)).toContainText('Wpływy');
       await expect(page.getByTestId(`cascade-${column}-expenses`)).toContainText('− Wydatki');
       await expect(page.getByTestId(`cascade-${column}-contributions`)).toContainText(
@@ -409,20 +413,13 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
       );
     }
     await expect(page.getByTestId('free-funds-plan')).toContainText('= Wolne środki');
-    await expect(page.getByTestId('free-funds-forecast')).toContainText('= Wolne środki');
+    await expect(page.getByTestId('free-funds-actual')).toContainText('= Wolne środki');
     await expect(
       page.getByTestId('cascade-bar-plan-contributions').locator('app-split-bar [role="img"]'),
     ).toBeVisible();
     await expect(page.getByTestId('expense-cost').locator('dt')).toHaveText(
       'Koszt miesiąca (z rezerwami)',
     );
-    const planCost = await page
-      .getByTestId('cascade-plan-expenses')
-      .locator('.cascade__amount')
-      .innerText();
-    await expect(
-      page.getByTestId('cascade-forecast-expenses').locator('.cascade__amount'),
-    ).toHaveText(planCost);
   });
 
   await test.step('Krok 10: "Podział wolnych środków" has the info, the cushion level, shares summing to 100%, a warning with disabled save for another sum and a saved correction', async () => {
@@ -513,7 +510,7 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
       'Różnica',
       'Wydatki',
       'Wolne środki plan',
-      'Wolne środki prognoza',
+      'Wolne środki faktyczne',
     ]) {
       await expect(page.getByRole('columnheader', { name: column, exact: true })).toBeVisible();
     }
@@ -652,7 +649,7 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
     await expect(page.getByRole('columnheader', { name: 'Miesiąc', exact: true })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Wydatki', exact: true })).toBeVisible();
     await expect(
-      page.getByRole('columnheader', { name: 'Wolne środki prognoza', exact: true }),
+      page.getByRole('columnheader', { name: 'Wolne środki faktyczne', exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Wpływy plan', exact: true })).toHaveCount(
       0,
