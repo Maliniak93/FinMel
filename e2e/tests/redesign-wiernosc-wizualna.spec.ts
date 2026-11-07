@@ -55,7 +55,6 @@ const PULPIT_RULES: Rule[] = [
   { selector: '.todo-card__row', side: 'bottom' },
   { selector: '.month-card__cascade', side: 'top' },
   { selector: '.month-card__line', side: 'bottom' },
-  { selector: '.dashboard-page__group-card', side: 'top' },
   { selector: '.dashboard-page__group-row', side: 'bottom' },
   { selector: '.dashboard-page__structure', side: 'top' },
   { selector: '.dashboard-page__structure-row', side: 'bottom' },
@@ -531,7 +530,8 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     const groups = await box(page.locator('.dashboard-page__group-card'));
     const side = await box(page.locator('.dashboard-page__side'));
     expect(Math.abs(groups.y - side.y)).toBeLessThanOrEqual(1);
-    expect(Math.abs(groups.width / side.width - 7 / 5)).toBeLessThan(0.02);
+    expect(Math.abs(groups.width - side.width)).toBeLessThanOrEqual(2);
+    await expectNoBorder(page.locator('.dashboard-page__group-card'), 'top');
     await expect(page.getByRole('heading', { name: 'Wg grup', exact: true })).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Struktura majątku', exact: true }),
