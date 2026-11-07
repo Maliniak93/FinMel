@@ -47,7 +47,6 @@ import { AccountTransferDialog } from '../account-transfer-dialog/account-transf
 import { accountTypeLabel, bankVariantLabel, taxWrapperLabel } from '../account-type';
 import { CashOperationDialog } from '../cash-operation-dialog/cash-operation-dialog';
 import { ContributionBar } from '../contribution-bar/contribution-bar';
-import { ContributionLimitDialog } from '../contribution-limit-dialog/contribution-limit-dialog';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -288,26 +287,6 @@ export class AccountDetail {
         anchorName: account.name,
         currency: account.currency,
         anchorBalance: account.cashBalance,
-      },
-    });
-    ref.afterClosed().subscribe((saved: boolean | undefined) => {
-      if (saved) {
-        this.reload();
-      }
-    });
-  }
-
-  protected openContributionLimit(): void {
-    if (!this.accountResource.hasValue()) {
-      return;
-    }
-    const account = this.accountResource.value();
-    const ref = this.dialog.open(ContributionLimitDialog, {
-      width: '480px',
-      data: {
-        accountId: account.id,
-        year: this.year(),
-        limitPln: account.contribution?.limitPln ?? null,
       },
     });
     ref.afterClosed().subscribe((saved: boolean | undefined) => {

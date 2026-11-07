@@ -33,7 +33,6 @@ internal static class ContributionPeriod
             return [];
         }
 
-        var wrappedIds = wrapped.Select(a => a.Id).ToList();
         var cashIds = wrapped.Select(a => cashByAccount[a.Id].Id).ToList();
         var from = new DateOnly(year, 1, 1);
         var to = new DateOnly(year, 12, 31);
@@ -58,10 +57,10 @@ internal static class ContributionPeriod
             sourceAccountByTransfer = sources.ToDictionary(s => s.TransferId, s => s.AccountId);
         }
 
-        var limits = await dbContext.AccountContributionLimits
+        var limits = await dbContext.ContributionLimits
             .AsNoTracking()
-            .Where(l => wrappedIds.Contains(l.AccountId) && l.Year == year)
-            .ToDictionaryAsync(l => l.AccountId, l => l.Amount, cancellationToken);
+            .Where(l => l.Year == year)
+            .ToDictionaryAsync(l => l.Wrapper, l => l.Amount, cancellationToken);
 
         return wrapped.ToDictionary(
             account => account.Id,
@@ -78,7 +77,7 @@ internal static class ContributionPeriod
                 {
                     Year = year,
                     ContributedPln = contributed,
-                    LimitPln = limits.TryGetValue(account.Id, out var limit) ? limit : null
+                    LimitPln = limits.TryGetValue(account.Wrapper, out var limit) ? limit : null
                 };
             });
     }

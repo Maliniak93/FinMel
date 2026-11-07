@@ -256,21 +256,34 @@
         }
       }
     },
-    "/api/portfolio/accounts/{id}/contribution-limits/{year}": {
+    "/api/portfolio/contribution-limits": {
+      "get": {
+        "tags": [
+          "ListContributionLimitsEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContributionLimitsResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/contribution-limits/{year}": {
       "put": {
         "tags": [
-          "SetContributionLimitEndpoint"
+          "SetContributionLimitsEndpoint"
         ],
         "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "year",
             "in": "path",
@@ -286,7 +299,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SetContributionLimitRequest"
+                "$ref": "#/components/schemas/SetContributionLimitsRequest"
               }
             }
           },
@@ -300,18 +313,9 @@
       },
       "delete": {
         "tags": [
-          "DeleteContributionLimitEndpoint"
+          "DeleteContributionLimitsEndpoint"
         ],
         "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
           {
             "name": "year",
             "in": "path",
@@ -4978,6 +4982,40 @@
           }
         }
       },
+      "ContributionLimitsResponse": {
+        "required": [
+          "year"
+        ],
+        "type": "object",
+        "properties": {
+          "year": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "ikeAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "ikzeAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "ContributionResponse": {
         "required": [
           "year",
@@ -7732,15 +7770,22 @@
       "SecurityPriceUnavailableReason": {
         "type": "integer"
       },
-      "SetContributionLimitRequest": {
-        "required": [
-          "amount"
-        ],
+      "SetContributionLimitsRequest": {
         "type": "object",
         "properties": {
-          "amount": {
+          "ikeAmount": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "ikzeAmount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
               "number",
               "string"
             ],
@@ -9335,10 +9380,13 @@
       "name": "RestoreAccountEndpoint"
     },
     {
-      "name": "SetContributionLimitEndpoint"
+      "name": "ListContributionLimitsEndpoint"
     },
     {
-      "name": "DeleteContributionLimitEndpoint"
+      "name": "SetContributionLimitsEndpoint"
+    },
+    {
+      "name": "DeleteContributionLimitsEndpoint"
     },
     {
       "name": "AddAssetEndpoint"

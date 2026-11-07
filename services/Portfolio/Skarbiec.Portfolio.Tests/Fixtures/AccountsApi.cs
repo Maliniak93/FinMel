@@ -274,17 +274,30 @@ internal static class AccountsApi
         return new NetContributionsScenario(ike.AccountId, regular.AccountId, archived.AccountId, bank.AccountId);
     }
 
-    public static string ContributionLimitUri(Guid accountId, int year) => $"{AccountUri(accountId)}/contribution-limits/{year}";
+    public const string ContributionLimitsUri = "/api/portfolio/contribution-limits";
+
+    public static string ContributionLimitsYearUri(int year) => $"{ContributionLimitsUri}/{year}";
 
     public static string AccountContributionUri(Guid accountId, int year) => $"{AccountUri(accountId)}?year={year}";
 
     public sealed record ContributionView(int Year, decimal ContributedPln, decimal? LimitPln);
 
-    public static async Task SetContributionLimitAsync(
-        this HttpClient client, Guid accountId, int year, decimal amount, CancellationToken cancellationToken)
+    public sealed record ContributionLimitsView(int Year, decimal? IkeAmount, decimal? IkzeAmount);
+
+    public static async Task SetContributionLimitsAsync(
+        this HttpClient client, int year, decimal? ikeAmount, decimal? ikzeAmount, CancellationToken cancellationToken)
     {
-        var response = await client.PutAsJsonAsync(ContributionLimitUri(accountId, year), new { amount }, cancellationToken);
+        var response = await client.PutAsJsonAsync(ContributionLimitsYearUri(year), new { ikeAmount, ikzeAmount }, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<List<ContributionLimitsView>> ListContributionLimitsAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(ContributionLimitsUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<List<ContributionLimitsView>>(WebJson, cancellationToken))!;
     }
 
     public static async Task<ContributionView?> GetContributionAsync(

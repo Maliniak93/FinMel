@@ -241,33 +241,6 @@ namespace Skarbiec.Portfolio.Migrations
                     b.ToTable("Accounts");
                 });
 
-            modelBuilder.Entity("Skarbiec.Portfolio.Data.AccountContributionLimit", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("Year")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId", "Year")
-                        .IsUnique();
-
-                    b.ToTable("AccountContributionLimits");
-                });
-
             modelBuilder.Entity("Skarbiec.Portfolio.Data.Asset", b =>
                 {
                     b.Property<Guid>("Id")
@@ -604,6 +577,35 @@ namespace Skarbiec.Portfolio.Migrations
                         .IsUnique();
 
                     b.ToTable("CashPlaces");
+                });
+
+            modelBuilder.Entity("Skarbiec.Portfolio.Data.ContributionLimit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Wrapper")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Wrapper", "Year")
+                        .IsUnique();
+
+                    b.ToTable("ContributionLimits");
                 });
 
             modelBuilder.Entity("Skarbiec.Portfolio.Data.MetalHolding", b =>

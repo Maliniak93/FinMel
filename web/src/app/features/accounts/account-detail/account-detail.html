@@ -130,14 +130,6 @@
             <mat-option [value]="option">{{ option }}</mat-option>
           }
         </mat-select>
-        <button
-          mat-stroked-button
-          type="button"
-          [disabled]="account.isArchived"
-          (click)="openContributionLimit()"
-        >
-          {{ 'accounts.contribution.action' | transloco }}
-        </button>
       </div>
     }
 

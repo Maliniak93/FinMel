@@ -55,8 +55,6 @@ public sealed class DeleteAccountHandler(
 
         dbContext.Assets.Remove(cash);
         dbContext.Accounts.Remove(account);
-        dbContext.AccountContributionLimits.RemoveRange(
-            await dbContext.AccountContributionLimits.Where(l => l.AccountId == id).ToListAsync(cancellationToken));
 
         await publishEndpoint.Publish(new AssetRemoved
         {

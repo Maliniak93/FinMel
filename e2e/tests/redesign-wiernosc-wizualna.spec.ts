@@ -346,10 +346,10 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
       quantity: 10000,
       date: warsawDate(100),
     });
-    const limit = await request.put(
-      `/api/portfolio/accounts/${xtb.id}/contribution-limits/${YEAR}`,
-      { headers, data: { amount: 20000 } },
-    );
+    const limit = await request.put(`/api/portfolio/contribution-limits/${YEAR}`, {
+      headers,
+      data: { ikeAmount: 20000 },
+    });
     expect(limit.ok()).toBeTruthy();
 
     const place = await request.post('/api/portfolio/cash-places', {

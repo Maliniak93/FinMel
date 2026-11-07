@@ -1423,12 +1423,7 @@
       "status": "Wpłacono {{ paid }} / {{ limit }} zł w {{ year }} · zostało {{ left }} zł",
       "exceeded": "Wpłacono {{ paid }} / {{ limit }} zł w {{ year }} · limit przekroczony",
       "noLimit": "Wpłacono {{ paid }} zł w {{ year }}",
-      "action": "Limit wpłat",
-      "year": "Rok",
-      "amount": "Limit (zł)",
-      "dialogTitle": "Limit wpłat",
-      "yearInvalid": "Podaj rok z zakresu 2000-2100.",
-      "remove": "Usuń limit"
+      "year": "Rok"
     }
   }
 }

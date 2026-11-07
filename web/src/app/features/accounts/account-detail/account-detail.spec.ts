@@ -16,7 +16,6 @@ import { CashBankTransferDialog } from '../../cash/cash-bank-transfer-dialog/cas
 import { depositResponse } from '../../deposits/testing/deposit-fixtures';
 import { AccountTransferDialog } from '../account-transfer-dialog/account-transfer-dialog';
 import { CashOperationDialog } from '../cash-operation-dialog/cash-operation-dialog';
-import { ContributionLimitDialog } from '../contribution-limit-dialog/contribution-limit-dialog';
 import { AccountDetail } from './account-detail';
 
 const accountId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -455,20 +454,16 @@ describe('AccountDetail', () => {
     expect(root().querySelector('[role="progressbar"]')).toBeNull();
   });
 
-  it('Limit wpłat opens the contribution limit dialog for this account and year', async () => {
+  it('an IKE account shows the year selector and no Limit wpłat button', async () => {
     await setup({
       wrapper: 1,
       contribution: { year: 2026, contributedPln: 12000, limitPln: 26000 },
     });
     await switchLanguage(fixture, 'pl');
-    dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
 
-    action(/limit wpłat/i).click();
-    await fixture.whenStable();
-
-    const [dialogType, config] = dialog.open.mock.calls[0] as [unknown, { data: unknown }];
-    expect(dialogType).toBe(ContributionLimitDialog);
-    expect(config.data).toMatchObject({ accountId, year: 2026, limitPln: 26000 });
+    expect(root().querySelector('.account-detail__year')).not.toBeNull();
+    expect(root().querySelector('[role="progressbar"]')).not.toBeNull();
+    expect(text()).not.toMatch(/limit wpłat/i);
   });
 
   it('flagged account shows balance only', async () => {
