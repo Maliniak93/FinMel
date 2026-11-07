@@ -8,6 +8,7 @@ import { provideI18nTesting } from '../../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../../shared/format';
 import { depositResponse } from '../../deposits/testing/deposit-fixtures';
 import { jsonResponse } from '../../assets/asset-form/testing/asset-form-fixtures';
+import { SettleExpenseDialog } from '../settle-expense-dialog/settle-expense-dialog';
 import { SettleOccurrenceDialog } from '../settle-occurrence-dialog/settle-occurrence-dialog';
 import { PlanningCalendar } from './planning-calendar';
 
@@ -343,6 +344,59 @@ describe('PlanningCalendar', () => {
     ];
     expect(component).toBe(SettleOccurrenceDialog);
     expect(config.data.occurrence.recurringIncomeId).toBe('id-Wypłata');
+    expect(stateReload).toHaveBeenCalledTimes(1);
+    expect(saved).toHaveBeenCalledTimes(1);
+  });
+
+  it('expense payment is settleable', async () => {
+    const pendingPayment = {
+      ...payment('Czynsz', '2027-03-10', 2400),
+      status: 'Pending',
+      accountId,
+      accountName: 'mBank ROR',
+      plannedAccountId: accountId,
+      currency: 'PLN',
+      actualAmount: null,
+      actualDate: null,
+      actualAmountPln: null,
+      difference: null,
+      withdrawalCreated: false,
+    };
+    const settledPayment = {
+      ...pendingPayment,
+      recurringExpenseId: 'expense-Prąd',
+      name: 'Prąd',
+      date: '2027-03-12',
+      amount: 200,
+      status: 'Settled',
+      actualAmount: 210,
+      actualDate: '2027-03-11',
+      actualAmountPln: 210,
+      difference: 10,
+      withdrawalCreated: true,
+    };
+    await render(monthData([], [pendingPayment, settledPayment]));
+    const saved = vi.fn();
+    fixture.componentInstance.saved.subscribe(saved);
+
+    expect(itemsOf('2027-03-10')[0].dataset['status']).toBe('pending');
+    expect(itemsOf('2027-03-12')[0].dataset['status']).toBe('settled');
+    expect(itemsOf('2027-03-12')[0].textContent).toContain(formatMoney(210, 'PLN'));
+
+    itemsOf('2027-03-12')[0].click();
+    await settle();
+    expect(dialogOpen).not.toHaveBeenCalled();
+
+    itemsOf('2027-03-10')[0].click();
+    await settle();
+
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    const [component, config] = dialogOpen.mock.calls[0] as unknown as [
+      unknown,
+      { data: { payment: { recurringExpenseId: string } } },
+    ];
+    expect(component).toBe(SettleExpenseDialog);
+    expect(config.data.payment.recurringExpenseId).toBe('expense-Czynsz');
     expect(stateReload).toHaveBeenCalledTimes(1);
     expect(saved).toHaveBeenCalledTimes(1);
   });

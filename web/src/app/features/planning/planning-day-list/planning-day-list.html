@@ -142,23 +142,88 @@
                   </div>
                 }
                 @case ('payment') {
+                  @let expense = entry.row;
+                  @let payment = expense.item;
+                  @let paymentStatus = expenseStatusOf(payment);
+                  @let paymentCurrency = payment.currency ?? 'PLN';
                   <div class="day-list__item" data-testid="expense-payment-row">
                     <mat-icon class="day-list__icon" aria-hidden="true">arrow_upward</mat-icon>
                     <div class="day-list__main">
                       <span class="day-list__name">
-                        <span data-testid="row-name">{{ entry.name }}</span>
-                        @if (entry.oneOff) {
+                        <span data-testid="row-name">{{ payment.name }}</span>
+                        @if (expense.oneOff) {
                           <span class="day-list__mark" data-testid="one-off-mark">{{
                             'planning.oneOff.mark' | transloco
                           }}</span>
                         }
                       </span>
+                      <span class="day-list__meta">
+                        @if (payment.accountName) {
+                          <span>{{ payment.accountName }}</span>
+                        }
+                        @if (hasValue(payment.actualAmount)) {
+                          <span data-testid="expense-actual">
+                            @if (payment.actualDate) {
+                              {{
+                                'planning.calendar.settledOn'
+                                  | transloco: { date: formatDate(payment.actualDate) }
+                              }}
+                            }
+                            {{ formatMoney(payment.actualAmount, paymentCurrency) }}
+                          </span>
+                        }
+                        @if (hasValue(payment.difference)) {
+                          <span data-testid="expense-difference">
+                            {{ 'planning.occurrence.difference' | transloco }}:
+                            {{ formatMoney(payment.difference, paymentCurrency) }}
+                          </span>
+                        }
+                        @if (payment.withdrawalCreated) {
+                          <span data-testid="withdrawal-created">
+                            {{ 'planning.occurrence.withdrawalCreated' | transloco }}
+                          </span>
+                        }
+                      </span>
                     </div>
-                    <span class="day-list__status"></span>
+                    <span class="day-list__status" data-testid="expense-status">
+                      <app-status-chip
+                        [label]="paymentStatus.key | transloco"
+                        [icon]="paymentStatus.icon"
+                        [tone]="paymentStatus.tone"
+                      />
+                    </span>
                     <span class="day-list__amount sk-num">{{
-                      formatMoney(entry.amount, 'PLN')
+                      formatMoney(payment.amount, paymentCurrency)
                     }}</span>
-                    <span class="day-list__actions"></span>
+                    <span class="day-list__actions">
+                      @if (payment.status === 'Settled') {
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="edit-expense-settlement"
+                          (click)="settleExpense.emit(expense)"
+                        >
+                          {{ 'planning.occurrence.edit' | transloco }}
+                        </button>
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="undo-expense"
+                          (click)="undoExpense.emit(expense)"
+                        >
+                          {{ 'planning.occurrence.undo' | transloco }}
+                        </button>
+                      } @else {
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="settle-expense"
+                          (click)="settleExpense.emit(expense)"
+                        >
+                          {{ 'planning.occurrence.settle' | transloco }}
+                        </button>
+                      }
+                    </span>
                   </div>
                 }
                 @case ('deadline') {

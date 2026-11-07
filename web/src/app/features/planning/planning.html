@@ -159,6 +159,8 @@
                 (settle)="openSettleDialog($event)"
                 (skip)="skipOccurrence($event)"
                 (undo)="undoOccurrence($event)"
+                (settleExpense)="openSettleExpenseDialog($event)"
+                (undoExpense)="undoExpense($event)"
               />
             }
           </div>
@@ -512,6 +514,9 @@
                             | transloco: { amount: formatMoney(definition.reservePln, 'PLN') }
                         }}
                       </span>
+                      @if (definition.accountName) {
+                        <span data-testid="expense-account">{{ definition.accountName }}</span>
+                      }
                       @if (definition.nextPayment; as next) {
                         @if (isMultiMonth(definition)) {
                           <span data-testid="expense-next-payment">
@@ -563,6 +568,8 @@
                   </li>
                 }
                 @for (oneOff of spending.oneOffs; track oneOff.id) {
+                  @let oneOffSettled = oneOff.status === 'Settled';
+                  @let oneOffCurrency = oneOff.currency ?? 'PLN';
                   <li class="planning-definition" data-testid="one-off-expense-row">
                     <div class="planning-definition__main">
                       <span class="planning-definition__name">{{ oneOff.name }}</span>
@@ -570,29 +577,74 @@
                         <mat-chip data-testid="one-off-mark">{{
                           'planning.oneOff.mark' | transloco
                         }}</mat-chip>
+                        <mat-chip data-testid="expense-status">{{
+                          (oneOffSettled
+                            ? 'planning.calendar.status.settled'
+                            : 'planning.calendar.status.pending'
+                          ) | transloco
+                        }}</mat-chip>
                       </mat-chip-set>
                     </div>
                     <div class="planning-definition__details">
-                      <span>{{ formatMoney(oneOff.amount, 'PLN') }}</span>
+                      <span>{{ formatMoney(oneOff.amount, oneOffCurrency) }}</span>
+                      @if (oneOff.accountName) {
+                        <span>{{ oneOff.accountName }}</span>
+                      }
                       <span data-testid="one-off-date">{{ formatDate(oneOff.date) }}</span>
+                      @if (oneOffSettled) {
+                        <span class="planning-definition__change" data-testid="one-off-locked-hint">
+                          {{ 'planning.oneOff.lockedHint' | transloco }}
+                        </span>
+                      }
                     </div>
                     <div class="planning-definition__actions">
-                      <button
-                        mat-button
-                        type="button"
-                        data-testid="edit-one-off-expense"
-                        (click)="openEditOneOffExpenseDialog(oneOff)"
-                      >
-                        {{ 'planning.edit.action' | transloco }}
-                      </button>
-                      <button
-                        mat-button
-                        type="button"
-                        data-testid="delete-one-off-expense"
-                        (click)="removeOneOffExpense(oneOff)"
-                      >
-                        {{ 'common.delete' | transloco }}
-                      </button>
+                      @if (oneOffSettled) {
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="edit-expense-settlement"
+                          (click)="
+                            openSettleExpenseDialog({ oneOff: true, key: oneOff.id, item: oneOff })
+                          "
+                        >
+                          {{ 'planning.occurrence.edit' | transloco }}
+                        </button>
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="undo-expense"
+                          (click)="undoExpense({ oneOff: true, key: oneOff.id, item: oneOff })"
+                        >
+                          {{ 'planning.occurrence.undo' | transloco }}
+                        </button>
+                      } @else {
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="settle-expense"
+                          (click)="
+                            openSettleExpenseDialog({ oneOff: true, key: oneOff.id, item: oneOff })
+                          "
+                        >
+                          {{ 'planning.occurrence.settle' | transloco }}
+                        </button>
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="edit-one-off-expense"
+                          (click)="openEditOneOffExpenseDialog(oneOff)"
+                        >
+                          {{ 'planning.edit.action' | transloco }}
+                        </button>
+                        <button
+                          mat-button
+                          type="button"
+                          data-testid="delete-one-off-expense"
+                          (click)="removeOneOffExpense(oneOff)"
+                        >
+                          {{ 'common.delete' | transloco }}
+                        </button>
+                      }
                     </div>
                   </li>
                 }

@@ -20,6 +20,10 @@ import {
   SettleOccurrenceDialog,
   type SettleOccurrenceDialogData,
 } from '../settle-occurrence-dialog/settle-occurrence-dialog';
+import {
+  SettleExpenseDialog,
+  type SettleExpenseDialogData,
+} from '../settle-expense-dialog/settle-expense-dialog';
 
 const MAX_ITEMS_IN_CELL = 3;
 
@@ -34,7 +38,7 @@ interface CalendarItem {
   amount: number | string;
   currency: string;
   actualDate: string | null;
-  settleable: SettleOccurrenceDialogData | null;
+  settleable: SettleOccurrenceDialogData | SettleExpenseDialogData | null;
 }
 
 interface CalendarCell {
@@ -93,6 +97,13 @@ function incomeStatus(
     return 'skipped';
   }
   return occurrence.overdue ? 'overdue' : 'pending';
+}
+
+function expenseStatus(expense: { status?: string }): CalendarItemStatus | null {
+  if (expense.status === 'Settled') {
+    return 'settled';
+  }
+  return expense.status === 'Pending' ? 'pending' : null;
 }
 
 // MatDialogModule stays out of imports: it would shadow the TestBed provider override.
@@ -161,28 +172,32 @@ export class PlanningCalendar {
     }
 
     for (const payment of data.expenses.payments) {
+      const status = expenseStatus(payment);
+      const settled = status === 'settled';
       add(payment.date, {
         key: `payment-${payment.recurringExpenseId}-${payment.nominalMonth}`,
         kind: 'payment',
         name: payment.name,
-        status: null,
-        amount: payment.amount,
-        currency: 'PLN',
-        actualDate: null,
-        settleable: null,
+        status,
+        amount: settled ? (payment.actualAmount ?? payment.amount) : payment.amount,
+        currency: payment.currency ?? 'PLN',
+        actualDate: settled ? (payment.actualDate ?? null) : null,
+        settleable: status === 'pending' ? { payment } : null,
       });
     }
 
     for (const oneOff of data.expenses.oneOffs.filter((entry) => entry.inMonth)) {
+      const status = expenseStatus(oneOff);
+      const settled = status === 'settled';
       add(oneOff.date, {
         key: `payment-one-off-${oneOff.id}`,
         kind: 'payment',
         name: oneOff.name,
-        status: null,
-        amount: oneOff.amount,
-        currency: 'PLN',
-        actualDate: null,
-        settleable: null,
+        status,
+        amount: settled ? (oneOff.actualAmount ?? oneOff.amount) : oneOff.amount,
+        currency: oneOff.currency ?? 'PLN',
+        actualDate: settled ? (oneOff.actualDate ?? null) : null,
+        settleable: status === 'pending' ? { oneOffExpense: oneOff } : null,
       });
     }
 
@@ -266,9 +281,15 @@ export class PlanningCalendar {
     }
   }
 
-  protected openSettleDialog(data: SettleOccurrenceDialogData, event: Event): void {
+  protected openSettleDialog(
+    data: SettleOccurrenceDialogData | SettleExpenseDialogData,
+    event: Event,
+  ): void {
     event.stopPropagation();
-    const ref = this.dialog.open(SettleOccurrenceDialog, { width: '420px', data });
+    const ref =
+      'payment' in data || 'oneOffExpense' in data
+        ? this.dialog.open(SettleExpenseDialog, { width: '420px', data })
+        : this.dialog.open(SettleOccurrenceDialog, { width: '420px', data });
     ref.afterClosed().subscribe((saved) => {
       if (saved) {
         this.planningState.reload();
