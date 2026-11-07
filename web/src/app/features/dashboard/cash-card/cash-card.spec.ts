@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import { polishProblems, restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
 import { formatMoney } from '../../../shared/format';
+import { rowLineSkipsLast } from '../../../../testing/stylesheet';
 import { cashPlacesResponse, jsonResponse, renderCard } from '../testing/dashboard-fixtures';
 import { CashCard } from './cash-card';
 
@@ -35,7 +36,7 @@ describe('CashCard', () => {
       'utf8',
     );
     expect(scss).not.toMatch(/border-top/);
-    expect(scss).toMatch(/\.cash-card__row\s*\{[^}]*border-bottom:/);
+    expect(rowLineSkipsLast(scss, '.cash-card__row')).toBe(true);
   });
 
   it('shows totals per currency', async () => {

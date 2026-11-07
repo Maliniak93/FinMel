@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { restoreEnglish, switchLanguage } from '../../../../testing/i18n';
+import { rowLineSkipsLast } from '../../../../testing/stylesheet';
 import { formatMoney } from '../../../shared/format';
 import {
   CUSHION_GROUP_ID,
@@ -284,7 +285,7 @@ describe('MonthCard stylesheet', () => {
     );
 
     expect(scss).toMatch(/\.month-card__title\s*\{[^}]*font-size:\s*24px/);
-    expect(scss).toMatch(/border-bottom:/);
+    expect(rowLineSkipsLast(scss, '.month-card__line')).toBe(true);
     expect(scss).toMatch(/\.month-card__cascade\s*\{[^}]*border-top:/);
   });
 });
