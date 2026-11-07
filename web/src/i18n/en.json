@@ -150,7 +150,21 @@
     "runFinished": "finished {{ date }}",
     "runCounts": "synced {{ synced }}, no data {{ noData }}, failed {{ failed }}",
     "loadFailed": "Failed to load sync status.",
-    "triggerFailed": "Failed to trigger sync."
+    "triggerFailed": "Failed to trigger sync.",
+    "limits": {
+      "title": "Contribution limits",
+      "year": "Year",
+      "ike": "IKE limit (PLN)",
+      "ikze": "IKZE limit (PLN)",
+      "save": "Save",
+      "remove": "Remove year",
+      "addYear": "Add year",
+      "empty": "No limits set yet.",
+      "loadFailed": "Failed to load contribution limits.",
+      "saveFailed": "Failed to save the limit.",
+      "removeFailed": "Failed to remove the year.",
+      "invalidAmount": "Enter an amount above 0."
+    }
   },
   "notFound": {
     "message": "Page not found."
@@ -1423,6 +1437,7 @@
       "status": "Paid {{ paid }} / {{ limit }} PLN in {{ year }} · {{ left }} PLN left",
       "exceeded": "Paid {{ paid }} / {{ limit }} PLN in {{ year }} · limit exceeded",
       "noLimit": "Paid {{ paid }} PLN in {{ year }}",
+      "noLimitHint": "No limit set for {{ year }}",
       "year": "Year"
     }
   }

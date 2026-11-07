@@ -488,6 +488,27 @@ describe('Accounts', () => {
     expect(element.querySelector(`a[href="/wealth/accounts/${bonds.id}"]`)).not.toBeNull();
   });
 
+  it('shows the contribution bar only with a limit', async () => {
+    const withLimit: AccountResponse = {
+      ...brokerage,
+      wrapper: 1,
+      contribution: { year: 2026, contributedPln: 0, limitPln: 28260 },
+    };
+    const withoutLimit: AccountResponse = {
+      ...bonds,
+      wrapper: 1,
+      contribution: { year: 2026, contributedPln: 0, limitPln: null },
+    };
+    await setup(jsonResponse([withLimit, withoutLimit]));
+
+    const hasBar = (name: string): boolean =>
+      rowCells(name).some(
+        (cell) => cell.querySelector('[data-testid="contribution-bar"]') !== null,
+      );
+    expect(hasBar('XTB IKE')).toBe(true);
+    expect(hasBar('Obligacje IKE')).toBe(false);
+  });
+
   it('shows the cash from the account and the securities as the total minus the cash', async () => {
     const dashboard: DashboardResponse = {
       ...emptyDashboard,

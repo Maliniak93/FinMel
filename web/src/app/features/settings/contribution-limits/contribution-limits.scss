@@ -1,0 +1,20 @@
+.contribution-limits {
+  margin-top: 16px;
+}
+
+.contribution-limits__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.contribution-limits__year {
+  min-width: 3rem;
+  font-weight: 500;
+}
+
+.contribution-limits__error {
+  margin: 8px 0;
+  color: var(--mat-sys-error, #b3261e);
+}

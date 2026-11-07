@@ -14,6 +14,7 @@ import { formatDateTime } from '../../shared/format';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { SectionError } from '../../shared/section-error/section-error';
 import { Skeleton } from '../../shared/skeleton/skeleton';
+import { ContributionLimits } from './contribution-limits/contribution-limits';
 
 // Mirrors Skarbiec.MarketData.Data.SyncRunStatus in declaration order: the enum travels as its int.
 const SYNC_RUN_STATUS_LABELS: readonly string[] = [
@@ -51,6 +52,7 @@ export const RUN_KINDS = [
 @Component({
   selector: 'app-settings',
   imports: [
+    ContributionLimits,
     EmptyState,
     MatButtonModule,
     MatChipsModule,
