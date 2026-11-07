@@ -208,7 +208,17 @@ internal static class PlanningApi
         ExpensesView Expenses,
         FreeFundsView FreeFunds,
         List<DateOnly>? NonBusinessDays = null,
-        SplitView? Split = null);
+        SplitView? Split = null,
+        List<ContributionLimitWarningView>? ContributionLimitWarnings = null);
+
+    public sealed record ContributionLimitWarningView(
+        Guid AccountId,
+        string AccountName,
+        int Year,
+        decimal LimitPln,
+        decimal ContributedPln,
+        decimal PlannedPln,
+        decimal ExceededByPln);
 
     public sealed record PlanningYearView(
         int Year,

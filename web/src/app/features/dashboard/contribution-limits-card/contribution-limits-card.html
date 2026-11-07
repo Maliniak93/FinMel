@@ -1,0 +1,42 @@
+@if (loadError(); as error) {
+  <mat-card class="contribution-limits-card">
+    <mat-card-content>
+      <h3 class="contribution-limits-card__title">
+        {{ 'dashboard.contributionLimits.title' | transloco }}
+      </h3>
+      <div class="contribution-limits-card__state" role="alert">
+        <p>{{ error.message }}</p>
+        <button mat-button type="button" (click)="reload()">
+          {{ 'common.retry' | transloco }}
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+} @else if (rows().length > 0) {
+  <mat-card class="contribution-limits-card">
+    <mat-card-content>
+      <h3 class="contribution-limits-card__title">
+        {{ 'dashboard.contributionLimits.title' | transloco }}
+      </h3>
+      <ul class="contribution-limits-card__list">
+        @for (row of rows(); track row.id) {
+          <li class="contribution-limits-card__row">
+            <a class="contribution-limits-card__name" [routerLink]="['/wealth/accounts', row.id]">{{
+              row.name
+            }}</a>
+            <span
+              class="contribution-limits-card__value"
+              [class.contribution-limits-card__value--exceeded]="row.exceeded"
+              >{{
+                (row.exceeded
+                  ? 'dashboard.contributionLimits.exceeded'
+                  : 'dashboard.contributionLimits.remaining'
+                ) | transloco: { amount: formatMoney(row.amountPln) }
+              }}</span
+            >
+          </li>
+        }
+      </ul>
+    </mat-card-content>
+  </mat-card>
+}

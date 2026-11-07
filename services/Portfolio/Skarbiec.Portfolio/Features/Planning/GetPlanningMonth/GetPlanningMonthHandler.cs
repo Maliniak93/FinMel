@@ -1,11 +1,12 @@
 using System.Globalization;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
 using Skarbiec.Portfolio.Features.RecurringIncomes;
 
 namespace Skarbiec.Portfolio.Features.Planning.GetPlanningMonth;
 
-public sealed class GetPlanningMonthHandler(PlanningMonthLoader loader)
+public sealed class GetPlanningMonthHandler(PlanningMonthLoader loader, PortfolioDbContext dbContext)
 {
     private static readonly YearMonth FirstMonth = YearMonth.From(RecurringIncomeLimits.FirstDay);
     private static readonly YearMonth LastMonth = YearMonth.From(RecurringIncomeLimits.LastDay);
@@ -25,6 +26,8 @@ public sealed class GetPlanningMonthHandler(PlanningMonthLoader loader)
 
         var data = await loader.LoadAsync(viewed, viewed, cancellationToken);
 
-        return PlanningMonthBuilder.Build(data, viewed);
+        var warnings = await ContributionLimitWarnings.LoadAsync(dbContext, data, viewed.Year, cancellationToken);
+
+        return PlanningMonthBuilder.Build(data, viewed, warnings);
     }
 }

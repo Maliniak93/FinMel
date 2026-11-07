@@ -139,6 +139,7 @@
         </div>
       } @else if (monthData(); as data) {
         @let plan = data.incomes;
+        <app-contribution-limit-warning [warnings]="data.contributionLimitWarnings" />
         <div class="planning-layout">
           <div class="planning-layout__main">
             @if (showCalendar()) {

@@ -84,6 +84,7 @@ import {
   type RecurringIncomeFormDialogData,
 } from './recurring-income-form-dialog/recurring-income-form-dialog';
 import { PlanningCalendar } from './planning-calendar/planning-calendar';
+import { ContributionLimitWarning } from './contribution-limit-warning/contribution-limit-warning';
 import {
   PlanningDayList,
   type ExpenseRow,
@@ -130,6 +131,7 @@ function shiftMonth(month: string, delta: number): string {
     MatProgressSpinnerModule,
     FreeFundsCascade,
     MatTabsModule,
+    ContributionLimitWarning,
     PlanningCalendar,
     PlanningDayList,
     PlanningYear,

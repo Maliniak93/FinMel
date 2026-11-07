@@ -522,6 +522,12 @@
       "outside": "Poza rachunkami",
       "loadFailed": "Nie udało się wczytać rachunków."
     },
+    "contributionLimits": {
+      "title": "Limity wpłat",
+      "remaining": "Pozostało {{ amount }}",
+      "exceeded": "Przekroczono o {{ amount }}",
+      "loadFailed": "Nie udało się wczytać limitów wpłat."
+    },
     "monthCard": {
       "title": "{{ month }} · plan",
       "setup": "Zaplanuj miesiąc",
@@ -869,6 +875,7 @@
       "noItems": "Na ten dzień nic nie zaplanowano.",
       "deadlinesFailed": "Nie udało się wczytać terminów lokat i obligacji."
     },
+    "contributionLimitWarning": "Planowane wpłaty na {{ account }} w {{ year }} przekroczą limit o {{ amount }}",
     "tabs": {
       "month": "Miesiąc",
       "year": "Rok"

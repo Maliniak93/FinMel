@@ -27,6 +27,7 @@ import { assetClassLabel, assetClassPage } from '../assets/asset-class';
 import { GROUP_KIND } from '../groups/group-kind';
 import { CashCard } from './cash-card/cash-card';
 import { AccountsCard } from './accounts-card/accounts-card';
+import { ContributionLimitsCard } from './contribution-limits-card/contribution-limits-card';
 import { MonthCard } from './month-card/month-card';
 import { TodoCard } from './todo-card/todo-card';
 import { UpcomingCard } from './upcoming-card/upcoming-card';
@@ -99,6 +100,7 @@ function toGrosze(amount: number | string): number {
     SectionError,
     SplitBar,
     AccountsCard,
+    ContributionLimitsCard,
     CashCard,
     MonthCard,
     TodoCard,

@@ -1,0 +1,13 @@
+@for (warning of warnings(); track warning.accountId) {
+  <p class="contribution-limit-warning" role="alert" data-testid="contribution-limit-warning">
+    {{
+      'planning.contributionLimitWarning'
+        | transloco
+          : {
+              account: warning.accountName,
+              year: warning.year,
+              amount: formatMoney(warning.exceededByPln),
+            }
+    }}
+  </p>
+}

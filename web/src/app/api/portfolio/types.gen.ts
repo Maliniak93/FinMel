@@ -325,6 +325,17 @@ export type CashTotalResponse = {
     balance: number | string;
 };
 
+export type ContributionLimitWarningResponse = {
+    accountId: string;
+    accountName: string;
+    wrapper: TaxWrapper;
+    year: number | string;
+    limitPln: number | string;
+    contributedPln: number | string;
+    plannedPln: number | string;
+    exceededByPln: number | string;
+};
+
 export type ContributionLimitsResponse = {
     year: number | string;
     ikeAmount?: null | number | string;
@@ -727,6 +738,7 @@ export type PlanningMonthResponse = {
     freeFunds: FreeFundsResponse;
     split: null | PlanningSplitResponse;
     nonBusinessDays: Array<string>;
+    contributionLimitWarnings: Array<ContributionLimitWarningResponse>;
 };
 
 export type PlanningSettingsResponse = {

@@ -404,6 +404,7 @@ describe('Dashboard', () => {
     expect(children[1].querySelector('app-cash-card')).not.toBeNull();
     expect([...children[1].children].map((child) => child.tagName.toLowerCase())).toEqual([
       'app-accounts-card',
+      'app-contribution-limits-card',
       'app-cash-card',
     ]);
     expect(element.querySelector('.dashboard-page__pair--ruled')).toBeNull();
