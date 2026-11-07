@@ -389,6 +389,7 @@ export type CreateRecurringExpenseRequest = {
     dayKind: RecurrenceDayKind;
     dayOfMonth?: null | number | string;
     shift: BusinessDayShift;
+    accountId?: null | string;
 };
 
 export type CreateRecurringExpenseResponse = {
@@ -496,6 +497,8 @@ export type ExpenseDefinitionResponse = {
     nextPayment: null | ExpenseNextPaymentResponse;
     effectiveFrom: string;
     nextChange: null | ExpenseNextChangeResponse;
+    accountId: null | string;
+    accountName: null | string;
 };
 
 export type ExpenseNextChangeResponse = {
@@ -505,6 +508,8 @@ export type ExpenseNextChangeResponse = {
     dayKind: RecurrenceDayKind;
     dayOfMonth: null | number | string;
     shift: BusinessDayShift;
+    accountId: null | string;
+    accountName: null | string;
 };
 
 export type ExpenseNextPaymentResponse = {
@@ -518,6 +523,16 @@ export type ExpensePaymentResponse = {
     date: string;
     name: string;
     amount: number | string;
+    status: OccurrenceStatus;
+    accountId: null | string;
+    accountName: null | string;
+    plannedAccountId: null | string;
+    currency: null | string;
+    actualAmount: null | number | string;
+    actualDate: null | string;
+    actualAmountPln: null | number | string;
+    difference: null | number | string;
+    withdrawalCreated: boolean;
 };
 
 export type FreeFundsResponse = {
@@ -853,6 +868,14 @@ export type SettleDepositRequest = {
     payOut?: boolean;
 };
 
+export type SettleExpensePaymentRequest = {
+    actualAmount: number | string;
+    actualDate: string;
+    accountId: string;
+    createWithdrawal?: boolean;
+    rememberAccount?: boolean;
+};
+
 export type SettleOccurrenceRequest = {
     actualAmount: number | string;
     actualDate: string;
@@ -1053,6 +1076,7 @@ export type UpdateRecurringExpenseRequest = {
     dayKind: RecurrenceDayKind;
     dayOfMonth?: null | number | string;
     shift: BusinessDayShift;
+    accountId?: null | string;
 };
 
 export type UpdateRecurringIncomeRequest = {
@@ -2535,6 +2559,44 @@ export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses = {
 };
 
 export type DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponse = DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses[keyof DeleteApiPortfolioRecurringExpensesByIdChangesByMonthResponses];
+
+export type DeleteApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementData = {
+    body?: never;
+    path: {
+        id: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-expenses/{id}/payments/{month}/settlement';
+};
+
+export type DeleteApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementResponse = DeleteApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementResponses[keyof DeleteApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementResponses];
+
+export type PutApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementData = {
+    body: SettleExpensePaymentRequest;
+    path: {
+        id: string;
+        month: string;
+    };
+    query?: never;
+    url: '/api/portfolio/recurring-expenses/{id}/payments/{month}/settlement';
+};
+
+export type PutApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementResponse = PutApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementResponses[keyof PutApiPortfolioRecurringExpensesByIdPaymentsByMonthSettlementResponses];
 
 export type PutApiPortfolioRecurringIncomesByIdOccurrencesByMonthSettlementData = {
     body: SettleOccurrenceRequest;

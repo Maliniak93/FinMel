@@ -18,12 +18,16 @@ internal sealed class PlanningForecast
     private readonly HashSet<(Guid, DateOnly)> storedKeys;
     private readonly Dictionary<Guid, RecurringIncome> incomesById;
     private readonly Dictionary<YearMonth, IReadOnlyList<PlannedRow>> plannedByMonth = [];
+    private readonly IReadOnlyList<RecurringExpenseOccurrence> settledPayments;
+    private readonly HashSet<(Guid, DateOnly)> settledPaymentKeys;
+    private readonly Dictionary<Guid, RecurringExpense> expensesById;
 
     public PlanningForecast(
         IReadOnlyList<RecurringIncome> incomes,
         IReadOnlyDictionary<Guid, Account> accounts,
         IReadOnlyList<RecurringIncomeOccurrence> stored,
         IReadOnlyList<RecurringExpense> expenses,
+        IReadOnlyList<RecurringExpenseOccurrence> settledPayments,
         IReadOnlyList<OneOffIncome> oneOffIncomes,
         IReadOnlyList<OneOffExpense> oneOffExpenses,
         IReadOnlyList<AssetGroup> groups,
@@ -37,6 +41,9 @@ internal sealed class PlanningForecast
         storedKeys = stored.Select(o => (o.RecurringIncomeId, o.NominalMonth)).ToHashSet();
         incomesById = incomes.ToDictionary(i => i.Id);
         Plans = expenses.Select(e => (Expense: e, Plan: e.ToReservePlan())).ToList();
+        this.settledPayments = settledPayments;
+        settledPaymentKeys = settledPayments.Select(o => (o.RecurringExpenseId, o.NominalMonth)).ToHashSet();
+        expensesById = expenses.ToDictionary(e => e.Id);
         Groups = groups;
         CurrentMonth = currentMonth;
     }
@@ -105,6 +112,25 @@ internal sealed class PlanningForecast
                 };
             })
             .ToList();
+
+    public Account? AccountOf(Guid? accountId) => accounts.GetValueOrDefault(accountId ?? Guid.Empty);
+
+    public IReadOnlyList<ExpensePaymentResponse> ExpensePaymentsIn(YearMonth month)
+    {
+        var pending = Plans.SelectMany(p => ReserveSchedule.PaymentsIn(month, p.Plan)
+            .Where(payment => !settledPaymentKeys.Contains((p.Expense.Id, payment.NominalMonth.FirstDay)))
+            .Select(payment => PendingPayment(p.Expense, payment)));
+
+        var settled = settledPayments
+            .Where(o => YearMonth.From(o.PlannedDate) == month)
+            .Select(SettledPayment);
+
+        return pending
+            .Concat(settled)
+            .OrderBy(p => p.Date)
+            .ThenBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
 
     public IReadOnlyList<OneOffExpenseResponse> OneOffExpensesIn(YearMonth month) =>
         OneOffExpenses
@@ -207,6 +233,7 @@ internal sealed class PlanningForecast
 
     public decimal CostIn(YearMonth month) =>
         Plans.Sum(p => ReserveSchedule.CostIn(month, p.Plan))
+        + settledPayments.Where(o => YearMonth.From(o.PlannedDate) == month).Sum(o => SettledCost(o) - o.PlannedAmount)
         + OneOffExpenses.Where(e => YearMonth.From(e.Date) == month).Sum(e => e.IsSettled ? SettledCost(e) : e.Amount)
         + ContributingGroupsIn(month).Sum(g => g.MonthlyContributionPln);
 
@@ -249,6 +276,60 @@ internal sealed class PlanningForecast
 
         return planned;
     }
+
+    private ExpensePaymentResponse PendingPayment(RecurringExpense expense, ReservePayment payment)
+    {
+        var plannedAccountId = expense.InForce(payment.NominalMonth).AccountId;
+        var account = accounts.GetValueOrDefault(plannedAccountId ?? Guid.Empty);
+
+        return new ExpensePaymentResponse
+        {
+            RecurringExpenseId = expense.Id,
+            NominalMonth = payment.NominalMonth.ToString(),
+            Date = payment.Date,
+            Name = expense.Name,
+            Amount = payment.Amount,
+            Status = OccurrenceStatus.Pending,
+            AccountId = account?.Id,
+            AccountName = account?.Name,
+            PlannedAccountId = plannedAccountId,
+            Currency = null,
+            ActualAmount = null,
+            ActualDate = null,
+            ActualAmountPln = null,
+            Difference = null,
+            WithdrawalCreated = false
+        };
+    }
+
+    private ExpensePaymentResponse SettledPayment(RecurringExpenseOccurrence occurrence)
+    {
+        var expense = expensesById[occurrence.RecurringExpenseId];
+        var nominal = YearMonth.From(occurrence.NominalMonth);
+        var account = accounts[occurrence.AccountId];
+        var actualAmountPln = SettledCost(occurrence);
+
+        return new ExpensePaymentResponse
+        {
+            RecurringExpenseId = expense.Id,
+            NominalMonth = nominal.ToString(),
+            Date = occurrence.PlannedDate,
+            Name = expense.Name,
+            Amount = occurrence.PlannedAmount,
+            Status = OccurrenceStatus.Settled,
+            AccountId = account.Id,
+            AccountName = account.Name,
+            PlannedAccountId = expense.InForce(nominal).AccountId,
+            Currency = account.Currency,
+            ActualAmount = occurrence.ActualAmount,
+            ActualDate = occurrence.ActualDate,
+            ActualAmountPln = actualAmountPln,
+            Difference = actualAmountPln - occurrence.PlannedAmount,
+            WithdrawalCreated = occurrence.TransactionId is not null
+        };
+    }
+
+    private static decimal SettledCost(RecurringExpenseOccurrence occurrence) => Round(occurrence.ActualAmount * occurrence.FxRateToPln);
 
     private static decimal SettledCost(OneOffExpense expense) => Round(expense.ActualAmount!.Value * expense.FxRateToPln!.Value);
 

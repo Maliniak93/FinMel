@@ -29,6 +29,10 @@ public sealed class PlanningMonthLoader(
             .Include(e => e.Versions)
             .ToListAsync(cancellationToken);
 
+        var settledPayments = await dbContext.RecurringExpenseOccurrences
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
         var oneOffIncomes = await dbContext.OneOffIncomes
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -45,7 +49,7 @@ public sealed class PlanningMonthLoader(
         var currentMonth = YearMonth.From(today);
 
         var forecast = new PlanningForecast(
-            incomes, accounts, stored, expenseRows, oneOffIncomes, oneOffExpenses, groups, currentMonth);
+            incomes, accounts, stored, expenseRows, settledPayments, oneOffIncomes, oneOffExpenses, groups, currentMonth);
 
         // A later month's cushion level depends on the free funds of every month from the current one.
         var foreign = new List<string>();

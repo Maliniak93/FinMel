@@ -31,6 +31,9 @@ public sealed record UpdateRecurringExpenseRequest : IValidatableObject
 
     public required BusinessDayShift Shift { get; init; }
 
+    /// <summary>The account the expense is usually paid from from that month on; none when absent.</summary>
+    public Guid? AccountId { get; init; }
+
     internal YearMonth EffectiveMonth => YearMonth.Parse(EffectiveFrom);
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)

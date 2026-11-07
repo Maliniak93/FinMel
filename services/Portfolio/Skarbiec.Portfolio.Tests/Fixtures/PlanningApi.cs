@@ -124,7 +124,21 @@ internal static class PlanningApi
         List<OneOffIncomeView>? OneOffs = null);
 
     public sealed record ExpensePaymentView(
-        Guid RecurringExpenseId, string NominalMonth, DateOnly Date, string Name, decimal Amount);
+        Guid RecurringExpenseId,
+        string NominalMonth,
+        DateOnly Date,
+        string Name,
+        decimal Amount,
+        string? Status = null,
+        Guid? AccountId = null,
+        string? AccountName = null,
+        Guid? PlannedAccountId = null,
+        string? Currency = null,
+        decimal? ActualAmount = null,
+        DateOnly? ActualDate = null,
+        decimal? ActualAmountPln = null,
+        decimal? Difference = null,
+        bool WithdrawalCreated = false);
 
     public sealed record NextPaymentView(DateOnly Date, decimal Amount);
 
@@ -142,7 +156,9 @@ internal static class PlanningApi
         decimal ReservePln,
         NextPaymentView? NextPayment,
         string EffectiveFrom,
-        ExpenseNextChangeView? NextChange);
+        ExpenseNextChangeView? NextChange,
+        Guid? AccountId = null,
+        string? AccountName = null);
 
     public sealed record ExpenseNextChangeView(
         string EffectiveFrom,
@@ -150,7 +166,9 @@ internal static class PlanningApi
         int IntervalMonths,
         JsonElement DayKind,
         int? DayOfMonth,
-        JsonElement Shift);
+        JsonElement Shift,
+        Guid? AccountId = null,
+        string? AccountName = null);
 
     public sealed record ExpensesView(
         List<ExpensePaymentView> Payments,
@@ -311,7 +329,8 @@ internal static class PlanningApi
         int intervalMonths = 1,
         RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
         int? dayOfMonth = 10,
-        BusinessDayShift shift = BusinessDayShift.None) => new
+        BusinessDayShift shift = BusinessDayShift.None,
+        Guid? accountId = null) => new
         {
             name,
             amount,
@@ -320,7 +339,8 @@ internal static class PlanningApi
             intervalMonths,
             dayKind = (int)dayKind,
             dayOfMonth = dayKind == RecurrenceDayKind.LastBusinessDay ? null : dayOfMonth,
-            shift = (int)shift
+            shift = (int)shift,
+            accountId
         };
 
     public static async Task<Guid> CreateRecurringExpenseAsync(
@@ -333,11 +353,12 @@ internal static class PlanningApi
         int intervalMonths = 1,
         RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
         int? dayOfMonth = 10,
-        BusinessDayShift shift = BusinessDayShift.None)
+        BusinessDayShift shift = BusinessDayShift.None,
+        Guid? accountId = null)
     {
         var response = await client.PostAsJsonAsync(
             RecurringExpensesUri,
-            NewRecurringExpenseBody(name, amount, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift),
+            NewRecurringExpenseBody(name, amount, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift, accountId),
             cancellationToken);
         response.EnsureSuccessStatusCode();
         var created = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -370,7 +391,8 @@ internal static class PlanningApi
         int intervalMonths = 1,
         RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
         int? dayOfMonth = 10,
-        BusinessDayShift shift = BusinessDayShift.None) => new
+        BusinessDayShift shift = BusinessDayShift.None,
+        Guid? accountId = null) => new
         {
             name,
             startDate = startDate ?? new DateOnly(2026, 1, 1),
@@ -380,7 +402,8 @@ internal static class PlanningApi
             intervalMonths,
             dayKind = (int)dayKind,
             dayOfMonth = dayKind == RecurrenceDayKind.LastBusinessDay ? null : dayOfMonth,
-            shift = (int)shift
+            shift = (int)shift,
+            accountId
         };
 
     public static async Task UpdateRecurringExpenseAsync(
@@ -395,11 +418,12 @@ internal static class PlanningApi
         int intervalMonths = 1,
         RecurrenceDayKind dayKind = RecurrenceDayKind.DayOfMonth,
         int? dayOfMonth = 10,
-        BusinessDayShift shift = BusinessDayShift.None)
+        BusinessDayShift shift = BusinessDayShift.None,
+        Guid? accountId = null)
     {
         var response = await client.PutAsJsonAsync(
             RecurringExpenseUri(id),
-            UpdateRecurringExpenseBody(effectiveFrom, name, amount, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift),
+            UpdateRecurringExpenseBody(effectiveFrom, name, amount, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift, accountId),
             cancellationToken);
         response.EnsureSuccessStatusCode();
     }
@@ -792,6 +816,59 @@ internal static class PlanningApi
             t => t.Type == TransactionType.Withdraw);
 
         return new OneOffExpenseWithdrawal(account, expenseId, withdrawal.Id);
+    }
+
+    public const string ExpensePaymentNotFoundErrorCode = "NotFound.ExpensePayment";
+
+    public const string RecurringExpenseHasSettlementsErrorCode = "Conflict.RecurringExpenseHasSettlements";
+
+    public static string ExpensePaymentSettlementUri(Guid id, string month) =>
+        $"{RecurringExpenseUri(id)}/payments/{month}/settlement";
+
+    public static ExpensePaymentView Payment(this ExpensesView expenses, Guid id, string month) =>
+        Assert.Single(expenses.Payments, p => p.RecurringExpenseId == id && p.NominalMonth == month);
+
+    public static object SettleExpensePaymentBody(
+        Guid accountId,
+        decimal actualAmount,
+        DateOnly actualDate,
+        bool createWithdrawal = false,
+        bool rememberAccount = false) =>
+        new { actualAmount, actualDate, accountId, createWithdrawal, rememberAccount };
+
+    public static async Task SettleExpensePaymentAsync(
+        this HttpClient client,
+        Guid id,
+        string month,
+        Guid accountId,
+        decimal actualAmount,
+        DateOnly actualDate,
+        CancellationToken cancellationToken,
+        bool createWithdrawal = false,
+        bool rememberAccount = false)
+    {
+        var response = await client.PutAsJsonAsync(
+            ExpensePaymentSettlementUri(id, month),
+            SettleExpensePaymentBody(accountId, actualAmount, actualDate, createWithdrawal, rememberAccount),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public sealed record ExpensePaymentWithdrawal(BankAccountsApi.BankAccount Account, Guid ExpenseId, Guid TransactionId);
+
+    // Settles the October payment of a monthly "Czynsz" of 2 400 (day 5, from 2026-01-01) as 2 350 on a fresh PLN "mBank ROR" holding 5 000 since 2026-10-12, with a withdrawal; the caller's clock must be past 2026-10-15.
+    public static async Task<ExpensePaymentWithdrawal> CreateExpensePaymentWithdrawalAsync(
+        this HttpClient client, CancellationToken cancellationToken, decimal actualAmount = 2_350m)
+    {
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR", balance: 5_000m);
+        var expenseId = await client.CreateRecurringExpenseAsync(cancellationToken, "Czynsz", 2_400m, dayOfMonth: 5);
+        await client.SettleExpensePaymentAsync(
+            expenseId, "2026-10", account.AccountId, actualAmount, ExpenseSettlementDay, cancellationToken, createWithdrawal: true);
+        var withdrawal = Assert.Single(
+            (await client.ListTransactionsAsync(account.MoneyAssetId, cancellationToken)).Items,
+            t => t.Type == TransactionType.Withdraw);
+
+        return new ExpensePaymentWithdrawal(account, expenseId, withdrawal.Id);
     }
 
     public static async Task<Guid> CreateOneOffIncomeAsync(
