@@ -259,9 +259,42 @@ async function expectCard(
   );
 }
 
+const OVERDUE_EXPENSES = overdueExpensePayments();
+
+function overdueExpensePayments(): number {
+  let count = 0;
+  for (let year = 2026; year <= Y; year++) {
+    for (let month = 1; month <= 12; month++) {
+      for (const day of ['01', '10']) {
+        if (`${year}-${String(month).padStart(2, '0')}-${day}` < D) {
+          count++;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+async function showAllTodo(page: Page): Promise<void> {
+  const showAll = page.getByTestId('todo-card-show-all');
+  if (await showAll.isVisible()) {
+    await showAll.click();
+  }
+}
+
+async function expectBadge(page: Page, extra: number): Promise<void> {
+  const total = OVERDUE_EXPENSES + extra;
+  await (total === 0
+    ? expect(badge(page)).toHaveCount(0)
+    : expect(badge(page)).toHaveText(String(total)));
+}
+
 async function expectAllDone(page: Page): Promise<void> {
-  await expect(page.getByTestId('todo-card-empty')).toHaveText('Wszystko załatwione');
-  await expect(todoItems(page)).toHaveCount(0);
+  await expect(todoItems(page).first()).toBeVisible();
+  await showAllTodo(page);
+  await expect(todoItems(page)).toHaveCount(OVERDUE_EXPENSES);
+  await expect(todoItems(page).filter({ hasNotText: 'wydatek' })).toHaveCount(0);
+  await expect(todoItems(page).filter({ hasNotText: 'zaległe' })).toHaveCount(0);
 }
 
 function yearRows(page: Page): Locator {
@@ -425,7 +458,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
       interval: '12',
       day: 15,
     });
-    await expect(badge(page)).toHaveCount(0);
+    await expectBadge(page, 0);
   });
 
   await test.step('Krok 4: the card shows free funds 12 300,00 zł / 12 300,00 zł, incomes 0 of 3 and Wszystko załatwione', async () => {
@@ -436,7 +469,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
       settled: '0 z 3',
     });
     await expectAllDone(page);
-    await expect(badge(page)).toHaveCount(0);
+    await expectBadge(page, 0);
   });
 
   await test.step('Krok 5: settling Wypłata Dominik at 9 143,27 zł and Wypłata żona at 6 500 zł gives 12 300,00 zł / 12 243,27 zł and 2 of 3', async () => {
@@ -461,7 +494,7 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
       settled: '3 z 3',
     });
     await expectAllDone(page);
-    await expect(badge(page)).toHaveCount(0);
+    await expectBadge(page, 0);
   });
 
   const before = MONTH_NUMBER - 1;
@@ -624,13 +657,16 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
       interval: '6',
       day: Number(CHECKUP_DATE.slice(8)),
     });
-    await expect(badge(page)).toHaveText('1');
+    await expectBadge(page, 1);
     await openDashboard(page);
-    await expect(todoItems(page)).toHaveCount(1);
-    await expect(todoItems(page).first()).toContainText(CHECKUP);
-    await expect(todoItems(page).first()).toContainText(dateInText(CHECKUP_DATE));
-    await expect(todoItems(page).first()).toContainText('za 5 dni · wydatek');
-    await expect(todoItems(page).first()).toContainText(pln('400,00'));
+    await showAllTodo(page);
+    await expect(todoItems(page)).toHaveCount(OVERDUE_EXPENSES + 1);
+    const upcoming = todoItems(page).filter({ hasNotText: 'zaległe' });
+    await expect(upcoming).toHaveCount(1);
+    await expect(upcoming).toContainText(CHECKUP);
+    await expect(upcoming).toContainText(dateInText(CHECKUP_DATE));
+    await expect(upcoming).toContainText('za 5 dni · wydatek');
+    await expect(upcoming).toContainText(pln('400,00'));
   });
 
   await test.step('Krok 17: the lead time 3 days hides the item and the counter, 0 days keeps them hidden and 7 days brings them back', async () => {
@@ -638,12 +674,12 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     const input = page.getByTestId('payment-lead-days-input');
     await expect(input).toHaveValue('7');
     await setLeadDays(page, '3');
-    await expect(badge(page)).toHaveCount(0);
+    await expectBadge(page, 0);
     await page.reload();
     await expect(input).toHaveValue('3');
     await openDashboard(page);
     await expectAllDone(page);
-    await expect(badge(page)).toHaveCount(0);
+    await expectBadge(page, 0);
 
     await openMonth(page, M);
     await setLeadDays(page, '0');
@@ -651,13 +687,14 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     await expect(input).toHaveValue('0');
     await openDashboard(page);
     await expectAllDone(page);
-    await expect(badge(page)).toHaveCount(0);
+    await expectBadge(page, 0);
 
     await openMonth(page, M);
     await setLeadDays(page, '7');
-    await expect(badge(page)).toHaveText('1');
+    await expectBadge(page, 1);
     await openDashboard(page);
-    await expect(todoItems(page)).toHaveCount(1);
+    await showAllTodo(page);
+    await expect(todoItems(page)).toHaveCount(OVERDUE_EXPENSES + 1);
   });
 
   await test.step('Krok 18: at 390 px layout=calendar shows the day list without the layout switch and the calendar', async () => {
@@ -682,9 +719,11 @@ test('month dashboard: reminders, the counter, the year view and the day calenda
     const card = monthCard(page);
     await expect(card.getByRole('heading', { name: /· plan$/ })).toBeVisible();
     await expect(card.getByTestId('month-card-settled')).toHaveText('Incomes settled: 3 of 3');
-    await expect(todoItems(page)).toHaveCount(1);
-    await expect(todoItems(page).first()).toContainText(CHECKUP);
-    await expect(todoItems(page).first()).toContainText('in 5 days · expense');
+    await showAllTodo(page);
+    await expect(todoItems(page)).toHaveCount(OVERDUE_EXPENSES + 1);
+    const upcoming = todoItems(page).filter({ hasText: CHECKUP });
+    await expect(upcoming).toHaveCount(1);
+    await expect(upcoming).toContainText('in 5 days · expense');
 
     await navigation(page)
       .getByRole('link', { name: /^(Planowanie|Planning)/ })
