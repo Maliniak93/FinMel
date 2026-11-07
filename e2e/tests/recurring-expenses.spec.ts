@@ -116,7 +116,8 @@ test('recurring expenses: plan fixed expenses with reserves, read free funds for
 
   await test.step('Krok 2: Życie 3 000 zł on the 1st without an account or currency question gives a payment of 3 000 zł, cost 3 000 zł and plan 13 500 zł', async () => {
     const dialog = await openAddExpenseDialog(page);
-    await expect(dialog.getByRole('combobox', { name: 'Konto' })).toHaveCount(0);
+    await expect(dialog.getByRole('combobox', { name: 'Konto' })).toBeVisible();
+    await expect(dialog.getByRole('combobox', { name: 'Konto' })).toHaveText('');
     await expect(dialog.getByRole('combobox', { name: 'Waluta' })).toHaveCount(0);
     await fillExpense(page, dialog, {
       name: LIFE,
