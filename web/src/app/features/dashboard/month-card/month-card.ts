@@ -1,4 +1,4 @@
-import { Component, computed, resource } from '@angular/core';
+import { Component, computed, input, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -40,7 +40,10 @@ function toGrosze(amount: number | string): number {
   styleUrl: './month-card.scss',
 })
 export class MonthCard {
+  readonly version = input(0);
+
   protected readonly monthResource = resource({
+    params: () => this.version(),
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioPlanningMonthsByMonth({
         path: { month: currentWarsawMonth() },

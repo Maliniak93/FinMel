@@ -137,10 +137,10 @@
               <h2 class="dashboard-page__card-title">{{ 'dashboard.todo.heading' | transloco }}</h2>
               <a routerLink="/planning">{{ 'dashboard.todo.planning' | transloco }}</a>
             </header>
-            <app-todo-card />
+            <app-todo-card (settled)="reloadAfterSettlement()" />
             <app-upcoming-card />
           </section>
-          <app-month-card />
+          <app-month-card [version]="balancesVersion()" />
         </div>
 
         <div class="dashboard-page__pair dashboard-page__pair--split">
@@ -253,8 +253,8 @@
           </section>
 
           <div class="dashboard-page__side">
-            <app-accounts-card />
-            <app-cash-card />
+            <app-accounts-card [version]="balancesVersion()" />
+            <app-cash-card [version]="balancesVersion()" />
           </div>
         </div>
       </div>

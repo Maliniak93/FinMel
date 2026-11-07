@@ -940,7 +940,7 @@ export type SwapNewBondRequest = {
 
 export type TaxWrapper = number;
 
-export type TodoItemKind = 'OverdueIncome' | 'UpcomingPayment';
+export type TodoItemKind = 'OverdueIncome' | 'UpcomingPayment' | 'OverdueExpense';
 
 export type TodoItemResponse = {
     kind: TodoItemKind;
@@ -950,6 +950,8 @@ export type TodoItemResponse = {
     currency: string;
     daysOverdue: null | number | string;
     daysUntil: null | number | string;
+    expensePayment: null | ExpensePaymentResponse;
+    oneOffExpense: null | OneOffExpenseResponse;
 };
 
 export type TransactionResponse = {

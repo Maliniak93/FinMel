@@ -530,6 +530,7 @@
       "showAll": "pokaż wszystkie",
       "settle": "Rozlicz",
       "overdue": "{{ date }} · zaległe: {{ days }} dni",
+      "overdueExpense": "{{ date }} · zaległe: {{ days }} dni · wydatek",
       "payment": "{{ date }} · za {{ days }} dni · wydatek"
     }
   },

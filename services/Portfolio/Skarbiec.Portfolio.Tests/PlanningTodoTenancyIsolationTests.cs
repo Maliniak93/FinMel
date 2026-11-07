@@ -43,4 +43,25 @@ public sealed class PlanningTodoTenancyIsolationTests(SkarbiecContainersFixture 
         Assert.Equal(new PlanningSettingsView(14), await clientA.GetPlanningSettingsAsync(cancellationToken));
         Assert.Equal(new PlanningSettingsView(10), await clientB.GetPlanningSettingsAsync(cancellationToken));
     }
+
+    [Fact]
+    public async Task Todo_OverdueExpenses_AsUserB_SeeOnlyOwn()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var clientA = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        using var clientB = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await clientA.CreateOneOffExpenseAsync(cancellationToken, "Abonament A", 120m, new DateOnly(2026, 10, 10));
+        await clientA.CreateRecurringExpenseAsync(
+            cancellationToken, "Czynsz A", 2_400m, new DateOnly(2026, 9, 1), dayOfMonth: 5);
+        await clientB.CreateOneOffExpenseAsync(cancellationToken, "Abonament B", 90m, new DateOnly(2026, 10, 11));
+
+        var todoA = await clientA.GetTodoAsync(cancellationToken);
+        var todoB = await clientB.GetTodoAsync(cancellationToken);
+
+        Assert.Equal(
+            ["Czynsz A", "Czynsz A", "Abonament A"],
+            todoA.Items.Select(i => i.Name));
+        Assert.Equal([(OverdueExpenseKind, "Abonament B")], todoB.Items.Select(i => (i.Kind, i.Name)));
+    }
 }

@@ -3,7 +3,9 @@ import { resolve } from 'node:path';
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { MatDialog } from '@angular/material/dialog';
 import { MatTooltip } from '@angular/material/tooltip';
+import { of } from 'rxjs';
 import { provideRouter } from '@angular/router';
 
 import {
@@ -679,6 +681,77 @@ describe('Dashboard', () => {
     expect(normalised(textOf(payment))).toContain('za 5 dni · wydatek');
     expect(normalised(textOf(payment))).not.toContain('Rozlicz');
     expect(payment.querySelector('button')).toBeNull();
+  });
+
+  describe('settling an overdue expense', () => {
+    const expenseTodo = jsonResponse({
+      paymentLeadDays: 7,
+      items: [
+        {
+          kind: 'OverdueExpense',
+          name: 'Abonament',
+          date: dateOnlyFromToday(-4),
+          amount: 120,
+          currency: 'PLN',
+          daysOverdue: 4,
+          daysUntil: null,
+          oneOffExpense: {
+            id: 'one-off-abonament',
+            name: 'Abonament',
+            date: dateOnlyFromToday(-4),
+            amount: 120,
+            inMonth: true,
+            status: 'Pending',
+          },
+        },
+      ],
+    });
+
+    function requestsTo(path: string): number {
+      return fetchSpy.mock.calls.filter(([input]: unknown[]) => requestUrl(input).includes(path))
+        .length;
+    }
+
+    async function clickSettle(saved: boolean): Promise<void> {
+      vi.spyOn(TestBed.inject(MatDialog), 'open').mockReturnValue({
+        afterClosed: () => of(saved),
+      } as never);
+      await switchLanguage(fixture, 'pl');
+      const button = [
+        ...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>(
+          '[data-testid="todo-card-item"] button',
+        ),
+      ].find((candidate) => textOf(candidate) === 'Rozlicz');
+      button!.click();
+      await fixture.whenStable();
+    }
+
+    it('reloads the page after settling an expense', async () => {
+      await setup(jsonResponse(dashboard), undefined, { todo: expenseTodo });
+      const before = {
+        todo: requestsTo('/planning/todo'),
+        dashboard: requestsTo('/api/reporting/dashboard'),
+        history: requestsTo('/net-worth-history'),
+      };
+
+      await clickSettle(true);
+
+      await vi.waitFor(() => {
+        expect(requestsTo('/planning/todo')).toBeGreaterThan(before.todo);
+        expect(requestsTo('/api/reporting/dashboard')).toBeGreaterThan(before.dashboard);
+        expect(requestsTo('/net-worth-history')).toBeGreaterThan(before.history);
+      });
+    });
+
+    it('does not reload when the settle dialog is cancelled', async () => {
+      await setup(jsonResponse(dashboard), undefined, { todo: expenseTodo });
+      const before = fetchSpy.mock.calls.length;
+
+      await clickSettle(false);
+      await fixture.whenStable();
+
+      expect(fetchSpy.mock.calls).toHaveLength(before);
+    });
   });
 
   it('a failed section does not replace the page', async () => {

@@ -1,6 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -9,28 +10,48 @@ import type { TodoItemResponse } from '../../../api/portfolio';
 import { PlanningState } from '../../../core/planning/planning-state';
 import { formatDate, formatMoney } from '../../../shared/format';
 import { SectionError } from '../../../shared/section-error/section-error';
+import {
+  SettleExpenseDialog,
+  type SettleExpenseDialogData,
+} from '../../planning/settle-expense-dialog/settle-expense-dialog';
 
 const VISIBLE_ITEMS = 5;
 
+type TodoRowKind = 'income' | 'expense' | 'payment';
+
 interface TodoRow {
-  overdue: boolean;
+  kind: TodoRowKind;
   name: string;
   date: string;
   days: number;
   amount: string;
   month: string;
+  dialogData: SettleExpenseDialogData | null;
+}
+
+function dialogDataOf(item: TodoItemResponse): SettleExpenseDialogData | null {
+  if (item.expensePayment) {
+    return { payment: item.expensePayment };
+  }
+  return item.oneOffExpense ? { oneOffExpense: item.oneOffExpense } : null;
 }
 
 function rowOf(item: TodoItemResponse): TodoRow {
-  const overdue = item.kind === 'OverdueIncome';
+  const kind: TodoRowKind =
+    item.kind === 'OverdueIncome'
+      ? 'income'
+      : item.kind === 'OverdueExpense'
+        ? 'expense'
+        : 'payment';
   const amount = Number(item.amount);
   return {
-    overdue,
+    kind,
     name: item.name,
     date: formatDate(item.date),
-    days: Number((overdue ? item.daysOverdue : item.daysUntil) ?? 0),
-    amount: formatMoney(overdue ? amount : -amount, item.currency),
+    days: Number((kind === 'payment' ? item.daysUntil : item.daysOverdue) ?? 0),
+    amount: formatMoney(kind === 'income' ? amount : -amount, item.currency),
     month: item.date.slice(0, 7),
+    dialogData: dialogDataOf(item),
   };
 }
 
@@ -49,7 +70,10 @@ function rowOf(item: TodoItemResponse): TodoRow {
 })
 export class TodoCard {
   protected readonly planningState = inject(PlanningState);
+  private readonly dialog = inject(MatDialog);
   private readonly expanded = signal(false);
+
+  readonly settled = output<void>();
 
   private readonly rows = computed(() => this.planningState.todo().map(rowOf));
 
@@ -65,5 +89,18 @@ export class TodoCard {
 
   protected showAll(): void {
     this.expanded.set(true);
+  }
+
+  protected openSettleDialog(row: TodoRow): void {
+    if (!row.dialogData) {
+      return;
+    }
+    const ref = this.dialog.open(SettleExpenseDialog, { width: '420px', data: row.dialogData });
+    ref.afterClosed().subscribe((saved) => {
+      if (saved === true) {
+        this.planningState.reloadTodo();
+        this.settled.emit();
+      }
+    });
   }
 }

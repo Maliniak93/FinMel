@@ -530,6 +530,7 @@
       "showAll": "show all",
       "settle": "Settle",
       "overdue": "{{ date }} · overdue: {{ days }} days",
+      "overdueExpense": "{{ date }} · overdue: {{ days }} days · expense",
       "payment": "{{ date }} · in {{ days }} days · expense"
     }
   },

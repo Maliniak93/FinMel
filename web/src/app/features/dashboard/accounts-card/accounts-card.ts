@@ -1,4 +1,4 @@
-import { Component, computed, resource } from '@angular/core';
+import { Component, computed, input, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -25,7 +25,10 @@ interface AccountRow {
   styleUrl: './accounts-card.scss',
 })
 export class AccountsCard {
+  readonly version = input(0);
+
   private readonly accountsResource = resource({
+    params: () => this.version(),
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioAccounts({ signal: abortSignal });
       if (result.error) {
@@ -38,6 +41,7 @@ export class AccountsCard {
   });
 
   private readonly valuesResource = resource({
+    params: () => this.version(),
     loader: async ({ abortSignal }) => {
       const result = await getApiReportingDashboard({ signal: abortSignal });
       if (result.error) {

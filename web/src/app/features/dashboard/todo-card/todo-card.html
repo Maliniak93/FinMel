@@ -18,22 +18,42 @@
           <li class="todo-card__row" data-testid="todo-card-item">
             <span class="todo-card__name">{{ row.name }}</span>
             <span class="todo-card__meta">
-              @if (row.overdue) {
-                {{ 'dashboard.todo.overdue' | transloco: { date: row.date, days: row.days } }}
-              } @else {
-                {{ 'dashboard.todo.payment' | transloco: { date: row.date, days: row.days } }}
+              @switch (row.kind) {
+                @case ('income') {
+                  {{ 'dashboard.todo.overdue' | transloco: { date: row.date, days: row.days } }}
+                }
+                @case ('expense') {
+                  {{
+                    'dashboard.todo.overdueExpense' | transloco: { date: row.date, days: row.days }
+                  }}
+                }
+                @default {
+                  {{ 'dashboard.todo.payment' | transloco: { date: row.date, days: row.days } }}
+                }
               }
             </span>
             <span class="todo-card__amount">{{ row.amount }}</span>
-            @if (row.overdue) {
-              <a
-                mat-flat-button
-                class="todo-card__settle"
-                routerLink="/planning"
-                [queryParams]="{ month: row.month }"
-                fragment="do-rozliczenia"
-                >{{ 'dashboard.todo.settle' | transloco }}</a
-              >
+            @switch (row.kind) {
+              @case ('income') {
+                <a
+                  mat-flat-button
+                  class="todo-card__settle"
+                  routerLink="/planning"
+                  [queryParams]="{ month: row.month }"
+                  fragment="do-rozliczenia"
+                  >{{ 'dashboard.todo.settle' | transloco }}</a
+                >
+              }
+              @case ('expense') {
+                <button
+                  mat-flat-button
+                  type="button"
+                  class="todo-card__settle"
+                  (click)="openSettleDialog(row)"
+                >
+                  {{ 'dashboard.todo.settle' | transloco }}
+                </button>
+              }
             }
           </li>
         }

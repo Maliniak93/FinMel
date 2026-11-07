@@ -88,11 +88,175 @@ public sealed class PlanningTodoEndpointTests(SkarbiecContainersFixture containe
                 (UpcomingPaymentKind, "Przegląd", new DateOnly(2027, 3, 12), 400m, 2),
                 (UpcomingPaymentKind, "OC Toyota", new DateOnly(2027, 3, 15), 1_200m, 5)
             ],
-            onTenth.Items.Select(i => (i.Kind, i.Name, i.Date, i.Amount, i.DaysUntil)));
-        Assert.Equal([("Przegląd", 5)], onSeventh.Items.Select(i => (i.Name, i.DaysUntil)));
-        Assert.Equal([("OC Toyota", 0)], onFifteenth.Items.Select(i => (i.Name, i.DaysUntil)));
-        Assert.Empty(onSixteenth.Items);
-        Assert.Empty(withoutLead.Items);
+            onTenth.Items.Where(i => i.Kind == UpcomingPaymentKind).Select(i => (i.Kind, i.Name, i.Date, i.Amount, i.DaysUntil)));
+        Assert.Equal([("Przegląd", 5)], onSeventh.Items.Where(i => i.Kind == UpcomingPaymentKind).Select(i => (i.Name, i.DaysUntil)));
+        Assert.Equal([("OC Toyota", 0)], onFifteenth.Items.Where(i => i.Kind == UpcomingPaymentKind).Select(i => (i.Name, i.DaysUntil)));
+        Assert.DoesNotContain(onSixteenth.Items, i => i.Kind == UpcomingPaymentKind);
+        Assert.DoesNotContain(withoutLead.Items, i => i.Kind == UpcomingPaymentKind);
+    }
+
+    [Fact]
+    public async Task OverdueExpenses_OneOff_IsListed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var expenseId = await client.CreateOneOffExpenseAsync(cancellationToken, "Abonament", 120m, new DateOnly(2026, 10, 10));
+
+        var todo = await client.GetTodoAsync(cancellationToken);
+
+        var item = Assert.Single(todo.Items);
+        Assert.Equal(
+            (OverdueExpenseKind, "Abonament", new DateOnly(2026, 10, 10), 120m, "PLN", 10),
+            (item.Kind, item.Name, item.Date, item.Amount, item.Currency, item.DaysOverdue));
+        Assert.Equal(expenseId, item.OneOffExpense!.Id);
+        Assert.Null(item.ExpensePayment);
+    }
+
+    [Fact]
+    public async Task OverdueExpenses_Recurring_ListsEveryUnsettledPastPayment()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var expenseId = await client.CreateRecurringExpenseAsync(
+            cancellationToken, "Czynsz", 2_400m, new DateOnly(2026, 7, 1), dayOfMonth: 20);
+        await client.SettleExpensePaymentAsync(
+            expenseId, "2026-07", account.AccountId, 2_400m, new DateOnly(2026, 7, 20), cancellationToken);
+
+        var todo = await client.GetTodoAsync(cancellationToken);
+
+        Assert.Equal(
+            [
+                (OverdueExpenseKind, new DateOnly(2026, 8, 20), "2026-08", 61),
+                (OverdueExpenseKind, new DateOnly(2026, 9, 20), "2026-09", 30)
+            ],
+            todo.Items.Select(i => (i.Kind, i.Date, i.ExpensePayment!.NominalMonth, i.DaysOverdue!.Value)));
+        Assert.All(todo.Items, i => Assert.Equal(expenseId, i.ExpensePayment!.RecurringExpenseId));
+        Assert.All(todo.Items, i => Assert.Null(i.OneOffExpense));
+    }
+
+    [Fact]
+    public async Task OverdueExpenses_Settled_AreNotListed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var expenseId = await client.CreateOneOffExpenseAsync(cancellationToken, "Abonament", 120m, new DateOnly(2026, 10, 10));
+        await client.SettleOneOffExpenseAsync(
+            expenseId, account.AccountId, 120m, new DateOnly(2026, 10, 10), cancellationToken);
+
+        var whileSettled = await client.GetTodoAsync(cancellationToken);
+        var undo = await client.DeleteAsync(OneOffExpenseSettlementUri(expenseId), cancellationToken);
+        undo.EnsureSuccessStatusCode();
+        var afterUndo = await client.GetTodoAsync(cancellationToken);
+
+        Assert.Empty(whileSettled.Items);
+        Assert.Equal([expenseId], afterUndo.Items.Select(i => i.OneOffExpense!.Id));
+    }
+
+    [Fact]
+    public async Task UpcomingPayments_SettledPayment_IsNotListed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(Mid2027MarchTen);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var expenseId = await client.CreateRecurringExpenseAsync(
+            cancellationToken, "Ubezpieczenie", 900m, new DateOnly(2027, 3, 15), intervalMonths: 3, dayOfMonth: 15);
+
+        var unsettled = await client.GetTodoAsync(cancellationToken);
+        await client.SettleExpensePaymentAsync(
+            expenseId, "2027-03", account.AccountId, 900m, new DateOnly(2027, 3, 10), cancellationToken);
+        var settled = await client.GetTodoAsync(cancellationToken);
+
+        Assert.Equal([(UpcomingPaymentKind, "Ubezpieczenie")], unsettled.Items.Select(i => (i.Kind, i.Name)));
+        Assert.Empty(settled.Items);
+    }
+
+    [Fact]
+    public async Task Order_MergesOverdueIncomesAndExpenses()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(CreationDayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "Konto premii");
+        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Premia", 500m, dayOfMonth: 18);
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Wydatek A", 10m, new DateOnly(2026, 10, 16));
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Wydatek B", 20m, new DateOnly(2026, 10, 18));
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Wydatek C", 30m, new DateOnly(2026, 10, 19));
+        await client.CreateRecurringExpenseAsync(
+            cancellationToken, "Przegląd", 400m, new DateOnly(2026, 10, 25), intervalMonths: 6, dayOfMonth: 25);
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+
+        var todo = await client.GetTodoAsync(cancellationToken);
+
+        Assert.Equal(
+            [
+                (OverdueExpenseKind, "Wydatek A", new DateOnly(2026, 10, 16)),
+                (OverdueIncomeKind, "Premia", new DateOnly(2026, 10, 18)),
+                (OverdueExpenseKind, "Wydatek B", new DateOnly(2026, 10, 18)),
+                (OverdueExpenseKind, "Wydatek C", new DateOnly(2026, 10, 19)),
+                (UpcomingPaymentKind, "Przegląd", new DateOnly(2026, 10, 25))
+            ],
+            todo.Items.Select(i => (i.Kind, i.Name, i.Date)));
+    }
+
+    [Fact]
+    public async Task OverdueExpenses_MatchPlanningMonthPendingRows()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var rent = await client.CreateRecurringExpenseAsync(
+            cancellationToken, "Czynsz", 2_400m, new DateOnly(2026, 8, 1), dayOfMonth: 5, accountId: account.AccountId);
+        await client.SettleExpensePaymentAsync(
+            rent, "2026-08", account.AccountId, 2_400m, new DateOnly(2026, 8, 5), cancellationToken);
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Abonament", 120m, new DateOnly(2026, 9, 3));
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Naprawa", 300m, new DateOnly(2026, 10, 12));
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Przyszły", 50m, new DateOnly(2026, 10, 28));
+        var today = new DateOnly(2026, 10, 20);
+
+        var payments = new List<ExpensePaymentView>();
+        var oneOffs = new List<OneOffExpenseView>();
+        foreach (var month in new[] { "2026-08", "2026-09", "2026-10" })
+        {
+            var expenses = (await client.GetPlanningMonthAsync(month, cancellationToken)).Expenses;
+            payments.AddRange(expenses.Payments.Where(p => p.Status == "Pending" && p.Date < today));
+            oneOffs.AddRange(expenses.OneOffs!.Where(o => o.InMonth && o.Status == "Pending" && o.Date < today));
+        }
+
+        var todo = await client.GetTodoAsync(cancellationToken);
+
+        var overdue = todo.Items.Where(i => i.Kind == OverdueExpenseKind).ToList();
+        Assert.Equal(4, payments.Count + oneOffs.Count);
+        Assert.Equal(4, overdue.Count);
+        Assert.Equal(
+            payments.OrderBy(p => p.Date).ToList(),
+            overdue.Where(i => i.ExpensePayment is not null).Select(i => i.ExpensePayment!).ToList());
+        Assert.Equal(
+            oneOffs.OrderBy(o => o.Date).ToList(),
+            overdue.Where(i => i.OneOffExpense is not null).Select(i => i.OneOffExpense!).ToList());
+        Assert.Equal(todo.Items.Count, overdue.Count);
+    }
+
+    [Fact]
+    public async Task OverdueExpenses_WithPaymentsHidden_AreStillListed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await client.CreateOneOffExpenseAsync(cancellationToken, "Abonament", 120m, new DateOnly(2026, 10, 10));
+        await client.CreateRecurringExpenseAsync(
+            cancellationToken, "Przegląd", 400m, new DateOnly(2026, 10, 25), intervalMonths: 6, dayOfMonth: 25);
+        await client.SavePlanningSettingsAsync(cancellationToken, paymentLeadDays: 0);
+
+        var todo = await client.GetTodoAsync(cancellationToken);
+
+        Assert.Equal([(OverdueExpenseKind, "Abonament")], todo.Items.Select(i => (i.Kind, i.Name)));
     }
 
     [Fact]
