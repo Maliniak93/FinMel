@@ -301,7 +301,7 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     await expect(dialog.getByLabel('Nazwa')).toBeVisible();
     await expect(dialog.getByRole('spinbutton', { name: 'Kwota', exact: true })).toBeVisible();
     await expect(dialog.getByLabel('Data', { exact: true })).toBeVisible();
-    await expect(dialog.getByRole('combobox', { name: 'Konto', exact: true })).toHaveCount(0);
+    await expect(dialog.getByRole('combobox', { name: 'Konto', exact: true })).toHaveText('');
     await expectNoRuleFields(dialog);
     await dialog.getByLabel('Nazwa').fill(SERVICE);
     await dialog.getByRole('spinbutton', { name: 'Kwota', exact: true }).fill('1200');
@@ -321,7 +321,8 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     await expectFreeFunds(page, '4 800,00');
     const payment = expensePayments(page, SERVICE);
     await expect(payment).toHaveCount(1);
-    await expect(payment.getByRole('button')).toHaveCount(0);
+    await expect(payment.getByRole('button')).toHaveCount(1);
+    await expect(payment.getByTestId('settle-expense')).toBeVisible();
     await expect(payment).not.toContainText('zapłacon');
     await expect(payment).not.toContainText('rozliczone');
   });
