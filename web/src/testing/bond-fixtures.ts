@@ -24,6 +24,7 @@ export interface BondFixture {
   bookValue: number;
   costPln: number;
   paidInterestPln: number;
+  paidInterestNetPln: number;
   status: number;
   duePeriodCount: number;
   lastSettlement: BondSettlementFixture | null;
@@ -93,6 +94,7 @@ export function bondResponse(overrides: Partial<BondFixture> = {}): BondFixture 
     bookValue: 5000,
     costPln: 5000,
     paidInterestPln: 0,
+    paidInterestNetPln: 0,
     status: BOND_STATUS.Active,
     duePeriodCount: 0,
     lastSettlement: null,
@@ -533,3 +535,91 @@ export const rorEarlySeries = {
   ...rorSeries,
   periodRates: [{ periodIndex: 4, ratePercent: 3.75 }],
 };
+
+export const gainEdoBond = bondResponse({
+  assetId: 'd4d4d4d4-0000-0000-0000-00000000d001',
+  name: 'EDO0236',
+  seriesCode: 'EDO0236',
+  purchaseDate: '2025-02-01',
+  bondCount: 35,
+  nominalValue: 3500,
+  bookValue: 3647.7,
+  costPln: 3500,
+  estimate: { grossValue: 3647.7, netValue: 3510, asOf: '2026-11-06' },
+});
+
+export const gainCoiBond = bondResponse({
+  assetId: 'd4d4d4d4-0000-0000-0000-00000000d002',
+  name: 'COI0630 with coupon',
+  seriesCode: 'COI0630',
+  type: 4,
+  purchaseDate: '2025-06-10',
+  bondCount: 10,
+  firstPeriodRatePercent: 6.5,
+  marginPercent: null,
+  maturityDate: '2030-06-10',
+  nominalValue: 1000,
+  bookValue: 1000,
+  costPln: 1000,
+  paidInterestPln: 65,
+  paidInterestNetPln: 52.65,
+  estimate: { grossValue: 1000, netValue: 987.35, asOf: '2026-11-06' },
+});
+
+export const gainCoiNoCouponBond = bondResponse({
+  ...gainCoiBond,
+  assetId: 'd4d4d4d4-0000-0000-0000-00000000d003',
+  name: 'COI0630 without coupon',
+  bondCount: 20,
+  nominalValue: 2000,
+  bookValue: 2000,
+  costPln: 2000,
+  paidInterestPln: 0,
+  paidInterestNetPln: 0,
+  estimate: { grossValue: 2016.2, netValue: 2032.7, asOf: '2026-11-06' },
+});
+
+export const gainEdo0736Bond = bondResponse({
+  assetId: 'd4d4d4d4-0000-0000-0000-00000000d004',
+  name: 'EDO0736',
+  seriesCode: 'EDO0736',
+  purchaseDate: '2025-07-01',
+  bondCount: 5,
+  nominalValue: 500,
+  bookValue: 500,
+  costPln: 500,
+  estimate: { grossValue: 500, netValue: 500, asOf: '2026-11-06' },
+});
+
+export const noRateGainBond = bondResponse({
+  assetId: 'd4d4d4d4-0000-0000-0000-00000000d005',
+  name: 'ROR without rate',
+  seriesCode: 'ROR0627',
+  type: 1,
+  purchaseDate: '2026-06-10',
+  marginPercent: null,
+  bondCount: 10,
+  nominalValue: 1000,
+  bookValue: 1000,
+  costPln: 1000,
+  estimate: null,
+  estimateUnavailableReason: BOND_ESTIMATE_UNAVAILABLE_REASON.RateMissing,
+});
+
+export const partiallyRedeemedGainBond = bondResponse({
+  ...partiallyRedeemedEdoBond,
+  assetId: 'c3c3c3c3-0000-0000-0000-00000000c004',
+  name: 'Edo partially redeemed gain',
+  costPln: 600,
+  estimate: { grossValue: 632.1, netValue: 610, asOf: '2026-11-06' },
+});
+
+export const fullyRedeemedGainBond = bondResponse({
+  ...redeemedTosBond,
+  assetId: 'b2b2b2b2-0000-0000-0000-00000000b005',
+  name: 'Redeemed whole',
+  bondCount: 0,
+  nominalValue: 0,
+  bookValue: 0,
+  costPln: 0,
+});

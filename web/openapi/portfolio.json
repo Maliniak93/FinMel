@@ -4458,6 +4458,7 @@
           "bookValue",
           "costPln",
           "paidInterestPln",
+          "paidInterestNetPln",
           "status",
           "duePeriodCount",
           "periods",
@@ -4572,6 +4573,14 @@
             "format": "double"
           },
           "paidInterestPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "paidInterestNetPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",

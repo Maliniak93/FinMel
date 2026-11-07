@@ -48,6 +48,31 @@ public sealed class BondTenancyIsolationTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task List_DoesNotLeakPaidInterestNet()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 6, 20, 10, 0, 0, TimeSpan.Zero));
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var funded = await owner.CreateFundedBondAsync(
+            cancellationToken,
+            request: NewCoiBondRequest(name: "Owner coi"),
+            cashToppedUpOn: new DateOnly(2025, 6, 1),
+            accountName: "Owner coi");
+        await owner.SettleBondInterestAsync(funded.Bond.AssetId, [(1, null)], cancellationToken);
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var own = await stranger.CreateAccountWithBondAsync(
+            cancellationToken, NewBondRequest(name: "Stranger's own", purchaseDate: new DateOnly(2026, 6, 1)));
+
+        var response = await stranger.GetAsync(AllBondsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var listed = Assert.Single((await response.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken))!);
+        Assert.Multiple(
+            () => Assert.Equal(own.Bond.AssetId, listed.AssetId),
+            () => Assert.Equal(0m, listed.PaidInterestNetPln));
+    }
+
+    [Fact]
     public async Task Get_ByStranger_ReturnsNotFound()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -128,6 +128,11 @@
       <td mat-cell *matCellDef="let bond" data-testid="gross-today">
         @if (bond.estimate; as estimate) {
           <app-money [amount]="toNumber(estimate.grossValue)" />
+          @if (grossGain(bond); as gain) {
+            <span class="my-bonds__gain">
+              <app-gain [amount]="gain.amount" [percent]="gain.percent" [signedPercent]="true" />
+            </span>
+          }
         } @else {
           @let reason = estimateUnavailableLabel(bond);
           <span data-testid="estimate-missing" [matTooltip]="reason ? (reason | transloco) : ''">{{
@@ -142,6 +147,11 @@
       <td mat-cell *matCellDef="let bond" data-testid="net-today">
         @if (bond.estimate; as estimate) {
           <app-money [amount]="toNumber(estimate.netValue)" />
+          @if (netGain(bond); as gain) {
+            <span class="my-bonds__gain">
+              <app-gain [amount]="gain.amount" [percent]="gain.percent" [signedPercent]="true" />
+            </span>
+          }
         } @else {
           @let reason = estimateUnavailableLabel(bond);
           <span data-testid="estimate-missing" [matTooltip]="reason ? (reason | transloco) : ''">{{
@@ -162,6 +172,16 @@
         @let totals = estimateTotals();
         @if (totals) {
           <app-money [amount]="totals.gross" />
+          @if (grossTotalGain(); as gain) {
+            <span class="my-bonds__gain">
+              <app-gain [amount]="gain.amount" [percent]="gain.percent" [signedPercent]="true" />
+              @if (gain.withoutGain > 0) {
+                <span class="my-bonds__muted">{{
+                  'bonds.my.gainSkipped' | transloco: { count: gain.withoutGain }
+                }}</span>
+              }
+            </span>
+          }
         } @else {
           —
         }
@@ -173,6 +193,16 @@
         @let totals = estimateTotals();
         @if (totals) {
           <app-money [amount]="totals.net" />
+          @if (netTotalGain(); as gain) {
+            <span class="my-bonds__gain">
+              <app-gain [amount]="gain.amount" [percent]="gain.percent" [signedPercent]="true" />
+              @if (gain.withoutGain > 0) {
+                <span class="my-bonds__muted">{{
+                  'bonds.my.gainSkipped' | transloco: { count: gain.withoutGain }
+                }}</span>
+              }
+            </span>
+          }
         } @else {
           —
         }

@@ -118,6 +118,40 @@ public sealed class ListBondsEndpointTests(SkarbiecContainersFixture containers)
     }
 
     [Fact]
+    public async Task Returns_PaidInterestNet()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(new DateTimeOffset(2026, 6, 20, 10, 0, 0, TimeSpan.Zero));
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var edo = await client.CreateEdoYearOneSettledAsync(cancellationToken);
+        var regularCoi = await client.CreateFundedBondAsync(
+            cancellationToken,
+            request: NewCoiBondRequest(name: "Coi regular"),
+            cashToppedUpOn: new DateOnly(2025, 6, 1),
+            accountName: "Coi");
+        await client.SettleBondInterestAsync(regularCoi.Bond.AssetId, [(1, null)], cancellationToken);
+        var ikeCoi = await client.CreateFundedBondAsync(
+            cancellationToken,
+            request: NewCoiBondRequest(name: "Coi IKE"),
+            cashToppedUpOn: new DateOnly(2025, 6, 1),
+            wrapper: TaxWrapper.Ike,
+            accountName: "Coi IKE");
+        await client.SettleBondInterestAsync(ikeCoi.Bond.AssetId, [(1, null)], cancellationToken);
+
+        var response = await client.GetAsync(AllBondsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var bonds = (await response.Content.ReadFromJsonAsync<List<BondResponse>>(cancellationToken))!
+            .ToDictionary(b => b.AssetId);
+        var ike = bonds[ikeCoi.Bond.AssetId];
+        Assert.Multiple(
+            () => Assert.Equal(65m, bonds[regularCoi.Bond.AssetId].PaidInterestPln),
+            () => Assert.Equal(52.65m, bonds[regularCoi.Bond.AssetId].PaidInterestNetPln),
+            () => Assert.Equal(ike.PaidInterestPln, ike.PaidInterestNetPln),
+            () => Assert.Equal(0m, bonds[edo.Bond.AssetId].PaidInterestNetPln));
+    }
+
+    [Fact]
     public async Task List_EstimatesWithOneBatchCall()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

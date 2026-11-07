@@ -467,6 +467,7 @@ describe('Bonds page, my bonds tab', () => {
     const root = fixture.nativeElement as HTMLElement;
     const money = (amount: number): string => formatMoney(amount, 'PLN').replace(/\s+/g, ' ');
     const cell = (row: HTMLElement, testId: string): string =>
+      textOf(row.querySelector(`[data-testid="${testId}"] app-money`)) ||
       textOf(row.querySelector(`[data-testid="${testId}"]`));
     const tooltipsIn = (name: string): string[] =>
       fixture.debugElement
@@ -490,8 +491,12 @@ describe('Bonds page, my bonds tab', () => {
       'Wycena chwilowo niedostępna',
     ]);
     expect(textOf(root.querySelector('tfoot, tr.mat-mdc-footer-row'))).toContain('Razem');
-    expect(textOf(root.querySelector('[data-testid="gross-today-total"]'))).toBe(money(2068));
-    expect(textOf(root.querySelector('[data-testid="net-today-total"]'))).toBe(money(2043.65));
+    expect(textOf(root.querySelector('[data-testid="gross-today-total"] app-money'))).toBe(
+      money(2068),
+    );
+    expect(textOf(root.querySelector('[data-testid="net-today-total"] app-money'))).toBe(
+      money(2043.65),
+    );
   });
 });
 

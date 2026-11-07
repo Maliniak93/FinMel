@@ -119,6 +119,9 @@ public sealed record BondResponse
     /// <summary>Gross interest of the settled periods of a coupon type, PLN; 0 for a capitalising type.</summary>
     public required decimal PaidInterestPln { get; init; }
 
+    /// <summary>Net interest (gross less tax) of the settled periods of a coupon type, PLN; 0 for a capitalising type.</summary>
+    public required decimal PaidInterestNetPln { get; init; }
+
     public required BondStatus Status { get; init; }
 
     /// <summary>Ended periods not settled yet.</summary>
@@ -190,7 +193,8 @@ public static class BondMappingExtensions
             NominalValue = terms.BondCount * NominalPerBond,
             BookValue = asset.Quantity,
             CostPln = terms.BondCount * terms.PurchasePricePerBond,
-            PaidInterestPln = PaidInterest(terms.Type, settlements),
+            PaidInterestPln = PaidInterest(terms.Type, settlements, s => s.GrossInterest),
+            PaidInterestNetPln = PaidInterest(terms.Type, settlements, s => s.GrossInterest - s.Tax),
             // Maturity and swap redeem the holding whole; early redemptions only once they took every bond.
             Status = terms.BondCount == 0 || redemptions.Any(r => r.Kind != BondRedemptionKind.Early) ? BondStatus.Redeemed
                 : terms.MaturityDate <= today ? BondStatus.Matured
@@ -205,7 +209,13 @@ public static class BondMappingExtensions
     }
 
     public static decimal PaidInterest(TreasuryBondType type, IEnumerable<BondInterestSettlement> settlements)
-        => BondSchedule.IsCoupon(type) ? settlements.Sum(s => s.GrossInterest) : 0m;
+        => PaidInterest(type, settlements, s => s.GrossInterest);
+
+    public static decimal PaidInterest(
+        TreasuryBondType type,
+        IEnumerable<BondInterestSettlement> settlements,
+        Func<BondInterestSettlement, decimal> amount)
+        => BondSchedule.IsCoupon(type) ? settlements.Sum(amount) : 0m;
 
     public static BondSettlementResponse ToResponse(this BondInterestSettlement settlement) => new()
     {
