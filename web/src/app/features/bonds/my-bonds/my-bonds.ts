@@ -24,6 +24,8 @@ import { readProblemDetails } from '../../../core/auth/problem-details';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
+import { Gain } from '../../../shared/gain/gain';
+import { gainOf, sumGains } from '../../../shared/gain/gain-math';
 import { Money } from '../../../shared/money/money';
 import { SectionError } from '../../../shared/section-error/section-error';
 import { Skeleton } from '../../../shared/skeleton/skeleton';
@@ -100,6 +102,7 @@ function sumInGrosze(amounts: readonly (number | string)[]): number {
   selector: 'app-my-bonds',
   imports: [
     EmptyState,
+    Gain,
     MatButtonModule,
     MatDividerModule,
     MatIconModule,
@@ -190,6 +193,42 @@ export class MyBonds {
           net: sumInGrosze(estimates.map((estimate) => estimate.netValue)),
         };
   });
+
+  protected readonly grossTotalGain = computed(() =>
+    sumGains(
+      this.visibleBonds().map((bond) => ({
+        value: bond.estimate?.grossValue,
+        cost: bond.costPln,
+        paid: bond.paidInterestPln,
+      })),
+    ),
+  );
+
+  protected readonly netTotalGain = computed(() =>
+    sumGains(
+      this.visibleBonds().map((bond) => ({
+        value: bond.estimate?.netValue,
+        cost: bond.costPln,
+        paid: bond.paidInterestNetPln,
+      })),
+    ),
+  );
+
+  protected grossGain(bond: BondResponse) {
+    return bond.estimate
+      ? gainOf({ value: bond.estimate.grossValue, cost: bond.costPln, paid: bond.paidInterestPln })
+      : null;
+  }
+
+  protected netGain(bond: BondResponse) {
+    return bond.estimate
+      ? gainOf({
+          value: bond.estimate.netValue,
+          cost: bond.costPln,
+          paid: bond.paidInterestNetPln,
+        })
+      : null;
+  }
 
   protected readonly expandedId = signal<string | null>(null);
 

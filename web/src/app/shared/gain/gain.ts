@@ -1,6 +1,12 @@
 import { Component, computed, input } from '@angular/core';
 
-import { formatMoney, formatPercent, formatSignedMoney, roundsToZero } from '../format';
+import {
+  formatMoney,
+  formatPercent,
+  formatSignedMoney,
+  formatSignedPercent,
+  roundsToZero,
+} from '../format';
 
 @Component({
   selector: 'app-gain',
@@ -12,6 +18,7 @@ export class Gain {
   readonly percent = input<number | null | undefined>();
   readonly currency = input('PLN');
   readonly dashWithoutPercent = input(false);
+  readonly signedPercent = input(false);
 
   protected readonly present = computed(() => {
     const amount = this.amount();
@@ -38,6 +45,6 @@ export class Gain {
     if (percent === null || percent === undefined) {
       return this.dashWithoutPercent() ? '(—)' : null;
     }
-    return `(${formatPercent(percent)})`;
+    return `(${this.signedPercent() ? formatSignedPercent(percent) : formatPercent(percent)})`;
   });
 }

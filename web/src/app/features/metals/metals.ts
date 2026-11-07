@@ -16,6 +16,8 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { formatDate, formatQuantity } from '../../shared/format';
+import { Gain } from '../../shared/gain/gain';
+import { gainOf, sumGains } from '../../shared/gain/gain-math';
 import { Money } from '../../shared/money/money';
 import { SectionError } from '../../shared/section-error/section-error';
 import { Skeleton } from '../../shared/skeleton/skeleton';
@@ -29,10 +31,16 @@ import { TRANSACTION_TYPE_BUY, TRANSACTION_TYPE_SELL } from '../transactions/tra
 import { METALS, metalLabel, wholeTroyOunces } from './metal';
 import { MetalFormDialog, type MetalFormDialogData } from './metal-form-dialog/metal-form-dialog';
 
+// Display-only sum of the row values, in whole grosze.
+function sumInGrosze(amounts: readonly number[]): number {
+  return amounts.reduce((sum, amount) => sum + Math.round(amount * 100), 0) / 100;
+}
+
 @Component({
   selector: 'app-metals',
   imports: [
     EmptyState,
+    Gain,
     MatButtonModule,
     MatIconModule,
     MatMenuModule,
@@ -57,8 +65,12 @@ export class Metals {
     'pieces',
     'totalWeight',
     'valueToday',
+    'gain',
     'actions',
   ];
+
+  protected readonly footerColumns = ['totalLabel', 'valueTodayTotal', 'gainTotal', 'totalRest'];
+  protected readonly totalLabelSpan = this.displayedColumns.indexOf('valueToday');
 
   protected readonly holdingsResource = resource({
     loader: async ({ abortSignal }) => {
@@ -127,6 +139,27 @@ export class Metals {
       Number(price.pricePerGramPln)
     );
   }
+
+  protected gain(holding: MetalResponse) {
+    return gainOf({ value: this.valueToday(holding), cost: holding.costPln });
+  }
+
+  protected readonly totals = computed(() => {
+    if (!this.holdingsResource.hasValue()) {
+      return null;
+    }
+    const rows = this.holdingsResource.value();
+    const values = rows.flatMap((holding) => {
+      const value = this.valueToday(holding);
+      return value === null ? [] : [value];
+    });
+    return {
+      value: values.length === 0 ? null : sumInGrosze(values),
+      gain: sumGains(
+        rows.map((holding) => ({ value: this.valueToday(holding), cost: holding.costPln })),
+      ),
+    };
+  });
 
   protected isReadOnly(holding: MetalResponse): boolean {
     return holding.isArchived;

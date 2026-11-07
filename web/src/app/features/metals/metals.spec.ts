@@ -8,9 +8,9 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { MetalPriceResponse } from '../../api/marketdata';
 import type { MetalResponse } from '../../api/portfolio';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatMoney } from '../../shared/format';
+import { formatMoney, formatSignedMoney } from '../../shared/format';
 import { clickRowMenuItem, menuItemLabel, rowMenuItems } from '../../../testing/archive';
-import { textOf } from '../../../testing/i18n';
+import { restoreEnglish, switchLanguage, textOf } from '../../../testing/i18n';
 import {
   goldKrugerrand,
   metalPricesGoldOnly,
@@ -34,8 +34,9 @@ describe('Metals', () => {
     marketDataClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fetchSpy.mockRestore();
+    await restoreEnglish();
   });
 
   async function setup(
@@ -144,9 +145,9 @@ describe('Metals', () => {
   it('shows a zero value today, not a dash, for a priced holding with no pieces', async () => {
     await setup([metalResponse({ pieces: 0, totalFineGrams: 0 })]);
 
-    const gold = rowFor('Krugerrand').textContent ?? '';
-    expect(gold).toContain(formatMoney(0, 'PLN'));
-    expect(gold).not.toContain('—');
+    const value = rowFor('Krugerrand').querySelector('app-money')?.textContent ?? '';
+    expect(value).toContain(formatMoney(0, 'PLN'));
+    expect(value).not.toContain('—');
   });
 
   it('shows the empty state with an add button when there are no holdings', async () => {
@@ -235,6 +236,35 @@ describe('Metals', () => {
     expect(isDisabled(menuItem(items, /transaction history/i))).toBe(false);
   });
 
+  it('gain column', async () => {
+    await setup([gainGold, { ...silverBar, costPln: 1600 }, noCostCoin], gainPrices);
+    await switchLanguage(fixture, 'pl');
+
+    expect(textOf(element().querySelector('thead'))).toContain('Zysk/strata');
+    expect(gainOf(rowFor('Krugerrand'))).toBe('+300,00 zł (+15,00 %)');
+    expect(rowFor('Krugerrand').querySelector('.gain--positive')).not.toBeNull();
+    const silver = rowFor('Silver bar');
+    expect(gainOf(silver)).toContain(formatSignedMoney(-100, 'PLN').replace(/\s+/g, ' '));
+    expect(gainOf(silver)).toMatch(/6,25 %/);
+    expect(silver.querySelector('.gain--negative')).not.toBeNull();
+    expect(gainOf(rowFor('Coin without cost'))).toBe('—');
+    expect(rowFor('Coin without cost').querySelector('.gain--empty')).not.toBeNull();
+  });
+
+  it('total row', async () => {
+    await setup([gainGold, { ...silverBar, costPln: 2500 }, noCostCoin], gainPrices);
+    await switchLanguage(fixture, 'pl');
+
+    const footer = element().querySelector('tfoot');
+    const text = textOf(footer);
+    expect(text).toContain('Razem');
+    expect(text).toContain(formatMoney(3915, 'PLN').replace(/\s+/g, ' '));
+    expect(text).toContain(formatSignedMoney(-700, 'PLN').replace(/\s+/g, ' '));
+    expect(text).toMatch(/15,56 %/);
+    expect(text).toContain('bez 1 pozycji');
+    expect(footer?.querySelector('.gain--negative')).not.toBeNull();
+  });
+
   it('states', async () => {
     await setup(new Promise<Response>(() => undefined), metalPricesGoldOnly, false);
     expect(element().querySelector('app-skeleton')).not.toBeNull();
@@ -252,6 +282,34 @@ describe('Metals', () => {
     expect(textOf(emptyState)).toContain('Add precious metal');
   });
 });
+
+const gainGold = metalResponse({
+  name: 'Krugerrand',
+  pieces: 2,
+  fineWeightGramsPerPiece: 10,
+  totalFineGrams: 20,
+  costPln: 2000,
+});
+
+const noCostCoin = metalResponse({
+  assetId: '55555555-eeee-5555-eeee-555555555555',
+  name: 'Coin without cost',
+  pieces: 1,
+  fineWeightGramsPerPiece: 1,
+  totalFineGrams: 1,
+  costPln: null,
+});
+
+const gainPrices: MetalPriceResponse[] = [
+  { ...metalPricesGoldOnly[0], pricePerGramPln: 115, isStale: false },
+  { ...metalPricesGoldOnly[1], pricePerGramPln: 3, isStale: false },
+];
+
+function gainOf(row: HTMLElement): string {
+  return textOf(row.querySelector('app-gain'))
+    .replace(/\s+/g, ' ')
+    .replace(/(\S)\(/, '$1 (');
+}
 
 function menuItem(items: HTMLElement[], label: RegExp): HTMLElement {
   const item = items.find((candidate) => label.test(menuItemLabel(candidate)));

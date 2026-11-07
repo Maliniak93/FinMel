@@ -98,6 +98,16 @@ export function formatPercent(value: number | string): string {
   return `${formatPercentNumber(value)} %`;
 }
 
+export function formatSignedPercent(value: number | string): string {
+  const number = Number(value);
+  const text = new Intl.NumberFormat(activeLocale(), {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    signDisplay: 'exceptZero',
+  }).format(Math.abs(number) < 0.005 ? 0 : number);
+  return `${withTrueMinus(text)} %`;
+}
+
 export function formatSignedMoney(amount: number | string, currency = 'PLN'): string {
   const value = Number(amount);
   return withTrueMinus(

@@ -355,6 +355,17 @@ internal static class PortfolioApi
             firstPeriodRatePercent: firstPeriodRatePercent,
             marginPercent: null);
 
+    public static AddBondRequest NewCoiBondRequest(
+        string name = "Coi", DateOnly? purchaseDate = null, int bondCount = 10, decimal firstPeriodRatePercent = 6.50m) =>
+        NewBondRequest(
+            name: name,
+            seriesCode: "COI0630",
+            type: TreasuryBondType.Coi,
+            purchaseDate: purchaseDate ?? new DateOnly(2025, 6, 10),
+            bondCount: bondCount,
+            firstPeriodRatePercent: firstPeriodRatePercent,
+            marginPercent: null);
+
     public static object NewSettleBondBody(
         IEnumerable<(int PeriodIndex, decimal? RatePercent)> periods) => new
         {

@@ -269,6 +269,7 @@ export type BondResponse = {
     bookValue: number | string;
     costPln: number | string;
     paidInterestPln: number | string;
+    paidInterestNetPln: number | string;
     status: BondStatus;
     duePeriodCount: number | string;
     lastSettlement?: null | BondSettlementResponse;
