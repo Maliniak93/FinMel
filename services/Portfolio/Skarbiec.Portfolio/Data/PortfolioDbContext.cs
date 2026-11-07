@@ -12,7 +12,7 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
     public Guid CurrentUserId => currentUser.UserId;
 
     public DbSet<Account> Accounts => Set<Account>();
-    public DbSet<AccountContributionLimit> AccountContributionLimits => Set<AccountContributionLimit>();
+    public DbSet<ContributionLimit> ContributionLimits => Set<ContributionLimit>();
     public DbSet<CashPlace> CashPlaces => Set<CashPlace>();
     public DbSet<AssetGroup> AssetGroups => Set<AssetGroup>();
     public DbSet<Asset> Assets => Set<Asset>();
@@ -57,9 +57,10 @@ public sealed class PortfolioDbContext(DbContextOptions<PortfolioDbContext> opti
             account.HasIndex(a => new { a.UserId, a.Name }).IsUnique();
         });
 
-        modelBuilder.Entity<AccountContributionLimit>(limit =>
+        modelBuilder.Entity<ContributionLimit>(limit =>
         {
-            limit.HasIndex(l => new { l.AccountId, l.Year }).IsUnique();
+            limit.Property(l => l.Wrapper).HasConversion<string>().HasMaxLength(20);
+            limit.HasIndex(l => new { l.UserId, l.Wrapper, l.Year }).IsUnique();
             limit.Property(l => l.Amount).HasPrecision(18, 2);
         });
 

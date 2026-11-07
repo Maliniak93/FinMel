@@ -44,8 +44,6 @@ internal static class PortfolioAssertions
 
     public const string ContributionLimitErrorCode = "Validation.ContributionLimit";
 
-    public const string ContributionLimitNotAllowedErrorCode = "Validation.ContributionLimitNotAllowed";
-
     public static async Task AssertAccountArchivedConflictAsync(
         this HttpResponseMessage response, CancellationToken cancellationToken) =>
         await response.AssertProblemAsync(HttpStatusCode.Conflict, AccountArchivedErrorCode, cancellationToken);

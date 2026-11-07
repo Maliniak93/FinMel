@@ -1423,12 +1423,7 @@
       "status": "Paid {{ paid }} / {{ limit }} PLN in {{ year }} · {{ left }} PLN left",
       "exceeded": "Paid {{ paid }} / {{ limit }} PLN in {{ year }} · limit exceeded",
       "noLimit": "Paid {{ paid }} PLN in {{ year }}",
-      "action": "Contribution limit",
-      "year": "Year",
-      "amount": "Limit (PLN)",
-      "dialogTitle": "Contribution limit",
-      "yearInvalid": "Enter a year from 2000 to 2100.",
-      "remove": "Remove limit"
+      "year": "Year"
     }
   }
 }

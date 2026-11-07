@@ -103,7 +103,7 @@ public sealed class GetAccountEndpointTests(SkarbiecContainersFixture containers
             stockId, cancellationToken, TransactionType.Sell, quantity: 5m, unitPrice: 100m, date: new DateOnly(2026, 3, 1));
         await client.RecordTransactionAsync(
             ike.CashAssetId, TransactionType.Withdraw, 1_000m, new DateOnly(2026, 3, 2), cancellationToken, unitPrice: 1m);
-        await client.SetContributionLimitAsync(ike.AccountId, 2026, 26_000m, cancellationToken);
+        await client.SetContributionLimitsAsync(2026, 26_000m, null, cancellationToken);
 
         var contribution2026 = await client.GetContributionAsync(ike.AccountId, 2026, cancellationToken);
         var contribution2025 = await client.GetContributionAsync(ike.AccountId, 2025, cancellationToken);

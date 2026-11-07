@@ -47,15 +47,6 @@ internal static class AccountErrors
     public static Error TypeMismatch(AssetClass assetClass, AccountType required, AccountType actual) =>
         new("Validation.AccountTypeMismatch", $"A {assetClass} asset needs a {required} account, not a {actual} one.");
 
-    public static Error ContributionLimitNotAllowed { get; } =
-        new("Validation.ContributionLimitNotAllowed", "Only an IKE or IKZE account has a contribution limit.");
-
-    public static Error InvalidContributionLimit { get; } =
-        new("Validation.ContributionLimit", "A contribution limit needs an amount above 0 and a year from 2000 to 2100.");
-
-    public static Error ContributionLimitNotFound(Guid id, int year) =>
-        new("NotFound.ContributionLimit", $"Account '{id}' has no contribution limit for {year}.");
-
     public static Error UseAccountEndpoints { get; } =
         new("Validation.UseAccountEndpoints", "A BankAccount asset is a bank account's money — create a Bank account instead.");
 
