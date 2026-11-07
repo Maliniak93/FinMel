@@ -63,6 +63,10 @@ function exactPln(amount: string): RegExp {
   return new RegExp(`^\\s*${digits(amount)}\\szł\\s*$`);
 }
 
+function valueCellPln(amount: string): RegExp {
+  return new RegExp(`^\\s*${digits(amount)}\\szł`);
+}
+
 function legendPln(amount: string): RegExp {
   return new RegExp(`${digits(amount)}\\szł`);
 }
@@ -176,7 +180,7 @@ async function expectAccountRowAmounts(
     async () => {
       const cells = accountRow(page, name).locator('td');
       await expect(cells.nth(3)).toHaveText(exactPln(amounts.cash), { timeout: 2_000 });
-      await expect(cells.nth(5)).toHaveText(exactPln(amounts.value), { timeout: 2_000 });
+      await expect(cells.nth(5)).toHaveText(valueCellPln(amounts.value), { timeout: 2_000 });
     },
   );
 }

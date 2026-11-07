@@ -81,12 +81,12 @@ function accountRow(page: Page, name: string): Locator {
   return page.getByRole('row').filter({ has: page.getByRole('link', { name, exact: true }) });
 }
 
-function mainTable(page: Page): Locator {
-  return page.locator('.bank-accounts__table');
+function chip(page: Page, name: string): Locator {
+  return page.getByRole('option', { name, exact: true });
 }
 
-function currentSection(page: Page): Locator {
-  return page.getByTestId('current-accounts');
+function statusOf(page: Page, name: string): Locator {
+  return accountRow(page, name).locator('.mat-column-status');
 }
 
 async function openRowMenu(page: Page, name: string, item: string): Promise<void> {
@@ -157,7 +157,7 @@ async function addCurrentAccount(
   await expect(flagSwitch(dialog)).toBeChecked();
   await dialog.getByRole('button', { name: 'Utwórz' }).click();
   await expect(dialog).toBeHidden();
-  await expect(currentSection(page).getByRole('link', { name: account.name })).toBeVisible();
+  await expect(statusOf(page, account.name)).toContainText(LABEL);
 
   await openRowMenu(page, account.name, 'Wpłata');
   const deposit = page.getByRole('dialog');
@@ -279,25 +279,13 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
       await expect(groupSelect(dialog)).toHaveCount(0);
     });
 
-    await test.step('Krok 4: po zapisie mBank ROR jest w sekcji Konta bieżące z sumą 3 200 zł, poza główną tabelą', async () => {
+    await test.step('Krok 4: po zapisie mBank ROR stoi w jednej tabeli z etykietą Poza majątkiem i jest widoczny pod chipem Bieżące', async () => {
       await dialog.getByRole('button', { name: 'Zapisz' }).click();
       await expect(dialog).toBeHidden();
-      await expect(mainTable(page).getByRole('link', { name: MBANK, exact: true })).toHaveCount(0);
-      await expect(
-        currentSection(page).getByRole('heading', { name: 'Konta bieżące' }),
-      ).toBeVisible();
-      await expect(
-        currentSection(page).getByRole('link', { name: MBANK, exact: true }),
-      ).toBeVisible();
-      await expectProjected(
-        () => page.reload(),
-        async () => {
-          await expect(currentSection(page).locator('.bank-accounts__current-sum')).toContainText(
-            pln('3 200,00'),
-            { timeout: 2_000 },
-          );
-        },
-      );
+      await expect(statusOf(page, MBANK)).toContainText(LABEL);
+      await chip(page, 'Bieżące').click();
+      await expect(accountRow(page, MBANK)).toBeVisible();
+      await chip(page, 'Wszystkie').click();
     });
   });
 
@@ -372,7 +360,7 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
 
   await test.step('Krok 9: strona mBank ROR pokazuje saldo 3 200 zł i etykietę Poza majątkiem, bez wartości liczonej do majątku', async () => {
     await openBankList(page);
-    await currentSection(page).getByRole('link', { name: MBANK, exact: true }).click();
+    await accountRow(page, MBANK).getByRole('link', { name: MBANK, exact: true }).click();
     await expect(page.getByRole('heading', { name: MBANK, exact: true })).toBeVisible();
     await expect(page.getByTestId('account-cash')).toContainText(pln('3 200,00'));
     await expect(page.locator('.account-detail__meta')).toContainText(LABEL);
@@ -381,7 +369,7 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
 
   await test.step('Krok 10: wyłączenie flagi zostawia grupę pustą (nie wraca Poduszka), ponowne włączenie chowa wybór grupy', async () => {
     await setFlag(page, MBANK, false);
-    await expect(mainTable(page).getByRole('link', { name: MBANK, exact: true })).toBeVisible();
+    await expect(statusOf(page, MBANK)).not.toContainText(LABEL);
     const dialog = await openEditDialog(page, MBANK);
     await expect(groupSelect(dialog)).toBeVisible();
     await expect(groupSelect(dialog)).not.toContainText(GROUP);
@@ -390,9 +378,7 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
     await expect(groupSelect(dialog)).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
-    await expect(
-      currentSection(page).getByRole('link', { name: MBANK, exact: true }),
-    ).toBeVisible();
+    await expect(statusOf(page, MBANK)).toContainText(LABEL);
   });
 
   await test.step('Krok 11: przelew 1 000 zł z mBank ROR na Oszczędności z dzisiejszą datą: ROR 2 200 zł, wartość netto 41 000 zł, etykieta tylko przy koncie poza majątkiem', async () => {
@@ -443,25 +429,19 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
     await expectNetWorth(page, '41 500,00');
   });
 
-  await test.step('Krok 14: Konto wspólne (PLN, Bieżący) z 500 zł poza majątkiem jest w sekcji Konta bieżące, wartość netto 41 500 zł', async () => {
+  await test.step('Krok 14: Konto wspólne (PLN, Bieżący) z 500 zł poza majątkiem ma etykietę Poza majątkiem w tabeli, wartość netto 41 500 zł', async () => {
     await addCurrentAccount(page, { name: JOINT, currency: /^PLN/, deposit: '500' });
     await expectBalance(page, JOINT, pln('500,00'));
-    await expect(
-      currentSection(page).getByRole('link', { name: JOINT, exact: true }),
-    ).toBeVisible();
+    await expect(statusOf(page, JOINT)).toContainText(LABEL);
     await expectNetWorth(page, '41 500,00');
   });
 
-  await test.step('Krok 15: Revolut EUR ze 100 EUR poza majątkiem: suma sekcji to 2 625 zł (1 700 + 500 + 100 EUR po kursie 4,25), wartość netto bez zmian', async () => {
+  await test.step('Krok 15: Revolut EUR ze 100 EUR poza majątkiem ma etykietę i saldo 100 EUR, wartość netto bez zmian', async () => {
     await addCurrentAccount(page, { name: REVOLUT, currency: /^EUR/, deposit: '100' });
-    await expectProjected(
-      () => openBankList(page).then(() => page.reload()),
-      async () => {
-        await expect(currentSection(page).locator('.bank-accounts__current-sum')).toContainText(
-          pln('2 625,00'),
-          { timeout: 2_000 },
-        );
-      },
+    await openBankList(page);
+    await expect(statusOf(page, REVOLUT)).toContainText(LABEL);
+    await expect(accountRow(page, REVOLUT).locator('.mat-column-balance')).toContainText(
+      /100,00\sEUR/,
     );
     await expectNetWorth(page, '41 500,00');
   });
@@ -470,12 +450,8 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
     await transfer(page, { from: MBANK, to: JOINT, amount: '200' });
     await expectBalance(page, MBANK, pln('1 500,00'));
     await expectBalance(page, JOINT, pln('700,00'));
-    await expect(
-      currentSection(page).getByRole('link', { name: MBANK, exact: true }),
-    ).toBeVisible();
-    await expect(
-      currentSection(page).getByRole('link', { name: JOINT, exact: true }),
-    ).toBeVisible();
+    await expect(statusOf(page, MBANK)).toContainText(LABEL);
+    await expect(statusOf(page, JOINT)).toContainText(LABEL);
     await expectNetWorth(page, '41 500,00');
   });
 
@@ -533,19 +509,11 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
     }
   });
 
-  await test.step('Krok 20: po wyłączeniu przełącznika mBank ROR wraca do głównej tabeli bez grupy, a sekcja zawiera dwa pozostałe konta', async () => {
+  await test.step('Krok 20: po wyłączeniu przełącznika mBank ROR traci etykietę Poza majątkiem, a dwa pozostałe konta ją zachowują', async () => {
     await setFlag(page, MBANK, false);
-    await expect(mainTable(page).getByRole('link', { name: MBANK, exact: true })).toBeVisible();
-    await expect(currentSection(page).getByRole('link')).toHaveCount(2);
-    await expect(
-      currentSection(page).getByRole('link', { name: JOINT, exact: true }),
-    ).toBeVisible();
-    await expect(
-      currentSection(page).getByRole('link', { name: REVOLUT, exact: true }),
-    ).toBeVisible();
-    await expect(currentSection(page).getByRole('link', { name: MBANK, exact: true })).toHaveCount(
-      0,
-    );
+    await expect(statusOf(page, MBANK)).not.toContainText(LABEL);
+    await expect(statusOf(page, JOINT)).toContainText(LABEL);
+    await expect(statusOf(page, REVOLUT)).toContainText(LABEL);
   });
 
   await test.step('Krok 21: pulpit pokazuje wartość netto 43 000 zł, a wykres obejmuje ROR od początku bez skoku w dniu wyłączenia', async () => {
@@ -573,11 +541,11 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
     );
   });
 
-  await test.step('Krok 22: po wyłączeniu flagi na Konto wspólne i Revolut EUR sekcja Konta bieżące znika', async () => {
+  await test.step('Krok 22: po wyłączeniu flagi na Konto wspólne i Revolut EUR żadne konto nie ma etykiety Poza majątkiem', async () => {
     await setFlag(page, JOINT, false);
     await setFlag(page, REVOLUT, false);
-    await expect(currentSection(page)).toHaveCount(0);
-    await expect(mainTable(page).getByRole('link', { name: JOINT, exact: true })).toBeVisible();
-    await expect(mainTable(page).getByRole('link', { name: REVOLUT, exact: true })).toBeVisible();
+    await expect(accountRow(page, JOINT)).toBeVisible();
+    await expect(accountRow(page, REVOLUT)).toBeVisible();
+    await expect(page.getByText(LABEL, { exact: true })).toHaveCount(0);
   });
 });
