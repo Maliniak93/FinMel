@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { polishProblems, restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
+import { rowLineSkipsLast } from '../../../../testing/stylesheet';
 import { bondResponse } from '../../../../testing/bond-fixtures';
 import { BOND_STATUS } from '../../bonds/bond-interest';
 import { DEPOSIT_STATUS } from '../../deposits/deposit-terms';
@@ -206,6 +207,6 @@ describe('UpcomingCard stylesheet', () => {
     );
 
     expect(scss).toMatch(/\.upcoming-card__list\s*\{[^}]*border-top:/);
-    expect(scss).toMatch(/\.upcoming-card__row\s*\{[^}]*border-bottom:/);
+    expect(rowLineSkipsLast(scss, '.upcoming-card__row')).toBe(true);
   });
 });

@@ -12,6 +12,25 @@ export function rulesFor(css: string, selector: RegExp): string {
     .join('\n');
 }
 
+export function ruleBodies(css: string, selector: string): string {
+  const pattern = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Array.from(
+    css.matchAll(new RegExp(`(?:^|[\\s,])${pattern}\\s*(?:,[^{]*)?\\{([^}]*)`, 'g')),
+  )
+    .map((match) => match[1])
+    .join('\n');
+}
+
+export function rowLineSkipsLast(css: string, row: string): boolean {
+  const hasLine = (body: string) =>
+    /border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/.test(body);
+  const resetsLine = (body: string) => /border-bottom:\s*(none|0)\b/.test(body);
+  const everyRow = ruleBodies(css, row);
+  const betweenRows = ruleBodies(css, `${row}:not(:last-child)`);
+  const lastRow = ruleBodies(css, `${row}:last-child`);
+  return (hasLine(betweenRows) && !hasLine(everyRow)) || (hasLine(everyRow) && resetsLine(lastRow));
+}
+
 export function mediaBlock(css: string, condition: string): string {
   const start = css.indexOf(`@media ${condition}`);
   if (start === -1) {

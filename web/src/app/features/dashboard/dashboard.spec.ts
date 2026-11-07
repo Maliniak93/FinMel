@@ -23,6 +23,7 @@ import type { DashboardResponse, NetWorthHistoryResponse } from '../../api/repor
 import { ASSET_CLASS } from '../assets/asset-class';
 import { Dashboard } from './dashboard';
 import { provideI18nTesting } from '../../core/i18n/testing';
+import { rowLineSkipsLast, ruleBodies } from '../../../testing/stylesheet';
 import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
 import {
   type ApiRoute,
@@ -383,8 +384,9 @@ describe('Dashboard', () => {
         .find((text) => text.includes('.dashboard-page__hero')) ?? '';
     const split = css.indexOf('@container (min-width: 720px)');
     expect(split).toBeGreaterThan(-1);
-    expect(css.slice(split)).toMatch(/\.dashboard-page__hero[^{]*\{[^}]*5fr/);
-    expect(css.slice(0, split)).not.toMatch(/\.dashboard-page__hero[^{]*\{[^}]*5fr/);
+    expect(css.slice(0, split)).toMatch(/\.dashboard-page__hero[^{]*\{[^}]*border-bottom:/);
+    expect(css.slice(0, split)).not.toMatch(/\d+fr\s+\d+fr/);
+    expect(css.slice(split)).not.toMatch(/\b[57]fr\b/);
   });
 
   it('puts accounts and cash in one column beside the groups', async () => {
@@ -431,11 +433,8 @@ describe('Dashboard', () => {
     expect(element.querySelectorAll('.dashboard-page__structure-row').length).toBeGreaterThan(0);
 
     const scss = dashboardStylesheet();
-    expect(scss).toMatch(/\.dashboard-page__group-card\s*\{[^}]*border-top:/);
-    expect(scss).toMatch(/\.dashboard-page__structure\s*\{[^}]*border-top:/);
-    expect(scss).toMatch(/7fr\)?\s+(minmax\(0,\s*)?5fr/);
-    expect(scss).toMatch(/\.dashboard-page__group-row\s*\{[^}]*border-bottom:/);
-    expect(scss).toMatch(/\.dashboard-page__structure-row\s*\{[^}]*border-bottom:/);
+    expect(ruleBodies(scss, '.dashboard-page__group-card')).not.toMatch(/border-top/);
+    expect(ruleBodies(scss, '.dashboard-page__structure')).toMatch(/border-top:/);
   });
 
   it('styles a negative change as negative', async () => {
@@ -921,15 +920,23 @@ describe('Dashboard', () => {
 });
 
 describe('dashboard stylesheet', () => {
-  it('rules the hero bottom edge with the outline-variant colour and 36.8 px padding', () => {
+  it('rules rows 1 and 2 only', () => {
     const scss = dashboardStylesheet();
+    const separator = (body: string) =>
+      /border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/.test(body) &&
+      /padding-bottom:\s*var\(--sk-space-8\)/.test(body);
+    const pairRules = [
+      ruleBodies(scss, '.dashboard-page__pair'),
+      ruleBodies(scss, '.dashboard-page__pair:not(:last-child)'),
+    ].join('\n');
 
-    expect(scss).toMatch(
-      /\.dashboard-page__hero\b[^{]*\{[^}]*border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/,
-    );
-    expect(scss).toMatch(
-      /\.dashboard-page__hero\b[^{]*\{[^}]*padding-bottom:\s*var\(--sk-space-8\)/,
-    );
+    expect(separator(ruleBodies(scss, '.dashboard-page__hero'))).toBe(true);
+    expect(separator(pairRules)).toBe(true);
+    expect(
+      scss.includes('.dashboard-page__pair:not(:last-child)') ||
+        /border-bottom:\s*(none|0)\b/.test(ruleBodies(scss, '.dashboard-page__pair--split')),
+    ).toBe(true);
+    expect(ruleBodies(scss, '.dashboard-page__structure')).toMatch(/border-top:/);
   });
 
   it('colours the change with the sign tokens', () => {
@@ -958,25 +965,19 @@ describe('dashboard stylesheet', () => {
     );
   });
 
-  it('stacks the sections on a phone', () => {
-    const scss = dashboardStylesheet();
-    const split = scss.indexOf('@container (min-width: 720px)');
-    const base = scss.slice(0, split);
-
-    expect(split).toBeGreaterThan(-1);
-    expect(base).toMatch(/\.dashboard-page__group-card\s*\{[^}]*border-top:/);
-    expect(base).toMatch(/\.dashboard-page__structure\s*\{[^}]*border-top:/);
-    expect(base).not.toMatch(/\d+fr\s+\d+fr/);
-  });
-
-  it('lays the hero out in two rows on a wide container', () => {
+  it('splits every row 50 50 on a wide container', () => {
     const scss = dashboardStylesheet();
     const split = scss.indexOf('@container (min-width: 720px)');
     const base = scss.slice(0, split);
     const wide = scss.slice(split);
+    const equalHalves = /repeat\(2,\s*minmax\(0,\s*1fr\)\)|minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\)/;
 
     expect(split).toBeGreaterThan(-1);
-    expect(wide).toMatch(/\.dashboard-page__hero\s*\{[^}]*5fr/);
+    expect(ruleBodies(wide, '.dashboard-page__hero')).toMatch(equalHalves);
+    expect(ruleBodies(wide, '.dashboard-page__pair')).toMatch(equalHalves);
+    const splitRow = ruleBodies(wide, '.dashboard-page__pair--split');
+    expect(splitRow === '' || equalHalves.test(splitRow)).toBe(true);
+    expect(scss).not.toMatch(/\b[57]fr\b/);
     expect(wide).toMatch(
       /\.dashboard-page__hero\s*\{[^}]*grid-template-areas:\s*["']value history["']\s*["']structure history["']/,
     );
@@ -984,12 +985,18 @@ describe('dashboard stylesheet', () => {
     expect(scss).toMatch(/\.dashboard-page__value\s*\{[^}]*grid-area:\s*value/);
     expect(scss).toMatch(/\.dashboard-page__structure\s*\{[^}]*grid-area:\s*structure/);
     expect(scss).toMatch(/\.dashboard-page__history\s*\{[^}]*grid-area:\s*history/);
-    expect(scss).toMatch(/\.dashboard-page__history\s*\{[^}]*align-self:\s*start/);
     expect(base).not.toMatch(/grid-template-areas:\s*"[^"]*"\s*"/);
-    expect(base).not.toMatch(/\.dashboard-page__hero\s*\{[^}]*\d+fr/);
-    expect(wide).toMatch(
-      /\.dashboard-page__pair--split\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*7fr\)\s*minmax\(0,\s*5fr\)/,
-    );
+  });
+
+  it('stretches the halves to equal height', () => {
+    const scss = dashboardStylesheet();
+    const split = scss.indexOf('@container (min-width: 720px)');
+    const wide = scss.slice(split);
+
+    expect(ruleBodies(scss, '.dashboard-page__history')).not.toMatch(/align-self:\s*start/);
+    expect(ruleBodies(scss, '.dashboard-page__side')).not.toMatch(/align-self:\s*start/);
+    expect(ruleBodies(wide, '.dashboard-page__hero')).toMatch(/grid-template-rows:\s*auto\s+1fr/);
+    expect(ruleBodies(scss, '.dashboard-page__side')).toMatch(/grid-template-rows:\s*auto\s+1fr/);
   });
 
   it('lets the history section grow', () => {
@@ -1010,6 +1017,34 @@ describe('dashboard stylesheet', () => {
 
     expect(structureRules).toMatch(/min-width:\s*0/);
     expect(structureRules).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it('drops the last row line of Grupy and Struktura', () => {
+    const scss = dashboardStylesheet();
+
+    expect(rowLineSkipsLast(scss, '.dashboard-page__group-row')).toBe(true);
+    expect(rowLineSkipsLast(scss, '.dashboard-page__structure-row')).toBe(true);
+    expect(ruleBodies(scss, '.dashboard-page__group-card')).not.toMatch(/padding-top/);
+  });
+
+  it('never clips a number in Grupy or Struktura', () => {
+    const scss = dashboardStylesheet();
+
+    expect(scss).not.toMatch(/text-overflow:\s*ellipsis/);
+    expect(scss).not.toMatch(/overflow(-x|-y)?:\s*(hidden|clip)\b/);
+    for (const row of ['.dashboard-page__group-row', '.dashboard-page__structure-row']) {
+      expect(ruleBodies(scss, row), row).toMatch(
+        /grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)\s+(auto|max-content)\s+(auto|max-content)/,
+      );
+    }
+    for (const cell of [
+      '.dashboard-page__group-value',
+      '.dashboard-page__group-share',
+      '.dashboard-page__structure-value',
+      '.dashboard-page__structure-share',
+    ]) {
+      expect(ruleBodies(scss, cell), cell).not.toMatch(/max-width|min-width:\s*0\b|overflow/);
+    }
   });
 
   it('styles the dashboard only with tokens', () => {

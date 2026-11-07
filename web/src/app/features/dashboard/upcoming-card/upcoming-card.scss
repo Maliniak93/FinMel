@@ -38,6 +38,10 @@
   column-gap: 16px;
 }
 
+.upcoming-card__row:last-child {
+  border-bottom: none;
+}
+
 .upcoming-card__date {
   grid-area: date;
   color: var(--mat-sys-on-surface-variant);
