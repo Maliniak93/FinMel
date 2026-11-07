@@ -73,7 +73,10 @@ internal static class PlanningMonthBuilder
         var balance = PlanningForecast.BalanceOf(occurrences, oneOffIncomes);
         var fxUnavailable = forecast.ForeignIn(viewed).Any(c => !rates.ContainsKey(c));
 
-        var expenses = BuildExpenses(viewed, forecast);
+        var expenses = BuildExpenses(viewed, data);
+        var funded = expenses.GroupContributions.Sum(c => c.FundedPln ?? 0m);
+        var actualPln = balance.ActualPln - (forecast.SettledCostIn(viewed) + funded);
+        var fundingIncomplete = viewed == forecast.CurrentMonth && data.Funding.Incomplete;
         var viewedFigures = new MonthFigures(balance.ActualPln + balance.PendingPln - expenses.CostPln, expenses.CostPln);
 
         return new PlanningMonthResponse
@@ -90,8 +93,8 @@ internal static class PlanningMonthBuilder
             FreeFunds = new FreeFundsResponse
             {
                 PlanPln = balance.PlanPln - expenses.CostPln,
-                ForecastPln = viewedFigures.Forecast,
-                Incomplete = fxUnavailable
+                ActualPln = actualPln,
+                Incomplete = fxUnavailable || fundingIncomplete
             },
             Split = BuildSplit(data, viewed, viewedFigures.Forecast),
             NonBusinessDays = Enumerable.Range(0, viewed.LastDay.Day)
@@ -185,8 +188,37 @@ internal static class PlanningMonthBuilder
 
     private static int MonthsBetween(YearMonth from, YearMonth to) => (to.Year - from.Year) * 12 + to.Month - from.Month;
 
-    private static PlanningExpensesResponse BuildExpenses(YearMonth viewed, PlanningForecast forecast)
+    private static GroupContributionResponse BuildContribution(AssetGroup group, YearMonth viewed, PlanningMonthData data)
     {
+        if (viewed != data.Forecast.CurrentMonth)
+        {
+            return new GroupContributionResponse
+            {
+                GroupId = group.Id,
+                Name = group.Name,
+                AmountPln = group.MonthlyContributionPln,
+                FundedPln = null,
+                Status = null
+            };
+        }
+
+        var funded = data.Funding.ByGroup.GetValueOrDefault(group.Id);
+
+        return new GroupContributionResponse
+        {
+            GroupId = group.Id,
+            Name = group.Name,
+            AmountPln = group.MonthlyContributionPln,
+            FundedPln = funded,
+            Status = funded >= group.MonthlyContributionPln ? GroupContributionStatus.Settled
+                : funded > 0m ? GroupContributionStatus.Partial
+                : GroupContributionStatus.Unsettled
+        };
+    }
+
+    private static PlanningExpensesResponse BuildExpenses(YearMonth viewed, PlanningMonthData data)
+    {
+        var forecast = data.Forecast;
         var plans = forecast.Plans;
         var payments = forecast.ExpensePaymentsIn(viewed);
 
@@ -245,7 +277,7 @@ internal static class PlanningMonthBuilder
             GroupContributions =
             [
                 .. forecast.ContributingGroupsIn(viewed)
-                    .Select(g => new GroupContributionResponse { GroupId = g.Id, Name = g.Name, AmountPln = g.MonthlyContributionPln })
+                    .Select(g => BuildContribution(g, viewed, data))
             ],
             Definitions = definitions,
             OneOffs = forecast.OneOffExpensesIn(viewed)

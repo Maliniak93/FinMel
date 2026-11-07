@@ -56,7 +56,7 @@ function incomeMonth(extra: Record<string, unknown> = {}): Record<string, unknow
       definitions: [{ id: 'income-1', name: 'Wypłata Dominik' }],
       oneOffs: [],
     },
-    freeFunds: { planPln: 12300, forecastPln: 12243.27, incomplete: false },
+    freeFunds: { planPln: 12300, actualPln: 12243.27, incomplete: false },
     ...extra,
   });
 }
@@ -166,7 +166,7 @@ describe('MonthCard', () => {
           definitions: [],
           oneOffs: [],
         },
-        freeFunds: { planPln: 5420.01, forecastPln: 5300, incomplete: false },
+        freeFunds: { planPln: 5420.01, actualPln: 5300, incomplete: false },
       }),
     );
     const text = (id: string) => plain(all(element, id)[0].textContent ?? '');
@@ -181,7 +181,7 @@ describe('MonthCard', () => {
     expect(colours).toHaveLength(2);
     expect(colours[0]).toContain('var(--sk-g-blue)');
     expect(colours[1]).toContain('var(--sk-g-green)');
-    expect(all(element, 'month-card-forecast')[0].textContent).toContain(formatMoney(5300, 'PLN'));
+    expect(all(element, 'month-card-actual')[0].textContent).toContain(formatMoney(5300, 'PLN'));
     expect(all(element, 'month-card-settled')[0].textContent).toMatch(/1\D+2/);
   });
 
@@ -242,13 +242,24 @@ describe('MonthCard', () => {
     expect(all(element, 'month-card-free-deficit')).toHaveLength(0);
   });
 
-  it('styles a negative forecast as a deficit', async () => {
+  it('styles a negative actual as a deficit', async () => {
     const element = await render(
-      incomeMonth({ freeFunds: { planPln: 12300, forecastPln: -700, incomplete: false } }),
+      incomeMonth({ freeFunds: { planPln: 12300, actualPln: -700, incomplete: false } }),
     );
 
     expect(all(element, 'month-card-deficit')).toHaveLength(1);
     expect(all(element, 'month-card-deficit')[0].textContent).toContain(formatMoney(-700, 'PLN'));
+  });
+
+  it('labels the free funds line Actual and shows freeFunds.actualPln', async () => {
+    const element = await render(
+      incomeMonth({ freeFunds: { planPln: 12300, actualPln: 4400, incomplete: false } }),
+    );
+
+    const line = all(element, 'month-card-actual')[0].textContent!;
+    expect(line).toContain('Actual');
+    expect(line).toContain(formatMoney(4400, 'PLN'));
+    expect(line).not.toMatch(/forecast/i);
   });
 
   it('shows the setup link without definitions', async () => {
@@ -257,7 +268,7 @@ describe('MonthCard', () => {
     const setup = all(element, 'month-card-setup');
     expect(setup).toHaveLength(1);
     expect(setup[0].getAttribute('href')).toBe('/planning');
-    expect(all(element, 'month-card-forecast')).toHaveLength(0);
+    expect(all(element, 'month-card-actual')).toHaveLength(0);
     expect(all(element, 'month-card-incomes')).toHaveLength(0);
     expect(all(element, 'month-card-free')).toHaveLength(0);
   });

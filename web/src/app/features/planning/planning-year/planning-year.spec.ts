@@ -14,7 +14,7 @@ const VALUE_KEYS = [
   'differencePln',
   'costPln',
   'freeFundsPlanPln',
-  'freeFundsForecastPln',
+  'freeFundsActualPln',
 ] as const;
 
 const EMPTY_MONTH = {
@@ -24,7 +24,7 @@ const EMPTY_MONTH = {
   differencePln: null,
   costPln: null,
   freeFundsPlanPln: null,
-  freeFundsForecastPln: null,
+  freeFundsActualPln: null,
   hasOverdue: false,
   incomplete: false,
 };
@@ -36,7 +36,7 @@ const FULL_MONTH = {
   differencePln: -56.73,
   costPln: 4200,
   freeFundsPlanPln: 12300,
-  freeFundsForecastPln: 12243.27,
+  freeFundsActualPln: 12243.27,
   hasOverdue: false,
   incomplete: false,
 };
@@ -68,7 +68,7 @@ function yearPage(year: number): Record<string, unknown> {
       month,
       ...FULL_MONTH,
       incomeActualPln: future ? null : FULL_MONTH.incomeActualPln,
-      freeFundsForecastPln: month === '2026-09' ? 11111.11 : FULL_MONTH.freeFundsForecastPln,
+      freeFundsActualPln: month === '2026-09' ? 11111.11 : FULL_MONTH.freeFundsActualPln,
       hasOverdue: month === '2026-10',
       incomplete: month === '2026-04',
     };
@@ -183,6 +183,17 @@ describe('PlanningYear', () => {
     ]);
   });
 
+  it('labels the last free funds column Actual and not Forecast', async () => {
+    await setup();
+
+    const headers = Array.from(
+      element().querySelectorAll('thead th'),
+      (th) => th.textContent ?? '',
+    );
+    expect(headers.some((header) => header.includes('Free funds actual'))).toBe(true);
+    expect(headers.some((header) => /forecast/i.test(header))).toBe(false);
+  });
+
   it('shows an em dash in every value of a month without definitions', async () => {
     await setup();
 
@@ -255,7 +266,7 @@ describe('PlanningYear', () => {
     expect(rows()[4].querySelector('[data-testid="year-incomplete"]')).toBeNull();
   });
 
-  it('shows the result of a past month instead of the forecast', async () => {
+  it('shows the result of a past month instead of the actual', async () => {
     await setup();
 
     const past = rows()[8].querySelector('[data-testid="year-result-actual"]');

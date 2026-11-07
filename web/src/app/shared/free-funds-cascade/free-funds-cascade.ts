@@ -21,7 +21,7 @@ export interface CascadeLabels {
   readonly free: string;
   readonly deficit: string;
   readonly plan?: string;
-  readonly forecast?: string;
+  readonly actual?: string;
 }
 
 export interface CascadeContribution {
@@ -41,7 +41,7 @@ export interface CascadeSplitRow {
   readonly amountPln: number;
 }
 
-type ColumnKey = 'plan' | 'forecast';
+type ColumnKey = 'plan' | 'actual';
 type RowKey = 'incomes' | 'expenses' | 'contributions' | 'free';
 
 interface CascadeRow {
@@ -73,7 +73,7 @@ const ROW_KEYS: readonly RowKey[] = ['incomes', 'expenses', 'contributions', 'fr
 export class FreeFundsCascade {
   readonly labels = input.required<CascadeLabels>();
   readonly plan = input.required<CascadeAmounts>();
-  readonly forecast = input<CascadeAmounts | null>(null);
+  readonly actual = input<CascadeAmounts | null>(null);
   readonly contributions = input<readonly CascadeContribution[]>([]);
   readonly groups = input<readonly CascadeGroup[]>([]);
   readonly split = input<readonly CascadeSplitRow[]>([]);
@@ -95,9 +95,9 @@ export class FreeFundsCascade {
   protected readonly columns = computed<CascadeColumn[]>(() => {
     const labels = this.labels();
     const plan = this.plan();
-    const forecast = this.forecast();
+    const actual = this.actual();
     const axis = Math.max(
-      ...[plan, forecast].flatMap((amounts) =>
+      ...[plan, actual].flatMap((amounts) =>
         amounts ? ROW_KEYS.map((key) => Math.abs(amounts[key])) : [],
       ),
     );
@@ -120,15 +120,15 @@ export class FreeFundsCascade {
         deficit: rowKey === 'free' && deficit,
         testId: this.testId(`${key}-${rowKey}`),
         barTestId: `cascade-bar-${key}-${rowKey}`,
-        deficitTestId: this.testId(key === 'plan' ? 'free-deficit' : 'forecast-free-deficit'),
+        deficitTestId: this.testId(key === 'plan' ? 'free-deficit' : 'actual-free-deficit'),
       })),
     });
 
     const columns = [
-      build('plan', plan, forecast ? (labels.plan ?? null) : null, planDeficit ?? plan.free < 0),
+      build('plan', plan, actual ? (labels.plan ?? null) : null, planDeficit ?? plan.free < 0),
     ];
-    if (forecast) {
-      columns.push(build('forecast', forecast, labels.forecast ?? null, forecast.free < 0));
+    if (actual) {
+      columns.push(build('actual', actual, labels.actual ?? null, actual.free < 0));
     }
     return columns;
   });

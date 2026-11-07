@@ -38,7 +38,7 @@
   }
 }
 
-.year-chart__forecast {
+.year-chart__actual {
   position: absolute;
   inset-inline: 4%;
   height: 2px;
@@ -106,7 +106,7 @@
   border: 1px solid var(--sk-accent-stroke);
 }
 
-.year-chart__swatch--forecast {
+.year-chart__swatch--actual {
   height: 2px;
   background: var(--mat-sys-on-surface);
 }

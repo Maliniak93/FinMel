@@ -58,7 +58,7 @@ function monthData(
       groupContributions: [],
       ...expenses,
     },
-    freeFunds: { planPln: 0, forecastPln: 0, incomplete: false },
+    freeFunds: { planPln: 0, actualPln: 0, incomplete: false },
     nonBusinessDays: [],
     split: null,
   };
@@ -179,8 +179,20 @@ describe('PlanningDayList', () => {
     const root = await render(
       monthData([], {
         groupContributions: [
-          { groupId: blueGroupId, name: 'Poduszka finansowa', amountPln: 1000 },
-          { groupId: unknownGroupId, name: 'Emerytura', amountPln: 1500 },
+          {
+            groupId: blueGroupId,
+            name: 'Poduszka finansowa',
+            amountPln: 1000,
+            fundedPln: null,
+            status: null,
+          },
+          {
+            groupId: unknownGroupId,
+            name: 'Emerytura',
+            amountPln: 1500,
+            fundedPln: null,
+            status: null,
+          },
         ],
       }),
       { groups: [{ id: blueGroupId, name: 'Poduszka finansowa', color: 'blue' }] },

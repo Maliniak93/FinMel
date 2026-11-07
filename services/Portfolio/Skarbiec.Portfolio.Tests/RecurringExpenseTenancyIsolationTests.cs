@@ -108,6 +108,6 @@ public sealed class RecurringExpenseTenancyIsolationTests(SkarbiecContainersFixt
         Assert.Empty(month.Expenses.Definitions);
         Assert.Equal(0m, month.Expenses.CostPln);
         Assert.Equal(0m, month.FreeFunds.PlanPln);
-        Assert.Equal(0m, month.FreeFunds.ForecastPln);
+        Assert.Equal(0m, month.FreeFunds.ActualPln);
     }
 }

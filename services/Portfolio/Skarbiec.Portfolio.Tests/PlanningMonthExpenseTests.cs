@@ -87,7 +87,7 @@ public sealed class PlanningMonthExpenseTests(SkarbiecContainersFixture containe
         Assert.Equal("Settled", insurance.Status);
         Assert.Equal((1_260m, 60m), (insurance.ActualAmountPln, insurance.Difference));
         Assert.Equal(before.Expenses.CostPln + 10m, after.Expenses.CostPln);
-        Assert.Equal(before.FreeFunds.ForecastPln - 10m, after.FreeFunds.ForecastPln);
+        Assert.Equal(before.FreeFunds.ActualPln - 3_610m, after.FreeFunds.ActualPln);
     }
 
     [Fact]

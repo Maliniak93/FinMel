@@ -274,10 +274,26 @@
                     }}</span>
                   </span>
                 </div>
-                <span class="day-list__status"></span>
-                <span class="day-list__amount sk-num">{{
-                  formatMoney(negative(line.amountPln), 'PLN')
-                }}</span>
+                <span class="day-list__status">
+                  @if (line.status; as status) {
+                    <app-status-chip
+                      data-testid="contribution-status"
+                      [label]="contributionStatusViews[status].key | transloco"
+                      [icon]="contributionStatusViews[status].icon"
+                      [tone]="contributionStatusViews[status].tone"
+                    />
+                  }
+                </span>
+                @if (line.fundedPln !== null) {
+                  <span class="day-list__amount sk-num">
+                    {{ formatMoney(line.fundedPln, 'PLN') }} /
+                    {{ formatMoney(line.amountPln, 'PLN') }}
+                  </span>
+                } @else {
+                  <span class="day-list__amount sk-num">{{
+                    formatMoney(negative(line.amountPln), 'PLN')
+                  }}</span>
+                }
                 <span class="day-list__actions"></span>
               </div>
             </li>

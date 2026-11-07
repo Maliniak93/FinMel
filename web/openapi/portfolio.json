@@ -6056,7 +6056,7 @@
       "FreeFundsResponse": {
         "required": [
           "planPln",
-          "forecastPln",
+          "actualPln",
           "incomplete"
         ],
         "type": "object",
@@ -6069,7 +6069,7 @@
             ],
             "format": "double"
           },
-          "forecastPln": {
+          "actualPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",
@@ -6086,7 +6086,9 @@
         "required": [
           "groupId",
           "name",
-          "amountPln"
+          "amountPln",
+          "fundedPln",
+          "status"
         ],
         "type": "object",
         "properties": {
@@ -6104,8 +6106,35 @@
               "string"
             ],
             "format": "double"
+          },
+          "fundedPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GroupContributionStatus"
+              }
+            ]
           }
         }
+      },
+      "GroupContributionStatus": {
+        "enum": [
+          "Unsettled",
+          "Partial",
+          "Settled",
+          null
+        ]
       },
       "GroupShareRequest": {
         "required": [
@@ -7109,7 +7138,7 @@
           "differencePln",
           "costPln",
           "freeFundsPlanPln",
-          "freeFundsForecastPln",
+          "freeFundsActualPln",
           "hasOverdue",
           "incomplete"
         ],
@@ -7166,7 +7195,7 @@
             ],
             "format": "double"
           },
-          "freeFundsForecastPln": {
+          "freeFundsActualPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "null",
@@ -7235,7 +7264,7 @@
           "differencePln",
           "costPln",
           "freeFundsPlanPln",
-          "freeFundsForecastPln"
+          "freeFundsActualPln"
         ],
         "type": "object",
         "properties": {
@@ -7279,7 +7308,7 @@
             ],
             "format": "double"
           },
-          "freeFundsForecastPln": {
+          "freeFundsActualPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "type": [
               "number",

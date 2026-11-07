@@ -43,7 +43,7 @@ public sealed class PlanningMonthOneOffTests(SkarbiecContainersFixture container
         Assert.Equal(4_200m, december.Expenses.CostPln);
         Assert.Equal(october.FreeFunds.PlanPln - 1_200m, november.FreeFunds.PlanPln);
         Assert.Equal(october.FreeFunds.PlanPln, december.FreeFunds.PlanPln);
-        Assert.Equal(october.FreeFunds.ForecastPln - 1_200m, november.FreeFunds.ForecastPln);
+        Assert.Equal(october.FreeFunds.ActualPln, november.FreeFunds.ActualPln);
     }
 
     [Fact]

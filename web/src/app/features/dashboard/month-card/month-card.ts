@@ -128,7 +128,7 @@ export class MonthCard {
 
   protected readonly freePln = computed(() => Number(this.month()?.freeFunds.planPln ?? 0));
 
-  protected readonly forecastPln = computed(() => Number(this.month()?.freeFunds.forecastPln ?? 0));
+  protected readonly actualPln = computed(() => Number(this.month()?.freeFunds.actualPln ?? 0));
 
   protected readonly deficitPln = computed(() => Number(this.month()?.split?.deficitPln ?? 0));
 

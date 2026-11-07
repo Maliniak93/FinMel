@@ -537,7 +537,7 @@ export type ExpensePaymentResponse = {
 
 export type FreeFundsResponse = {
     planPln: number | string;
-    forecastPln: number | string;
+    actualPln: number | string;
     incomplete: boolean;
 };
 
@@ -545,7 +545,11 @@ export type GroupContributionResponse = {
     groupId: string;
     name: string;
     amountPln: number | string;
+    fundedPln: null | number | string;
+    status: null | GroupContributionStatus;
 };
+
+export type GroupContributionStatus = 'Unsettled' | 'Partial' | 'Settled';
 
 export type GroupShareRequest = {
     groupId: string;
@@ -745,7 +749,7 @@ export type PlanningYearMonthResponse = {
     differencePln: null | number | string;
     costPln: null | number | string;
     freeFundsPlanPln: null | number | string;
-    freeFundsForecastPln: null | number | string;
+    freeFundsActualPln: null | number | string;
     hasOverdue: boolean;
     incomplete: boolean;
 };
@@ -764,7 +768,7 @@ export type PlanningYearTotalsResponse = {
     differencePln: number | string;
     costPln: number | string;
     freeFundsPlanPln: number | string;
-    freeFundsForecastPln: number | string;
+    freeFundsActualPln: number | string;
 };
 
 export type RecordTransactionRequest = {

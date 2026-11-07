@@ -31,7 +31,7 @@ public sealed record PlanningYearMonthResponse
     public required decimal? DifferencePln { get; init; }
     public required decimal? CostPln { get; init; }
     public required decimal? FreeFundsPlanPln { get; init; }
-    public required decimal? FreeFundsForecastPln { get; init; }
+    public required decimal? FreeFundsActualPln { get; init; }
 
     /// <summary>True when any occurrence of the month is overdue.</summary>
     public required bool HasOverdue { get; init; }
@@ -47,5 +47,5 @@ public sealed record PlanningYearTotalsResponse
     public required decimal DifferencePln { get; init; }
     public required decimal CostPln { get; init; }
     public required decimal FreeFundsPlanPln { get; init; }
-    public required decimal FreeFundsForecastPln { get; init; }
+    public required decimal FreeFundsActualPln { get; init; }
 }

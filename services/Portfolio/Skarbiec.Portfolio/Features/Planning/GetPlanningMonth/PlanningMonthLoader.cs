@@ -77,6 +77,8 @@ public sealed class PlanningMonthLoader(
 
         var settings = await dbContext.PlanningSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
 
+        var funding = await LoadFundingAsync(currentMonth, groups.Any(g => g.MonthlyContributionPln > 0m), cancellationToken);
+
         return new PlanningMonthData(
             today,
             incomes,
@@ -84,6 +86,30 @@ public sealed class PlanningMonthLoader(
             forecast,
             rates,
             replica,
+            funding,
             settings?.PaymentLeadDays ?? PlanningSettings.DefaultPaymentLeadDays);
+    }
+
+    private async Task<GroupFundingResult> LoadFundingAsync(YearMonth month, bool anyContribution, CancellationToken cancellationToken)
+    {
+        if (!anyContribution)
+        {
+            return GroupFundingResult.Empty;
+        }
+
+        var first = month.FirstDay;
+        var last = month.LastDay;
+        var legs = await dbContext.Transactions
+            .AsNoTracking()
+            .Where(t => t.Date >= first && t.Date <= last)
+            .Join(
+                dbContext.Assets,
+                t => t.AssetId,
+                a => a.Id,
+                (t, a) => new FundingLeg(
+                    t.TransferId, t.Type, a.GroupId, t.Quantity, t.UnitPriceAmount, t.FxRateToPln, t.AmountPln))
+            .ToListAsync(cancellationToken);
+
+        return GroupFunding.Compute(legs);
     }
 }
