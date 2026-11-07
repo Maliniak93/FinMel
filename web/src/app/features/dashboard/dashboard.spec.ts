@@ -992,6 +992,15 @@ describe('dashboard stylesheet', () => {
     );
   });
 
+  it('lets the history section grow', () => {
+    const rule = [...dashboardStylesheet().matchAll(/\.dashboard-page__history\s*\{([^}]*)\}/g)]
+      .map((match) => match[1])
+      .join(' ');
+
+    expect(rule).toMatch(/display:\s*flex/);
+    expect(rule).toMatch(/flex-direction:\s*column/);
+  });
+
   it('lets the structure rows wrap', () => {
     const structureRules = [
       ...dashboardStylesheet().matchAll(/\.dashboard-page__structure[^{]*\{([^}]*)\}/g),

@@ -1,4 +1,16 @@
-import { Component, computed, input, model, output, signal, viewChild } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  model,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleGroup, MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
@@ -25,8 +37,6 @@ const CUSTOM_RANGE: ChartRange = 'CUSTOM';
 const WIDTH = 640;
 const HEIGHT = 280;
 const MARGIN = { top: 12, right: 16, bottom: 28, left: 64 };
-const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
-const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 const Y_TICK_COUNT = 5;
 const Y_LABEL_FRACTION_DIGITS = 2;
 const BAND_LABEL_MIN_WIDTH = 200;
@@ -85,11 +95,18 @@ export class NetWorthChart {
   protected readonly customRange = CUSTOM_RANGE;
   protected readonly assetClassLabel = assetClassLabel;
   protected readonly assetClassColor = assetClassColor;
-  protected readonly width = WIDTH;
-  protected readonly height = HEIGHT;
+  private readonly canvas = viewChild<ElementRef<HTMLElement>>('canvas');
+  private readonly measured = signal<{ width: number; height: number } | null>(null);
+  private observer: ResizeObserver | null = null;
+  private observed: HTMLElement | null = null;
+
+  private readonly size = computed(() => this.measured() ?? { width: WIDTH, height: HEIGHT });
+
+  protected readonly width = computed(() => this.size().width);
+  protected readonly height = computed(() => this.size().height);
   protected readonly margin = MARGIN;
-  protected readonly plotWidth = PLOT_WIDTH;
-  protected readonly plotHeight = PLOT_HEIGHT;
+  protected readonly plotWidth = computed(() => this.width() - MARGIN.left - MARGIN.right);
+  protected readonly plotHeight = computed(() => this.height() - MARGIN.top - MARGIN.bottom);
   protected readonly formatDate = formatDate;
   protected readonly formatMoney = formatMoney;
   protected readonly formatMoneyCompact = formatMoneyCompact;
@@ -116,6 +133,34 @@ export class NetWorthChart {
 
   private readonly hoveredIndex = signal<number | null>(null);
 
+  constructor() {
+    const destroyRef = inject(DestroyRef);
+    effect(() => this.observe(this.canvas()?.nativeElement ?? null));
+    destroyRef.onDestroy(() => this.observer?.disconnect());
+  }
+
+  private observe(element: HTMLElement | null): void {
+    if (element === this.observed) {
+      return;
+    }
+    if (this.observed) {
+      this.observer?.unobserve(this.observed);
+    }
+    this.observed = element;
+    if (!element || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    this.observer ??= new ResizeObserver((entries) => {
+      const entry = entries.filter((candidate) => candidate.target === this.observed).at(-1);
+      if (!entry) {
+        return;
+      }
+      const { width, height } = entry.contentRect;
+      this.measured.set(width > 0 && height > 0 ? { width, height } : null);
+    });
+    this.observer.observe(element);
+  }
+
   protected readonly chart = computed(() => {
     const raw = this.points();
     if (raw.length < 2) {
@@ -130,9 +175,10 @@ export class NetWorthChart {
     const xMin = times[0];
     const xSpan = times[times.length - 1] - xMin || 1;
 
-    const toX = (time: number) => MARGIN.left + ((time - xMin) / xSpan) * PLOT_WIDTH;
-    const toY = (value: number) =>
-      MARGIN.top + PLOT_HEIGHT - ((value - yMin) / ySpan) * PLOT_HEIGHT;
+    const plotWidth = this.plotWidth();
+    const plotHeight = this.plotHeight();
+    const toX = (time: number) => MARGIN.left + ((time - xMin) / xSpan) * plotWidth;
+    const toY = (value: number) => MARGIN.top + plotHeight - ((value - yMin) / ySpan) * plotHeight;
 
     const coordinates: ChartPoint[] = raw.map((p, i) => ({
       x: toX(times[i]),
@@ -162,7 +208,7 @@ export class NetWorthChart {
     }
 
     const line = coordinates.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join('L');
-    const bottom = MARGIN.top + PLOT_HEIGHT;
+    const bottom = MARGIN.top + plotHeight;
     const first = coordinates[0];
     const last = coordinates[coordinates.length - 1];
 
@@ -213,7 +259,7 @@ export class NetWorthChart {
   }
 
   protected tooltipAlignment(point: ChartPoint): 'start' | 'center' | 'end' {
-    const ratio = (point.x - MARGIN.left) / PLOT_WIDTH;
+    const ratio = (point.x - MARGIN.left) / this.plotWidth();
     return ratio < 0.2 ? 'start' : ratio > 0.8 ? 'end' : 'center';
   }
 

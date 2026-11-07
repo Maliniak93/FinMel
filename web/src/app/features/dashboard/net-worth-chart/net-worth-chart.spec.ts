@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 
 import {
   attributesOf,
@@ -89,8 +93,80 @@ describe('NetWorthChart', () => {
   let fixture: ComponentFixture<NetWorthChart>;
 
   afterEach(async () => {
+    vi.unstubAllGlobals();
     await restoreEnglish();
   });
+
+  interface FakeObserver {
+    callback: ResizeObserverCallback;
+    targets: Element[];
+    disconnected: boolean;
+  }
+
+  function stubResizeObserver(): FakeObserver[] {
+    const observers: FakeObserver[] = [];
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        private readonly state: FakeObserver;
+        constructor(callback: ResizeObserverCallback) {
+          this.state = { callback, targets: [], disconnected: false };
+          observers.push(this.state);
+        }
+        observe(target: Element): void {
+          this.state.targets.push(target);
+        }
+        unobserve(target: Element): void {
+          this.state.targets = this.state.targets.filter((candidate) => candidate !== target);
+        }
+        disconnect(): void {
+          this.state.disconnected = true;
+        }
+      },
+    );
+    return observers;
+  }
+
+  async function resizeTo(observers: FakeObserver[], width: number, height: number): Promise<void> {
+    for (const observer of observers) {
+      const entries = observer.targets.map(
+        (target) =>
+          ({
+            target,
+            contentRect: {
+              width,
+              height,
+              x: 0,
+              y: 0,
+              top: 0,
+              left: 0,
+              right: width,
+              bottom: height,
+            },
+            contentBoxSize: [{ inlineSize: width, blockSize: height }],
+            borderBoxSize: [{ inlineSize: width, blockSize: height }],
+          }) as unknown as ResizeObserverEntry,
+      );
+      observer.callback(entries, {} as ResizeObserver);
+    }
+    await fixture.whenStable();
+  }
+
+  function stylesheet(): string {
+    return readFileSync(
+      resolve(process.cwd(), 'src/app/features/dashboard/net-worth-chart/net-worth-chart.scss'),
+      'utf8',
+    );
+  }
+
+  function ruleOf(scss: string, selector: string): string {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return [
+      ...scss.matchAll(new RegExp(`(?:^|[\\s,}])${escaped}\\s*(?:,[^{]*)?\\{([^}]*)\\}`, 'g')),
+    ]
+      .map((match) => match[1])
+      .join(' ');
+  }
 
   async function setup(
     points: HistoryPoints,
@@ -421,6 +497,122 @@ describe('NetWorthChart', () => {
     expect(Number(bands[0].getAttribute('width'))).toBeCloseTo((6 / 14) * PLOT_WIDTH, 0);
     expect(label()).toBe(before);
     expect(label()).toContain(formatDate('2024-03-12'));
+  });
+
+  it('draws in the measured container size', async () => {
+    const observers = stubResizeObserver();
+    const element = await setup(yearPoints);
+
+    await resizeTo(observers, 800, 420);
+
+    const plot = element.querySelector('.net-worth-chart__plot') as SVGElement;
+    expect(element.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 800 420');
+    expect(Number(plot.getAttribute('width'))).toBe(800 - 64 - 16);
+    expect(Number(plot.getAttribute('height'))).toBe(420 - 12 - 28);
+  });
+
+  it('falls back to 640 by 280 without a measurement', async () => {
+    vi.stubGlobal('ResizeObserver', undefined);
+    const element = await setup(yearPoints);
+
+    expect(element.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 640 280');
+  });
+
+  it('falls back to 640 by 280 when the measured size is 0', async () => {
+    const observers = stubResizeObserver();
+    const element = await setup(yearPoints);
+    await resizeTo(observers, 800, 420);
+    expect(element.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 800 420');
+
+    await resizeTo(observers, 0, 0);
+
+    expect(element.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 640 280');
+    const plot = element.querySelector('.net-worth-chart__plot') as SVGElement;
+    expect(Number(plot.getAttribute('width'))).toBe(PLOT_WIDTH);
+  });
+
+  it('redraws when the container is resized', async () => {
+    const observers = stubResizeObserver();
+    const element = await setup(yearPoints);
+    await resizeTo(observers, 800, 420);
+    const line = () => element.querySelector('path.net-worth-chart__line')?.getAttribute('d');
+    const xPositions = () =>
+      [...element.querySelectorAll('.net-worth-chart__x-label')].map((l) => l.getAttribute('x'));
+    const yPositions = () =>
+      [...element.querySelectorAll('.net-worth-chart__y-label')].map((l) => l.getAttribute('y'));
+    const before = { line: line(), x: xPositions(), y: yPositions() };
+
+    await resizeTo(observers, 400, 200);
+
+    expect(element.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 400 200');
+    expect(line()).not.toBe(before.line);
+    expect(xPositions()).not.toEqual(before.x);
+    expect(yPositions()).not.toEqual(before.y);
+  });
+
+  it('maps the pointer to the nearest point at a measured size', async () => {
+    const observers = stubResizeObserver();
+    const element = await setup(yearPoints);
+    await resizeTo(observers, 800, 420);
+
+    hoverPlot(element, 150);
+    await fixture.whenStable();
+
+    expect(textOf(element.querySelector('.net-worth-chart__tooltip'))).toContain(
+      formatDate('2026-07-01'),
+    );
+
+    hoverPlot(element, 300);
+    await fixture.whenStable();
+
+    expect(textOf(element.querySelector('.net-worth-chart__tooltip'))).toContain(
+      formatDate('2026-08-01'),
+    );
+    expect(Number(element.querySelector('.net-worth-chart__marker')?.getAttribute('cx'))).toBe(
+      800 - 16,
+    );
+
+    hoverPlot(element, 0);
+    await fixture.whenStable();
+
+    expect(Number(element.querySelector('.net-worth-chart__marker')?.getAttribute('cx'))).toBe(64);
+  });
+
+  it('keeps the 640 by 280 proportion and grows to fill', async () => {
+    await TestBed.configureTestingModule({ providers: [provideI18nTesting()] }).compileComponents();
+    const scss = stylesheet();
+    const host = ruleOf(scss, ':host');
+    const canvas = ruleOf(scss, '.net-worth-chart__canvas');
+
+    expect(host).toMatch(/display:\s*flex/);
+    expect(host).toMatch(/flex-direction:\s*column/);
+    expect(host).toMatch(/flex:\s*1/);
+    expect(canvas).toMatch(/aspect-ratio:\s*640\s*\/\s*280/);
+    expect(canvas).toMatch(/flex:\s*1/);
+  });
+
+  it('centres the loading, error and empty states', async () => {
+    const element = await setup([{ date: '2026-08-01', netWorthPln: 10000, isIncomplete: false }]);
+    expect(element.querySelector('.net-worth-chart__empty')).not.toBeNull();
+
+    fixture.componentRef.setInput('loadError', 'Could not load history.');
+    await fixture.whenStable();
+    expect(element.querySelector('.net-worth-chart__state app-section-error')).not.toBeNull();
+
+    fixture.componentRef.setInput('loadError', null);
+    fixture.componentRef.setInput('loading', true);
+    await fixture.whenStable();
+    expect(element.querySelector('.net-worth-chart__state mat-spinner')).not.toBeNull();
+
+    const scss = stylesheet();
+    const state = ruleOf(scss, '.net-worth-chart__state');
+    const empty = ruleOf(scss, '.net-worth-chart__empty');
+
+    expect(state).toMatch(/flex:\s*1/);
+    expect(state).toMatch(/justify-content:\s*center/);
+    expect(state).toMatch(/align-items:\s*center/);
+    expect(empty).toMatch(/flex:\s*1/);
+    expect(empty).toMatch(/(display:\s*flex|text-align:\s*center)/);
   });
 
   it('shows not enough history', async () => {
