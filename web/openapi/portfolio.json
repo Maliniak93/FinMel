@@ -6462,7 +6462,8 @@
           "metal",
           "fineWeightGramsPerPiece",
           "pieces",
-          "totalFineGrams"
+          "totalFineGrams",
+          "transactionCount"
         ],
         "type": "object",
         "properties": {
@@ -6518,6 +6519,14 @@
               "string"
             ],
             "format": "double"
+          },
+          "transactionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -7536,7 +7545,8 @@
           "unrealizedPl",
           "unrealizedPlPercent",
           "unrealizedPlPln",
-          "priceUnavailableReason"
+          "priceUnavailableReason",
+          "transactionCount"
         ],
         "type": "object",
         "properties": {
@@ -7679,6 +7689,14 @@
                 "$ref": "#/components/schemas/SecurityPriceUnavailableReason"
               }
             ]
+          },
+          "transactionCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

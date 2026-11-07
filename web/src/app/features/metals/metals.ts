@@ -1,8 +1,11 @@
-import { Component, computed, inject, resource } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
@@ -14,6 +17,8 @@ import {
   type TransactionType,
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { confirmSetAssetArchived } from '../../shared/asset-archive';
+import { confirmRemoveAsset } from '../../shared/confirm-remove-asset';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { formatDate, formatQuantity } from '../../shared/format';
 import { Gain } from '../../shared/gain/gain';
@@ -42,8 +47,10 @@ function sumInGrosze(amounts: readonly number[]): number {
     EmptyState,
     Gain,
     MatButtonModule,
+    MatDividerModule,
     MatIconModule,
     MatMenuModule,
+    MatSlideToggleModule,
     MatTableModule,
     Money,
     RouterLink,
@@ -57,6 +64,7 @@ function sumInGrosze(amounts: readonly number[]): number {
 })
 export class Metals {
   private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
   protected readonly displayedColumns = [
     'name',
@@ -81,6 +89,14 @@ export class Metals {
       return result.data ?? [];
     },
   });
+
+  protected readonly showArchived = signal(false);
+
+  protected readonly visibleHoldings = computed(() =>
+    this.holdingsResource.hasValue()
+      ? this.holdingsResource.value().filter((h) => this.showArchived() || !h.isArchived)
+      : [],
+  );
 
   protected readonly pricesResource = resource({
     loader: async ({ abortSignal }) => {
@@ -148,7 +164,7 @@ export class Metals {
     if (!this.holdingsResource.hasValue()) {
       return null;
     }
-    const rows = this.holdingsResource.value();
+    const rows = this.visibleHoldings();
     const values = rows.flatMap((holding) => {
       const value = this.valueToday(holding);
       return value === null ? [] : [value];
@@ -186,6 +202,31 @@ export class Metals {
       type,
     };
     this.reloadWhenDone(this.dialog.open(TransactionFormDialog, { width: '480px', data }));
+  }
+
+  protected async setArchived(holding: MetalResponse, archive: boolean): Promise<void> {
+    const done = await confirmSetAssetArchived(
+      this.dialog,
+      this.snackBar,
+      { assetId: holding.assetId, name: holding.name },
+      archive,
+    );
+    if (done) {
+      this.holdingsResource.reload();
+    }
+  }
+
+  protected async remove(holding: MetalResponse): Promise<void> {
+    const grams = Number(holding.totalFineGrams);
+    const done = await confirmRemoveAsset(this.dialog, this.snackBar, {
+      assetId: holding.assetId,
+      name: holding.name,
+      transactionCount: Number(holding.transactionCount),
+      held: grams > 0 ? { quantity: grams, unit: 'grams' } : null,
+    });
+    if (done) {
+      this.holdingsResource.reload();
+    }
   }
 
   private reloadWhenDone(ref: MatDialogRef<unknown, boolean>): void {

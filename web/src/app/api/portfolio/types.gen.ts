@@ -624,6 +624,7 @@ export type MetalResponse = {
     pieces: number | string;
     totalFineGrams: number | string;
     costPln?: null | number | string;
+    transactionCount: number | string;
 };
 
 export type OccurrenceStatus = 'Pending' | 'Settled' | 'Skipped';
@@ -838,6 +839,7 @@ export type SecurityHoldingResponse = {
     unrealizedPlPercent: null | number | string;
     unrealizedPlPln: null | number | string;
     priceUnavailableReason: null | SecurityPriceUnavailableReason;
+    transactionCount: number | string;
 };
 
 export type SecurityPriceUnavailableReason = number;

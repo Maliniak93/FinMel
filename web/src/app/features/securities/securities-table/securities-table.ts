@@ -1,8 +1,10 @@
 import { Component, computed, inject, input, resource } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, type MatDialogRef } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, translate } from '@jsverse/transloco';
@@ -14,6 +16,8 @@ import {
   type TransactionType,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
+import { confirmSetAssetArchived } from '../../../shared/asset-archive';
+import { confirmRemoveAsset } from '../../../shared/confirm-remove-asset';
 import { fromDateOnly } from '../../../shared/date-only';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatDate, formatMoney, formatQuantity } from '../../../shared/format';
@@ -52,6 +56,7 @@ const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
     EmptyState,
     Gain,
     MatButtonModule,
+    MatDividerModule,
     MatIconModule,
     MatMenuModule,
     MatTableModule,
@@ -67,9 +72,11 @@ const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 })
 export class SecuritiesTable {
   private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
 
   readonly assetClass = input.required<AssetClass>();
   readonly account = input<string>();
+  readonly showArchived = input(false);
 
   protected readonly displayedColumns = [
     'instrument',
@@ -88,10 +95,10 @@ export class SecuritiesTable {
   );
 
   protected readonly holdingsResource = resource({
-    params: () => ({ assetClass: this.assetClass() }),
+    params: () => ({ assetClass: this.assetClass(), includeArchived: this.showArchived() }),
     loader: async ({ params, abortSignal }) => {
       const result = await getApiPortfolioSecurities({
-        query: { assetClass: params.assetClass },
+        query: { assetClass: params.assetClass, includeArchived: params.includeArchived },
         signal: abortSignal,
       });
       if (result.error) {
@@ -191,6 +198,31 @@ export class SecuritiesTable {
       type,
     };
     this.reloadWhenDone(this.dialog.open(TransactionFormDialog, { width: '480px', data }));
+  }
+
+  protected async setArchived(holding: SecurityHoldingResponse, archive: boolean): Promise<void> {
+    const done = await confirmSetAssetArchived(
+      this.dialog,
+      this.snackBar,
+      { assetId: holding.assetId, name: holding.name },
+      archive,
+    );
+    if (done) {
+      this.holdingsResource.reload();
+    }
+  }
+
+  protected async remove(holding: SecurityHoldingResponse): Promise<void> {
+    const quantity = Number(holding.quantity);
+    const done = await confirmRemoveAsset(this.dialog, this.snackBar, {
+      assetId: holding.assetId,
+      name: holding.name,
+      transactionCount: Number(holding.transactionCount),
+      held: quantity > 0 ? { quantity, unit: 'pieces' } : null,
+    });
+    if (done) {
+      this.holdingsResource.reload();
+    }
   }
 
   private reloadWhenDone(ref: MatDialogRef<unknown, boolean>): void {

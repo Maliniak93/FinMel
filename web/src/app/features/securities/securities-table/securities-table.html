@@ -159,6 +159,27 @@
             <mat-icon>receipt_long</mat-icon>
             <span>{{ 'securities.action.history' | transloco }}</span>
           </a>
+          @if (holding.isArchived) {
+            <button mat-menu-item type="button" (click)="setArchived(holding, false)">
+              <mat-icon>unarchive</mat-icon>
+              <span>{{ 'common.restore' | transloco }}</span>
+            </button>
+          } @else {
+            <button mat-menu-item type="button" (click)="setArchived(holding, true)">
+              <mat-icon>archive</mat-icon>
+              <span>{{ 'common.archive' | transloco }}</span>
+            </button>
+          }
+          <mat-divider />
+          <button
+            mat-menu-item
+            class="securities-table__delete"
+            type="button"
+            (click)="remove(holding)"
+          >
+            <mat-icon>delete</mat-icon>
+            <span>{{ 'common.delete' | transloco }}</span>
+          </button>
         </mat-menu>
       </td>
       <td mat-footer-cell *matFooterCellDef></td>

@@ -29,7 +29,9 @@ public sealed class ListMetalsHandler(PortfolioDbContext dbContext)
 
         return rows
             .Select(r => r.Holding.ToResponse(
-                r.Asset, MetalCostBasis.Compute(tradesByAsset[r.Asset.Id].ToList(), cashLegs).CostPln))
+                r.Asset,
+                MetalCostBasis.Compute(tradesByAsset[r.Asset.Id].ToList(), cashLegs).CostPln,
+                tradesByAsset[r.Asset.Id].Count()))
             .ToList();
     }
 }

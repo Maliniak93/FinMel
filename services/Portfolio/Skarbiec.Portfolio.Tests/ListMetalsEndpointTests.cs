@@ -68,4 +68,30 @@ public sealed class ListMetalsEndpointTests(SkarbiecContainersFixture containers
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Empty((await response.Content.ReadFromJsonAsync<List<MetalResponse>>(cancellationToken))!);
     }
+
+    [Fact]
+    public async Task List_ReturnsTransactionCount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(MetalTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var cashId = await client.AddCashAssetWithBalanceAsync(cancellationToken);
+        var coin = await client.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Counted coin"));
+        for (var day = 0; day < 3; day++)
+        {
+            var buy = await client.PostAsJsonAsync(
+                TransactionsUri(coin.AssetId),
+                NewMetalCashRequest(cashId, TransactionType.Buy, 1m, 100m, MetalPurchaseDate.AddDays(day)),
+                cancellationToken);
+            buy.EnsureSuccessStatusCode();
+        }
+        await client.AddMetalAsync(cancellationToken, NewMetalRequest(name: "Empty coin"));
+
+        var response = await client.GetAsync(AllMetalsUri, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var rows = (await response.Content.ReadFromJsonAsync<List<MetalResponse>>(cancellationToken))!;
+        Assert.Equal(3, rows.Single(r => r.Name == "Counted coin").TransactionCount);
+        Assert.Equal(0, rows.Single(r => r.Name == "Empty coin").TransactionCount);
+    }
 }

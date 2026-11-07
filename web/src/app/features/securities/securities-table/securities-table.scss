@@ -30,3 +30,8 @@
 .securities-table__filter {
   margin: 16px 0;
 }
+
+.securities-table__delete {
+  --mat-menu-item-label-text-color: var(--mat-sys-error);
+  --mat-menu-item-icon-color: var(--mat-sys-error);
+}

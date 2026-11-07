@@ -1301,6 +1301,20 @@
       "title": "Restore \"{{ name }}\"?",
       "message": "It counts toward net worth again from today.",
       "failed": "Failed to restore."
+    },
+    "remove": {
+      "title": "Delete \"{{ name }}\"?",
+      "message": {
+        "none": "Delete \"{{ name }}\"? This cannot be undone.",
+        "one": "Delete \"{{ name }}\" along with {{ count }} transaction? This cannot be undone.",
+        "few": "Delete \"{{ name }}\" along with {{ count }} transactions? This cannot be undone.",
+        "many": "Delete \"{{ name }}\" along with {{ count }} transactions? This cannot be undone.",
+        "other": "Delete \"{{ name }}\" along with {{ count }} transactions? This cannot be undone."
+      },
+      "held": "You still hold {{ amount }} of this position.",
+      "grams": "{{ value }} g",
+      "pieces": "{{ value }} pcs",
+      "failed": "Failed to delete."
     }
   },
   "accounts": {

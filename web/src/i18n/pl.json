@@ -1301,6 +1301,20 @@
       "title": "Przywrócić \"{{ name }}\"?",
       "message": "Od dziś znów liczy się do wartości majątku.",
       "failed": "Nie udało się przywrócić."
+    },
+    "remove": {
+      "title": "Usunąć \"{{ name }}\"?",
+      "message": {
+        "none": "Usunąć \"{{ name }}\"? Tej operacji nie można cofnąć.",
+        "one": "Usunąć \"{{ name }}\" wraz z {{ count }} transakcją? Tej operacji nie można cofnąć.",
+        "few": "Usunąć \"{{ name }}\" wraz z {{ count }} transakcjami? Tej operacji nie można cofnąć.",
+        "many": "Usunąć \"{{ name }}\" wraz z {{ count }} transakcjami? Tej operacji nie można cofnąć.",
+        "other": "Usunąć \"{{ name }}\" wraz z {{ count }} transakcji? Tej operacji nie można cofnąć."
+      },
+      "held": "Masz jeszcze {{ amount }} tej pozycji.",
+      "grams": "{{ value }} g",
+      "pieces": "{{ value }} szt.",
+      "failed": "Nie udało się usunąć."
     }
   },
   "accounts": {

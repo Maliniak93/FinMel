@@ -1,11 +1,26 @@
 <div class="securities-page">
+  <div class="securities-page__toolbar">
+    <mat-slide-toggle [checked]="showArchived()" (change)="showArchived.set($event.checked)">
+      {{ 'assetArchive.showArchived' | transloco }}
+    </mat-slide-toggle>
+  </div>
   <mat-tab-group>
     <mat-tab [label]="'securities.tabs.stocks' | transloco">
-      <app-securities-table #stocks [assetClass]="stockClass" [account]="account()" />
+      <app-securities-table
+        #stocks
+        [assetClass]="stockClass"
+        [account]="account()"
+        [showArchived]="showArchived()"
+      />
       <app-watchlist-table [assetClass]="stockClass" (changed)="stocks.reload()" />
     </mat-tab>
     <mat-tab [label]="'securities.tabs.etfs' | transloco">
-      <app-securities-table #etfs [assetClass]="etfClass" [account]="account()" />
+      <app-securities-table
+        #etfs
+        [assetClass]="etfClass"
+        [account]="account()"
+        [showArchived]="showArchived()"
+      />
       <app-watchlist-table [assetClass]="etfClass" (changed)="etfs.reload()" />
     </mat-tab>
   </mat-tab-group>

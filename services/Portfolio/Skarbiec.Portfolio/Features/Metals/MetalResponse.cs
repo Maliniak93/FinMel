@@ -24,12 +24,15 @@ public sealed record MetalResponse
 
     /// <summary>PLN paid for the pieces held, from the cash legs of the purchases; null when a purchase has none.</summary>
     public decimal? CostPln { get; init; }
+
+    /// <summary>All transactions of the asset, dividends included.</summary>
+    public required int TransactionCount { get; init; }
 }
 
 public static class MetalMappingExtensions
 {
     public static MetalResponse ToResponse(
-        this MetalHolding holding, Asset asset, decimal? costPln = null) => new()
+        this MetalHolding holding, Asset asset, decimal? costPln = null, int transactionCount = 0) => new()
         {
             AssetId = asset.Id,
             IsArchived = asset.IsArchived,
@@ -39,6 +42,7 @@ public static class MetalMappingExtensions
             FineWeightGramsPerPiece = holding.FineWeightGramsPerPiece,
             Pieces = asset.Quantity,
             TotalFineGrams = MetalWeight.TotalFineGrams(asset.Quantity, holding.FineWeightGramsPerPiece),
-            CostPln = costPln
+            CostPln = costPln,
+            TransactionCount = transactionCount
         };
 }

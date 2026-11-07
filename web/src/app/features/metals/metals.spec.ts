@@ -8,8 +8,14 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import type { MetalPriceResponse } from '../../api/marketdata';
 import type { MetalResponse } from '../../api/portfolio';
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatMoney, formatSignedMoney } from '../../shared/format';
-import { clickRowMenuItem, menuItemLabel, rowMenuItems } from '../../../testing/archive';
+import { formatMoney, formatQuantity, formatSignedMoney } from '../../shared/format';
+import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import {
+  clickRowMenuItem,
+  menuItemLabel,
+  rowMenuItems,
+  showArchived,
+} from '../../../testing/archive';
 import { restoreEnglish, switchLanguage, textOf } from '../../../testing/i18n';
 import {
   goldKrugerrand,
@@ -45,7 +51,18 @@ describe('Metals', () => {
     settle = true,
   ): Promise<void> {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const request = input as Request;
       const url = requestUrl(input);
+      if (request.method === 'DELETE' && Array.isArray(holdings)) {
+        const index = holdings.findIndex((holding) => url.endsWith(`/${holding.assetId}`));
+        if (index >= 0) {
+          holdings.splice(index, 1);
+        }
+        return new Response(null, { status: 204 });
+      }
+      if (request.method === 'POST' && /\/assets\/[^/]+\/(archive|restore)$/.test(url)) {
+        return jsonResponse({});
+      }
       if (url.includes('/api/marketdata/metal-prices')) {
         return jsonResponse(prices);
       }
@@ -93,6 +110,12 @@ describe('Metals', () => {
     return fetchSpy.mock.calls.filter((call: unknown[]) =>
       requestUrl(call[0]).includes('/api/portfolio/metals'),
     ).length;
+  }
+
+  function writes(): Request[] {
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .filter((request: Request) => request.method !== 'GET');
   }
 
   function addButton(): HTMLButtonElement | undefined {
@@ -221,6 +244,7 @@ describe('Metals', () => {
       [goldKrugerrand, archivedCoin],
       [{ ...metalPricesGoldOnly[0], isStale: true }, metalPricesGoldOnly[1]],
     );
+    await showArchived(fixture);
 
     const goldStrip = Array.from(
       element().querySelectorAll<HTMLElement>('.metals-page__price'),
@@ -234,6 +258,111 @@ describe('Metals', () => {
       expect(isDisabled(menuItem(items, label))).toBe(true);
     }
     expect(isDisabled(menuItem(items, /transaction history/i))).toBe(false);
+  });
+
+  it('hides archived holdings until the toggle is on', async () => {
+    const archivedCoin = metalResponse({
+      assetId: '44444444-eeee-4444-eeee-444444444444',
+      name: 'Archived coin',
+      isArchived: true,
+    });
+    await setup([goldKrugerrand, archivedCoin]);
+
+    expect(rows()).toHaveLength(1);
+    expect(element().textContent).not.toContain('Archived coin');
+
+    await showArchived(fixture);
+
+    expect(rows()).toHaveLength(2);
+    expect(textOf(rowFor('Archived coin').querySelector('app-status-chip'))).toContain('Archived');
+    expect(textOf(rowFor('Krugerrand'))).not.toContain('Archived');
+  });
+
+  it('archives a holding after confirming', async () => {
+    await setup();
+    const before = holdingsCalls();
+
+    await clickRowMenuItem(fixture, rowFor('Krugerrand'), /^archive$/i);
+
+    expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+    await vi.waitFor(() => expect(writes()).toHaveLength(1));
+    const [request] = writes();
+    expect(request.method).toBe('POST');
+    expect(request.url).toContain(`/api/portfolio/assets/${goldKrugerrand.assetId}/archive`);
+    await vi.waitFor(() => expect(holdingsCalls()).toBeGreaterThan(before));
+  });
+
+  it('restores an archived holding', async () => {
+    const archivedCoin = metalResponse({
+      assetId: '44444444-eeee-4444-eeee-444444444444',
+      name: 'Archived coin',
+      isArchived: true,
+    });
+    await setup([goldKrugerrand, archivedCoin]);
+    await showArchived(fixture);
+
+    const items = await rowMenuItems(fixture, rowFor('Archived coin'));
+    expect(items.map(menuItemLabel)).toEqual(expect.arrayContaining(['Restore', 'Delete']));
+    expect(items.map(menuItemLabel)).not.toContain('Archive');
+    document.querySelector<HTMLElement>('.cdk-overlay-backdrop')?.click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    await clickRowMenuItem(fixture, rowFor('Archived coin'), /^restore$/i);
+
+    await vi.waitFor(() => expect(writes()).toHaveLength(1));
+    const [request] = writes();
+    expect(request.method).toBe('POST');
+    expect(request.url).toContain(`/api/portfolio/assets/${archivedCoin.assetId}/restore`);
+  });
+
+  it('delete dialog names the transaction count and the held quantity', async () => {
+    const coin = metalResponse({
+      assetId: '55555555-eeee-4444-eeee-555555555555',
+      name: 'Testowy',
+      pieces: 1,
+      totalFineGrams: 12,
+      transactionCount: 3,
+    });
+    const holdings = [coin, silverBar];
+    await setup(holdings);
+
+    await clickRowMenuItem(fixture, rowFor('Testowy'), /^delete$/i);
+
+    expect(dialog.open).toHaveBeenCalledWith(ConfirmDialog, expect.anything());
+    const data = dialog.open.mock.calls[0][1].data;
+    expect(data.destructive).toBe(true);
+    expect(data.message).toContain('3');
+    expect(data.message).toContain(`${formatQuantity(12)} g`);
+    await vi.waitFor(() =>
+      expect(
+        writes().some(
+          (request) =>
+            request.method === 'DELETE' && request.url.endsWith(`/assets/${coin.assetId}`),
+        ),
+      ).toBe(true),
+    );
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(rows().some((row) => (row.textContent ?? '').includes('Testowy'))).toBe(false);
+    });
+  });
+
+  it('delete dialog shows no transaction count for a metal without transactions', async () => {
+    const coin = metalResponse({
+      assetId: '66666666-eeee-4444-eeee-666666666666',
+      name: 'Pusty',
+      pieces: 1,
+      totalFineGrams: 12,
+      transactionCount: 0,
+    });
+    await setup([coin]);
+
+    await clickRowMenuItem(fixture, rowFor('Pusty'), /^delete$/i);
+
+    const data = dialog.open.mock.calls[0][1].data;
+    expect(data.message).not.toMatch(/\b0\b/);
+    expect(data.message).toContain(`${formatQuantity(12)} g`);
   });
 
   it('gain column', async () => {
