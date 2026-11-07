@@ -150,7 +150,21 @@
     "runFinished": "zakończono {{ date }}",
     "runCounts": "zsynchronizowano: {{ synced }}, brak danych: {{ noData }}, błędy: {{ failed }}",
     "loadFailed": "Nie udało się wczytać stanu synchronizacji.",
-    "triggerFailed": "Nie udało się uruchomić synchronizacji."
+    "triggerFailed": "Nie udało się uruchomić synchronizacji.",
+    "limits": {
+      "title": "Limity wpłat",
+      "year": "Rok",
+      "ike": "Limit IKE (zł)",
+      "ikze": "Limit IKZE (zł)",
+      "save": "Zatwierdź",
+      "remove": "Usuń rok",
+      "addYear": "Dodaj rok",
+      "empty": "Nie ustawiono jeszcze żadnych limitów.",
+      "loadFailed": "Nie udało się wczytać limitów wpłat.",
+      "saveFailed": "Nie udało się zapisać limitu.",
+      "removeFailed": "Nie udało się usunąć roku.",
+      "invalidAmount": "Podaj kwotę większą od 0."
+    }
   },
   "notFound": {
     "message": "Nie znaleziono strony."
@@ -1423,6 +1437,7 @@
       "status": "Wpłacono {{ paid }} / {{ limit }} zł w {{ year }} · zostało {{ left }} zł",
       "exceeded": "Wpłacono {{ paid }} / {{ limit }} zł w {{ year }} · limit przekroczony",
       "noLimit": "Wpłacono {{ paid }} zł w {{ year }}",
+      "noLimitHint": "Nie ustawiono limitu na {{ year }}",
       "year": "Rok"
     }
   }

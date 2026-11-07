@@ -454,6 +454,18 @@ describe('AccountDetail', () => {
     expect(root().querySelector('[role="progressbar"]')).toBeNull();
   });
 
+  it('shows a settings hint when the year has no limit', async () => {
+    await setup({
+      wrapper: 1,
+      contribution: { year: 2026, contributedPln: 12000, limitPln: null },
+    });
+    await switchLanguage(fixture, 'pl');
+
+    expect(text()).toContain('Nie ustawiono limitu na 2026');
+    expect(root().querySelector('a[href="/settings"]')).not.toBeNull();
+    expect(text()).toContain('Wpłacono 12 000,00 zł w 2026');
+  });
+
   it('an IKE account shows the year selector and no Limit wpłat button', async () => {
     await setup({
       wrapper: 1,

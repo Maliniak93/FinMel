@@ -44,7 +44,9 @@
               />
             }
             @if (account.contribution; as contribution) {
-              <app-contribution-bar [contribution]="contribution" />
+              @if (contribution.limitPln !== null && contribution.limitPln !== undefined) {
+                <app-contribution-bar [contribution]="contribution" />
+              }
             }
           </td>
         </ng-container>

@@ -131,6 +131,11 @@
           }
         </mat-select>
       </div>
+      @if (contribution.limitPln === null || contribution.limitPln === undefined) {
+        <a class="account-detail__limit-hint" routerLink="/settings">{{
+          'accounts.contribution.noLimitHint' | transloco: { year: contribution.year }
+        }}</a>
+      }
     }
 
     <app-summary-strip [items]="summary()" />

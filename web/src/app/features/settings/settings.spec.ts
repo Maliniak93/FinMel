@@ -3,8 +3,10 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { isTranslationIn, looksLikeTranslationKey, textOf } from '../../../testing/i18n';
 import { client as marketdataClient } from '../../api/marketdata/client.gen';
 import type { SyncStatusResponse } from '../../api/marketdata';
+import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
+import { requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
 import { Settings } from './settings';
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -65,6 +67,7 @@ describe('Settings', () => {
 
   beforeAll(() => {
     marketdataClient.setConfig({ baseUrl: 'https://example.test' });
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
   });
 
   afterEach(async () => {
@@ -80,9 +83,12 @@ describe('Settings', () => {
   ): Promise<void> {
     fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockImplementation(async (input: RequestInfo | URL) =>
-        requestMethod(input) === 'POST' ? triggerResponse : await statusResponse,
-      );
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        if (requestUrl(input).includes('/api/portfolio/')) {
+          return jsonResponse([]);
+        }
+        return requestMethod(input) === 'POST' ? triggerResponse : await statusResponse;
+      });
 
     await TestBed.configureTestingModule({
       imports: [Settings],
@@ -120,6 +126,16 @@ describe('Settings', () => {
 
     expect(element.querySelector('app-section-error')).toBeNull();
     expect(element.textContent).toContain('synced 5');
+  });
+
+  it('mounts the contribution limits section after the market data sync', async () => {
+    await setup(jsonResponse(noRunYet));
+    const element = fixture.nativeElement as HTMLElement;
+    const sync = element.querySelector('app-empty-state');
+    const limits = element.querySelector('app-contribution-limits');
+
+    expect(limits).not.toBeNull();
+    expect(sync?.compareDocumentPosition(limits!) ?? 0).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('empty state before any run', async () => {
