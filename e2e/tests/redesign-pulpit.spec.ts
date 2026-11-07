@@ -379,7 +379,7 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
 
   const settledTotal = PREMIA_IN_MONTH ? 2 : 1;
 
-  await test.step('Krok 13: "Ten miesiąc" cascade with incomes, expenses, group contributions, free funds, the split rows, the forecast and "Wpływy załatwione"', async () => {
+  await test.step('Krok 13: "Ten miesiąc" cascade with incomes, expenses, group contributions, free funds, the split rows, the actual free funds and "Wpływy załatwione"', async () => {
     await openMonth(page, MONTH);
     const planned = async (testId: string): Promise<string> =>
       (await page.getByTestId(testId).locator('dd').innerText()).trim();
@@ -414,9 +414,7 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
     await expect(
       card.getByTestId('month-card-split-row').filter({ hasText: `→ ${PENSION}` }),
     ).toHaveCount(1);
-    await expect(card.getByTestId('month-card-forecast')).toContainText(
-      'Prognoza wolnych środków:',
-    );
+    await expect(card.getByTestId('month-card-actual')).toContainText('Faktyczne wolne środki:');
     await expect(card.getByTestId('month-card-settled')).toHaveText(
       `Wpływy załatwione: 0 z ${settledTotal}`,
     );

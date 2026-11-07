@@ -1,4 +1,5 @@
 import { type Locator, type Page } from '@playwright/test';
+import { expectProjected } from './projection';
 import { expect, logInThroughApi, logInThroughUi, test, warsawDate, wealthTab } from './fixtures';
 import {
   addExpense,
@@ -273,7 +274,10 @@ test('pulpit: zaległe wydatki na karcie „Do rozliczenia” are listed, settle
   });
 
   await test.step('Krok 5: Rozlicz at the 5.10 rent opens the window with 2400, 5.10, mBank bieżące and the withdrawal on, the dashboard stays behind', async () => {
-    await expect(accountRow(page, MBANK)).toContainText(pln('10 000,00'));
+    await expectProjected(
+      () => page.goto('/dashboard'),
+      () => expect(accountRow(page, MBANK)).toContainText(pln('10 000,00'), { timeout: 2_000 }),
+    );
     const dialog = await openSettleFromCard(todoItems(page).nth(0), page);
     await expect(dialog.getByRole('heading', { name: 'Rozlicz „Czynsz”' })).toBeVisible();
     await expect(dialog.getByRole('spinbutton', { name: 'Faktyczna kwota' })).toHaveValue('2400');

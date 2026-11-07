@@ -330,9 +330,9 @@ export function monthInList(month: string): string {
   return `${number}.${year}`;
 }
 
-export async function expectFreeFunds(page: Page, plan: string, forecast?: string): Promise<void> {
+export async function expectFreeFunds(page: Page, plan: string, actual?: string): Promise<void> {
   await expect(page.getByTestId('free-funds-plan')).toContainText(pln(plan));
-  if (forecast) {
-    await expect(page.getByTestId('free-funds-forecast')).toContainText(pln(forecast));
+  if (actual) {
+    await expect(page.getByTestId('free-funds-actual')).toContainText(pln(actual));
   }
 }
