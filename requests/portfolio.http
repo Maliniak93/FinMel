@@ -1456,7 +1456,7 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/portfolio/one-off-incomes/{{createOneOffIncome.response.body.id}}
 Authorization: Bearer {{authToken}}
 
-### Create a one-off expense: PLN only, no account (201; same name, amount and date rules)
+### Create a one-off expense: planned in PLN, optional paying account (201; same name, amount and date rules; 404 for another user's account, 409 Conflict.AccountArchived)
 # @name createOneOffExpense
 POST {{baseUrl}}/api/portfolio/one-off-expenses
 Authorization: Bearer {{authToken}}
@@ -1465,10 +1465,28 @@ Content-Type: application/json
 {
   "name": "Wakacje",
   "amount": 1200,
+  "accountId": "{{createMbankAccount.response.body.id}}",
   "date": "2026-11-10"
 }
 
-### Change a one-off expense: name, amount and date (204; 404 NotFound.OneOffExpense)
+### Settle a one-off expense, or edit its settlement: actual date not after today, an unarchived account in any currency, the FX rate of actualDate frozen (204; 400 Validation.ActualDateInFuture / Validation.FxRateMissing / Validation.InsufficientFunds; 404 NotFound.OneOffExpense; 409 Conflict.AccountArchived); createWithdrawal (default false) also writes, moves or removes an editable Withdraw on the account's cash; rememberAccount (default false) makes the account the expense's default
+PUT {{baseUrl}}/api/portfolio/one-off-expenses/{{createOneOffExpense.response.body.id}}/settlement
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "actualAmount": 1100,
+  "actualDate": "2026-11-05",
+  "accountId": "{{createMbankAccount.response.body.id}}",
+  "createWithdrawal": true,
+  "rememberAccount": true
+}
+
+### Undo a one-off expense's settlement: pending again, its withdrawal removed when it still exists (204; 404 NotFound.OneOffExpenseSettlement when it is not settled)
+DELETE {{baseUrl}}/api/portfolio/one-off-expenses/{{createOneOffExpense.response.body.id}}/settlement
+Authorization: Bearer {{authToken}}
+
+### Change a one-off expense: name, amount, date and account (204; 404 NotFound.OneOffExpense; 409 Conflict.OneOffExpenseSettled while it is settled)
 PUT {{baseUrl}}/api/portfolio/one-off-expenses/{{createOneOffExpense.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -1476,10 +1494,11 @@ Content-Type: application/json
 {
   "name": "Wakacje w górach",
   "amount": 1500,
+  "accountId": "{{createMbankAccount.response.body.id}}",
   "date": "2026-11-12"
 }
 
-### Delete a one-off expense (204; 404 NotFound.OneOffExpense)
+### Delete a one-off expense (204; 404 NotFound.OneOffExpense; 409 Conflict.OneOffExpenseSettled while it is settled)
 DELETE {{baseUrl}}/api/portfolio/one-off-expenses/{{createOneOffExpense.response.body.id}}
 Authorization: Bearer {{authToken}}
 

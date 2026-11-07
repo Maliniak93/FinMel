@@ -362,6 +362,7 @@ export type CreateOneOffExpenseRequest = {
     name: string;
     amount: number | string;
     date: string;
+    accountId?: null | string;
 };
 
 export type CreateOneOffExpenseResponse = {
@@ -618,6 +619,15 @@ export type OneOffExpenseResponse = {
     date: string;
     amount: number | string;
     inMonth: boolean;
+    accountId: null | string;
+    accountName: null | string;
+    status: OccurrenceStatus;
+    currency: null | string;
+    actualAmount: null | number | string;
+    actualDate: null | string;
+    actualAmountPln: null | number | string;
+    difference: null | number | string;
+    withdrawalCreated: boolean;
 };
 
 export type OneOffIncomeResponse = {
@@ -850,6 +860,14 @@ export type SettleOccurrenceRequest = {
     createDeposit?: boolean;
 };
 
+export type SettleOneOffExpenseRequest = {
+    actualAmount: number | string;
+    actualDate: string;
+    accountId: string;
+    createWithdrawal?: boolean;
+    rememberAccount?: boolean;
+};
+
 export type SettleOneOffIncomeRequest = {
     actualAmount: number | string;
     actualDate: string;
@@ -1015,6 +1033,7 @@ export type UpdateOneOffExpenseRequest = {
     name: string;
     amount: number | string;
     date: string;
+    accountId?: null | string;
 };
 
 export type UpdateOneOffIncomeRequest = {
@@ -2302,6 +2321,42 @@ export type PutApiPortfolioOneOffExpensesByIdResponses = {
 };
 
 export type PutApiPortfolioOneOffExpensesByIdResponse = PutApiPortfolioOneOffExpensesByIdResponses[keyof PutApiPortfolioOneOffExpensesByIdResponses];
+
+export type DeleteApiPortfolioOneOffExpensesByIdSettlementData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-expenses/{id}/settlement';
+};
+
+export type DeleteApiPortfolioOneOffExpensesByIdSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteApiPortfolioOneOffExpensesByIdSettlementResponse = DeleteApiPortfolioOneOffExpensesByIdSettlementResponses[keyof DeleteApiPortfolioOneOffExpensesByIdSettlementResponses];
+
+export type PutApiPortfolioOneOffExpensesByIdSettlementData = {
+    body: SettleOneOffExpenseRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/portfolio/one-off-expenses/{id}/settlement';
+};
+
+export type PutApiPortfolioOneOffExpensesByIdSettlementResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioOneOffExpensesByIdSettlementResponse = PutApiPortfolioOneOffExpensesByIdSettlementResponses[keyof PutApiPortfolioOneOffExpensesByIdSettlementResponses];
 
 export type PostApiPortfolioRecurringIncomesData = {
     body: CreateRecurringIncomeRequest;

@@ -14,6 +14,11 @@ public sealed class DeleteOneOffExpenseHandler(PortfolioDbContext dbContext)
             return OneOffExpenseErrors.NotFound(id);
         }
 
+        if (expense.IsSettled)
+        {
+            return OneOffExpenseErrors.Settled(id);
+        }
+
         dbContext.OneOffExpenses.Remove(expense);
         await dbContext.SaveChangesAsync(cancellationToken);
 

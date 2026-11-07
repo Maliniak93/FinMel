@@ -13,6 +13,9 @@ public sealed record CreateOneOffExpenseRequest : IValidatableObject
 
     public required DateOnly Date { get; init; }
 
+    /// <summary>The account the expense is expected to be paid from.</summary>
+    public Guid? AccountId { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         OneOffValidation.Validate(Date);
 }

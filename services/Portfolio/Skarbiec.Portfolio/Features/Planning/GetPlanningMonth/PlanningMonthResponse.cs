@@ -45,6 +45,27 @@ public sealed record OneOffExpenseResponse
 
     /// <summary>True when the date falls in the viewed month.</summary>
     public required bool InMonth { get; init; }
+
+    /// <summary>The settlement account once settled, the default one otherwise; null when none.</summary>
+    public required Guid? AccountId { get; init; }
+
+    public required string? AccountName { get; init; }
+    public required OccurrenceStatus Status { get; init; }
+
+    /// <summary>The currency of the settlement account; null while pending.</summary>
+    public required string? Currency { get; init; }
+
+    public required decimal? ActualAmount { get; init; }
+    public required DateOnly? ActualDate { get; init; }
+
+    /// <summary>The actual amount in PLN at the rate frozen on settlement; null while pending.</summary>
+    public required decimal? ActualAmountPln { get; init; }
+
+    /// <summary>Actual PLN minus planned, null while pending.</summary>
+    public required decimal? Difference { get; init; }
+
+    /// <summary>True when the settlement created a withdrawal on its account and it still exists.</summary>
+    public required bool WithdrawalCreated { get; init; }
 }
 
 public sealed record ExpensePaymentResponse
