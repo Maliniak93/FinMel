@@ -154,7 +154,7 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await expect(page.getByRole('button', { name: 'Nowe aktywo' })).toHaveCount(2);
   });
 
-  await test.step('Krok 3: creating the XTB IKE account (limit 20 000 zł, deposit 10 000 zł) puts it in "Rachunki inwestycyjne" with 10 000,00 zł and "1 rachunek" under the tab', async () => {
+  await test.step('Krok 3: creating the XTB IKE account (limit 20 000 zł set in Ustawienia, deposit 10 000 zł) puts it in "Rachunki inwestycyjne" with 10 000,00 zł and "1 rachunek" under the tab', async () => {
     await newAsset(page, 'Rachunek inwestycyjny');
     await dialog.getByLabel('Nazwa').fill('XTB IKE');
     await selectOption(page, dialog.getByRole('combobox', { name: 'Opakowanie podatkowe' }), 'IKE');
@@ -164,11 +164,21 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await expandWealthSections(page);
     await expect(allRow(page, 'XTB IKE')).toBeVisible();
 
+    await page.goto('/settings');
+    await page.getByTestId('add-year').click();
+    const limitRow = page.getByTestId('contribution-limit-row').first();
+    await limitRow.getByTestId('ike-amount').fill('20000');
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PUT' &&
+        response.url().includes('/contribution-limits/') &&
+        response.ok(),
+    );
+    await limitRow.getByTestId('save-year').click();
+    await saved;
+    await openWealth(page);
+    await expandWealthSections(page);
     await allRow(page, 'XTB IKE').getByRole('link', { name: 'XTB IKE', exact: true }).click();
-    await page.getByRole('button', { name: 'Limit wpłat', exact: true }).click();
-    await dialog.getByLabel('Limit (zł)').fill('20000');
-    await dialog.getByRole('button', { name: 'Zapisz' }).click();
-    await expect(dialog).toBeHidden();
     await page.getByRole('button', { name: 'Wpłata', exact: true }).click();
     await cashOperation(dialog, '10000');
 
@@ -196,13 +206,13 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     );
   });
 
-  await test.step('Krok 5: the account name opens /wealth/accounts/<id> with the breadcrumb "Majątek · Rachunki inwestycyjne" and the deposit, transfer and limit actions', async () => {
+  await test.step('Krok 5: the account name opens /wealth/accounts/<id> with the breadcrumb "Majątek · Rachunki inwestycyjne" and the deposit and transfer actions and no limit button', async () => {
     await accountRow(page, 'XTB IKE').getByRole('link', { name: 'XTB IKE', exact: true }).click();
     await expect(page).toHaveURL(/\/wealth\/accounts\/[0-9a-f-]+$/);
     await expect(page.getByTestId('breadcrumb')).toContainText('Majątek · Rachunki inwestycyjne');
     await expect(page.getByRole('button', { name: 'Wpłata', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Przelew', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Limit wpłat', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Limit wpłat', exact: true })).toHaveCount(0);
   });
 
   await test.step('Krok 6: the stock CD Projekt (CDR.WA), 70 pieces at 200,00 zł on XTB IKE, appears in "Akcje i ETF" with the value "—"', async () => {
