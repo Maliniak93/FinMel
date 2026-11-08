@@ -120,10 +120,60 @@ describe('global styles', () => {
     const main = ruleBodies(styles, '.sk-section-title ')[0] ?? '';
     const sub = ruleBodies(styles, '.sk-section-title--sub')[0] ?? '';
 
-    expect(main).toMatch(/font-size:\s*24px/);
+    expect(main).toMatch(/font-size:\s*var\(--sk-text-2xl\)/);
     expect(main).toMatch(/font-weight:\s*600/);
-    expect(sub).toMatch(/font-size:\s*20px/);
+    expect(sub).toMatch(/font-size:\s*var\(--sk-text-xl\)/);
     expect(sub).toMatch(/font-weight:\s*600/);
+  });
+
+  it('defines the text scale', () => {
+    const tokens = read('src/skarbiec-tokens.css');
+    const scale = { xs: 12, sm: 13, base: 14, lg: 16, xl: 20, '2xl': 24, '3xl': 40 };
+
+    for (const [name, size] of Object.entries(scale)) {
+      expect(tokens, `--sk-text-${name}`).toMatch(
+        new RegExp(`--sk-text-${name}:\\s*${size}px\\s*;`),
+      );
+    }
+  });
+
+  it('typography roles use the scale and stay at or above 12px', () => {
+    const tokens = read('src/skarbiec-tokens.css');
+    const scale: Record<string, number> = {
+      xs: 12,
+      sm: 13,
+      base: 14,
+      lg: 16,
+      xl: 20,
+      '2xl': 24,
+      '3xl': 40,
+    };
+    const roles = Array.from(
+      tokens.matchAll(
+        /--mat-sys-((?:display|headline|title|body|label)-(?:large|medium|small)):\s*([^;]+);/g,
+      ),
+    );
+
+    expect(roles).toHaveLength(11);
+    for (const [, role, value] of roles) {
+      const token = value.match(/\bvar\(--sk-text-(xs|sm|base|lg|xl|2xl|3xl)\)/)?.[1];
+      expect(token, `${role}: ${value}`).toBeDefined();
+      expect(scale[token!], role).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it('material component overrides stay on the scale', () => {
+    const styles = read('src/styles.scss');
+    const tabs = styles.match(/mat\.tabs-overrides\(([\s\S]*?)\n\s*\);/)?.[1] ?? '';
+
+    expect(tabs).toMatch(/label-text-size:\s*var\(--sk-text-lg\)/);
+    const sizeOverrides = Array.from(
+      styles.matchAll(/^\s*[\w-]*(?:text-size|font-size)[\w-]*:\s*([^,;\n]+)/gm),
+    ).map((match) => match[1].trim());
+    expect(sizeOverrides.length).toBeGreaterThan(0);
+    for (const value of sizeOverrides) {
+      expect(value, value).toMatch(/^var\(--sk-text-(xs|sm|base|lg|xl|2xl|3xl)\)$/);
+    }
   });
 
   it('rounds the outer corners of the first and last button toggle with the group radius', () => {

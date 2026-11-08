@@ -6,7 +6,7 @@
   .auth-page__label {
     display: block;
     margin-bottom: 6px;
-    font-size: 14px;
+    font-size: var(--sk-text-base);
     font-weight: 400;
     color: var(--mat-sys-on-surface-variant);
   }
@@ -27,19 +27,19 @@
     flex: none;
     width: 18px;
     height: 18px;
-    font-size: 18px;
+    font-size: var(--sk-text-lg);
   }
 
   .auth-page__error {
     margin: 0 0 16px;
     color: var(--sk-negative);
-    font-size: 13px;
+    font-size: var(--sk-text-sm);
   }
 
   .auth-page__error mat-icon {
     width: 14px;
     height: 14px;
-    font-size: 14px;
+    font-size: var(--sk-text-base);
   }
 
   .auth-page__submit {

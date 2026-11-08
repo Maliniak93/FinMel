@@ -30,7 +30,7 @@
   padding-bottom: 16px;
   border-bottom: 1px solid var(--mat-sys-outline-variant);
   font-family: var(--mat-sys-brand-family);
-  font-size: 44px;
+  font-size: var(--sk-text-3xl);
   line-height: 1.1;
   text-align: center;
 }
@@ -38,7 +38,7 @@
 .auth-shell__title {
   margin: 0 0 24px;
   font-family: var(--mat-sys-brand-family);
-  font-size: 26px;
+  font-size: var(--sk-text-2xl);
   font-weight: 600;
   text-align: left;
 }

@@ -31,7 +31,7 @@
   align-items: center;
   gap: 8px;
   margin: 0 0 4px;
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   color: var(--mat-sys-on-surface-variant);
 }
 
@@ -67,7 +67,7 @@
 .net-worth-chart__y-label,
 .net-worth-chart__x-label {
   fill: var(--mat-sys-on-surface-variant);
-  font-size: 12px;
+  font-size: var(--sk-text-xs);
 }
 
 .net-worth-chart__band {
@@ -78,7 +78,7 @@
 
 .net-worth-chart__band-label {
   fill: var(--mat-sys-on-surface-variant);
-  font-size: 11px;
+  font-size: var(--sk-text-xs);
   pointer-events: none;
 }
 
@@ -127,7 +127,7 @@
   border-radius: 8px;
   background: var(--mat-sys-inverse-surface);
   color: var(--mat-sys-inverse-on-surface);
-  font-size: 0.8125rem;
+  font-size: var(--sk-text-sm);
   white-space: nowrap;
   pointer-events: none;
   transform: translate(-50%, calc(-100% - 12px));

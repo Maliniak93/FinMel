@@ -14,11 +14,11 @@
 }
 
 .wealth__tab-note {
-  font-size: 0.6875rem;
+  font-size: var(--sk-text-xs);
   color: var(--mat-sys-on-surface-variant);
 }
 
 .wealth__tab-caption {
-  font-size: 0.75rem;
+  font-size: var(--sk-text-xs);
   color: var(--mat-sys-on-surface-variant);
 }

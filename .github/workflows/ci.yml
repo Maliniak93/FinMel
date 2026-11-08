@@ -359,6 +359,10 @@ jobs:
         working-directory: web
         run: npm run lint
 
+      - name: Style lint
+        working-directory: web
+        run: npm run lint:styles
+
       - name: Format check
         working-directory: web
         run: npm run format:check

@@ -24,7 +24,7 @@ function scssFiles(dir: string): string[] {
 describe('Majątek stylesheets', () => {
   it('row menu icons are 16 px and the cash place heading takes its size from the section title', () => {
     const wealthAll = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
-    expect(rulesFor(wealthAll, /mat-icon/)).toMatch(/font-size:\s*16px/);
+    expect(rulesFor(wealthAll, /mat-icon/)).toMatch(/font-size:\s*var\(--sk-text-lg\)/);
 
     const cash = readStylesheet('src/app/features/cash/cash.scss');
     expect(rulesFor(cash, /cash-place__name/)).not.toMatch(/font-size|font-family/);
@@ -35,7 +35,7 @@ describe('Majątek stylesheets', () => {
     expect(rulesFor(shared, /header-cell/)).toMatch(/border-bottom:\s*1px solid/);
     expect(rulesFor(shared, /mat-mdc-cell/)).toMatch(/border-bottom:\s*1px solid/);
     expect(rulesFor(shared, /footer-cell/)).toMatch(/border-top:\s*1px solid/);
-    expect(rulesFor(shared, /mat-icon/)).toMatch(/font-size:\s*16px/);
+    expect(rulesFor(shared, /mat-icon/)).toMatch(/font-size:\s*var\(--sk-text-lg\)/);
 
     const tables = [
       'accounts/accounts.scss',
@@ -80,8 +80,8 @@ describe('Majątek stylesheets', () => {
     expect(rulesFor(strip, /summary-strip__item/)).not.toMatch(/\bflex\s*:/);
 
     const phone = mediaBlock(strip, '(width < 720px)');
-    expect(rulesFor(phone, /summary-strip__value/)).toMatch(/font-size:\s*14px/);
-    expect(rulesFor(phone, /summary-strip__label/)).toMatch(/font-size:\s*10px/);
+    expect(rulesFor(phone, /summary-strip__value/)).toMatch(/font-size:\s*var\(--sk-text-base\)/);
+    expect(rulesFor(phone, /summary-strip__label/)).toMatch(/font-size:\s*var\(--sk-text-xs\)/);
   });
 
   it('wealth tables keep name, value and menu on a phone', () => {

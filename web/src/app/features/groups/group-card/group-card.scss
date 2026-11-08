@@ -61,7 +61,7 @@
 }
 
 .group-card__amount {
-  font-size: 1.75rem;
+  font-size: var(--sk-text-2xl);
   line-height: 1.2;
 }
 
@@ -89,7 +89,7 @@ app-goal-progress {
 
 .group-card__caption-icon,
 .group-card__flag-icon {
-  font-size: 18px;
+  font-size: var(--sk-text-lg);
   width: 18px;
   height: 18px;
 }

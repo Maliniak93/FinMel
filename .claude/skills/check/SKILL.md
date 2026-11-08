@@ -17,7 +17,7 @@ generous timeout - test runs start Docker containers.
 ## Report (at most 5 lines)
 
 1. `ok` or `failed`, and which command was run.
-2. Which steps failed (`format`, `build`, `scripts-test`, `test`, `web-typecheck`, `web-lint`,
+2. Which steps failed (`format`, `build`, `scripts-test`, `test`, `web-typecheck`, `web-lint`, `web-lint-styles`,
    `web-build`, `web-test`, `api`) - from the `VERIFY_RESULT:` line, not from your reading of the log.
 3. The first few failing items, one per line: test name, compiler error, or lint rule, with the file.
 

@@ -105,7 +105,7 @@
   mat-icon {
     width: 18px;
     height: 18px;
-    font-size: 18px;
+    font-size: var(--sk-text-lg);
   }
 }
 
@@ -267,7 +267,7 @@
   vertical-align: middle;
   width: 18px;
   height: 18px;
-  font-size: 18px;
+  font-size: var(--sk-text-lg);
 }
 
 @media (min-width: 1200px) {

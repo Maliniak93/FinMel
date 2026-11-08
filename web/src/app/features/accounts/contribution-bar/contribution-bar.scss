@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: 6px;
   min-width: 200px;
-  font-size: 0.8125rem;
+  font-size: var(--sk-text-sm);
   --contribution-color: var(--sk-accent-stroke);
 }
 
@@ -49,7 +49,7 @@
   flex: none;
   width: 16px;
   height: 16px;
-  font-size: 16px;
+  font-size: var(--sk-text-lg);
   color: var(--contribution-color);
 }
 

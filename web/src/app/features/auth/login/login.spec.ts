@@ -119,8 +119,8 @@ describe('Login', () => {
     );
 
     expect(scss).toMatch(/\.auth-page__error\s*\{[^}]*color:\s*var\(--sk-negative\)/);
-    expect(scss).toMatch(/\.auth-page__error\s*\{[^}]*font-size:\s*13px/);
-    expect(scss).toMatch(/\.auth-page__error mat-icon\s*\{[^}]*font-size:\s*14px/);
+    expect(scss).toMatch(/\.auth-page__error\s*\{[^}]*font-size:\s*var\(--sk-text-sm\)/);
+    expect(scss).toMatch(/\.auth-page__error mat-icon\s*\{[^}]*font-size:\s*var\(--sk-text-base\)/);
   });
 
   it('colours the field labels with on-surface-variant', () => {

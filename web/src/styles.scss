@@ -95,6 +95,8 @@ html {
       outlined-focus-label-text-color: var(--mat-sys-on-surface-variant),
       outlined-container-shape: var(--mat-sys-corner-small),
       error-text-color: var(--mat-sys-error),
+      subscript-text-size: var(--sk-text-xs),
+      outlined-label-text-populated-size: var(--sk-text-xs),
     )
   );
   @include mat.button-toggle-overrides(
@@ -113,7 +115,7 @@ html {
       active-indicator-color: var(--sk-accent-stroke),
       active-focus-indicator-color: var(--sk-accent-stroke),
       active-hover-indicator-color: var(--sk-accent-stroke),
-      label-text-size: 17px,
+      label-text-size: var(--sk-text-lg),
     )
   );
   @include mat.table-overrides(
@@ -142,12 +144,12 @@ h1 {
 
 .sk-section-title {
   margin: 0 0 12px;
-  font-size: 24px;
+  font-size: var(--sk-text-2xl);
   font-weight: 600;
 }
 
 .sk-section-title--sub {
-  font-size: 20px;
+  font-size: var(--sk-text-xl);
   font-weight: 600;
 }
 
@@ -186,7 +188,7 @@ input.app-amount {
   display: inline-block;
   margin-inline-end: 4px;
   font-family: 'Material Symbols Outlined';
-  font-size: 16px;
+  font-size: var(--sk-text-lg);
   line-height: 1;
   vertical-align: text-bottom;
   font-feature-settings: 'liga';

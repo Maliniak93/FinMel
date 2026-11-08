@@ -94,7 +94,7 @@
 
 .dashboard-page__kpi-label {
   margin: 0 0 4px;
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   color: var(--mat-sys-on-surface-variant);
 }
 
@@ -106,7 +106,7 @@
 
 .dashboard-page__change {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--sk-text-2xl);
   font-weight: 600;
 }
 
@@ -123,20 +123,20 @@
 }
 
 .dashboard-page__change-range {
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   font-weight: 400;
   color: var(--mat-sys-on-surface-variant);
 }
 
 .dashboard-page__net-worth {
-  font-size: 2.5rem;
+  font-size: var(--sk-text-3xl);
   font-weight: 600;
   margin: 0;
 }
 
 .dashboard-page__as-of {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   opacity: 0.7;
 }
 
@@ -206,7 +206,7 @@
   padding: 0 8px;
   border: 1px solid var(--mat-sys-outline);
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: var(--sk-text-xs);
   color: var(--mat-sys-on-surface-variant);
 }
 
@@ -215,12 +215,12 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   color: var(--mat-sys-on-surface-variant);
 }
 
 .dashboard-page__change-class {
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   font-weight: 400;
   color: var(--mat-sys-on-surface-variant);
 }
@@ -241,7 +241,7 @@
 
 .dashboard-page__stale-note {
   margin: 4px 0 0;
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   color: var(--sk-warning);
 }
 

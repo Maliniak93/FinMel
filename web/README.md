@@ -35,9 +35,26 @@ npm run watch        # ng build --watch, development configuration
 ```bash
 npm test             # ng test — Vitest
 npm run lint          # ng lint — ESLint (angular-eslint)
+npm run lint:styles   # stylelint — every font-size must be a --sk-text-* token
 npm run format        # prettier --write .
 npm run format:check  # prettier --check .
 ```
+
+### Text scale
+
+Every `font-size` in `src/**/*.scss` is `var(--sk-text-*)` (or `inherit`/`initial`); `npm run lint:styles` fails on a literal. The tokens live in `src/skarbiec-tokens.css` and the `--mat-sys-*` typography roles read them:
+
+| Token            | Size                                          |
+| ---------------- | --------------------------------------------- |
+| `--sk-text-xs`   | 12 px (the minimum — nothing renders smaller) |
+| `--sk-text-sm`   | 13 px                                         |
+| `--sk-text-base` | 14 px                                         |
+| `--sk-text-lg`   | 16 px                                         |
+| `--sk-text-xl`   | 20 px                                         |
+| `--sk-text-2xl`  | 24 px                                         |
+| `--sk-text-3xl`  | 40 px                                         |
+
+Mapping rule for a new size: resolve `rem`/`em` to px in context, take the nearest token, a tie goes to the larger one; a role may pick the neighbour. An icon with a fixed box takes the token that fits the box.
 
 ## Languages
 
