@@ -2,6 +2,8 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  afterNextRender,
+  afterRenderEffect,
   computed,
   effect,
   inject,
@@ -9,6 +11,7 @@ import {
   model,
   output,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -90,6 +93,14 @@ export class NetWorthChart {
   readonly retry = output<void>();
 
   private readonly rangeGroup = viewChild.required(MatButtonToggleGroup);
+  private readonly rangeGroupElement = viewChild.required(MatButtonToggleGroup, {
+    read: ElementRef,
+  });
+  private placedOnce = false;
+  private rangeObserver: ResizeObserver | null = null;
+
+  protected readonly thumb = signal<{ left: number; width: number } | null>(null);
+  protected readonly thumbAnimated = signal(false);
 
   protected readonly ranges = RANGES;
   protected readonly customRange = CUSTOM_RANGE;
@@ -137,7 +148,42 @@ export class NetWorthChart {
   constructor() {
     const destroyRef = inject(DestroyRef);
     effect(() => this.observe(this.canvas()?.nativeElement ?? null));
-    destroyRef.onDestroy(() => this.observer?.disconnect());
+    destroyRef.onDestroy(() => {
+      this.observer?.disconnect();
+      this.rangeObserver?.disconnect();
+    });
+    afterRenderEffect(() => {
+      this.range();
+      this.placeThumb();
+    });
+    afterNextRender(() => {
+      if (typeof ResizeObserver === 'undefined') {
+        return;
+      }
+      this.rangeObserver = new ResizeObserver(() => {
+        this.placedOnce = false;
+        this.placeThumb();
+      });
+      this.rangeObserver.observe(this.rangeGroupElement().nativeElement as HTMLElement);
+    });
+  }
+
+  private placeThumb(): void {
+    const index = this.range() === CUSTOM_RANGE ? RANGES.length : RANGES.indexOf(this.range());
+    const toggle = (
+      this.rangeGroupElement().nativeElement as HTMLElement
+    ).querySelectorAll<HTMLElement>('mat-button-toggle')[index];
+    if (!toggle) {
+      return;
+    }
+    const left = toggle.offsetLeft;
+    const width = toggle.offsetWidth;
+    this.thumbAnimated.set(this.placedOnce);
+    this.placedOnce = true;
+    const current = untracked(this.thumb);
+    if (current?.left !== left || current?.width !== width) {
+      this.thumb.set({ left, width });
+    }
   }
 
   private observe(element: HTMLElement | null): void {

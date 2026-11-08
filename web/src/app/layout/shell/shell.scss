@@ -269,3 +269,17 @@
     line-height: 14px;
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  .shell__nav-link {
+    transition:
+      background-color var(--sk-motion-duration) var(--sk-motion-easing),
+      color var(--sk-motion-duration) var(--sk-motion-easing),
+      border-left-color var(--sk-motion-duration) var(--sk-motion-easing),
+      border-top-color var(--sk-motion-duration) var(--sk-motion-easing);
+  }
+
+  .shell__nav-link mat-icon {
+    transition: color var(--sk-motion-duration) var(--sk-motion-easing);
+  }
+}

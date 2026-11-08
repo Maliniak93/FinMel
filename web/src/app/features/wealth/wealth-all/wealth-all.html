@@ -145,77 +145,90 @@
             </th>
             <th scope="colgroup" class="wealth-all__actions"></th>
           </tr>
-          @for (row of isExpanded(section.type) ? section.rows : []; track row.id) {
-            <tr
-              class="wealth-all__row"
-              animate.enter="wealth-all__row--enter"
-              animate.leave="wealth-all__row--leave"
-              [class.wealth-all__row--archived]="row.isArchived"
-            >
-              <td class="wealth-all__col--name">
-                <a class="wealth-all__name" [routerLink]="row.link">{{ row.name }}</a>
-                @if (row.isArchived) {
-                  <span class="wealth-all__tag">{{ 'common.archived' | transloco }}</span>
-                }
-                @if (row.subtitle; as subtitle) {
-                  <div class="wealth-all__subtitle">
-                    {{ subtitle.key ? (subtitle.key | transloco: subtitle.params) : subtitle.text }}
-                  </div>
-                }
-              </td>
-              <td class="wealth-all__col--place">{{ row.accountLabel }}</td>
-              <td class="wealth-all__col--group">
-                @if (groupOf(row); as group) {
-                  <span
-                    class="wealth-all__swatch"
-                    [style.background-color]="groupColor(group.color)"
-                  ></span>
-                  {{ group.name }}
-                }
-              </td>
-              <td class="wealth-all__col--status">
-                @for (flag of row.flags; track flag) {
-                  <app-status-chip
-                    [label]="
-                      flagViews[flag].labelKey | transloco: { date: formatDate(row.maturityDate) }
-                    "
-                    [icon]="flagViews[flag].icon"
-                    [tone]="flagViews[flag].tone"
-                  />
-                }
-              </td>
-              <td class="wealth-all__num">
-                <app-money [amount]="row.valuePln" />
-                @if (row.gain; as gain) {
-                  <div class="wealth-all__change">
-                    <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
-                  </div>
-                }
-              </td>
-              <td class="wealth-all__actions">
-                <button
-                  mat-icon-button
-                  type="button"
-                  [matMenuTriggerFor]="rowMenu"
-                  [attr.aria-label]="'wealth.rowActions' | transloco: { name: row.name }"
-                >
-                  <mat-icon>more_vert</mat-icon>
-                </button>
-                <mat-menu #rowMenu="matMenu">
-                  <a mat-menu-item [routerLink]="row.link">
-                    <mat-icon>open_in_new</mat-icon>
-                    {{ 'wealth.action.open' | transloco }}
-                  </a>
-                  @if (row.historyLink; as history) {
-                    <a mat-menu-item [routerLink]="history">
-                      <mat-icon>history</mat-icon>
-                      {{ 'wealth.action.history' | transloco }}
-                    </a>
-                  }
-                </mat-menu>
-              </td>
-            </tr>
-          }
+          <tr class="wealth-all__collapse-row">
+            <td colspan="6" class="wealth-all__collapse-cell">
+              <app-collapse [open]="isExpanded(section.type)">
+                <table class="wealth-all__table">
+                  <tbody>
+                    @for (row of section.rows; track row.id) {
+                      <tr
+                        class="wealth-all__row"
+                        [class.wealth-all__row--archived]="row.isArchived"
+                      >
+                        <td class="wealth-all__col--name">
+                          <a class="wealth-all__name" [routerLink]="row.link">{{ row.name }}</a>
+                          @if (row.isArchived) {
+                            <span class="wealth-all__tag">{{ 'common.archived' | transloco }}</span>
+                          }
+                          @if (row.subtitle; as subtitle) {
+                            <div class="wealth-all__subtitle">
+                              {{
+                                subtitle.key
+                                  ? (subtitle.key | transloco: subtitle.params)
+                                  : subtitle.text
+                              }}
+                            </div>
+                          }
+                        </td>
+                        <td class="wealth-all__col--place">{{ row.accountLabel }}</td>
+                        <td class="wealth-all__col--group">
+                          @if (groupOf(row); as group) {
+                            <span
+                              class="wealth-all__swatch"
+                              [style.background-color]="groupColor(group.color)"
+                            ></span>
+                            {{ group.name }}
+                          }
+                        </td>
+                        <td class="wealth-all__col--status">
+                          @for (flag of row.flags; track flag) {
+                            <app-status-chip
+                              [label]="
+                                flagViews[flag].labelKey
+                                  | transloco: { date: formatDate(row.maturityDate) }
+                              "
+                              [icon]="flagViews[flag].icon"
+                              [tone]="flagViews[flag].tone"
+                            />
+                          }
+                        </td>
+                        <td class="wealth-all__num">
+                          <app-money [amount]="row.valuePln" />
+                          @if (row.gain; as gain) {
+                            <div class="wealth-all__change">
+                              <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
+                            </div>
+                          }
+                        </td>
+                        <td class="wealth-all__actions">
+                          <button
+                            mat-icon-button
+                            type="button"
+                            [matMenuTriggerFor]="rowMenu"
+                            [attr.aria-label]="'wealth.rowActions' | transloco: { name: row.name }"
+                          >
+                            <mat-icon>more_vert</mat-icon>
+                          </button>
+                          <mat-menu #rowMenu="matMenu">
+                            <a mat-menu-item [routerLink]="row.link">
+                              <mat-icon>open_in_new</mat-icon>
+                              {{ 'wealth.action.open' | transloco }}
+                            </a>
+                            @if (row.historyLink; as history) {
+                              <a mat-menu-item [routerLink]="history">
+                                <mat-icon>history</mat-icon>
+                                {{ 'wealth.action.history' | transloco }}
+                              </a>
+                            }
+                          </mat-menu>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </app-collapse>
+            </td>
+          </tr>
         </tbody>
       }
     </table>

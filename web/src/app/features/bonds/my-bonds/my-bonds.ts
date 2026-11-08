@@ -21,6 +21,7 @@ import {
   type BondResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
+import { Collapse } from '../../../shared/collapse/collapse';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatDate, formatMoney, formatPercent, formatQuantity } from '../../../shared/format';
@@ -101,6 +102,7 @@ function sumInGrosze(amounts: readonly (number | string)[]): number {
 @Component({
   selector: 'app-my-bonds',
   imports: [
+    Collapse,
     EmptyState,
     Gain,
     MatButtonModule,
@@ -231,15 +233,6 @@ export class MyBonds {
   }
 
   protected readonly expandedId = signal<string | null>(null);
-
-  // A fresh array on every expand/collapse makes the table re-evaluate which bond gets its period row.
-  protected readonly tableRows = computed(() => {
-    this.expandedId();
-    return [...this.visibleBonds()];
-  });
-
-  protected readonly isExpanded = (_: number, bond: BondResponse): boolean =>
-    this.expandedId() === bond.assetId;
 
   protected readonly settleableBonds = computed(() =>
     this.bondsResource.hasValue() ? this.bondsResource.value().filter(canSettle) : [],

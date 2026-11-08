@@ -115,23 +115,25 @@
                 </td>
               }
             </tr>
-            @if (phone() && isExpanded(row.month)) {
+            @if (phone()) {
               <tr class="planning-year__detail" data-testid="year-detail">
                 <td colspan="4">
-                  <dl>
-                    @for (cell of row.cells; track cell.key) {
-                      @if (!cell.phone) {
-                        <div>
-                          <dt>{{ cell.label | transloco }}</dt>
-                          <dd>
-                            <ng-container
-                              *ngTemplateOutlet="amount; context: { $implicit: cell }"
-                            />
-                          </dd>
-                        </div>
+                  <app-collapse [open]="isExpanded(row.month)">
+                    <dl>
+                      @for (cell of row.cells; track cell.key) {
+                        @if (!cell.phone) {
+                          <div>
+                            <dt>{{ cell.label | transloco }}</dt>
+                            <dd>
+                              <ng-container
+                                *ngTemplateOutlet="amount; context: { $implicit: cell }"
+                              />
+                            </dd>
+                          </div>
+                        }
                       }
-                    }
-                  </dl>
+                    </dl>
+                  </app-collapse>
                 </td>
               </tr>
             }

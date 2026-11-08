@@ -32,6 +32,20 @@
   opacity: 0.7;
 }
 
+.my-bonds__table .my-bonds__periods-row {
+  height: auto;
+
+  td.mat-mdc-cell {
+    padding: 0;
+    border-bottom: 0;
+  }
+}
+
+.my-bonds__periods-wrap {
+  padding-inline: var(--sk-space-4);
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
 .my-bonds__periods {
   width: 100%;
   border-collapse: collapse;

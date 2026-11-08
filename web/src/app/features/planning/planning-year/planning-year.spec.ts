@@ -330,14 +330,22 @@ describe('PlanningYear', () => {
     expect(headers).not.toContain('Income plan');
 
     const toggle = rows()[9].querySelector<HTMLButtonElement>('[data-testid="year-expand"]')!;
+    const detail = rows()[9].nextElementSibling as HTMLElement;
+    expect(detail.getAttribute('data-testid')).toBe('year-detail');
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(detail.querySelector('app-collapse')?.hasAttribute('inert')).toBe(true);
     toggle.click();
     await settle();
 
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    const detail = element().querySelector<HTMLElement>('[data-testid="year-detail"]')!;
+    expect(detail.querySelector('app-collapse')?.hasAttribute('inert')).toBe(false);
     expect(detail.textContent).toContain(formatMoney(16500, 'PLN'));
     expect(TestBed.inject(Router).url).not.toContain('month=');
+
+    toggle.click();
+    await settle();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(detail.querySelector('app-collapse')?.hasAttribute('inert')).toBe(true);
   });
 
   it('shows a retry error when the year fails', async () => {

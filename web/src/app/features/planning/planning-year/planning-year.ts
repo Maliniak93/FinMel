@@ -16,6 +16,7 @@ import {
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { PHONE_QUERY } from '../../../shared/breakpoints';
+import { Collapse } from '../../../shared/collapse/collapse';
 import { fromDateOnly } from '../../../shared/date-only';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatMoney, formatMonth } from '../../../shared/format';
@@ -65,6 +66,7 @@ interface YearRow {
 @Component({
   selector: 'app-planning-year',
   imports: [
+    Collapse,
     EmptyState,
     MatButtonModule,
     MatIconModule,

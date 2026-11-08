@@ -13,6 +13,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 
 import { formatDate } from '../../../shared/format';
 import { groupColor } from '../../../shared/colors';
+import { Collapse } from '../../../shared/collapse/collapse';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { PageHeader } from '../../../shared/page-header/page-header';
 import { Gain } from '../../../shared/gain/gain';
@@ -64,6 +65,7 @@ const FLAG_VIEWS: Record<WealthFlag, FlagView> = {
 @Component({
   selector: 'app-wealth-all',
   imports: [
+    Collapse,
     EmptyState,
     Gain,
     MatButtonModule,

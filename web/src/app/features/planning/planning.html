@@ -309,15 +309,17 @@
                           </button>
                         }
                       </div>
-                      @if (group.breakdown && isExpanded(group.groupId)) {
-                        <ul>
-                          @for (part of group.breakdown; track part.assetClass) {
-                            <li data-testid="split-breakdown">
-                              {{ assetClassLabel(part.assetClass) | transloco }}:
-                              {{ formatMoney(part.amountPln, 'PLN') }}
-                            </li>
-                          }
-                        </ul>
+                      @if (group.breakdown) {
+                        <app-collapse [open]="isExpanded(group.groupId)">
+                          <ul>
+                            @for (part of group.breakdown; track part.assetClass) {
+                              <li data-testid="split-breakdown">
+                                {{ assetClassLabel(part.assetClass) | transloco }}:
+                                {{ formatMoney(part.amountPln, 'PLN') }}
+                              </li>
+                            }
+                          </ul>
+                        </app-collapse>
                       }
                     </li>
                   }

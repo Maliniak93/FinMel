@@ -49,7 +49,7 @@
     </button>
   </app-empty-state>
 } @else if (bondsResource.hasValue()) {
-  <table mat-table [dataSource]="tableRows()" multiTemplateDataRows class="my-bonds__table">
+  <table mat-table [dataSource]="visibleBonds()" multiTemplateDataRows class="my-bonds__table">
     <ng-container matColumnDef="expand">
       <th mat-header-cell *matHeaderCellDef></th>
       <td mat-cell *matCellDef="let bond">
@@ -291,41 +291,49 @@
 
     <ng-container matColumnDef="periods">
       <td mat-cell *matCellDef="let bond" [attr.colspan]="displayedColumns.length">
-        <table class="my-bonds__periods">
-          <thead>
-            <tr>
-              <th>{{ 'bonds.periods.index' | transloco }}</th>
-              <th>{{ 'bonds.periods.dates' | transloco }}</th>
-              <th>{{ 'bonds.periods.rate' | transloco }}</th>
-              <th>{{ 'bonds.periods.count' | transloco }}</th>
-              <th>{{ 'bonds.periods.gross' | transloco }}</th>
-              <th>{{ 'bonds.periods.tax' | transloco }}</th>
-              <th>{{ 'common.status' | transloco }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (period of bond.periods; track period.index) {
-              <tr [attr.data-testid]="'period-row-' + period.index">
-                <td>{{ period.index }}</td>
-                <td>{{ formatDate(period.start) }} – {{ formatDate(period.end) }}</td>
-                <td>
-                  @let rate = periodRate(bond, period);
-                  {{ rate === null ? '—' : formatPercent(rate) }}
-                </td>
-                <td>
-                  {{ period.settlement ? formatQuantity(period.settlement.bondCount) : '—' }}
-                </td>
-                <td>
-                  {{
-                    period.settlement ? formatMoney(period.settlement.grossInterest, 'PLN') : '—'
-                  }}
-                </td>
-                <td>{{ period.settlement ? formatMoney(period.settlement.tax, 'PLN') : '—' }}</td>
-                <td>{{ periodStateLabel(period) | transloco }}</td>
-              </tr>
-            }
-          </tbody>
-        </table>
+        <app-collapse [open]="expandedId() === bond.assetId">
+          <div class="my-bonds__periods-wrap">
+            <table class="my-bonds__periods">
+              <thead>
+                <tr>
+                  <th>{{ 'bonds.periods.index' | transloco }}</th>
+                  <th>{{ 'bonds.periods.dates' | transloco }}</th>
+                  <th>{{ 'bonds.periods.rate' | transloco }}</th>
+                  <th>{{ 'bonds.periods.count' | transloco }}</th>
+                  <th>{{ 'bonds.periods.gross' | transloco }}</th>
+                  <th>{{ 'bonds.periods.tax' | transloco }}</th>
+                  <th>{{ 'common.status' | transloco }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (period of bond.periods; track period.index) {
+                  <tr [attr.data-testid]="'period-row-' + period.index">
+                    <td>{{ period.index }}</td>
+                    <td>{{ formatDate(period.start) }} – {{ formatDate(period.end) }}</td>
+                    <td>
+                      @let rate = periodRate(bond, period);
+                      {{ rate === null ? '—' : formatPercent(rate) }}
+                    </td>
+                    <td>
+                      {{ period.settlement ? formatQuantity(period.settlement.bondCount) : '—' }}
+                    </td>
+                    <td>
+                      {{
+                        period.settlement
+                          ? formatMoney(period.settlement.grossInterest, 'PLN')
+                          : '—'
+                      }}
+                    </td>
+                    <td>
+                      {{ period.settlement ? formatMoney(period.settlement.tax, 'PLN') : '—' }}
+                    </td>
+                    <td>{{ periodStateLabel(period) | transloco }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </app-collapse>
       </td>
     </ng-container>
 
@@ -336,11 +344,7 @@
       [class.my-bonds__row--archived]="row.isArchived"
       [attr.data-archived]="row.isArchived ? 'true' : null"
     ></tr>
-    <tr
-      mat-row
-      *matRowDef="let row; columns: ['periods']; when: isExpanded"
-      class="my-bonds__periods-row"
-    ></tr>
+    <tr mat-row *matRowDef="let row; columns: ['periods']" class="my-bonds__periods-row"></tr>
     <tr mat-footer-row *matFooterRowDef="footerColumns"></tr>
     <tr *matNoDataRow>
       <td class="my-bonds__no-data" [attr.colspan]="displayedColumns.length">
