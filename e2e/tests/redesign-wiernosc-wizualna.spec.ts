@@ -740,9 +740,9 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
 
     await expectRules(page, PULPIT_RULES);
     const stacked = [
-      page.locator('.dashboard-page__structure'),
       page.locator('.dashboard-page__todo'),
       page.locator('app-month-card'),
+      page.locator('.dashboard-page__structure'),
       page.locator('.dashboard-page__group-card'),
       page.locator('app-accounts-card'),
       page.locator('app-cash-card'),
