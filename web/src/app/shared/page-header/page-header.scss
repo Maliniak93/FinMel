@@ -1,13 +1,13 @@
 :host {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: var(--sk-space-4);
 }
 
 .page-header__row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .page-header__breadcrumb,
@@ -18,11 +18,11 @@
 }
 
 .page-header__breadcrumb {
-  margin-bottom: 8px;
+  margin-bottom: var(--sk-space-2);
 }
 
 .page-header__subtitle {
-  margin-top: 8px;
+  margin-top: var(--sk-space-2);
 }
 
 .page-header__title {

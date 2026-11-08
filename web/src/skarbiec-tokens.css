@@ -154,11 +154,18 @@
 }
 
 :root {
-  --sk-space-2: 9.2px;
-  --sk-space-3: 13.8px;
-  --sk-space-4: 18.4px;
-  --sk-space-6: 27.6px;
-  --sk-space-8: 36.8px;
+  --sk-space-1: 4px;
+  --sk-space-2: 8px;
+  --sk-space-3: 12px;
+  --sk-space-4: 16px;
+  --sk-space-5: 20px;
+  --sk-space-6: 24px;
+  --sk-space-7: 28px;
+  --sk-space-8: 32px;
+  --sk-space-9: 36px;
+  --sk-space-10: 40px;
+  --sk-space-11: 44px;
+  --sk-space-12: 48px;
   --sk-radius-md: 4px;
   --sk-radius-lg: 7px;
   --sk-motion-duration: 500ms;

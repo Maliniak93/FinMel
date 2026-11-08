@@ -2,18 +2,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--sk-space-4);
 }
 
 .planning-page__months {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .planning-page__layout {
   display: flex;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .planning-page__layout--active {
@@ -21,7 +21,7 @@
 }
 
 .planning-page__layout mat-icon {
-  margin-inline-end: 4px;
+  margin-inline-end: var(--sk-space-1);
 }
 
 .planning-page__month {
@@ -36,13 +36,13 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 48px 16px;
+  gap: var(--sk-space-4);
+  padding: var(--sk-space-12) var(--sk-space-4);
   text-align: center;
 }
 
 .planning-free-funds__deficit {
-  padding: 2px 8px;
+  padding: 2px var(--sk-space-2);
   border-radius: 4px;
   background: var(--mat-sys-error-container);
   color: var(--mat-sys-on-error-container);
@@ -51,15 +51,15 @@
 .planning-settings__lead-days {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .planning-split__row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 12px;
-  margin-bottom: 8px;
+  gap: var(--sk-space-1) var(--sk-space-3);
+  margin-bottom: var(--sk-space-2);
 }
 
 .planning-split__dot {
@@ -72,7 +72,7 @@
 .planning-split__share {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sk-space-1);
   margin-inline-start: auto;
 
   input {
@@ -88,8 +88,8 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 16px;
-  margin-top: 8px;
+  gap: var(--sk-space-2) var(--sk-space-4);
+  margin-top: var(--sk-space-2);
   padding-block: var(--sk-space-2);
   border-top: 1px solid var(--mat-sys-outline-variant);
   border-bottom: 1px solid var(--mat-sys-outline-variant);
@@ -98,7 +98,7 @@
 .planning-split__sum {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sk-space-1);
   font-weight: 400;
   color: var(--sk-positive);
 
@@ -124,7 +124,7 @@
 .planning-balance__values {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
+  gap: var(--sk-space-6);
   margin: 0;
 
   dt {
@@ -143,7 +143,7 @@
 }
 
 .planning-section__incomplete {
-  margin-inline-start: 8px;
+  margin-inline-start: var(--sk-space-2);
   font-weight: 400;
   color: var(--mat-sys-error);
 }
@@ -158,15 +158,15 @@
   display: grid;
   grid-template-columns: 1fr 2fr auto;
   align-items: center;
-  gap: 12px;
-  padding: 8px 0;
+  gap: var(--sk-space-3);
+  padding: var(--sk-space-2) 0;
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
 .planning-definition__main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .planning-definition__name {
@@ -176,14 +176,14 @@
 .planning-definition__details {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 16px;
+  gap: var(--sk-space-1) var(--sk-space-4);
 }
 
 .planning-definition__change {
   flex-basis: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sk-space-1);
   color: var(--mat-sys-on-surface-variant);
 }
 
@@ -192,22 +192,22 @@
 }
 
 .planning-page__warning {
-  padding: 8px 12px;
+  padding: var(--sk-space-2) var(--sk-space-3);
   border-radius: var(--mat-sys-corner-small);
   background: var(--sk-warning-container);
   color: var(--sk-warning);
 }
 
 .planning-overdue {
-  margin: 16px 0;
-  padding: 12px 16px;
+  margin: var(--sk-space-4) 0;
+  padding: var(--sk-space-3) var(--sk-space-4);
   border: 1px solid var(--sk-negative);
   border-radius: var(--mat-sys-corner-medium);
   background: var(--sk-negative-container);
   color: var(--sk-negative);
 
   h2 {
-    margin: 0 0 8px;
+    margin: 0 0 var(--sk-space-2);
   }
 }
 
@@ -221,8 +221,8 @@
   display: grid;
   grid-template-columns: 8rem 1fr 1fr auto auto;
   align-items: center;
-  gap: 12px;
-  padding: 4px 0;
+  gap: var(--sk-space-3);
+  padding: var(--sk-space-1) 0;
 }
 
 .planning-overdue__amount {
@@ -239,9 +239,9 @@
 .planning-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
+  gap: var(--sk-space-6);
   align-items: start;
-  margin: 16px 0 24px;
+  margin: var(--sk-space-4) 0 var(--sk-space-6);
 }
 
 .planning-layout__main {
@@ -251,16 +251,16 @@
 .planning-layout__aside {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--sk-space-6);
   min-width: 0;
 }
 
 .planning-definitions-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
+  gap: var(--sk-space-6);
   align-items: start;
-  margin-bottom: 24px;
+  margin-bottom: var(--sk-space-6);
 }
 
 .planning-section__incomplete mat-icon {
@@ -277,8 +277,8 @@
 
   .planning-layout__aside {
     position: sticky;
-    top: 16px;
-    padding-inline-start: var(--sk-space-4);
+    top: var(--sk-space-4);
+    padding-inline-start: var(--sk-space-5);
     border-left: 1px solid var(--mat-sys-outline-variant);
   }
 }
@@ -304,7 +304,7 @@
 
   .planning-overdue__row {
     grid-template-columns: 1fr auto;
-    row-gap: 4px;
+    row-gap: var(--sk-space-1);
   }
 
   .planning-overdue__actions {

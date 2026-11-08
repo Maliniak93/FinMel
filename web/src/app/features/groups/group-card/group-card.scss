@@ -22,7 +22,7 @@
 .group-card__allocation {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sk-space-3);
   width: 100%;
   padding-top: var(--sk-space-2);
   border-top: 1px solid var(--mat-sys-outline-variant);
@@ -33,14 +33,14 @@
   flex: 1;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
-  padding: var(--sk-space-4) var(--sk-space-4) var(--sk-space-3);
+  gap: var(--sk-space-3);
+  padding: var(--sk-space-5) var(--sk-space-5) var(--sk-space-3);
 }
 
 .group-card__header {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sk-space-3);
   width: 100%;
 }
 
@@ -56,7 +56,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 8px;
+  gap: var(--sk-space-1) var(--sk-space-2);
   margin: 0;
 }
 
@@ -77,7 +77,7 @@ app-goal-progress {
 .group-card__flag {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sk-space-1);
   margin: 0;
   color: var(--mat-sys-on-surface-variant);
   font: var(--mat-sys-body-medium);
@@ -103,7 +103,7 @@ app-goal-progress {
 
   span + span::before {
     content: '·';
-    margin: 0 6px;
+    margin: 0 var(--sk-space-1);
   }
 }
 
@@ -113,7 +113,7 @@ app-allocation-bar {
 
 .group-card__actions {
   margin-top: auto;
-  padding-top: 4px;
+  padding-top: var(--sk-space-1);
 }
 
 @media (width <= 600px) {

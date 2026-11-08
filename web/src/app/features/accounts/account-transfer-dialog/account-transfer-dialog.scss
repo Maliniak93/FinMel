@@ -1,5 +1,5 @@
 .account-transfer-dialog__name {
-  margin: 0 0 12px;
+  margin: 0 0 var(--sk-space-3);
   font-weight: 400;
 }
 
@@ -10,5 +10,5 @@
 
 .account-transfer-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

@@ -3,15 +3,15 @@
 .metals-page__prices {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 32px;
-  margin: 0 0 16px;
+  gap: var(--sk-space-2) var(--sk-space-8);
+  margin: 0 0 var(--sk-space-4);
 }
 
 .metals-page__price {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 4px 12px;
+  gap: var(--sk-space-1) var(--sk-space-3);
 }
 
 .metals-page__price-date {
@@ -43,7 +43,7 @@
 }
 
 .metals-page__no-data {
-  padding: 16px;
+  padding: var(--sk-space-4);
   opacity: 0.7;
 }
 

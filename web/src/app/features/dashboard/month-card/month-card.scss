@@ -2,14 +2,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 0;
+  gap: var(--sk-space-2);
+  padding: var(--sk-space-4) 0;
   text-align: center;
 }
 
 .month-card__cascade {
   border-top: 1px solid var(--mat-sys-outline-variant);
-  margin-bottom: 12px;
+  margin-bottom: var(--sk-space-3);
 }
 
 .month-card__deficit {
@@ -17,9 +17,9 @@
 }
 
 .month-card__line {
-  padding: 7px 0;
+  padding: var(--sk-space-2) 0;
   border-bottom: 1px solid var(--mat-sys-outline-variant);
-  margin: 0 0 4px;
+  margin: 0 0 var(--sk-space-1);
   font-size: var(--sk-text-base);
   color: var(--mat-sys-on-surface-variant);
 }

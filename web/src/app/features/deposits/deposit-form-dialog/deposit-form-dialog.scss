@@ -5,7 +5,7 @@
 
 .deposit-form-dialog__row {
   display: flex;
-  gap: 12px;
+  gap: var(--sk-space-3);
 
   .deposit-form-dialog__field {
     flex: 1;
@@ -14,10 +14,10 @@
 
 .deposit-form-dialog__maturity,
 .deposit-form-dialog__funding {
-  margin: -8px 0 16px;
+  margin: -8px 0 var(--sk-space-4);
 }
 
 .deposit-form-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

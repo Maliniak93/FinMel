@@ -1,24 +1,24 @@
 .settings-page__section {
-  margin-top: 16px;
+  margin-top: var(--sk-space-4);
 }
 
 .settings-page__sync-row {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 16px;
+  gap: var(--sk-space-4);
 }
 
 .settings-page__runs {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .settings-page__run {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sk-space-2);
   flex-wrap: wrap;
 }
 
@@ -33,6 +33,6 @@
 }
 
 .settings-page__error {
-  margin-top: 8px;
+  margin-top: var(--sk-space-2);
   color: var(--mat-sys-error, #b3261e);
 }

@@ -2,8 +2,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  margin-block: 16px;
+  gap: var(--sk-space-2);
+  margin-block: var(--sk-space-4);
 }
 
 .planning-year__label {
@@ -15,7 +15,7 @@
 .planning-year__state {
   display: flex;
   justify-content: center;
-  padding: 24px;
+  padding: var(--sk-space-6);
 }
 
 .planning-year__table {
@@ -24,7 +24,7 @@
 
   th,
   td {
-    padding: 8px;
+    padding: var(--sk-space-2);
     text-align: start;
     border-bottom: 1px solid var(--mat-sys-outline-variant);
   }
@@ -62,14 +62,14 @@
 }
 
 .planning-year__incomplete {
-  margin-inline-start: 8px;
+  margin-inline-start: var(--sk-space-2);
   font-size: var(--sk-text-xs);
   font-weight: 400;
   text-transform: none;
 }
 
 .planning-year__deficit {
-  margin-inline-start: 4px;
+  margin-inline-start: var(--sk-space-1);
   font-size: var(--sk-text-xs);
   color: var(--sk-negative);
 }
@@ -88,14 +88,14 @@
 .planning-year__detail {
   dl {
     display: grid;
-    gap: 4px;
+    gap: var(--sk-space-1);
     margin: 0;
   }
 
   dl > div {
     display: flex;
     justify-content: space-between;
-    gap: 16px;
+    gap: var(--sk-space-4);
   }
 
   dd {
@@ -105,7 +105,7 @@
 
 app-planning-year-chart {
   display: block;
-  margin-block-end: 24px;
+  margin-block-end: var(--sk-space-6);
 }
 
 .planning-year__month {

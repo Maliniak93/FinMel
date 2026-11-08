@@ -35,7 +35,7 @@ npm run watch        # ng build --watch, development configuration
 ```bash
 npm test             # ng test — Vitest
 npm run lint          # ng lint — ESLint (angular-eslint)
-npm run lint:styles   # stylelint — every font-size must be a --sk-text-* token
+npm run lint:styles   # stylelint — font-size on --sk-text-*, spacing on --sk-space-*
 npm run format        # prettier --write .
 npm run format:check  # prettier --check .
 ```
@@ -55,6 +55,12 @@ Every `font-size` in `src/**/*.scss` is `var(--sk-text-*)` (or `inherit`/`initia
 | `--sk-text-3xl`  | 40 px                                         |
 
 Mapping rule for a new size: resolve `rem`/`em` to px in context, take the nearest token, a tie goes to the larger one; a role may pick the neighbour. An icon with a fixed box takes the token that fits the box.
+
+### Spacing grid
+
+Every `margin*`, `padding*`, `gap`, `top`/`right`/`bottom`/`left` and `inset*` in `src/**/*.scss` is `var(--sk-space-n)` on a 4 px grid: `--sk-space-1 … --sk-space-12` are n × 4 px (4 … 48 px). Allowed besides the tokens: `0`, `auto`, `inherit`, percentages, 1px/2px, a negative literal on `margin`, and a `calc()` of those; `npm run lint:styles` fails on any other literal.
+
+Mapping rule for a new value: resolve `rem` to px, take the nearest 4 px step; a tie (6 px, 10 px) goes to the smaller step for padding and gap and to the larger one for touch targets (buttons, tappable rows).
 
 ## Languages
 

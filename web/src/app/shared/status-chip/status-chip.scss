@@ -1,8 +1,8 @@
 .status-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 10px 2px 6px;
+  gap: var(--sk-space-1);
+  padding: 2px var(--sk-space-2) 2px var(--sk-space-1);
   border: 1px solid transparent;
   border-radius: 999px;
   font: var(--mat-sys-label-medium);

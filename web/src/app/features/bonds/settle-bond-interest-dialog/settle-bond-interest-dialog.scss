@@ -1,24 +1,24 @@
 .settle-bond-interest-dialog__name {
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
   font-weight: 400;
 }
 
 .settle-bond-interest-dialog__loading {
   display: flex;
   justify-content: center;
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
 }
 
 .settle-bond-interest-dialog__periods {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sk-space-1);
 }
 
 .settle-bond-interest-dialog__period {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sk-space-3);
 }
 
 .settle-bond-interest-dialog__period-label {
@@ -31,22 +31,22 @@
 
 .settle-bond-interest-dialog__hint {
   opacity: 0.7;
-  margin: 0 0 12px;
+  margin: 0 0 var(--sk-space-3);
 }
 
 .settle-bond-interest-dialog__preview {
   width: 100%;
   border-collapse: collapse;
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
 
   th,
   td {
-    padding: 4px 8px;
+    padding: var(--sk-space-1) var(--sk-space-2);
     text-align: right;
   }
 }
 
 .settle-bond-interest-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

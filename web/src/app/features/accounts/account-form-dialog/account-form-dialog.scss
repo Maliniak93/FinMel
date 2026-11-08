@@ -4,11 +4,11 @@
 }
 
 .account-form-dialog__hint {
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
   color: var(--mat-sys-on-surface-variant);
 }
 
 .account-form-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

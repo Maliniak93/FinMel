@@ -6,7 +6,7 @@
 }
 
 .deposits-page__no-data {
-  padding: 16px;
+  padding: var(--sk-space-4);
   opacity: 0.7;
 }
 
@@ -16,7 +16,7 @@
 }
 
 .deposits-page__payout {
-  margin-top: 4px;
+  margin-top: var(--sk-space-1);
   font-size: var(--sk-text-xs);
   opacity: 0.7;
 }

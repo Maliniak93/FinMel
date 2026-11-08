@@ -1,13 +1,13 @@
 .redeem-bond-dialog__name {
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
   font-weight: 400;
 }
 
 .redeem-bond-dialog__summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px 24px;
-  margin: 0 0 16px;
+  gap: var(--sk-space-3) var(--sk-space-6);
+  margin: 0 0 var(--sk-space-4);
 
   dt {
     opacity: 0.7;
@@ -21,20 +21,20 @@
 
 .redeem-bond-dialog__hint {
   opacity: 0.7;
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }
 
 .redeem-bond-dialog__loading {
   display: flex;
   justify-content: center;
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
 }
 
 .redeem-bond-dialog__settle-first {
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }
 
 .redeem-bond-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

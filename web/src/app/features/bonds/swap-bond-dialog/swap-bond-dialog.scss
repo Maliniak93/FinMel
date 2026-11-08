@@ -1,10 +1,10 @@
 .swap-bond-dialog__name {
-  margin: 0 0 4px;
+  margin: 0 0 var(--sk-space-1);
   font-weight: 400;
 }
 
 .swap-bond-dialog__hint {
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
   opacity: 0.7;
 }
 
@@ -15,7 +15,7 @@
 
 .swap-bond-dialog__row {
   display: flex;
-  gap: 12px;
+  gap: var(--sk-space-3);
 
   .swap-bond-dialog__field {
     flex: 1;
@@ -24,8 +24,8 @@
 
 .swap-bond-dialog__summary {
   display: flex;
-  gap: 24px;
-  margin: 0 0 16px;
+  gap: var(--sk-space-6);
+  margin: 0 0 var(--sk-space-4);
 
   dt {
     opacity: 0.7;
@@ -40,10 +40,10 @@
 .swap-bond-dialog__loading {
   display: flex;
   justify-content: center;
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
 }
 
 .swap-bond-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

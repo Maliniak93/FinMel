@@ -20,11 +20,11 @@ describe('Grupy stylesheets', () => {
   const card = readStylesheet('src/app/features/groups/group-card/group-card.scss');
   const dialog = readStylesheet('src/app/features/groups/group-form-dialog/group-form-dialog.scss');
 
-  it('lays the cards in two columns from 720 px with the sk-space-6 gap', () => {
+  it('lays the cards in two columns from 720 px with the sk-space-7 gap', () => {
     expect(groups).toMatch(
       /@media\s*\((width\s*>=\s*720px|min-width:\s*720px)\)\s*\{\s*\.groups-page__list\s*\{[^}]*repeat\(2,/,
     );
-    expect(groups).toMatch(/\.groups-page__list\s*\{[^}]*gap:\s*var\(--sk-space-6\)/);
+    expect(groups).toMatch(/\.groups-page__list\s*\{[^}]*gap:\s*var\(--sk-space-7\)/);
   });
 
   it('draws the group card edge as a 3 px top border', () => {
@@ -35,7 +35,7 @@ describe('Grupy stylesheets', () => {
   it('rules the allocation block and pads the card from the prototype', () => {
     expect(card).toMatch(/border-top:\s*1px solid var\(--mat-sys-outline-variant\)/);
     expect(card).toMatch(/padding-top:\s*var\(--sk-space-2\)/);
-    expect(card).toMatch(/padding:\s*var\(--sk-space-4\) var\(--sk-space-4\) var\(--sk-space-3\)/);
+    expect(card).toMatch(/padding:\s*var\(--sk-space-5\) var\(--sk-space-5\) var\(--sk-space-3\)/);
   });
 
   it('draws the ungrouped row dashed with md corners', () => {
