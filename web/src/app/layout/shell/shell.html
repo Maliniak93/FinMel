@@ -93,7 +93,9 @@
     }
 
     <main class="shell__content">
-      <router-outlet />
+      <div class="shell__page" [attr.data-content-width]="contentWidth()">
+        <router-outlet />
+      </div>
     </main>
 
     @if (layout() === 'bottom') {

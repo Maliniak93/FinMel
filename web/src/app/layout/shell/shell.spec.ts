@@ -1,6 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { provideRouter, Router } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+
+import { routes } from '../../app.routes';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import {
@@ -334,6 +337,86 @@ describe.each(LAYOUTS)('Shell actions (%s layout)', (layout) => {
       );
       expect(names).toContain('Majątek');
       expect(names).toContain('Ustawienia');
+    }
+  });
+});
+
+describe('Shell page width', () => {
+  const NARROW_WIDTH = 1000;
+  const WIDE_SCREEN = 1900;
+
+  async function mountRouted(width: number): Promise<RouterTestingHarness> {
+    viewport = stubViewport(width);
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      jsonResponse({ detail: 'Not found.' }, 404),
+    );
+    await TestBed.configureTestingModule({
+      providers: [
+        provideRouter(routes),
+        provideI18nTesting(),
+        { provide: AuthService, useValue: { isAuthenticated: () => true } },
+        { provide: MATERIAL_ANIMATIONS, useValue: { animationsDisabled: true } },
+      ],
+    }).compileComponents();
+
+    return RouterTestingHarness.create();
+  }
+
+  async function pageAt(harness: RouterTestingHarness, url: string): Promise<HTMLElement> {
+    await harness.navigateByUrl(url, Shell);
+    await settle(harness.fixture);
+    const page = (harness.fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      'main.shell__content > .shell__page',
+    );
+    expect(page, url).not.toBeNull();
+
+    return page!;
+  }
+
+  it('caps the page at 1200px and centres it on default routes', async () => {
+    const harness = await mountRouted(WIDE_SCREEN);
+
+    for (const url of ['/dashboard', '/groups', '/settings']) {
+      const page = await pageAt(harness, url);
+      expect(page.getAttribute('data-content-width'), url).not.toBe('wide');
+    }
+  });
+
+  it('widens the page to 1440px on wealth and planning routes', async () => {
+    const harness = await mountRouted(WIDE_SCREEN);
+
+    for (const url of [
+      '/wealth/deposits',
+      '/wealth/assets/1/transactions',
+      '/wealth/accounts/1',
+      '/planning',
+    ]) {
+      const page = await pageAt(harness, url);
+      expect(page.getAttribute('data-content-width'), url).toBe('wide');
+    }
+  });
+
+  it('follows the active route when navigating between widths', async () => {
+    const harness = await mountRouted(WIDE_SCREEN);
+
+    expect((await pageAt(harness, '/wealth/deposits')).getAttribute('data-content-width')).toBe(
+      'wide',
+    );
+    expect((await pageAt(harness, '/dashboard')).getAttribute('data-content-width')).not.toBe(
+      'wide',
+    );
+    expect((await pageAt(harness, '/wealth/cash')).getAttribute('data-content-width')).toBe('wide');
+  });
+
+  it('does not narrow the page below 1200px', async () => {
+    const harness = await mountRouted(NARROW_WIDTH);
+
+    for (const url of ['/dashboard', '/wealth/deposits']) {
+      const page = await pageAt(harness, url);
+      expect(page.style.maxWidth, url).toBe('');
+      expect(page.style.marginInline, url).toBe('');
+      expect(page.style.width, url).toBe('');
     }
   });
 });
