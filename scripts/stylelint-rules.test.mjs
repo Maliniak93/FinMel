@@ -27,3 +27,9 @@ test("rejects off-grid spacing and allows exceptions", async () => {
   assert.equal((await lint("a { margin: -8px; }")).length, 0);
   assert.equal((await lint("a { padding: var(--sk-space-2); }")).length, 0);
 });
+
+test("rejects width literals in media and container queries", async () => {
+  assert.equal((await lint("@media (min-width: 720px) { a { color: red; } }")).length, 1);
+  assert.equal((await lint("@container (width < 700px) { a { color: red; } }")).length, 1);
+  assert.equal((await lint("a { @include sk-from(600) { color: red; } }")).length, 0);
+});

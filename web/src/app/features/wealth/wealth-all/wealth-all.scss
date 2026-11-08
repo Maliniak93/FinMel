@@ -1,3 +1,5 @@
+@use 'breakpoints' as *;
+
 :host {
   display: block;
 }
@@ -203,7 +205,7 @@
   }
 }
 
-@media (width < 720px) {
+@include sk-below($sk-bp-sm) {
   .wealth-all__table,
   .wealth-all__table thead,
   .wealth-all__table tbody {

@@ -5,6 +5,8 @@ import { Router, provideRouter, withComponentInputBinding } from '@angular/route
 import { RouterTestingHarness } from '@angular/router/testing';
 import { of } from 'rxjs';
 
+import { stubViewport } from '../../../testing/match-media';
+import { readStylesheet } from '../../../testing/stylesheet';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../shared/format';
@@ -943,6 +945,27 @@ describe('Planning', () => {
     expect(element().querySelector('.planning-page__strip')).toBeNull();
     expect(strip[0].textContent).toContain(formatMoney(4321.5, 'PLN'));
     expect(strip[0].textContent).toContain(formatMoney(1234.5, 'PLN'));
+  });
+
+  it('switches layout at the breakpoints', async () => {
+    const viewport = stubViewport(599);
+    try {
+      await setup('/planning?month=2026-10');
+      expect(rows('summary-strip')).toHaveLength(1);
+      harness.fixture.destroy();
+      fetchSpy.mockRestore();
+      TestBed.resetTestingModule();
+
+      viewport.setWidth(600);
+      await setup('/planning?month=2026-10');
+      expect(rows('summary-strip')).toHaveLength(0);
+    } finally {
+      viewport.restore();
+    }
+
+    const scss = readStylesheet('src/app/features/planning/planning.scss');
+    expect(scss).toMatch(/@include\s+sk-from\(\s*\$sk-bp-lg/);
+    expect(scss).not.toMatch(/@media[^{]*\d+(\.\d+)?px/);
   });
 
   function oneOffIncome(

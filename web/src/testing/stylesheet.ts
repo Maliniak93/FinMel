@@ -31,8 +31,24 @@ export function rowLineSkipsLast(css: string, row: string): boolean {
   return (hasLine(betweenRows) && !hasLine(everyRow)) || (hasLine(everyRow) && resetsLine(lastRow));
 }
 
+const BREAKPOINT_NAMES: Record<string, string> = { '600': 'sm', '960': 'md', '1280': 'lg' };
+
+function mixinCall(condition: string): RegExp | null {
+  const parsed = /^\(width\s*(<|>=)\s*(\d+)px\)$/.exec(condition);
+  const name = parsed ? BREAKPOINT_NAMES[parsed[2]] : undefined;
+  if (!parsed || !name) {
+    return null;
+  }
+  const mixin = parsed[1] === '<' ? 'sk-below' : 'sk-from';
+  return new RegExp(
+    `@include\\s+${mixin}\\(\\s*(?:\\$sk-bp-${name}|${parsed[2]}(?:px)?|${name})\\s*\\)`,
+  );
+}
+
 export function mediaBlock(css: string, condition: string): string {
-  const start = css.indexOf(`@media ${condition}`);
+  const call = mixinCall(condition);
+  const found = call ? call.exec(css) : null;
+  const start = found ? found.index : css.indexOf(`@media ${condition}`);
   if (start === -1) {
     throw new Error(`no @media ${condition} block`);
   }

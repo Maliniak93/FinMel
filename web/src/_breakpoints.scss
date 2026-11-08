@@ -1,0 +1,27 @@
+$sk-bp-sm: 600px;
+$sk-bp-md: 960px;
+$sk-bp-lg: 1280px;
+
+@mixin sk-from($bp, $container: false) {
+  @if $container {
+    @container (width >= #{$bp}) {
+      @content;
+    }
+  } @else {
+    @media (width >= #{$bp}) {
+      @content;
+    }
+  }
+}
+
+@mixin sk-below($bp, $container: false) {
+  @if $container {
+    @container (width < #{$bp}) {
+      @content;
+    }
+  } @else {
+    @media (width < #{$bp}) {
+      @content;
+    }
+  }
+}

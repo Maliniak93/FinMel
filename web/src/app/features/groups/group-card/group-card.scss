@@ -1,3 +1,5 @@
+@use 'breakpoints' as *;
+
 :host {
   display: block;
 }
@@ -116,7 +118,7 @@ app-allocation-bar {
   padding-top: var(--sk-space-1);
 }
 
-@media (width <= 600px) {
+@include sk-below($sk-bp-sm) {
   .group-card__menu,
   .group-card__actions button {
     min-width: 44px;

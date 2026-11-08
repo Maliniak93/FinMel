@@ -15,6 +15,7 @@ import {
   type PlanningYearTotalsResponse,
 } from '../../../api/portfolio';
 import { readProblemDetails } from '../../../core/auth/problem-details';
+import { PHONE_QUERY } from '../../../shared/breakpoints';
 import { fromDateOnly } from '../../../shared/date-only';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatMoney, formatMonth } from '../../../shared/format';
@@ -23,8 +24,6 @@ import { currentWarsawMonth } from '../recurrence';
 import { PlanningYearChart } from './planning-year-chart';
 
 const YEAR_PATTERN = /^\d{4}$/;
-
-const PHONE_QUERY = '(max-width: 719.98px)';
 
 type ValueColumn = keyof PlanningYearTotalsResponse;
 

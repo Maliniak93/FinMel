@@ -1,3 +1,5 @@
+@use 'breakpoints' as *;
+
 :host {
   display: block;
   margin-bottom: var(--sk-space-5);
@@ -51,7 +53,7 @@
   font: var(--mat-sys-label-medium);
 }
 
-@media (width < 720px) {
+@include sk-below($sk-bp-sm) {
   .summary-strip__item {
     padding-left: var(--sk-space-2);
   }

@@ -23,7 +23,7 @@ import { Shell } from './shell';
 
 type LayoutName = 'full' | 'rail' | 'bottom';
 
-const WIDTHS: Record<LayoutName, number> = { full: 1280, rail: 1000, bottom: 600 };
+const WIDTHS: Record<LayoutName, number> = { full: 1280, rail: 1000, bottom: 599 };
 const LAYOUTS: LayoutName[] = ['full', 'rail', 'bottom'];
 
 function todoItem(name: string): Record<string, unknown> {

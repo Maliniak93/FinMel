@@ -2,10 +2,12 @@ import { BreakpointObserver } from '@angular/cdk/layout';
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 
+import { BREAKPOINTS, fromQuery } from '../../shared/breakpoints';
+
 export type ShellLayoutName = 'full' | 'rail' | 'bottom';
 
-const FULL_QUERY = '(min-width: 1200px)';
-const RAIL_QUERY = '(min-width: 720px)';
+const FULL_QUERY = fromQuery(BREAKPOINTS.lg);
+const RAIL_QUERY = fromQuery(BREAKPOINTS.sm);
 
 @Injectable({ providedIn: 'root' })
 export class ShellLayout {

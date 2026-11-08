@@ -22,16 +22,16 @@ describe('ShellLayout', () => {
   }
 
   it('picks the layout from the width at the breakpoints', () => {
-    expect(layoutAt(1200).layout()).toBe('full');
+    expect(layoutAt(1280).layout()).toBe('full');
     viewport.restore();
     TestBed.resetTestingModule();
-    expect(layoutAt(1199).layout()).toBe('rail');
+    expect(layoutAt(1279).layout()).toBe('rail');
     viewport.restore();
     TestBed.resetTestingModule();
-    expect(layoutAt(720).layout()).toBe('rail');
+    expect(layoutAt(600).layout()).toBe('rail');
     viewport.restore();
     TestBed.resetTestingModule();
-    expect(layoutAt(719).layout()).toBe('bottom');
+    expect(layoutAt(599).layout()).toBe('bottom');
   });
 
   it('follows the breakpoints when the width changes without a reload', async () => {

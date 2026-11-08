@@ -31,7 +31,10 @@
                 "input": "public"
               }
             ],
-            "styles": ["src/styles.scss", "src/skarbiec-tokens.css"]
+            "styles": ["src/styles.scss", "src/skarbiec-tokens.css"],
+            "stylePreprocessorOptions": {
+              "includePaths": ["src"]
+            }
           },
           "configurations": {
             "production": {

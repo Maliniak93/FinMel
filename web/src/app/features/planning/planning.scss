@@ -1,3 +1,5 @@
+@use 'breakpoints' as *;
+
 .planning-page__header {
   display: flex;
   align-items: center;
@@ -270,7 +272,7 @@
   font-size: var(--sk-text-lg);
 }
 
-@media (min-width: 1200px) {
+@include sk-from($sk-bp-lg) {
   .planning-layout {
     grid-template-columns: minmax(0, 1fr) 24rem;
   }
@@ -283,7 +285,7 @@
   }
 }
 
-@media (max-width: 719.98px) {
+@include sk-below($sk-bp-sm) {
   .planning-page__add-label {
     display: none;
   }
