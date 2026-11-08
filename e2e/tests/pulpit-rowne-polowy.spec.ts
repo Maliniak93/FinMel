@@ -423,6 +423,7 @@ test('pulpit: three rows split evenly with two separator lines', async ({
     for (const range of ['1M', '1Y', 'MAX']) {
       await rangeToggle(page, range).click();
       await expect(rangeToggle(page, range)).toBeChecked();
+      await expect(page.locator('.net-worth-chart__layer')).toHaveCount(1);
       await expect(page.locator('.net-worth-chart__svg')).toBeVisible();
       await expect(async () => {
         const history = await box(page.locator('.dashboard-page__history'));
@@ -434,6 +435,7 @@ test('pulpit: three rows split evenly with two separator lines', async ({
     }
     await rangeToggle(page, '1Y').click();
     await expect(rangeToggle(page, '1Y')).toBeChecked();
+    await expect(page.locator('.net-worth-chart__layer')).toHaveCount(1);
   });
 
   await test.step('Krok 12: the tooltip follows the cursor, also after a resize', async () => {

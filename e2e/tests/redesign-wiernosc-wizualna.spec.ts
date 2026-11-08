@@ -423,7 +423,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
       async () => {
         await expect(netWorth).toBeVisible({ timeout: 2_000 });
         await expect(page.getByTestId('group-row').first()).toBeVisible({ timeout: 2_000 });
-        await expect(page.locator('.dashboard-page__structure-row').first()).toBeVisible({
+        await expect(page.locator('.dashboard-page__structure-row').first()).toBeAttached({
           timeout: 2_000,
         });
         await expect(page.locator('.cash-card__total')).toBeVisible({ timeout: 2_000 });
@@ -738,6 +738,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
       await expectPx(link.locator('.shell__nav-label'), 'font-size', 12);
     }
 
+    await page.getByRole('button', { name: 'Pokaż szczegóły' }).click();
     await expectRules(page, PULPIT_RULES);
     const stacked = [
       page.locator('.dashboard-page__todo'),
