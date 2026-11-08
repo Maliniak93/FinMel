@@ -55,6 +55,7 @@ import {
   PlanningState,
   isOverdueOneOff,
 } from '../../core/planning/planning-state';
+import { PHONE_QUERY } from '../../shared/breakpoints';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { fromDateOnly } from '../../shared/date-only';
@@ -103,8 +104,6 @@ import {
 } from './settle-occurrence-dialog/settle-occurrence-dialog';
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
-
-const PHONE_QUERY = '(max-width: 719.98px)';
 
 function toGrosze(amount: number | string): number {
   return Math.round(Number(amount) * 100);

@@ -55,6 +55,9 @@ function dashboardStylesheet(): string {
   return readFileSync(resolve(process.cwd(), 'src/app/features/dashboard/dashboard.scss'), 'utf8');
 }
 
+const HERO_CONTAINER_MIXIN = /@include\s+sk-from\(\s*\$sk-bp-sm\s*,\s*\$container:\s*true\s*\)/;
+const COMPILED_HERO_CONTAINER = /@container\s*\((?:width\s*>=\s*600px|min-width:\s*600px)\)/;
+
 describe('Dashboard', () => {
   let fixture: ComponentFixture<Dashboard>;
   let component: Dashboard;
@@ -384,7 +387,7 @@ describe('Dashboard', () => {
       [...document.querySelectorAll('style')]
         .map((style) => style.textContent ?? '')
         .find((text) => text.includes('.dashboard-page__hero')) ?? '';
-    const split = css.indexOf('@container (min-width: 720px)');
+    const split = css.search(COMPILED_HERO_CONTAINER);
     expect(split).toBeGreaterThan(-1);
     expect(css.slice(0, split)).toMatch(/\.dashboard-page__hero[^{]*\{[^}]*border-bottom:/);
     expect(css.slice(0, split)).not.toMatch(/\d+fr\s+\d+fr/);
@@ -1015,6 +1018,14 @@ describe('Dashboard', () => {
 });
 
 describe('dashboard stylesheet', () => {
+  it('hero switches on the container breakpoint', () => {
+    const scss = dashboardStylesheet();
+
+    expect(scss).toMatch(HERO_CONTAINER_MIXIN);
+    expect(scss).not.toMatch(/@container[^{]*\d+px/);
+    expect(ruleBodies(scss, '.dashboard-page')).toMatch(/container-type:\s*inline-size/);
+  });
+
   it('rules rows 1 and 2 only', () => {
     const scss = dashboardStylesheet();
     const separator = (body: string) =>
@@ -1066,7 +1077,7 @@ describe('dashboard stylesheet', () => {
 
   it('splits every row 50 50 on a wide container', () => {
     const scss = dashboardStylesheet();
-    const split = scss.indexOf('@container (min-width: 720px)');
+    const split = scss.search(HERO_CONTAINER_MIXIN);
     const base = scss.slice(0, split);
     const wide = scss.slice(split);
     const equalHalves = /repeat\(2,\s*minmax\(0,\s*1fr\)\)|minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\)/;
@@ -1089,7 +1100,7 @@ describe('dashboard stylesheet', () => {
 
   it('stretches the halves to equal height', () => {
     const scss = dashboardStylesheet();
-    const split = scss.indexOf('@container (min-width: 720px)');
+    const split = scss.search(HERO_CONTAINER_MIXIN);
     const wide = scss.slice(split);
 
     expect(ruleBodies(scss, '.dashboard-page__history')).not.toMatch(/align-self:\s*start/);

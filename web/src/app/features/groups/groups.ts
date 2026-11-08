@@ -17,6 +17,7 @@ import {
 } from '../../api/portfolio';
 import { getApiReportingDashboard } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
+import { BREAKPOINTS, fromQuery } from '../../shared/breakpoints';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { PageHeader } from '../../shared/page-header/page-header';
@@ -31,7 +32,7 @@ import { GroupFormDialog, type GroupFormDialogData } from './group-form-dialog/g
 import { buildGroupMetrics, buildGroupsSummary } from './group-metrics';
 
 const MAX_GROUPS = 12;
-const SIDE_PANEL_QUERY = '(min-width: 960px)';
+const SIDE_PANEL_QUERY = fromQuery(BREAKPOINTS.md);
 
 // MatDialogModule/MatSnackBarModule stay out of imports: they would shadow the TestBed provider override.
 @Component({

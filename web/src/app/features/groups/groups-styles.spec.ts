@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { readStylesheet } from '../../../testing/stylesheet';
+import { mediaBlock, readStylesheet } from '../../../testing/stylesheet';
 
 const GROUPS_DIR = join(process.cwd(), 'src/app/features/groups');
 
@@ -20,11 +20,20 @@ describe('Grupy stylesheets', () => {
   const card = readStylesheet('src/app/features/groups/group-card/group-card.scss');
   const dialog = readStylesheet('src/app/features/groups/group-form-dialog/group-form-dialog.scss');
 
-  it('lays the cards in two columns from 720 px with the sk-space-7 gap', () => {
-    expect(groups).toMatch(
-      /@media\s*\((width\s*>=\s*720px|min-width:\s*720px)\)\s*\{\s*\.groups-page__list\s*\{[^}]*repeat\(2,/,
-    );
+  it('uses the breakpoint mixins', () => {
+    for (const css of [groups, card]) {
+      expect(css).not.toMatch(/@(media|container)[^{]*\d+(\.\d+)?px/);
+    }
     expect(groups).toMatch(/\.groups-page__list\s*\{[^}]*gap:\s*var\(--sk-space-7\)/);
+
+    const twoColumns = mediaBlock(groups, '(width >= 600px)');
+    expect(twoColumns).toMatch(/\.groups-page__list\s*\{[^}]*grid-template-columns:\s*repeat\(2,/);
+
+    const phoneGroups = mediaBlock(groups, '(width < 600px)');
+    expect(phoneGroups).toMatch(/\.groups-page__ungrouped-assets\s*\{[^}]*min-height:\s*44px/);
+    const phoneCard = mediaBlock(card, '(width < 600px)');
+    expect(phoneCard).toMatch(/\.group-card__menu[^{]*\{[^}]*min-height:\s*44px/);
+    expect(phoneCard).toMatch(/\.group-card__menu[^{]*\{[^}]*min-width:\s*44px/);
   });
 
   it('draws the group card edge as a 3 px top border', () => {

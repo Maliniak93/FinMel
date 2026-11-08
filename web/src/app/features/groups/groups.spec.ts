@@ -696,7 +696,7 @@ describe('Groups', () => {
   });
 
   it('panel mode follows the breakpoint', async () => {
-    setViewport(800);
+    setViewport(959);
     await setup();
     await selectGroup('Emerytura');
     expect(panelOpen()).toBe(true);
@@ -707,7 +707,7 @@ describe('Groups', () => {
     fetchSpy.mockRestore();
 
     TestBed.resetTestingModule();
-    setViewport(1280);
+    setViewport(960);
     await setup();
     await selectGroup('Emerytura');
     expect(panel().classList.contains('mat-drawer-side')).toBe(true);

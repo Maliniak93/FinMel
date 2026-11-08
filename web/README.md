@@ -62,6 +62,20 @@ Every `margin*`, `padding*`, `gap`, `top`/`right`/`bottom`/`left` and `inset*` i
 
 Mapping rule for a new value: resolve `rem` to px, take the nearest 4 px step; a tie (6 px, 10 px) goes to the smaller step for padding and gap and to the larger one for touch targets (buttons, tappable rows).
 
+### Breakpoints
+
+The app has three breakpoints, 600 (`sm`), 960 (`md`) and 1280 (`lg`) px, defined once for SCSS in `src/_breakpoints.scss` (`$sk-bp-sm|md|lg`) and once for TypeScript in `src/app/shared/breakpoints.ts` (`BREAKPOINTS`); a spec keeps the two equal. Component styles reach the partial through `stylePreprocessorOptions.includePaths`:
+
+```scss
+@use 'breakpoints' as *;
+
+@include sk-from($sk-bp-lg) { … }                        // @media (width >= 1280px)
+@include sk-below($sk-bp-sm) { … }                       // @media (width < 600px)
+@include sk-from($sk-bp-sm, $container: true) { … }      // @container (width >= 600px)
+```
+
+In TypeScript use `fromQuery(BREAKPOINTS.md)` and `belowQuery(BREAKPOINTS.sm)` (`PHONE_QUERY` is the latter for `sm`) with `BreakpointObserver`. The shell is a bottom nav below 600, a rail from 600 and the full sidenav from 1280. `npm run lint:styles` fails on a width literal in any `@media` or `@container` outside the partial.
+
 ## Languages
 
 The UI runs on [Transloco](https://jsverse.gitbook.io/transloco) (`@jsverse/transloco`): English by

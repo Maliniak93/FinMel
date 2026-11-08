@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
+import { stubViewport } from '../../../../testing/match-media';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { formatMoney } from '../../../shared/format';
@@ -294,6 +295,27 @@ describe('PlanningYear', () => {
     expect(element().querySelector('app-planning-year-chart')).toBeNull();
     expect(element().querySelector('table')).toBeNull();
   });
+
+  it('phone layout below 600', async () => {
+    const viewport = stubViewport(599);
+    try {
+      await setup();
+      expect(headerTexts()).not.toContain('Income plan');
+      harness.fixture.destroy();
+      fetchSpy.mockRestore();
+      TestBed.resetTestingModule();
+
+      viewport.setWidth(600);
+      await setup();
+      expect(headerTexts()).toContain('Income plan');
+    } finally {
+      viewport.restore();
+    }
+  });
+
+  function headerTexts(): (string | undefined)[] {
+    return Array.from(element().querySelectorAll('thead th'), (th) => th.textContent?.trim());
+  }
 
   it('narrows the table on a phone and expands a row', async () => {
     phoneViewport();

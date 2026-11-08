@@ -1,3 +1,5 @@
+@use 'breakpoints' as *;
+
 :host {
   display: block;
 }
@@ -115,7 +117,7 @@
   border: 2px dashed var(--sk-negative);
 }
 
-@media (max-width: 719.98px) {
+@include sk-below($sk-bp-sm) {
   .year-chart__slot {
     height: 120px;
   }
