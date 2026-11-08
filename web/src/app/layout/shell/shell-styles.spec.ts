@@ -75,4 +75,16 @@ describe('Shell styles', () => {
     expect(shell).toMatch(/font-size:\s*var\(--sk-text-xl\)/);
     expect(shell).toMatch(/(^|[\s{;])height:\s*16px/m);
   });
+
+  it('puts the width limit on the page wrapper, not on the scrolling main', () => {
+    const page = rulesFor(shell, /\.shell__page\s*$/);
+    expect(page).toMatch(/max-width:\s*1200px/);
+    expect(page).toMatch(/margin-inline:\s*auto/);
+    expect(shell).toMatch(
+      /\.shell__page\[data-content-width=['"]?wide['"]?\][^{]*\{[^}]*max-width:\s*1440px/,
+    );
+    const content = rulesFor(shell, /\.shell__content\s*$/);
+    expect(content).toMatch(/overflow-y:\s*auto/);
+    expect(content).not.toMatch(/max-width/);
+  });
 });
