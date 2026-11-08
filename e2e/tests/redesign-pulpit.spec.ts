@@ -463,8 +463,11 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
     const ungrouped = groupRow(page, 'Bez grupy');
     await expect(ungrouped).toContainText(/majątku/);
     await expect(ungrouped.getByRole('progressbar')).toHaveCount(0);
-    const rows = page.getByTestId('group-row');
-    await expect(rows.last()).toContainText('Bez grupy');
+    await expect(page.locator('.dashboard-page__group-name')).toHaveText([
+      'Bez grupy',
+      CUSHION,
+      PENSION,
+    ]);
   });
 
   await test.step('Krok 17: a group whose class shares drift from the allocation shows the class, held share and target', async () => {

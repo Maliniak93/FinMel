@@ -655,8 +655,8 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
       0,
     );
     await page.getByTestId('year-expand').first().click();
-    await expect(page.getByTestId('year-detail')).toContainText('Wpływy plan');
-    await expect(page.getByTestId('year-detail')).toContainText('Wolne środki plan');
+    await expect(page.getByTestId('year-detail').first()).toContainText('Wpływy plan');
+    await expect(page.getByTestId('year-detail').first()).toContainText('Wolne środki plan');
   });
 
   await test.step('Krok 19: at 1000 px the right column falls under the list unpinned and a dialog on a phone fills the width', async () => {

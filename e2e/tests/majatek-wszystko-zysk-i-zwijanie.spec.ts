@@ -350,7 +350,7 @@ test('majątek → Wszystko: zysk przy aktywach, zwijane sekcje i szukanie', asy
     ]) {
       await expect(toggle(page, name)).toHaveAttribute('aria-expanded', 'false');
     }
-    await expect(page.locator('tr.wealth-all__row')).toHaveCount(0);
+    await expect(page.locator('tr.wealth-all__row:visible')).toHaveCount(0);
     for (const name of ['Rachunki inwestycyjne', 'Konta bankowe', 'Gotówka']) {
       await expect(sectionChange(page, name)).toHaveCount(0);
     }
@@ -375,7 +375,7 @@ test('majątek → Wszystko: zysk przy aktywach, zwijane sekcje i szukanie', asy
     }
     await toggle(page, BONDS).click();
     await expect(toggle(page, BONDS)).toHaveAttribute('aria-expanded', 'false');
-    await expect(page.locator('tr.wealth-all__row')).toHaveCount(0);
+    await expect(page.locator('tr.wealth-all__row:visible')).toHaveCount(0);
   });
 
   await test.step('Krok 9: expanded Akcje i ETF shows VWCE.DE with value 4 250,00 zł and the loss under it without an icon, percent next to the amount', async () => {

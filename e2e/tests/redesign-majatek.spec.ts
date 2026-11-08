@@ -187,7 +187,9 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
       () => refetchWealth(page),
       async () => {
         await expect(
-          section(page, 'Rachunki inwestycyjne').getByRole('row', { name: /XTB IKE/ }),
+          section(page, 'Rachunki inwestycyjne').locator('tr.wealth-all__row', {
+            hasText: /XTB IKE/,
+          }),
         ).toContainText(pln('10 000,00'), { timeout: 3_000 });
         await expect(tab(page, 'Rachunki inwestycyjne')).toContainText('1 rachunek', {
           timeout: 3_000,
@@ -296,10 +298,12 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
 
     await expandWealthSections(page);
     await expect(
-      section(page, 'Konta bankowe').getByRole('row', { name: /Santander oszczędnościowe/ }),
+      section(page, 'Konta bankowe').locator('tr.wealth-all__row', {
+        hasText: /Santander oszczędnościowe/,
+      }),
     ).toBeVisible();
     await expect(
-      section(page, 'Lokaty').getByRole('row', { name: /Lokata Santander/ }),
+      section(page, 'Lokaty').locator('tr.wealth-all__row', { hasText: /Lokata Santander/ }),
     ).toBeVisible();
     await expectProjected(
       () => refetchWealth(page),
@@ -343,7 +347,9 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
 
     await openWealth(page);
     await expandWealthSections(page);
-    await expect(section(page, 'Gotówka').getByRole('row', { name: /Portfel/ })).toBeVisible();
+    await expect(
+      section(page, 'Gotówka').locator('tr.wealth-all__row', { hasText: /Portfel/ }),
+    ).toBeVisible();
   });
 
   await test.step('Krok 10: an EDO series, 600 pieces on a new bond account, shows in "Obligacje"; the subtabs "Moje obligacje" and "Aktualna oferta" work', async () => {
@@ -378,7 +384,9 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await expect(dialog).toBeHidden();
 
     await expandWealthSections(page);
-    await expect(section(page, 'Obligacje').getByRole('row', { name: /EDO0136/ })).toBeVisible();
+    await expect(
+      section(page, 'Obligacje').locator('tr.wealth-all__row', { hasText: /EDO0136/ }),
+    ).toBeVisible();
 
     await clickTab(page, 'Obligacje');
     await expect(page).toHaveURL(/\/wealth\/bonds$/);
@@ -399,7 +407,9 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
     await expect(dialog).toBeHidden();
     await expandWealthSections(page);
     await expect(
-      section(page, 'Metale szlachetne').getByRole('row', { name: /Krugerrand 1 oz/ }),
+      section(page, 'Metale szlachetne').locator('tr.wealth-all__row', {
+        hasText: /Krugerrand 1 oz/,
+      }),
     ).toBeVisible();
 
     await clickTab(page, 'Metale szlachetne');
