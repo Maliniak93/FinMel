@@ -653,6 +653,130 @@ describe('NetWorthChart', () => {
     expect(empty).toMatch(/(display:\s*flex|text-align:\s*center)/);
   });
 
+  function stubReducedMotion(reduce: boolean): void {
+    vi.stubGlobal(
+      'matchMedia',
+      (query: string) =>
+        ({
+          matches: reduce && query.includes('prefers-reduced-motion: reduce'),
+          media: query,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          addListener: () => undefined,
+          removeListener: () => undefined,
+          dispatchEvent: () => false,
+          onchange: null,
+        }) as unknown as MediaQueryList,
+    );
+  }
+
+  const NEW_POINTS = dailyPoints('2024-05', 25, () => false);
+
+  async function loadRangeChange(element: HTMLElement): Promise<void> {
+    fixture.componentRef.setInput('range', '1M');
+    fixture.componentRef.setInput('loading', true);
+    await fixture.whenStable();
+    expect(element.querySelector('svg.net-worth-chart__svg')).not.toBeNull();
+  }
+
+  it('first load shows the spinner and no crossfade', async () => {
+    stubReducedMotion(false);
+    const element = await setup([]);
+    fixture.componentRef.setInput('loading', true);
+    await fixture.whenStable();
+
+    expect(element.querySelector('.net-worth-chart__state mat-spinner')).not.toBeNull();
+    expect(element.querySelector('[aria-busy="true"]')).toBeNull();
+
+    fixture.componentRef.setInput('points', NEW_POINTS);
+    fixture.componentRef.setInput('loading', false);
+    await fixture.whenStable();
+
+    expect(element.querySelectorAll('svg.net-worth-chart__svg')).toHaveLength(1);
+    expect(element.querySelector('.net-worth-chart__layer--outgoing')).toBeNull();
+  });
+
+  it('keeps the previous chart while loading', async () => {
+    stubReducedMotion(false);
+    const element = await setup(dailyPoints('2024-03', 20, () => false));
+    await loadRangeChange(element);
+
+    expect(element.querySelector('mat-spinner')).toBeNull();
+    expect(element.querySelector('[aria-busy="true"] svg.net-worth-chart__svg')).not.toBeNull();
+  });
+
+  it('crossfades into the new chart', async () => {
+    stubReducedMotion(false);
+    const element = await setup(dailyPoints('2024-03', 20, () => false));
+    await loadRangeChange(element);
+
+    fixture.componentRef.setInput('points', NEW_POINTS);
+    fixture.componentRef.setInput('loading', false);
+    await fixture.whenStable();
+
+    const outgoing = element.querySelector('.net-worth-chart__layer--outgoing');
+    expect(outgoing).not.toBeNull();
+    expect(outgoing?.getAttribute('aria-hidden')).toBe('true');
+    expect(element.querySelectorAll('svg.net-worth-chart__svg')).toHaveLength(2);
+    expect(element.querySelector('[aria-busy="true"]')).toBeNull();
+
+    outgoing?.dispatchEvent(new Event('animationend'));
+    await fixture.whenStable();
+
+    expect(element.querySelector('.net-worth-chart__layer--outgoing')).toBeNull();
+    expect(element.querySelectorAll('svg.net-worth-chart__svg')).toHaveLength(1);
+  });
+
+  it('an error drops the previous chart', async () => {
+    stubReducedMotion(false);
+    const element = await setup(dailyPoints('2024-03', 20, () => false));
+    await loadRangeChange(element);
+
+    fixture.componentRef.setInput('loading', false);
+    fixture.componentRef.setInput('loadError', 'Could not load history.');
+    await fixture.whenStable();
+
+    expect(element.querySelector('app-section-error')).not.toBeNull();
+    expect(element.querySelector('svg.net-worth-chart__svg')).toBeNull();
+    expect(element.querySelector('[aria-busy="true"]')).toBeNull();
+
+    fixture.componentRef.setInput('loadError', null);
+    fixture.componentRef.setInput('loading', true);
+    await fixture.whenStable();
+
+    expect(element.querySelector('.net-worth-chart__state mat-spinner')).not.toBeNull();
+    expect(element.querySelector('svg.net-worth-chart__svg')).toBeNull();
+  });
+
+  it('swaps at once under reduced motion', async () => {
+    stubReducedMotion(true);
+    const element = await setup(dailyPoints('2024-03', 20, () => false));
+    await loadRangeChange(element);
+
+    fixture.componentRef.setInput('points', NEW_POINTS);
+    fixture.componentRef.setInput('loading', false);
+    await fixture.whenStable();
+
+    expect(element.querySelector('.net-worth-chart__layer--outgoing')).toBeNull();
+    expect(element.querySelectorAll('svg.net-worth-chart__svg')).toHaveLength(1);
+    expect(element.querySelector('[aria-busy="true"]')).toBeNull();
+  });
+
+  it('keeps the dim and fade rules inside no-preference', async () => {
+    await TestBed.configureTestingModule({ providers: [provideI18nTesting()] }).compileComponents();
+    const scss = stylesheet();
+
+    for (const selector of ['.net-worth-chart__layer--outgoing', "[aria-busy='true']"]) {
+      const at = scss.indexOf(selector);
+      expect(at, selector).toBeGreaterThan(-1);
+      const media = scss.lastIndexOf('@media', at);
+      expect(scss.slice(media, scss.indexOf('{', media)), selector).toContain(
+        'prefers-reduced-motion: no-preference',
+      );
+    }
+    expect(scss).toContain('var(--sk-motion-duration)');
+  });
+
   it('shows not enough history', async () => {
     const element = await setup(
       [{ date: '2026-08-01', netWorthPln: 10000, isIncomplete: false }],

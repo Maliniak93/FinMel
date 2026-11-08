@@ -79,17 +79,13 @@
     <div class="net-worth-chart__state">
       <app-section-error [message]="message" (retry)="retry.emit()" />
     </div>
-  } @else if (loading()) {
-    <div class="net-worth-chart__state">
-      <mat-spinner diameter="32" />
-    </div>
-  } @else if (chart(); as view) {
-    @let selectedClass = assetClass();
-    @let selectedGroup = groupLabel();
+  } @else if (state().frame; as shown) {
+    @let selectedClass = shown.assetClass;
+    @let selectedGroup = shown.groupLabel;
     @if (selectedClass !== null || selectedGroup !== null) {
       <p class="net-worth-chart__caption">
         @if (selectedClass !== null) {
-          <span class="net-worth-chart__swatch" [style.background]="seriesColor()"></span>
+          <span class="net-worth-chart__swatch" [style.background]="shown.seriesColor"></span>
           {{ assetClassLabel(selectedClass) | transloco }}
         }
         @if (selectedGroup !== null) {
@@ -97,105 +93,119 @@
         }
       </p>
     }
-    <div #canvas class="net-worth-chart__canvas">
-      <svg
-        class="net-worth-chart__svg"
-        role="img"
-        tabindex="0"
-        (keydown)="onKeydown($event)"
-        (blur)="clearSelection()"
-        [attr.viewBox]="'0 0 ' + width() + ' ' + height()"
-        [attr.aria-label]="
-          chartLabelKey()
-            | transloco
-              : {
-                  range: rangeLabel() ?? range(),
-                  from: formatMoney(view.first.value),
-                  to: formatMoney(view.last.value),
-                  class: classLabelKey() | transloco,
-                }
-        "
-      >
-        @for (tick of view.yTicks; track tick.value) {
-          <line
-            class="net-worth-chart__gridline"
-            [attr.x1]="margin.left"
-            [attr.x2]="margin.left + plotWidth()"
-            [attr.y1]="tick.y"
-            [attr.y2]="tick.y"
-          />
-          <text
-            class="net-worth-chart__y-label"
-            text-anchor="end"
-            dominant-baseline="middle"
-            [attr.x]="margin.left - 8"
-            [attr.y]="tick.y"
+    <div #canvas class="net-worth-chart__canvas" [attr.aria-busy]="loading() ? 'true' : null">
+      @for (layer of layers(); track layer.key) {
+        @let frame = layer.frame;
+        @let view = frame.view;
+        <div
+          class="net-worth-chart__layer"
+          [class.net-worth-chart__layer--outgoing]="layer.outgoing"
+          [class.net-worth-chart__layer--incoming]="crossfading() && !layer.outgoing"
+          [attr.aria-hidden]="layer.outgoing ? 'true' : null"
+          (animationend)="layer.outgoing && dropOutgoing()"
+        >
+          <svg
+            class="net-worth-chart__svg"
+            role="img"
+            [attr.tabindex]="layer.outgoing ? null : 0"
+            (keydown)="onKeydown($event)"
+            (blur)="clearSelection()"
+            [attr.viewBox]="'0 0 ' + frame.width + ' ' + frame.height"
+            [attr.aria-label]="
+              frame.chartLabelKey
+                | transloco
+                  : {
+                      range: frame.rangeText,
+                      from: formatMoney(view.first.value),
+                      to: formatMoney(view.last.value),
+                      class: frame.classLabelKey | transloco,
+                    }
+            "
           >
-            {{ formatMoneyCompact(tick.value, 'PLN', labelFractionDigits) }}
-          </text>
-        }
-        @for (tick of view.xTicks; track tick.x) {
-          <text
-            class="net-worth-chart__x-label"
-            text-anchor="middle"
-            [attr.x]="tick.x"
-            [attr.y]="margin.top + plotHeight() + 18"
-          >
-            {{ formatAxisDate(tick.date, view.xTickUnit) }}
-          </text>
-        }
-        @for (band of view.bands; track band.x) {
-          <rect
-            class="net-worth-chart__band"
-            aria-hidden="true"
-            [attr.x]="band.x"
-            [attr.y]="margin.top"
-            [attr.width]="band.width"
-            [attr.height]="plotHeight()"
-          />
-        }
-        <path
-          class="net-worth-chart__line"
-          [attr.d]="view.linePath"
-          [style.stroke]="seriesColor()"
-        />
-        @for (band of view.bands; track band.x) {
-          @if (band.showLabel) {
-            <text
-              class="net-worth-chart__band-label"
-              [attr.x]="band.x + 6"
-              [attr.y]="margin.top + 14"
-            >
-              {{ 'netWorthChart.incompleteUntil' | transloco: { date: formatDate(band.lastDate) } }}
-            </text>
-          }
-        }
-        @if (hovered(); as point) {
-          <line
-            class="net-worth-chart__guide"
-            [attr.x1]="point.x"
-            [attr.x2]="point.x"
-            [attr.y1]="margin.top"
-            [attr.y2]="margin.top + plotHeight()"
-          />
-          <circle
-            class="net-worth-chart__marker"
-            r="5"
-            [attr.cx]="point.x"
-            [attr.cy]="point.y"
-            [style.fill]="seriesColor()"
-          />
-        }
-        <rect
-          class="net-worth-chart__plot"
-          [attr.x]="margin.left"
-          [attr.y]="margin.top"
-          [attr.width]="plotWidth()"
-          [attr.height]="plotHeight()"
-          (pointermove)="onPointerMove($event)"
-          (pointerleave)="onPointerLeave()"
-        />
-      </svg>
+            @for (tick of view.yTicks; track tick.value) {
+              <line
+                class="net-worth-chart__gridline"
+                [attr.x1]="margin.left"
+                [attr.x2]="margin.left + frame.plotWidth"
+                [attr.y1]="tick.y"
+                [attr.y2]="tick.y"
+              />
+              <text
+                class="net-worth-chart__y-label"
+                text-anchor="end"
+                dominant-baseline="middle"
+                [attr.x]="margin.left - 8"
+                [attr.y]="tick.y"
+              >
+                {{ formatMoneyCompact(tick.value, 'PLN', labelFractionDigits) }}
+              </text>
+            }
+            @for (tick of view.xTicks; track tick.x) {
+              <text
+                class="net-worth-chart__x-label"
+                text-anchor="middle"
+                [attr.x]="tick.x"
+                [attr.y]="margin.top + frame.plotHeight + 18"
+              >
+                {{ formatAxisDate(tick.date, view.xTickUnit) }}
+              </text>
+            }
+            @for (band of view.bands; track band.x) {
+              <rect
+                class="net-worth-chart__band"
+                aria-hidden="true"
+                [attr.x]="band.x"
+                [attr.y]="margin.top"
+                [attr.width]="band.width"
+                [attr.height]="frame.plotHeight"
+              />
+            }
+            <path
+              class="net-worth-chart__line"
+              [attr.d]="view.linePath"
+              [style.stroke]="frame.seriesColor"
+            />
+            @for (band of view.bands; track band.x) {
+              @if (band.showLabel) {
+                <text
+                  class="net-worth-chart__band-label"
+                  [attr.x]="band.x + 6"
+                  [attr.y]="margin.top + 14"
+                >
+                  {{
+                    'netWorthChart.incompleteUntil' | transloco: { date: formatDate(band.lastDate) }
+                  }}
+                </text>
+              }
+            }
+            @if (!layer.outgoing && hovered(); as point) {
+              <line
+                class="net-worth-chart__guide"
+                [attr.x1]="point.x"
+                [attr.x2]="point.x"
+                [attr.y1]="margin.top"
+                [attr.y2]="margin.top + frame.plotHeight"
+              />
+              <circle
+                class="net-worth-chart__marker"
+                r="5"
+                [attr.cx]="point.x"
+                [attr.cy]="point.y"
+                [style.fill]="frame.seriesColor"
+              />
+            }
+            <rect
+              class="net-worth-chart__plot"
+              [attr.x]="margin.left"
+              [attr.y]="margin.top"
+              [attr.width]="frame.plotWidth"
+              [attr.height]="frame.plotHeight"
+              (pointermove)="onPointerMove($event)"
+              (pointerleave)="onPointerLeave()"
+            />
+          </svg>
+        </div>
+      }
       <div class="net-worth-chart__live" aria-live="polite">
         @if (announced(); as point) {
           {{ formatDate(point.date) + ': ' + formatMoney(point.value) }}
@@ -208,8 +218,8 @@
         <div
           class="net-worth-chart__tooltip"
           [attr.data-align]="tooltipAlignment(point)"
-          [style.left.%]="(point.x / width()) * 100"
-          [style.top.%]="(point.y / height()) * 100"
+          [style.left.%]="(point.x / shown.width) * 100"
+          [style.top.%]="(point.y / shown.height) * 100"
         >
           @if (selectedClass !== null) {
             <span class="net-worth-chart__tooltip-class">{{
@@ -225,6 +235,10 @@
           }
         </div>
       }
+    </div>
+  } @else if (loading()) {
+    <div class="net-worth-chart__state">
+      <mat-spinner diameter="32" />
     </div>
   } @else {
     <p class="net-worth-chart__empty">{{ 'netWorthChart.notEnoughHistory' | transloco }}</p>

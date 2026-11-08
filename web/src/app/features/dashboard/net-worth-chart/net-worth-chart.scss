@@ -74,6 +74,47 @@
   flex: 1 1 auto;
 }
 
+.net-worth-chart__layer {
+  position: absolute;
+  inset: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .net-worth-chart__canvas[aria-busy='true'] {
+    opacity: 0.6;
+    transition: opacity var(--sk-motion-duration) var(--sk-motion-easing);
+  }
+
+  .net-worth-chart__layer--outgoing {
+    pointer-events: none;
+    animation: net-worth-chart-fade-out var(--sk-motion-duration) var(--sk-motion-easing) forwards;
+  }
+
+  .net-worth-chart__layer--incoming {
+    animation: net-worth-chart-fade-in var(--sk-motion-duration) var(--sk-motion-easing);
+  }
+}
+
+@keyframes net-worth-chart-fade-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes net-worth-chart-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 .net-worth-chart__svg {
   position: absolute;
   inset: 0;
