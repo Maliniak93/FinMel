@@ -411,6 +411,16 @@ describe('Planning', () => {
     expect(TestBed.inject(Router).url).toContain('month=2026-09');
   });
 
+  it('puts the title and both add buttons in the page header', async () => {
+    await setup('/planning?month=2027-03');
+
+    const header = element().querySelector('app-page-header')!;
+    expect(element().querySelectorAll('h1')).toHaveLength(1);
+    expect(header.querySelector('h1')?.textContent?.trim()).toBe('Planning');
+    expect(header.querySelector('button[data-testid="add-expense"]')).not.toBeNull();
+    expect(header.querySelector('button[data-testid="add-income"]')).not.toBeNull();
+  });
+
   it('deep-links to the month in the query param', async () => {
     await setup('/planning?month=2027-02');
 
@@ -1400,11 +1410,11 @@ describe('Planning', () => {
     expect(element().querySelector('.planning-split__shares')).not.toBeNull();
   });
 
-  it('renders the section headings at the prototype scale', async () => {
+  it('gives the section headings the global section title class', async () => {
     await setup('/planning?month=2027-03');
 
     const heading = element().querySelector<HTMLElement>('[data-testid="month-balance"] h2')!;
-    expect(getComputedStyle(heading).fontSize).toBe('22px');
+    expect(heading.classList.contains('sk-section-title')).toBe(true);
   });
 
   it('switches between list and calendar', async () => {

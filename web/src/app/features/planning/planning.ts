@@ -56,6 +56,7 @@ import {
   isOverdueOneOff,
 } from '../../core/planning/planning-state';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { fromDateOnly } from '../../shared/date-only';
 import { activeLocale } from '../../core/i18n/language';
 import {
@@ -125,6 +126,7 @@ function shiftMonth(month: string, delta: number): string {
 @Component({
   selector: 'app-planning',
   imports: [
+    PageHeader,
     MatButtonModule,
     MatChipsModule,
     MatIconModule,

@@ -1,6 +1,6 @@
 <mat-card class="todo-card">
   <mat-card-content>
-    <h2 class="todo-card__title">{{ 'dashboard.todo.title' | transloco }}</h2>
+    <h2 class="sk-section-title">{{ 'dashboard.todo.title' | transloco }}</h2>
 
     @if (planningState.todoError(); as error) {
       <app-section-error [message]="error.message" (retry)="planningState.reloadTodo()" />

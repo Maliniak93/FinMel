@@ -1,45 +1,45 @@
 <div class="transactions-page">
-  <nav class="transactions-page__breadcrumb">
-    <a routerLink="/wealth" class="transactions-page__back">
-      <mat-icon>arrow_back</mat-icon>
-      {{ 'shell.nav.wealth' | transloco }}
-    </a>
-    @if (assetResource.hasValue()) {
-      <span aria-hidden="true">{{ separator }}</span>
-      <a [routerLink]="backPath()" class="transactions-page__back">
-        {{ assetClassLabel(assetResource.value().assetClass) | transloco }}
+  @let asset = assetResource.hasValue() ? assetResource.value() : null;
+  <app-page-header
+    [title]="
+      asset
+        ? ('transactions.titleWithName' | transloco: { name: asset.name })
+        : ('transactions.title' | transloco)
+    "
+  >
+    <nav breadcrumb class="transactions-page__breadcrumb">
+      <a routerLink="/wealth" class="transactions-page__back">
+        <mat-icon>arrow_back</mat-icon>
+        {{ 'shell.nav.wealth' | transloco }}
       </a>
-    }
-  </nav>
-
-  <div class="transactions-page__header">
-    <div>
-      @if (assetResource.hasValue()) {
-        @let asset = assetResource.value();
-        <h1>{{ 'transactions.titleWithName' | transloco: { name: asset.name } }}</h1>
-        <p class="transactions-page__summary">
-          <span>{{ assetClassLabel(asset.assetClass) | transloco }}</span>
-          @if (accountName(); as account) {
-            <span aria-hidden="true">{{ separator }}</span>
-            <span>{{ account }}</span>
-          }
-          @if (group(); as group) {
-            <span aria-hidden="true">{{ separator }}</span>
-            <span class="transactions-page__group">
-              <span
-                class="transactions-page__swatch"
-                [style.background-color]="groupColor(group.color)"
-              ></span>
-              {{ group.name }}
-            </span>
-          }
-        </p>
-      } @else {
-        <h1>{{ 'transactions.title' | transloco }}</h1>
+      @if (asset) {
+        <span aria-hidden="true">{{ separator }}</span>
+        <a [routerLink]="backPath()" class="transactions-page__back">
+          {{ assetClassLabel(asset.assetClass) | transloco }}
+        </a>
       }
-    </div>
-    @if (!isReadOnly() && assetResource.hasValue()) {
-      <div class="transactions-page__actions">
+    </nav>
+    @if (asset) {
+      <p subtitle class="transactions-page__summary">
+        <span>{{ assetClassLabel(asset.assetClass) | transloco }}</span>
+        @if (accountName(); as account) {
+          <span aria-hidden="true">{{ separator }}</span>
+          <span>{{ account }}</span>
+        }
+        @if (group(); as group) {
+          <span aria-hidden="true">{{ separator }}</span>
+          <span class="transactions-page__group">
+            <span
+              class="transactions-page__swatch"
+              [style.background-color]="groupColor(group.color)"
+            ></span>
+            {{ group.name }}
+          </span>
+        }
+      </p>
+    }
+    @if (!isReadOnly() && asset) {
+      <div actions class="transactions-page__actions">
         @if (canSell()) {
           <button mat-stroked-button type="button" (click)="openCreateDialog(sellType)">
             {{ 'transactions.sell' | transloco }}
@@ -51,7 +51,7 @@
         </button>
       </div>
     }
-  </div>
+  </app-page-header>
 
   @if (isArchived()) {
     <p class="transactions-page__archived-notice" role="status">

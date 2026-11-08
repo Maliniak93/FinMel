@@ -1,4 +1,18 @@
 <div class="accounts-page">
+  <app-page-header [title]="'accounts.title' | transloco">
+    <mat-slide-toggle
+      actions
+      [checked]="includeArchived()"
+      (change)="includeArchived.set($event.checked)"
+    >
+      {{ 'accounts.showArchived' | transloco }}
+    </mat-slide-toggle>
+    <button actions mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+      {{ 'accounts.newAccount' | transloco }}
+    </button>
+  </app-page-header>
+
   @if (accountsResource.error(); as loadError) {
     <app-section-error [message]="loadError.message" (retry)="accountsResource.reload()" />
   } @else if (accountsResource.isLoading() && !accountsResource.hasValue()) {
@@ -7,19 +21,6 @@
     @if (visibleAccounts().length > 0) {
       <app-summary-strip [items]="summary()" />
     }
-
-    <div class="accounts-page__toolbar">
-      <mat-slide-toggle
-        [checked]="includeArchived()"
-        (change)="includeArchived.set($event.checked)"
-      >
-        {{ 'accounts.showArchived' | transloco }}
-      </mat-slide-toggle>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        <mat-icon>add</mat-icon>
-        {{ 'accounts.newAccount' | transloco }}
-      </button>
-    </div>
 
     @if (visibleAccounts().length === 0) {
       <app-empty-state icon="account_balance" [message]="'accounts.empty' | transloco">

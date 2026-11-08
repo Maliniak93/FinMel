@@ -512,7 +512,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await expect(page.locator('.dashboard-page__as-of')).toContainText(/Stan na\s.*\d{4}/);
     await expectRules(page, PULPIT_RULES);
 
-    const header = await box(page.locator('.dashboard-page__header'));
+    const header = await box(page.locator('.dashboard-page > app-page-header'));
     const hero = await box(page.locator('.dashboard-page__hero'));
     expect(hero.y).toBeGreaterThanOrEqual(header.y + header.height - 1);
 
@@ -520,7 +520,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await expect(
       page.locator('app-month-card').getByRole('heading', { name: /· plan$/ }),
     ).toBeVisible();
-    await expectPx(page.locator('.month-card__title'), 'font-size', 24);
+    await expectPx(page.locator('app-month-card h2').first(), 'font-size', 24);
     const todo = await box(page.locator('.dashboard-page__todo'));
     const month = await box(page.locator('app-month-card'));
     expect(Math.abs(todo.y - month.y)).toBeLessThanOrEqual(1);
@@ -555,7 +555,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
   await test.step('Krok 5: Majątek has tabs with a 2 px accent underline and a rule under the tab bar, a 36 px Cormorant heading, a table header with a rule under it, rows separated by rules and a rule over "Razem"', async () => {
     await page.goto('/wealth');
     await expandWealthSections(page);
-    const heading = page.locator('h1.wealth__title');
+    const heading = page.locator('app-page-header h1');
     await expect(heading).toHaveText('Majątek');
     await expectPx(heading, 'font-size', 36);
     await expect(heading).toHaveCSS('font-family', /Cormorant Garamond/);
@@ -593,7 +593,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await page.goto('/wealth/cash');
     await expectRule(page, { selector: '.cash-place__balance', side: 'top' });
     await expectRule(page, { selector: '.summary-strip__list', side: 'top' });
-    await expectPx(page.locator('.cash-place__name').first(), 'font-size', 22);
+    await expectPx(page.locator('.cash-place__name').first(), 'font-size', 24);
 
     await page.goto('/wealth');
     await expandWealthSections(page);
@@ -605,7 +605,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await page.goto('/wealth/accounts');
     await page.getByRole('link', { name: XTB, exact: true }).click();
     await expect(page).toHaveURL(/\/wealth\/accounts\/[0-9a-f-]+$/);
-    const title = page.locator('.account-detail__title');
+    const title = page.locator('app-page-header h1');
     await expect(title).toHaveText(XTB);
     await expectPx(title, 'font-size', 36);
     await expect(title).toHaveCSS('font-family', /Cormorant Garamond/);
@@ -647,17 +647,17 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await expectPx(
       page.getByRole('heading', { name: 'Bilans miesiąca', exact: true }),
       'font-size',
-      22,
+      24,
     );
     await expectPx(
       page.getByRole('heading', { name: 'Wolne środki', exact: true }),
       'font-size',
-      22,
+      24,
     );
     await expectPx(
       page.getByRole('heading', { name: 'Podział wolnych środków', exact: true }),
       'font-size',
-      22,
+      24,
     );
     await expect(page.locator('h1').first()).toHaveCSS('font-family', /Cormorant Garamond/);
   });
@@ -760,7 +760,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
   await test.step('Krok 13: at 390 px Majątek, Planowanie and Grupy keep the same rules as on the desktop and do not scroll sideways', async () => {
     await page.goto('/wealth');
     await expandWealthSections(page);
-    await expect(page.locator('h1.wealth__title')).toBeVisible();
+    await expect(page.locator('app-page-header h1')).toBeVisible();
     await expectRules(page, WEALTH_RULES);
     await expectUnderline(page);
     expect(await overflow(page)).toBeLessThanOrEqual(0);
@@ -791,7 +791,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
 
     await page.goto('/wealth');
     await expandWealthSections(page);
-    await expect(page.locator('h1.wealth__title')).toBeVisible();
+    await expect(page.locator('app-page-header h1')).toBeVisible();
     await expectRules(page, WEALTH_RULES);
     await expectUnderline(page);
 

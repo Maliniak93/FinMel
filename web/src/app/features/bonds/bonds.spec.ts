@@ -194,6 +194,15 @@ describe('Bonds page, my bonds tab', () => {
     expect(textOf(rowFor(activeBond.name))).toContain('EDO1036');
   });
 
+  it('shows one page title and no as-of line', async () => {
+    await setup();
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelectorAll('h1')).toHaveLength(1);
+    expect(root.querySelector('app-page-header h1')?.textContent?.trim()).toBe('Treasury bonds');
+    expect(root.querySelector('.page-header__subtitle')?.textContent?.trim()).toBe('');
+  });
+
   it('opens on "Moje obligacje", placed before "Aktualna oferta"', async () => {
     await setup();
     await switchLanguage(fixture, 'pl');

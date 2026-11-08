@@ -1,4 +1,10 @@
-<h1 class="page-header__title">{{ title() }}</h1>
-<div class="page-header__actions">
+<div class="page-header__breadcrumb">
+  <ng-content select="[breadcrumb]" />
+</div>
+<div class="page-header__row">
+  <h1 class="page-header__title">{{ title() }}</h1>
   <ng-content select="[actions]" />
+</div>
+<div class="page-header__subtitle">
+  <ng-content select="[subtitle]" />
 </div>

@@ -1,19 +1,23 @@
 <div class="deposits-page">
+  <app-page-header [title]="'deposits.title' | transloco">
+    <mat-slide-toggle
+      actions
+      [checked]="showArchived()"
+      (change)="showArchived.set($event.checked)"
+    >
+      {{ 'assetArchive.showArchived' | transloco }}
+    </mat-slide-toggle>
+    <button actions mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+      {{ 'deposits.add' | transloco }}
+    </button>
+  </app-page-header>
+
   @if (depositsResource.error(); as loadError) {
     <app-section-error [message]="loadError.message" (retry)="depositsResource.reload()" />
   } @else if (depositsResource.isLoading() && !depositsResource.hasValue()) {
     <app-skeleton [rows]="4" />
   } @else if (depositsResource.hasValue()) {
-    <div class="deposits-page__header">
-      <mat-slide-toggle [checked]="showArchived()" (change)="showArchived.set($event.checked)">
-        {{ 'assetArchive.showArchived' | transloco }}
-      </mat-slide-toggle>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        <mat-icon>add</mat-icon>
-        {{ 'deposits.add' | transloco }}
-      </button>
-    </div>
-
     @if (depositsResource.value().length === 0) {
       <app-empty-state icon="savings" [message]="'deposits.empty' | transloco">
         <button action mat-flat-button color="primary" type="button" (click)="openCreateDialog()">

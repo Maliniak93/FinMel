@@ -1,15 +1,7 @@
 <div class="groups-page">
-  <div class="groups-page__header">
-    <div class="groups-page__heading">
-      <h1>
-        {{ 'groups.title' | transloco }}
-        <span class="groups-page__counter" data-testid="group-counter">{{
-          'groups.counter' | transloco: { count: groups().length, max: maxGroups }
-        }}</span>
-      </h1>
-      <p class="groups-page__subtitle">{{ 'groups.subtitle' | transloco }}</p>
-    </div>
+  <app-page-header [title]="'groups.title' | transloco">
     <button
+      actions
       mat-flat-button
       color="primary"
       type="button"
@@ -20,7 +12,13 @@
       <mat-icon>add</mat-icon>
       {{ 'groups.add' | transloco }}
     </button>
-  </div>
+    <p subtitle class="groups-page__subtitle">
+      {{ 'groups.subtitle' | transloco }}
+      <span class="groups-page__counter" data-testid="group-counter">{{
+        'groups.counter' | transloco: { count: groups().length, max: maxGroups }
+      }}</span>
+    </p>
+  </app-page-header>
 
   @if (groupsResource.error(); as loadError) {
     <app-section-error [message]="loadError.message" (retry)="groupsResource.reload()" />

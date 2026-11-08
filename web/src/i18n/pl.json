@@ -1096,6 +1096,7 @@
     "paymentLeadDaysFailed": "Nie udało się zapisać wyprzedzenia przypomnień."
   },
   "securities": {
+    "title": "Akcje i ETF",
     "tabs": {
       "stocks": "Akcje",
       "etfs": "ETF"
@@ -1195,6 +1196,7 @@
     }
   },
   "deposits": {
+    "title": "Lokaty",
     "add": "Nowa lokata",
     "empty": "Nie masz jeszcze żadnych lokat terminowych.",
     "status": {
@@ -1291,6 +1293,7 @@
     }
   },
   "bankAccounts": {
+    "title": "Konta bankowe",
     "add": "Dodaj konto",
     "addFirst": "Dodaj pierwsze konto bankowe",
     "empty": "Nie masz jeszcze żadnych kont bankowych.",
@@ -1347,6 +1350,7 @@
     }
   },
   "accounts": {
+    "title": "Rachunki inwestycyjne",
     "showArchived": "Pokaż zarchiwizowane",
     "outsideNetWorthLabel": "Poza majątkiem",
     "newAccount": "Nowy rachunek",

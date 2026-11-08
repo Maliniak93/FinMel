@@ -1,9 +1,13 @@
 <div class="securities-page">
-  <div class="securities-page__toolbar">
-    <mat-slide-toggle [checked]="showArchived()" (change)="showArchived.set($event.checked)">
+  <app-page-header [title]="'securities.title' | transloco">
+    <mat-slide-toggle
+      actions
+      [checked]="showArchived()"
+      (change)="showArchived.set($event.checked)"
+    >
       {{ 'assetArchive.showArchived' | transloco }}
     </mat-slide-toggle>
-  </div>
+  </app-page-header>
   <mat-tab-group>
     <mat-tab [label]="'securities.tabs.stocks' | transloco">
       <app-securities-table

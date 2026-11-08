@@ -295,7 +295,7 @@ describe('MonthCard stylesheet', () => {
       'utf8',
     );
 
-    expect(scss).toMatch(/\.month-card__title\s*\{[^}]*font-size:\s*24px/);
+    expect(scss).not.toMatch(/month-card__title/);
     expect(rowLineSkipsLast(scss, '.month-card__line')).toBe(true);
     expect(scss).toMatch(/\.month-card__cascade\s*\{[^}]*border-top:/);
   });

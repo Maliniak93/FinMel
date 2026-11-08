@@ -24,6 +24,7 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { groupColor } from '../../shared/colors';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { formatMoney } from '../../shared/format';
 import { GroupList } from '../../shared/group-select/group-list';
@@ -54,6 +55,7 @@ const CONFLICT_MESSAGES: Record<string, string> = {
 @Component({
   selector: 'app-cash',
   imports: [
+    PageHeader,
     MatButtonModule,
     EmptyState,
     MatCardModule,

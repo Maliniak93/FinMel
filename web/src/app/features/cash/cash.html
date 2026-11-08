@@ -1,4 +1,18 @@
 <div class="cash-page">
+  <app-page-header [title]="'cash.title' | transloco">
+    <mat-slide-toggle
+      actions
+      [checked]="includeArchived()"
+      (change)="includeArchived.set($event.checked)"
+    >
+      {{ 'cash.showArchived' | transloco }}
+    </mat-slide-toggle>
+    <button actions mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+      {{ 'cash.add' | transloco }}
+    </button>
+  </app-page-header>
+
   @if (placesResource.error(); as loadError) {
     <app-section-error [message]="loadError.message" (retry)="placesResource.reload()" />
   } @else if (placesResource.isLoading() && !placesResource.hasValue()) {
@@ -38,19 +52,6 @@
       </section>
     }
 
-    <div class="cash-page__toolbar">
-      <mat-slide-toggle
-        [checked]="includeArchived()"
-        (change)="includeArchived.set($event.checked)"
-      >
-        {{ 'cash.showArchived' | transloco }}
-      </mat-slide-toggle>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        <mat-icon>add</mat-icon>
-        {{ 'cash.add' | transloco }}
-      </button>
-    </div>
-
     @if (visiblePlaces().length === 0) {
       <app-empty-state icon="payments" [message]="'cash.empty' | transloco">
         <button action mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
@@ -63,7 +64,7 @@
         @for (place of visiblePlaces(); track place.id) {
           <mat-card class="cash-place" [class.cash-place--archived]="place.isArchived">
             <mat-card-header class="cash-place__header">
-              <h2 class="cash-place__name">{{ place.name }}</h2>
+              <h2 class="cash-place__name sk-section-title">{{ place.name }}</h2>
               @if (place.isArchived) {
                 <app-status-chip
                   [label]="'common.archived' | transloco"

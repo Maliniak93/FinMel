@@ -220,7 +220,7 @@ describe('PlanningCalendar', () => {
     ).toHaveLength(cells().length);
   });
 
-  it('renders the day details heading at the prototype scale', async () => {
+  it('gives the day details heading the sub section title classes', async () => {
     await render(monthData([], []));
     await vi.waitFor(async () => {
       await settle();
@@ -231,7 +231,8 @@ describe('PlanningCalendar', () => {
     await settle();
 
     const heading = element().querySelector<HTMLElement>('[data-testid="calendar-details"] h3')!;
-    expect(getComputedStyle(heading).fontSize).toBe('20px');
+    expect(heading.classList.contains('sk-section-title')).toBe(true);
+    expect(heading.classList.contains('sk-section-title--sub')).toBe(true);
   });
 
   it('places one-off entries on their dates', async () => {

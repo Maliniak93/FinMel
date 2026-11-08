@@ -80,7 +80,7 @@
 
   @if (selectedDay(); as day) {
     <section class="planning-calendar__details" data-testid="calendar-details">
-      <h3>{{ formatDate(day) }}</h3>
+      <h3 class="sk-section-title sk-section-title--sub">{{ formatDate(day) }}</h3>
       @if (selectedItems().length === 0) {
         <p class="planning-calendar__empty">{{ 'planning.calendar.noItems' | transloco }}</p>
       } @else {

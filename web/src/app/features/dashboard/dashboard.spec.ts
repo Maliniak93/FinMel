@@ -410,15 +410,36 @@ describe('Dashboard', () => {
     expect(element.querySelector('.dashboard-page__pair--ruled')).toBeNull();
   });
 
-  it('renders the as-of date in the page header', async () => {
+  it('renders the as-of date in the subtitle of the page header', async () => {
     await setup(jsonResponse(dashboard));
     const element = fixture.nativeElement as HTMLElement;
-    const asOf = element.querySelector('.dashboard-page__as-of');
-    const header = asOf?.closest('header');
+    const header = element.querySelector('app-page-header');
+    const asOf = header?.querySelector('.dashboard-page__as-of');
 
+    expect(element.querySelectorAll('app-page-header h1')).toHaveLength(1);
+    expect(header?.querySelector('h1')?.textContent?.trim()).toBe('Dashboard');
     expect(asOf?.textContent).toContain('As of');
-    expect(header?.querySelector('h1')?.textContent?.trim()).toBeTruthy();
+    expect(asOf?.closest('.page-header__subtitle')).not.toBeNull();
     expect(asOf?.closest('.dashboard-page__value')).toBeNull();
+  });
+
+  it('shows no as-of line when the dashboard has no date', async () => {
+    await setup(jsonResponse({ ...dashboard, asOf: null }));
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('app-page-header h1')?.textContent?.trim()).toBe('Dashboard');
+    expect(element.querySelector('.dashboard-page__as-of')).toBeNull();
+  });
+
+  it('gives every card title the global section title class', async () => {
+    await setup(jsonResponse(dashboard));
+    const element = fixture.nativeElement as HTMLElement;
+    const titles = element.querySelectorAll('.dashboard-page__grid h2, .dashboard-page__grid h3');
+
+    expect(titles.length).toBeGreaterThan(0);
+    for (const title of titles) {
+      expect(title.classList.contains('sk-section-title'), title.textContent ?? '').toBe(true);
+    }
   });
 
   it('renders groups and structure without a card frame', async () => {
@@ -1033,10 +1054,14 @@ describe('dashboard stylesheet', () => {
     }
   });
 
-  it('sizes the "Do zrobienia" heading at 24 px', () => {
-    expect(dashboardStylesheet()).toMatch(
-      /\.dashboard-page__todo-head\s*\{[^}]*\.dashboard-page__card-title\s*\{[^}]*font-size:\s*24px/,
+  it('leaves the "Do zrobienia" heading size to the section title class', () => {
+    const html = readFileSync(
+      resolve(process.cwd(), 'src/app/features/dashboard/dashboard.html'),
+      'utf8',
     );
+
+    expect(html).toMatch(/<h2 class="sk-section-title">\{\{ 'dashboard\.todo\.heading'/);
+    expect(dashboardStylesheet()).not.toMatch(/\.dashboard-page__todo-top\s*\{[^}]*font-size/);
   });
 
   it('splits every row 50 50 on a wide container', () => {

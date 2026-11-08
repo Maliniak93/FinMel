@@ -22,12 +22,12 @@ function scssFiles(dir: string): string[] {
 }
 
 describe('Majątek stylesheets', () => {
-  it('row menu icons are 16 px and the cash place heading is 22 px', () => {
+  it('row menu icons are 16 px and the cash place heading takes its size from the section title', () => {
     const wealthAll = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
     expect(rulesFor(wealthAll, /mat-icon/)).toMatch(/font-size:\s*16px/);
 
     const cash = readStylesheet('src/app/features/cash/cash.scss');
-    expect(rulesFor(cash, /cash-place__name/)).toMatch(/font-size:\s*22px/);
+    expect(rulesFor(cash, /cash-place__name/)).not.toMatch(/font-size|font-family/);
   });
 
   it('every wealth table is ruled with a Razem top rule and 16 px icons', () => {

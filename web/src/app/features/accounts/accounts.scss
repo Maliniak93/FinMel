@@ -1,14 +1,5 @@
 @use '../../shared/ruled-table' as ruled;
 
-.accounts-page__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
 .accounts-page__table {
   @include ruled.ruled-table;
   width: 100%;

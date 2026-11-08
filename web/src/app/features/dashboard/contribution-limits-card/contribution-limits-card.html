@@ -1,7 +1,7 @@
 @if (loadError(); as error) {
   <mat-card class="contribution-limits-card">
     <mat-card-content>
-      <h3 class="contribution-limits-card__title">
+      <h3 class="sk-section-title">
         {{ 'dashboard.contributionLimits.title' | transloco }}
       </h3>
       <div class="contribution-limits-card__state" role="alert">
@@ -15,7 +15,7 @@
 } @else if (rows().length > 0) {
   <mat-card class="contribution-limits-card">
     <mat-card-content>
-      <h3 class="contribution-limits-card__title">
+      <h3 class="sk-section-title">
         {{ 'dashboard.contributionLimits.title' | transloco }}
       </h3>
       <ul class="contribution-limits-card__list">

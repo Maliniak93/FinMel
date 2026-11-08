@@ -22,6 +22,7 @@ import { getApiReportingDashboard, type DashboardAccountValue } from '../../api/
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { activeLocale } from '../../core/i18n/language';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { Gain } from '../../shared/gain/gain';
 import { Money } from '../../shared/money/money';
@@ -67,6 +68,7 @@ const gainOf = (amount: number, denominator: number): RowGain => ({
 @Component({
   selector: 'app-accounts',
   imports: [
+    PageHeader,
     EmptyState,
     Gain,
     MatButtonModule,

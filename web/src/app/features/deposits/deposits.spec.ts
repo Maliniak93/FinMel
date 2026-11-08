@@ -158,11 +158,12 @@ describe('Deposits', () => {
     );
   }
 
-  it('shows only the term deposits, with no page title and no tabs', async () => {
+  it('shows only the term deposits, under one page title and with no tabs', async () => {
     await setup();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('h1')).toBeNull();
+    expect(element.querySelectorAll('app-page-header h1')).toHaveLength(1);
+    expect(element.querySelector('app-page-header h1')?.textContent?.trim()).toBe('Deposits');
     expect(element.querySelectorAll('[role="tab"]')).toHaveLength(0);
     expect(rows()).toHaveLength(2);
     expect(
@@ -664,7 +665,7 @@ describe('Deposits', () => {
       await setup([dueDeposit, settledDeposit]);
       const element = fixture.nativeElement as HTMLElement;
       const texts = async () => [
-        ...labelsOf(element, '.deposits-page__header > button'),
+        ...labelsOf(element, 'app-page-header button[mat-flat-button]'),
         ...labelsOf(element, 'th:not(:empty)'),
         ...(await menuItems()),
       ];
@@ -693,7 +694,7 @@ describe('Deposits', () => {
       await switchLanguage(fixture, 'pl');
 
       expect(polishProblems(english, await texts(), cognates)).toEqual([]);
-      expect(labelsOf(element, '.deposits-page__header > button')).toEqual(['Nowa lokata']);
+      expect(labelsOf(element, 'app-page-header button[mat-flat-button]')).toEqual(['Nowa lokata']);
     });
 
     it("renders the rows' accessible names in Polish", async () => {

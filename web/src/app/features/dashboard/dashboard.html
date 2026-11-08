@@ -1,12 +1,11 @@
 <div class="dashboard-page">
-  <header class="dashboard-page__header">
-    <h1>{{ 'dashboard.title' | transloco }}</h1>
+  <app-page-header [title]="'dashboard.title' | transloco">
     @if (dashboardResource.hasValue() && dashboardResource.value().asOf !== null) {
-      <p class="dashboard-page__as-of">
+      <p subtitle class="dashboard-page__as-of">
         {{ 'dashboard.asOf' | transloco: { date: formatDate(dashboardResource.value().asOf!) } }}
       </p>
     }
-  </header>
+  </app-page-header>
 
   @if (dashboardResource.error(); as loadError) {
     <div class="dashboard-page__state" role="alert">
@@ -85,7 +84,7 @@
           </section>
 
           <section class="dashboard-page__history">
-            <h2 class="dashboard-page__card-title">
+            <h2 class="sk-section-title">
               {{ 'dashboard.netWorthHistory' | transloco }}
             </h2>
             <app-net-worth-chart
@@ -106,7 +105,7 @@
 
           <section class="dashboard-page__structure">
             <div>
-              <h2 class="dashboard-page__card-title">{{ 'dashboard.allocation' | transloco }}</h2>
+              <h2 class="sk-section-title">{{ 'dashboard.allocation' | transloco }}</h2>
               <app-split-bar [segments]="structureSegments()" />
               <ul class="dashboard-page__structure-list">
                 @for (row of structureRows(); track row.assetClass) {
@@ -133,8 +132,8 @@
 
         <div class="dashboard-page__pair">
           <section class="dashboard-page__todo">
-            <header class="dashboard-page__todo-head">
-              <h2 class="dashboard-page__card-title">{{ 'dashboard.todo.heading' | transloco }}</h2>
+            <header class="dashboard-page__todo-top">
+              <h2 class="sk-section-title">{{ 'dashboard.todo.heading' | transloco }}</h2>
               <a routerLink="/planning">{{ 'dashboard.todo.planning' | transloco }}</a>
             </header>
             <app-todo-card (settled)="reloadAfterSettlement()" />
@@ -146,7 +145,7 @@
         <div class="dashboard-page__pair dashboard-page__pair--split">
           <section class="dashboard-page__group-card">
             <div>
-              <h2 class="dashboard-page__card-title">{{ 'dashboard.groups.title' | transloco }}</h2>
+              <h2 class="sk-section-title">{{ 'dashboard.groups.title' | transloco }}</h2>
               @if (groupsResource.error(); as groupsError) {
                 <app-section-error
                   [message]="groupsError.message"

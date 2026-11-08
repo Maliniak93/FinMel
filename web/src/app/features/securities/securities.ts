@@ -4,14 +4,21 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { TranslocoPipe } from '@jsverse/transloco';
 
 import { ASSET_CLASS } from '../assets/asset-class';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { SecuritiesTable } from './securities-table/securities-table';
 import { WatchlistTable } from './watchlist-table/watchlist-table';
 
 @Component({
   selector: 'app-securities',
-  imports: [MatSlideToggleModule, MatTabsModule, SecuritiesTable, WatchlistTable, TranslocoPipe],
+  imports: [
+    MatSlideToggleModule,
+    MatTabsModule,
+    PageHeader,
+    SecuritiesTable,
+    WatchlistTable,
+    TranslocoPipe,
+  ],
   templateUrl: './securities.html',
-  styleUrl: './securities.scss',
 })
 export class Securities {
   readonly account = input<string>();

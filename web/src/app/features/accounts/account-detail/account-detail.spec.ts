@@ -259,7 +259,11 @@ describe('AccountDetail', () => {
     expect(crumb?.textContent).toContain('Wealth · Investment accounts');
     expect(root().querySelector('[data-testid="summary-strip"]')).not.toBeNull();
     expect(root().querySelector('dl.account-detail__totals')).toBeNull();
-    expect(root().querySelector('h1')?.textContent).toContain('XTB IKE');
+    expect(root().querySelectorAll('h1')).toHaveLength(1);
+    expect(root().querySelector('app-page-header h1')?.textContent).toContain('XTB IKE');
+    expect(crumb?.closest('.page-header__breadcrumb')).not.toBeNull();
+    expect(root().querySelector('.page-header__subtitle .account-detail__meta')).not.toBeNull();
+    expect(root().querySelector('.page-header__row .account-detail__actions')).not.toBeNull();
     fetchSpy.mockRestore();
     TestBed.resetTestingModule();
 

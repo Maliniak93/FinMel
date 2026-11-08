@@ -145,6 +145,18 @@ describe('Securities page', () => {
     );
   }
 
+  it('titles the page and keeps the archived toggle in the page header', async () => {
+    await setup();
+
+    expect(element().querySelectorAll('app-page-header h1')).toHaveLength(1);
+    expect(element().querySelector('app-page-header h1')?.textContent?.trim()).toBe('Akcje i ETF');
+    expect(element().querySelector('app-page-header mat-slide-toggle[actions]')).not.toBeNull();
+    await switchLanguage(fixture, 'en');
+    expect(element().querySelector('app-page-header h1')?.textContent?.trim()).toBe(
+      'Stocks & ETFs',
+    );
+  });
+
   it('shows the "Akcje" and "ETF" tabs, opening on "Akcje"', async () => {
     await setup();
 

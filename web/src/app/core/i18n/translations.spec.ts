@@ -27,6 +27,33 @@ describe('translation files', () => {
     }
   });
 
+  it('the Wealth page titles carry the texts of their nav labels', () => {
+    const pages = [
+      [
+        'accounts.title',
+        'shell.nav.accounts',
+        { en: 'Investment accounts', pl: 'Rachunki inwestycyjne' },
+      ],
+      [
+        'bankAccounts.title',
+        'shell.nav.bankAccounts',
+        { en: 'Bank accounts', pl: 'Konta bankowe' },
+      ],
+      ['cash.title', 'shell.nav.cash', { en: 'Cash', pl: 'Gotówka' }],
+      ['deposits.title', 'shell.nav.deposits', { en: 'Deposits', pl: 'Lokaty' }],
+      ['securities.title', 'shell.nav.securities', { en: 'Stocks & ETFs', pl: 'Akcje i ETF' }],
+    ] as const;
+
+    for (const lang of ['en', 'pl'] as const) {
+      for (const [title, nav, texts] of pages) {
+        expect(TRANSLATIONS[lang][title], `${title} in ${lang}.json`).toBe(texts[lang]);
+        expect(TRANSLATIONS[lang][title], `${title} vs ${nav} in ${lang}.json`).toBe(
+          TRANSLATIONS[lang][nav],
+        );
+      }
+    }
+  });
+
   it('en and pl define every groups.field key', () => {
     const keys = ['groups.field.group', 'groups.field.defaultGroup', 'groups.field.none'];
 

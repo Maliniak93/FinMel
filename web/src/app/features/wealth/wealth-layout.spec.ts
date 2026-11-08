@@ -62,7 +62,7 @@ describe('WealthLayout', () => {
     harness.detectChanges();
     const element = harness.routeNativeElement as HTMLElement;
 
-    expect(element.querySelector('h1')?.textContent?.trim()).toBe('Wealth');
+    expect(element.querySelector('h1')).toBeNull();
     const nav = element.querySelector('nav[mat-tab-nav-bar]')!;
     expect(nav.getAttribute('aria-label')).toBe('Asset types');
 

@@ -24,6 +24,7 @@ import {
 } from '../../api/portfolio';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { formatMonth, formatPercent } from '../../shared/format';
 import { Money } from '../../shared/money/money';
@@ -44,6 +45,7 @@ type VariantFilter = BankVariant | typeof ALL_VARIANTS;
 @Component({
   selector: 'app-bank-accounts',
   imports: [
+    PageHeader,
     EmptyState,
     MatButtonModule,
     MatChipsModule,
