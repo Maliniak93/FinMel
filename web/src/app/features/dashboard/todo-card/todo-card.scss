@@ -1,3 +1,8 @@
+.todo-card--overdue {
+  --mat-card-elevated-container-color: var(--mat-sys-surface-container-low);
+  background: var(--mat-sys-surface-container-low);
+}
+
 .todo-card__state {
   display: flex;
   justify-content: center;

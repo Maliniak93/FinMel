@@ -154,6 +154,55 @@ export function dateOnlyFromToday(days: number): string {
   return toDateOnly(date);
 }
 
+export function todoResponse(items: Record<string, unknown>[]): Response {
+  return jsonResponse({ items, paymentLeadDays: 7 });
+}
+
+export function overdueIncomeItem(name: string, daysOverdue: number): Record<string, unknown> {
+  return {
+    kind: 'OverdueIncome',
+    name,
+    date: dateOnlyFromToday(-daysOverdue),
+    amount: 1800,
+    currency: 'PLN',
+    daysOverdue,
+    daysUntil: null,
+  };
+}
+
+export function overdueExpenseItem(name: string, daysOverdue: number): Record<string, unknown> {
+  const date = dateOnlyFromToday(-daysOverdue);
+  return {
+    kind: 'OverdueExpense',
+    name,
+    date,
+    amount: 120,
+    currency: 'PLN',
+    daysOverdue,
+    daysUntil: null,
+    oneOffExpense: {
+      id: `one-off-${name}`,
+      name,
+      date,
+      amount: 120,
+      inMonth: true,
+      status: 'Pending',
+    },
+  };
+}
+
+export function upcomingPaymentItem(name: string, daysUntil: number): Record<string, unknown> {
+  return {
+    kind: 'UpcomingPayment',
+    name,
+    date: dateOnlyFromToday(daysUntil),
+    amount: 1200,
+    currency: 'PLN',
+    daysOverdue: null,
+    daysUntil,
+  };
+}
+
 export const API_PATHS = {
   dashboard: '/api/reporting/dashboard',
   history: '/net-worth-history',
@@ -170,7 +219,7 @@ export const API_PATHS = {
 export type ApiRoute = keyof typeof API_PATHS;
 
 // A Response body is read once, so a plain Response is cloned for each call and a function builds a fresh one.
-export type Responder = Response | ((url: string) => Response);
+export type Responder = Response | ((url: string) => Response | Promise<Response>);
 
 export function planningMonthResponse(
   overrides: Record<string, unknown> = {},

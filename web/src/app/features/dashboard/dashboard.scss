@@ -77,6 +77,18 @@
     row-gap: var(--sk-space-9);
   }
 
+  .dashboard-page__hero--overdue {
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      'value value'
+      'todo todo'
+      'structure history';
+  }
+
+  .dashboard-page__hero--overdue > .dashboard-page__todo-pair {
+    grid-area: todo;
+  }
+
   .dashboard-page__value {
     grid-area: value;
   }

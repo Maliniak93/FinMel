@@ -28,8 +28,21 @@
         }}</a>
       </app-empty-state>
     } @else {
+      <ng-template #todoPair>
+        <div class="dashboard-page__pair dashboard-page__todo-pair">
+          <section class="dashboard-page__todo">
+            <header class="dashboard-page__todo-top">
+              <h2 class="sk-section-title">{{ 'dashboard.todo.heading' | transloco }}</h2>
+              <a routerLink="/planning">{{ 'dashboard.todo.planning' | transloco }}</a>
+            </header>
+            <app-todo-card (settled)="reloadAfterSettlement()" />
+            <app-upcoming-card />
+          </section>
+          <app-month-card [version]="balancesVersion()" />
+        </div>
+      </ng-template>
       <div class="dashboard-page__grid">
-        <div class="dashboard-page__hero">
+        <div class="dashboard-page__hero" [class.dashboard-page__hero--overdue]="hasOverdue()">
           <section class="dashboard-page__value">
             <p class="dashboard-page__kpi-label">{{ 'dashboard.netWorth' | transloco }}</p>
             <div class="dashboard-page__net-worth-row">
@@ -83,6 +96,10 @@
             }
           </section>
 
+          @if (hasOverdue()) {
+            <ng-container [ngTemplateOutlet]="todoPair" />
+          }
+
           <section class="dashboard-page__history">
             <h2 class="sk-section-title">
               {{ 'dashboard.netWorthHistory' | transloco }}
@@ -130,17 +147,9 @@
           </section>
         </div>
 
-        <div class="dashboard-page__pair">
-          <section class="dashboard-page__todo">
-            <header class="dashboard-page__todo-top">
-              <h2 class="sk-section-title">{{ 'dashboard.todo.heading' | transloco }}</h2>
-              <a routerLink="/planning">{{ 'dashboard.todo.planning' | transloco }}</a>
-            </header>
-            <app-todo-card (settled)="reloadAfterSettlement()" />
-            <app-upcoming-card />
-          </section>
-          <app-month-card [version]="balancesVersion()" />
-        </div>
+        @if (!hasOverdue()) {
+          <ng-container [ngTemplateOutlet]="todoPair" />
+        }
 
         <div class="dashboard-page__pair dashboard-page__pair--split">
           <section class="dashboard-page__group-card">

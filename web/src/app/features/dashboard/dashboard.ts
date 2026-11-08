@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, linkedSignal, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
@@ -15,6 +16,7 @@ import {
 } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { activeLocale } from '../../core/i18n/language';
+import { PlanningState } from '../../core/planning/planning-state';
 import { assetClassColor, groupColor } from '../../shared/colors';
 import { changeDirection } from '../../shared/change-direction';
 import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
@@ -41,6 +43,7 @@ import {
 } from './range-dialog/range-dialog';
 import { customRangeLabel, type CustomRange } from './range-label';
 
+const OVERDUE_KINDS: ReadonlySet<string> = new Set(['OverdueIncome', 'OverdueExpense']);
 const UNGROUPED_KEY = 'ungrouped';
 const MAX_BAR_PERCENT = 100;
 
@@ -93,6 +96,7 @@ function toGrosze(amount: number | string): number {
     MatChipsModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    NgTemplateOutlet,
     RouterLink,
     TranslocoPipe,
     EmptyState,
@@ -112,6 +116,12 @@ function toGrosze(amount: number | string): number {
   styleUrl: './dashboard.scss',
 })
 export class Dashboard {
+  private readonly planningState = inject(PlanningState);
+
+  protected readonly hasOverdue = computed(() =>
+    this.planningState.todo().some((item) => OVERDUE_KINDS.has(item.kind)),
+  );
+
   protected readonly dashboardResource = resource({
     loader: async ({ abortSignal }) => {
       const result = await getApiReportingDashboard({ signal: abortSignal });
