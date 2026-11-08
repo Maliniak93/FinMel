@@ -44,11 +44,38 @@ import {
   openFilterMenu,
   mockApi,
   accountResponse,
+  overdueExpenseItem,
+  overdueIncomeItem,
   requestUrl,
+  todoResponse,
+  upcomingPaymentItem,
 } from './testing/dashboard-fixtures';
 
 function normalised(text: string): string {
   return text.replace(/\s+/g, ' ');
+}
+
+function followsInDocument(earlier: Element, later: Element): boolean {
+  return (earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+}
+
+function sectionsOf(element: HTMLElement) {
+  const query = (selector: string): HTMLElement => {
+    const node = element.querySelector<HTMLElement>(selector);
+    if (!node) {
+      throw new Error(`No ${selector} rendered.`);
+    }
+    return node;
+  };
+  return {
+    hero: query('.dashboard-page__hero'),
+    kpi: query('.dashboard-page__value'),
+    history: query('.dashboard-page__history'),
+    chart: query('app-net-worth-chart'),
+    structure: query('.dashboard-page__structure'),
+    todo: query('.dashboard-page__todo'),
+    month: query('app-month-card'),
+  };
 }
 
 function dashboardStylesheet(): string {
@@ -708,6 +735,90 @@ describe('Dashboard', () => {
     expect(payment.querySelector('button')).toBeNull();
   });
 
+  it('puts Do zrobienia under the KPI and above the chart when an income is overdue', async () => {
+    await setup(jsonResponse(dashboardWithClasses), undefined, {
+      todo: todoResponse([overdueIncomeItem('Premia kwartalna', 8)]),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const { kpi, todo, month, chart, structure } = sectionsOf(element);
+
+    expect(element.querySelectorAll('.dashboard-page__todo')).toHaveLength(1);
+    expect(followsInDocument(kpi, todo)).toBe(true);
+    expect(followsInDocument(todo, month)).toBe(true);
+    expect(followsInDocument(month, chart)).toBe(true);
+    expect(followsInDocument(month, structure)).toBe(true);
+  });
+
+  it('puts Do zrobienia under the KPI when an expense is overdue', async () => {
+    await setup(jsonResponse(dashboardWithClasses), undefined, {
+      todo: todoResponse([overdueExpenseItem('Abonament', 2)]),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const { kpi, todo, month, chart, structure } = sectionsOf(element);
+
+    expect(element.querySelectorAll('.dashboard-page__todo')).toHaveLength(1);
+    expect(followsInDocument(kpi, todo)).toBe(true);
+    expect(followsInDocument(todo, month)).toBe(true);
+    expect(followsInDocument(month, chart)).toBe(true);
+    expect(followsInDocument(month, structure)).toBe(true);
+  });
+
+  it('keeps Do zrobienia in its place without overdue rows', async () => {
+    await setup(jsonResponse(dashboardWithClasses), undefined, {
+      todo: todoResponse([upcomingPaymentItem('Ubezpieczenie OC', 5)]),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const { hero, structure, todo, month } = sectionsOf(element);
+
+    expect(element.querySelectorAll('.dashboard-page__todo')).toHaveLength(1);
+    expect(hero.contains(todo)).toBe(false);
+    expect(followsInDocument(structure, todo)).toBe(true);
+    expect(followsInDocument(todo, month)).toBe(true);
+  });
+
+  it('keeps Do zrobienia in its place while the todo list loads', async () => {
+    let answerTodo!: (response: Response) => void;
+    const pendingTodo = new Promise<Response>((resolve) => (answerTodo = resolve));
+    fetchSpy = mockApi({ dashboard: jsonResponse(dashboardWithClasses), todo: () => pendingTodo });
+    await TestBed.configureTestingModule({
+      imports: [Dashboard],
+      providers: [provideRouter([]), provideI18nTesting()],
+    }).compileComponents();
+    fixture = TestBed.createComponent(Dashboard);
+    const element = fixture.nativeElement as HTMLElement;
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(element.querySelector('app-todo-card mat-spinner')).not.toBeNull();
+    });
+    const { hero, structure, todo } = sectionsOf(element);
+
+    expect(hero.contains(todo)).toBe(false);
+    expect(followsInDocument(structure, todo)).toBe(true);
+    answerTodo(todoResponse([]));
+  });
+
+  it('stacks the overdue section after the KPI on a narrow container', async () => {
+    await setup(jsonResponse(dashboardWithClasses), undefined, {
+      todo: todoResponse([overdueIncomeItem('Premia kwartalna', 8)]),
+    });
+    const element = fixture.nativeElement as HTMLElement;
+    const { kpi, history, structure, todo } = sectionsOf(element);
+
+    expect(followsInDocument(kpi, todo)).toBe(true);
+    expect(followsInDocument(todo, history)).toBe(true);
+    expect(followsInDocument(todo, structure)).toBe(true);
+
+    // jsdom cannot evaluate container queries, so read the component's compiled stylesheet.
+    const css =
+      [...document.querySelectorAll('style')]
+        .map((style) => style.textContent ?? '')
+        .find((text) => text.includes('.dashboard-page__hero')) ?? '';
+    const split = css.search(COMPILED_HERO_CONTAINER);
+    expect(split).toBeGreaterThan(-1);
+    expect(css.slice(0, split)).not.toMatch(/\d+fr\s+\d+fr/);
+  });
+
   describe('settling an overdue expense', () => {
     const expenseTodo = jsonResponse({
       paymentLeadDays: 7,
@@ -737,7 +848,7 @@ describe('Dashboard', () => {
         .length;
     }
 
-    async function clickSettle(saved: boolean): Promise<void> {
+    async function clickSettle(saved: boolean, beforeClick?: () => void): Promise<void> {
       vi.spyOn(TestBed.inject(MatDialog), 'open').mockReturnValue({
         afterClosed: () => of(saved),
       } as never);
@@ -747,6 +858,7 @@ describe('Dashboard', () => {
           '[data-testid="todo-card-item"] button',
         ),
       ].find((candidate) => textOf(candidate) === 'Rozlicz');
+      beforeClick?.();
       button!.click();
       await fixture.whenStable();
     }
@@ -776,6 +888,29 @@ describe('Dashboard', () => {
       await fixture.whenStable();
 
       expect(fetchSpy.mock.calls).toHaveLength(before);
+    });
+
+    it('returns Do zrobienia to its place after the last overdue row is settled', async () => {
+      let overdueRows = [overdueExpenseItem('Abonament', 4)];
+      await setup(jsonResponse(dashboardWithClasses), undefined, {
+        todo: () => todoResponse(overdueRows),
+      });
+      const element = fixture.nativeElement as HTMLElement;
+      const before = sectionsOf(element);
+
+      expect(followsInDocument(before.kpi, before.todo)).toBe(true);
+      expect(followsInDocument(before.todo, before.chart)).toBe(true);
+
+      await clickSettle(true, () => {
+        overdueRows = [];
+      });
+
+      await vi.waitFor(() => {
+        fixture.detectChanges();
+        const after = sectionsOf(element);
+        expect(followsInDocument(after.structure, after.todo)).toBe(true);
+        expect(element.querySelector('.todo-card')?.classList).not.toContain('todo-card--overdue');
+      });
     });
   });
 

@@ -1,4 +1,4 @@
-<mat-card class="todo-card">
+<mat-card class="todo-card" [class.todo-card--overdue]="hasOverdue()">
   <mat-card-content>
     <h2 class="sk-section-title">{{ 'dashboard.todo.title' | transloco }}</h2>
 

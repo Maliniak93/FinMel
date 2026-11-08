@@ -7,7 +7,12 @@ import { of } from 'rxjs';
 
 import { restoreEnglish, switchLanguage, textOf } from '../../../../testing/i18n';
 import { SettleExpenseDialog } from '../../planning/settle-expense-dialog/settle-expense-dialog';
-import { dateOnlyFromToday, jsonResponse, renderCard } from '../testing/dashboard-fixtures';
+import {
+  dateOnlyFromToday,
+  jsonResponse,
+  renderCard,
+  upcomingPaymentItem,
+} from '../testing/dashboard-fixtures';
 import { TodoCard } from './todo-card';
 
 function overdueOneOffExpense(name: string, daysAgo: number): Record<string, unknown> {
@@ -175,6 +180,21 @@ describe('TodoCard', () => {
         data: { oneOffExpense: expect.objectContaining({ id: 'one-off-Abonament' }) },
       }),
     );
+  });
+
+  it('tints the block only while a row is overdue', async () => {
+    const block = (element: HTMLElement) => element.querySelector('.todo-card')?.classList;
+
+    const withOverdue = await render([overdue('Premia')]);
+    expect(block(withOverdue.element)).toContain('todo-card--overdue');
+
+    TestBed.resetTestingModule();
+    const upcoming = await render([upcomingPaymentItem('Ubezpieczenie OC', 5)]);
+    expect(block(upcoming.element)).not.toContain('todo-card--overdue');
+
+    TestBed.resetTestingModule();
+    const empty = await render([]);
+    expect(block(empty.element)).not.toContain('todo-card--overdue');
   });
 });
 

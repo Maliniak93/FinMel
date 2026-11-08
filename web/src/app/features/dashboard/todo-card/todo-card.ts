@@ -85,6 +85,8 @@ export class TodoCard {
     () => !this.expanded() && this.rows().length > VISIBLE_ITEMS,
   );
 
+  protected readonly hasOverdue = computed(() => this.rows().some((row) => row.kind !== 'payment'));
+
   protected readonly rowCount = computed(() => this.rows().length);
 
   protected showAll(): void {

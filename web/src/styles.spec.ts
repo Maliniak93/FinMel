@@ -26,6 +26,25 @@ function darkBlock(tokens: string): string {
   return tokens.slice(start, tokens.indexOf('}', start));
 }
 
+function hexOf(block: string, name: string): string {
+  const value = block.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})\\b`, 'i'))?.[1];
+  expect(value, name).toBeDefined();
+  return value!;
+}
+
+function luminance(hex: string): number {
+  const [r, g, b] = [1, 3, 5].map((at) => {
+    const channel = parseInt(hex.slice(at, at + 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(a: string, b: string): number {
+  const [lighter, darker] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 function ruleBodies(text: string, selector: string): string[] {
   const bodies: string[] = [];
   let at = text.indexOf(selector);
@@ -210,5 +229,33 @@ describe('global styles', () => {
       expect(groupRules, corner).toContain(`${corner}: ${innerRadius}`);
     }
     expect(groupRules).not.toMatch(/\bborder-radius\s*:/);
+  });
+});
+
+describe('todo block on the overdue tint', () => {
+  const TEXT_ON_TINT = [
+    '--mat-sys-on-surface',
+    '--mat-sys-on-surface-variant',
+    '--mat-sys-primary',
+  ];
+
+  it('todo block text keeps AA contrast on the overdue tint in both themes', () => {
+    const tokens = read('src/skarbiec-tokens.css');
+    const todoStyles = read('src/app/features/dashboard/todo-card/todo-card.scss');
+    const tinted = ruleBodies(todoStyles, '.todo-card--overdue')[0] ?? '';
+    const light = tokens.slice(tokens.indexOf(':root'), tokens.indexOf('}'));
+
+    expect(tinted).toMatch(/background(-color)?:\s*var\(--mat-sys-surface-container-low\)/);
+    for (const [theme, block] of [
+      ['light', light],
+      ['dark', darkBlock(tokens)],
+    ] as const) {
+      const tint = hexOf(block, '--mat-sys-surface-container-low');
+      for (const name of TEXT_ON_TINT) {
+        expect(contrastRatio(hexOf(block, name), tint), `${theme} ${name}`).toBeGreaterThanOrEqual(
+          4.5,
+        );
+      }
+    }
   });
 });
