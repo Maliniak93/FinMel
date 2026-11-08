@@ -85,11 +85,18 @@
   min-height: 44px;
 }
 
+.planning-year__table .planning-year__detail td {
+  padding: 0;
+  border-bottom: 0;
+}
+
 .planning-year__detail {
   dl {
     display: grid;
     gap: var(--sk-space-1);
     margin: 0;
+    padding: var(--sk-space-2);
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
   }
 
   dl > div {

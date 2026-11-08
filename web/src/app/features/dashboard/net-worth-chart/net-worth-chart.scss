@@ -20,6 +20,29 @@
 
 .net-worth-chart__ranges {
   --mat-button-toggle-height: 44px;
+  --mat-button-toggle-selected-state-background-color: transparent;
+  position: relative;
+
+  mat-button-toggle {
+    position: relative;
+    z-index: 1;
+  }
+}
+
+.net-worth-chart__thumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--mat-sys-secondary-container);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .net-worth-chart__thumb--animated {
+    transition:
+      left var(--sk-motion-duration) var(--sk-motion-easing),
+      width var(--sk-motion-duration) var(--sk-motion-easing);
+  }
 }
 
 .net-worth-chart__filter {

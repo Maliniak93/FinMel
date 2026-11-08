@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { readStylesheet, rulesFor } from '../../../testing/stylesheet';
+import { mediaBlock, readStylesheet, rulesFor } from '../../../testing/stylesheet';
 
 describe('Shell styles', () => {
   const shell = readFileSync(resolve(process.cwd(), 'src/app/layout/shell/shell.scss'), 'utf8');
@@ -53,6 +53,18 @@ describe('Shell styles', () => {
     expect(activeHover).toMatch(/background:\s*var\(--sk-accent-tint\)/);
     expect(activeHover).toMatch(/border-left-color:\s*var\(--sk-accent-stroke\)/);
     expect(activeHover).toMatch(/color:\s*var\(--mat-sys-primary\)/);
+  });
+
+  it('nav links transition colours with the shared token', () => {
+    const motion = mediaBlock(shell, '(prefers-reduced-motion: no-preference)');
+    const link = rulesFor(motion, /\.shell__nav-link\s*$/);
+    const transition = link.match(/transition:([^;]+);/)?.[1] ?? '';
+    expect(transition).toMatch(/background-color/);
+    expect(transition).toMatch(/(^|[\s,])color(?=[\s,])/);
+    expect(transition).toMatch(/border-left-color/);
+    expect(transition).toMatch(/border-top-color/);
+    expect(transition).toContain('var(--sk-motion-duration)');
+    expect(transition).toContain('var(--sk-motion-easing)');
   });
 
   it('sets the sidebar brand, links and icons to the prototype sizes', () => {

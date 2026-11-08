@@ -1513,12 +1513,19 @@ describe('Planning', () => {
     expect(groups[0].textContent).toContain(formatMoney(1250, 'PLN'));
     expect(rows('split-deficit')).toHaveLength(0);
     expect(rows('split-valuation-missing')).toHaveLength(0);
-    expect(rows('split-breakdown')).toHaveLength(0);
+    const toggle = rows('split-breakdown-toggle')[0];
+    const closedParts = rows('split-breakdown');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(closedParts.length).toBeGreaterThan(0);
+    for (const part of closedParts) {
+      expect(part.closest('[inert]')).not.toBeNull();
+    }
 
-    rows('split-breakdown-toggle')[0].click();
+    toggle.click();
     await settle();
 
-    const parts = rows('split-breakdown');
+    const parts = rows('split-breakdown').filter((part) => part.closest('[inert]') === null);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(parts).toHaveLength(2);
     expect(parts[1].textContent).toContain(formatMoney(2000, 'PLN'));
   });

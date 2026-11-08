@@ -82,6 +82,10 @@
     padding: 0;
   }
 
+  .wealth-all__collapse-cell {
+    padding: 0;
+  }
+
   thead th {
     color: var(--mat-sys-on-surface-variant);
     font-weight: 400;
@@ -181,28 +185,6 @@
   .wealth-all__toggle mat-icon {
     transition: transform var(--sk-motion-duration) var(--sk-motion-easing);
   }
-
-  .wealth-all__row--enter {
-    animation: wealth-all-row-in var(--sk-motion-duration) var(--sk-motion-easing);
-  }
-
-  .wealth-all__row--leave {
-    animation: wealth-all-row-out var(--sk-motion-duration) var(--sk-motion-easing) forwards;
-  }
-
-  @keyframes wealth-all-row-in {
-    from {
-      opacity: 0;
-      transform: translateY(-12px);
-    }
-  }
-
-  @keyframes wealth-all-row-out {
-    to {
-      opacity: 0;
-      transform: translateY(-12px);
-    }
-  }
 }
 
 @include sk-below($sk-bp-sm) {
@@ -248,6 +230,10 @@
     grid-column: 1 / -1;
     grid-row: 2;
     padding-top: 0;
+  }
+
+  .wealth-all__table .wealth-all__collapse-cell {
+    grid-column: 1 / -1;
   }
 
   .wealth-all__table .wealth-all__section th:first-child {

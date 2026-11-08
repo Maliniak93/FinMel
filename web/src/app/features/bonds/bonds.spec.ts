@@ -102,7 +102,9 @@ describe('Bonds page, my bonds tab', () => {
 
   function rows(): HTMLElement[] {
     return Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('tbody tr.mat-mdc-row'),
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+        'tbody tr.mat-mdc-row:not(.my-bonds__periods-row)',
+      ),
     );
   }
 
@@ -558,13 +560,15 @@ describe('Bonds page, current offer tab', () => {
     await vi.waitFor(() => {
       const rows = Array.from(
         (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
-          'tbody tr.mat-mdc-row',
+          'tbody tr.mat-mdc-row:not(.my-bonds__periods-row)',
         ),
       );
       expect(rows.some((row) => textOf(row).includes('EDO1036'))).toBe(true);
     });
     const row = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('tbody tr.mat-mdc-row'),
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+        'tbody tr.mat-mdc-row:not(.my-bonds__periods-row)',
+      ),
     ).find((candidate) => textOf(candidate).includes('EDO1036'))!;
     const buy = Array.from(row.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
       textOf(button).includes('Kup'),
@@ -636,7 +640,9 @@ describe('Bonds page, interest settlement', () => {
 
   function rowFor(name: string): HTMLElement {
     const row = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('tbody tr.mat-mdc-row'),
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+        'tbody tr.mat-mdc-row:not(.my-bonds__periods-row)',
+      ),
     ).find((candidate) => textOf(candidate).includes(name));
     if (!row) {
       throw new Error(`No row for '${name}'.`);
@@ -699,7 +705,7 @@ describe('Bonds page, interest settlement', () => {
       fixture,
       Array.from(
         (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
-          'tbody tr.mat-mdc-row',
+          'tbody tr.mat-mdc-row:not(.my-bonds__periods-row)',
         ),
       ).find((row) => textOf(row).includes(dueRorBond.name))!,
       /rozlicz/i,
@@ -717,8 +723,19 @@ describe('Bonds page, interest settlement', () => {
 
   it('expands a row into the period table and offers "Cofnij" on the latest settled period only', async () => {
     await setup([settledRorBond]);
+    const toggle = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      `[data-testid="expand-${settledRorBond.assetId}"]`,
+    )!;
+    const closed = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+      '[data-testid="period-row-1"]',
+    )!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(closed.closest('[inert]')).not.toBeNull();
 
     await expand(settledRorBond);
+
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(closed.closest('[inert]')).toBeNull();
 
     // textOf folds the locale's no-break spaces into plain ones, so the expected amounts are folded the same way.
     const table = textOf(fixture.nativeElement);

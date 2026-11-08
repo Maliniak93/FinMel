@@ -1,0 +1,29 @@
+:host {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+}
+
+:host(.collapse--open) {
+  grid-template-rows: 1fr;
+  visibility: visible;
+}
+
+.collapse__inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :host {
+    transition:
+      grid-template-rows var(--sk-motion-duration) var(--sk-motion-easing),
+      visibility 0s linear var(--sk-motion-duration);
+  }
+
+  :host(.collapse--open) {
+    transition:
+      grid-template-rows var(--sk-motion-duration) var(--sk-motion-easing),
+      visibility 0s;
+  }
+}

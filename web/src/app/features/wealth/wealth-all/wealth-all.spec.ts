@@ -91,17 +91,23 @@ describe('WealthAll', () => {
   }
 
   function toggle(type: string): HTMLButtonElement {
-    return section(type)!.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+    return section(type)!.querySelector<HTMLButtonElement>('button.wealth-all__toggle')!;
   }
 
   function toggles(): HTMLButtonElement[] {
     return Array.from(
-      root().querySelectorAll<HTMLButtonElement>('[data-section] button[aria-expanded]'),
+      root().querySelectorAll<HTMLButtonElement>('[data-section] button.wealth-all__toggle'),
+    );
+  }
+
+  function openRows(scope: ParentNode = root()): HTMLElement[] {
+    return Array.from(scope.querySelectorAll<HTMLElement>('tr.wealth-all__row')).filter(
+      (candidate) => candidate.closest('[inert]') === null,
     );
   }
 
   function rowCount(): number {
-    return root().querySelectorAll('tr.wealth-all__row').length;
+    return openRows().length;
   }
 
   async function expandAll(): Promise<void> {
@@ -114,7 +120,7 @@ describe('WealthAll', () => {
   }
 
   function row(name: string): HTMLElement | undefined {
-    return Array.from(root().querySelectorAll<HTMLElement>('tr')).find((candidate) =>
+    return openRows().find((candidate) =>
       candidate.querySelector('td')?.textContent?.includes(name),
     );
   }
@@ -219,14 +225,14 @@ describe('WealthAll', () => {
     await settle();
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(section('bonds')!.querySelectorAll('tr.wealth-all__row')).toHaveLength(0);
+      expect(openRows(section('bonds')!)).toHaveLength(0);
     });
     expect(toggle('bonds').getAttribute('aria-expanded')).toBe('false');
 
     toggle('bonds').click();
     await settle();
     expect(toggle('bonds').getAttribute('aria-expanded')).toBe('true');
-    expect(section('bonds')!.querySelectorAll('tr.wealth-all__row')).toHaveLength(1);
+    expect(openRows(section('bonds')!)).toHaveLength(1);
     expect(row('EDO0935')).toBeDefined();
   });
 
@@ -478,25 +484,27 @@ describe('WealthAll', () => {
 
   it('section rows animate with the shared motion tokens', () => {
     const tokens = readStylesheet('src/skarbiec-tokens.css');
-    expect(tokens).toMatch(/--sk-motion-duration:\s*500ms;/);
+    expect(tokens).toMatch(/--sk-motion-duration:\s*140ms;/);
     expect(tokens).toMatch(/--sk-motion-easing:\s*cubic-bezier\(0\.35,\s*0,\s*0\.25,\s*1\);/);
 
     const html = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.html');
-    const enter = html.match(/animate\.enter="([^"]+)"/)?.[1];
-    const leave = html.match(/animate\.leave="([^"]+)"/)?.[1];
-    expect(enter).toBeDefined();
-    expect(leave).toBeDefined();
+    expect(html).toContain('<app-collapse');
+    expect(html).not.toMatch(/animate\.(enter|leave)/);
 
     const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    expect(css).not.toMatch(/@keyframes/);
     const media = css.indexOf('@media (prefers-reduced-motion: no-preference)');
     expect(media).toBeGreaterThanOrEqual(0);
     expect(css.slice(0, media)).not.toMatch(/var\(--sk-motion-/);
     const motion = mediaBlock(css, '(prefers-reduced-motion: no-preference)');
     expect(motion).toContain('var(--sk-motion-duration)');
     expect(motion).toContain('var(--sk-motion-easing)');
-    expect(motion).toContain(`.${enter}`);
-    expect(motion).toContain(`.${leave}`);
-    expect(motion).toMatch(/transform/);
+
+    const collapse = readStylesheet('src/app/shared/collapse/collapse.scss');
+    const collapseMotion = mediaBlock(collapse, '(prefers-reduced-motion: no-preference)');
+    expect(collapseMotion).toContain('var(--sk-motion-duration)');
+    expect(collapseMotion).toContain('var(--sk-motion-easing)');
+    expect(collapse).toMatch(/grid-template-rows:\s*0fr/);
   });
 
   it('section header line is centred on one axis', async () => {

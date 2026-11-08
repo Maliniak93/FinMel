@@ -203,6 +203,45 @@ describe('NetWorthChart', () => {
     ];
   }
 
+  it('range thumb follows the selected toggle', async () => {
+    const element = await setup(yearPoints, '1Y', undefined, undefined, '2025-01-10');
+    const toggles = [...element.querySelectorAll<HTMLElement>('mat-button-toggle')];
+    toggles.forEach((toggle, index) => {
+      Object.defineProperty(toggle, 'offsetLeft', { configurable: true, value: index * 50 });
+      Object.defineProperty(toggle, 'offsetWidth', { configurable: true, value: 50 + index });
+    });
+    const thumb = () =>
+      element.querySelector<HTMLElement>('mat-button-toggle-group .net-worth-chart__thumb')!;
+
+    fixture.componentRef.setInput('range', 'YTD');
+    await fixture.whenStable();
+    expect(thumb()).not.toBeNull();
+    expect(thumb().style.left).toBe('100px');
+    expect(thumb().style.width).toBe('52px');
+
+    fixture.componentRef.setInput('range', 'CUSTOM');
+    await fixture.whenStable();
+    expect(thumb().style.left).toBe('200px');
+    expect(thumb().style.width).toBe('54px');
+    expect(thumb().classList).toContain('net-worth-chart__thumb--animated');
+  });
+
+  it('range thumb first placement has no transition', async () => {
+    const element = await setup(yearPoints, '1Y', undefined, undefined, '2025-01-10');
+    const thumb = element.querySelector<HTMLElement>(
+      'mat-button-toggle-group .net-worth-chart__thumb',
+    )!;
+    expect(thumb).not.toBeNull();
+    expect(thumb.classList).not.toContain('net-worth-chart__thumb--animated');
+
+    const css = stylesheet();
+    const motion = css.slice(css.indexOf('@media (prefers-reduced-motion: no-preference)'));
+    expect(motion).toMatch(/net-worth-chart__thumb--animated[^{]*\{[^}]*transition/);
+    expect(css.slice(0, css.indexOf('@media (prefers-reduced-motion: no-preference)'))).not.toMatch(
+      /transition\s*:/,
+    );
+  });
+
   it('range control has a Zakres option beside the presets', async () => {
     const element = await setup(yearPoints, '1Y', undefined, undefined, '2025-01-10');
 
