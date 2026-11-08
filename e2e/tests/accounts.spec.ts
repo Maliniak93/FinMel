@@ -60,12 +60,21 @@ test('accounts: an IKE account with a contribution limit, deposits, withdrawals,
     await expect(accountRow(page)).toContainText(pln('0,00'));
   });
 
-  await test.step('Krok 2: setting the limit to 20 000,00 zł for the current year shows the bar "Wpłacono 0,00 / 20 000,00 zł"', async () => {
+  await test.step('Krok 2: setting the IKE limit to 20 000,00 zł for the current year in Ustawienia shows the bar "Wpłacono 0,00 / 20 000,00 zł"', async () => {
+    await page.goto('/settings');
+    await page.getByTestId('add-year').click();
+    const limitRow = page.getByTestId('contribution-limit-row').first();
+    await limitRow.getByTestId('ike-amount').fill('20000');
+    const saved = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'PUT' &&
+        response.url().includes('/contribution-limits/') &&
+        response.ok(),
+    );
+    await limitRow.getByTestId('save-year').click();
+    await saved;
+    await wealthTab(page, 'Rachunki inwestycyjne');
     await accountRow(page).getByRole('link', { name: ACCOUNT, exact: true }).click();
-    await page.getByRole('button', { name: 'Limit wpłat', exact: true }).click();
-    await dialog.getByLabel('Limit (zł)').fill('20000');
-    await dialog.getByRole('button', { name: 'Zapisz' }).click();
-    await expect(dialog).toBeHidden();
     await expect(contribution).toContainText(bar('0,00', '20 000,00'));
   });
 
