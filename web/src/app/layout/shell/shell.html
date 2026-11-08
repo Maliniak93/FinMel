@@ -13,6 +13,7 @@
     @if (link.path === 'planning' && planningState.todoCount() > 0) {
       <span
         class="shell__badge"
+        [class.shell__badge--overdue]="planningState.hasOverdue()"
         data-testid="todo-badge"
         [attr.aria-label]="'planning.todo.badge' | transloco"
         >{{ planningState.todoCount() }}</span

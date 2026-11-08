@@ -79,6 +79,17 @@ describe('Shell styles', () => {
     );
   });
 
+  it('badge is accent and red only when overdue', () => {
+    const base = rulesFor(shell, /\.shell__badge\s*$/);
+    const overdue = rulesFor(shell, /\.shell__badge--overdue\s*$/);
+    expect(base).toMatch(/border:\s*1px solid var\(--mat-sys-primary\)/);
+    expect(base).toMatch(/(?:^|[\s;])color:\s*var\(--mat-sys-primary\)/);
+    expect(base).not.toContain('--sk-negative');
+    expect(overdue).toMatch(/border[^;]*var\(--sk-negative\)/);
+    expect(overdue).toMatch(/(?:^|[\s;])color:\s*var\(--sk-negative\)/);
+    expect(shell.replace(overdue, '')).not.toContain('--sk-negative');
+  });
+
   it('sets the bottom nav to 68 px with xs labels, xl icons and a 16 px badge', () => {
     expect(shell).toMatch(/(^|[\s{;])height:\s*68px/m);
     expect(shell).toMatch(

@@ -18,6 +18,7 @@ import {
   textOf,
 } from '../../../testing/i18n';
 import { stubViewport, type ViewportStub } from '../../../testing/match-media';
+import type { TodoItemKind } from '../../api/portfolio';
 import { AuthService } from '../../core/auth/auth';
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
@@ -29,15 +30,15 @@ type LayoutName = 'full' | 'rail' | 'bottom';
 const WIDTHS: Record<LayoutName, number> = { full: 1280, rail: 1000, bottom: 599 };
 const LAYOUTS: LayoutName[] = ['full', 'rail', 'bottom'];
 
-function todoItem(name: string): Record<string, unknown> {
+function todoItem(name: string, kind: TodoItemKind = 'OverdueIncome'): Record<string, unknown> {
   return {
-    kind: 'OverdueIncome',
+    kind,
     name,
     date: '2026-11-10',
     month: '2026-11',
     amount: 800,
     currency: 'PLN',
-    daysOverdue: 5,
+    daysOverdue: kind === 'UpcomingPayment' ? null : 5,
   };
 }
 
@@ -128,6 +129,35 @@ describe.each(LAYOUTS)('Shell planning badge (%s layout)', (layout) => {
     const fixture = await mount(layout);
 
     expect(badgeOf(root(fixture))).toBeNull();
+  });
+
+  it('badge is accent without overdue items', async () => {
+    fetchItems = [
+      todoItem('800+', 'UpcomingPayment'),
+      todoItem('Wypłata żona', 'UpcomingPayment'),
+      todoItem('Premia', 'UpcomingPayment'),
+    ];
+    const fixture = await mount(layout);
+
+    const badge = badgeOf(root(fixture));
+    expect(badge).not.toBeNull();
+    expect(textOf(badge)).toBe('3');
+    expect(badge!.classList.contains('shell__badge--overdue')).toBe(false);
+  });
+
+  it('badge is red with an overdue item', async () => {
+    fetchItems = [
+      todoItem('800+', 'UpcomingPayment'),
+      todoItem('Wypłata żona', 'UpcomingPayment'),
+      todoItem('Premia', 'UpcomingPayment'),
+      todoItem('Czynsz', 'OverdueExpense'),
+    ];
+    const fixture = await mount(layout);
+
+    const badge = badgeOf(root(fixture));
+    expect(badge).not.toBeNull();
+    expect(textOf(badge)).toBe('4');
+    expect(badge!.classList.contains('shell__badge--overdue')).toBe(true);
   });
 
   it('follows the second shell when a new session starts in the same tab', async () => {

@@ -128,12 +128,17 @@
   height: 20px;
   padding: 0 var(--sk-space-1);
   box-sizing: border-box;
-  border: 1px solid var(--sk-negative);
+  border: 1px solid var(--mat-sys-primary);
   border-radius: 10px;
-  color: var(--sk-negative);
+  color: var(--mat-sys-primary);
   font-size: var(--sk-text-xs);
   line-height: 18px;
   text-align: center;
+}
+
+.shell__badge--overdue {
+  border-color: var(--sk-negative);
+  color: var(--sk-negative);
 }
 
 .shell__nav--rail {

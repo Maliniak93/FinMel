@@ -67,6 +67,10 @@ export class PlanningState {
 
   readonly todoCount = computed(() => this.todo().length);
 
+  readonly hasOverdue = computed(() =>
+    this.todo().some((item) => item.kind === 'OverdueIncome' || item.kind === 'OverdueExpense'),
+  );
+
   readonly todoError = computed(() => this.todoResource.error());
 
   readonly todoLoaded = computed(() => this.todoResource.hasValue());
