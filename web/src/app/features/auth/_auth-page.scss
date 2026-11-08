@@ -5,7 +5,7 @@
 
   .auth-page__label {
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: var(--sk-space-1);
     font-size: var(--sk-text-base);
     font-weight: 400;
     color: var(--mat-sys-on-surface-variant);
@@ -14,13 +14,13 @@
   .auth-page__field {
     display: block;
     width: 100%;
-    margin-bottom: 8px;
+    margin-bottom: var(--sk-space-2);
   }
 
   .auth-page__message {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--sk-space-1);
   }
 
   .auth-page__message mat-icon {
@@ -31,7 +31,7 @@
   }
 
   .auth-page__error {
-    margin: 0 0 16px;
+    margin: 0 0 var(--sk-space-4);
     color: var(--sk-negative);
     font-size: var(--sk-text-sm);
   }
@@ -48,7 +48,7 @@
   }
 
   .auth-page__switch {
-    margin-top: 16px;
+    margin-top: var(--sk-space-4);
     text-align: center;
   }
 }

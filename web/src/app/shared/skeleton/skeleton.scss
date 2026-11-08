@@ -1,7 +1,7 @@
 :host {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sk-space-3);
 }
 
 .skeleton__row {

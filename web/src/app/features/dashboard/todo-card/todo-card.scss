@@ -1,7 +1,7 @@
 .todo-card__state {
   display: flex;
   justify-content: center;
-  padding: 16px 0;
+  padding: var(--sk-space-4) 0;
 }
 
 .todo-card__empty {
@@ -27,7 +27,7 @@
     'name amount'
     'meta settle';
   align-items: center;
-  column-gap: 16px;
+  column-gap: var(--sk-space-4);
   row-gap: 2px;
 }
 

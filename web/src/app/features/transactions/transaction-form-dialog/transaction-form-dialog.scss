@@ -5,10 +5,10 @@
 
 .transaction-form-dialog__hint {
   color: var(--mat-sys-on-surface-variant);
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
 }
 
 .transaction-form-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

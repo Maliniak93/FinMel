@@ -1,25 +1,25 @@
 .settle-all-bonds-dialog__loading {
   display: flex;
   justify-content: center;
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
 }
 
 .settle-all-bonds-dialog__bond {
-  padding: 8px 0 12px;
+  padding: var(--sk-space-2) 0 var(--sk-space-3);
   border-bottom: 1px solid var(--mat-sys-outline-variant);
 }
 
 .settle-all-bonds-dialog__periods {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
+  gap: var(--sk-space-1);
+  margin-top: var(--sk-space-2);
 }
 
 .settle-all-bonds-dialog__period {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sk-space-3);
 }
 
 .settle-all-bonds-dialog__period-label {
@@ -32,15 +32,15 @@
 
 .settle-all-bonds-dialog__hint {
   opacity: 0.7;
-  margin: 4px 0 0;
+  margin: var(--sk-space-1) 0 0;
 }
 
 .settle-all-bonds-dialog__done {
   opacity: 0.7;
-  margin: 4px 0 0;
+  margin: var(--sk-space-1) 0 0;
 }
 
 .settle-all-bonds-dialog__error {
   color: var(--mat-sys-error);
-  margin: 4px 0 0;
+  margin: var(--sk-space-1) 0 0;
 }

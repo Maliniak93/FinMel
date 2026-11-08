@@ -1,7 +1,7 @@
 :host {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .goal-progress__track {
@@ -19,8 +19,8 @@
 
 .goal-progress__mark {
   position: absolute;
-  top: -3px;
-  bottom: -3px;
+  top: calc(var(--sk-space-1) * -1);
+  bottom: calc(var(--sk-space-1) * -1);
   width: 2px;
   background-color: var(--mat-sys-on-surface);
 }

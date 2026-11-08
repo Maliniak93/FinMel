@@ -6,12 +6,12 @@
 .cash-place-form-dialog__currencies {
   display: flex;
   flex-direction: column;
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
   padding: 0;
   border: 0;
 }
 
 .cash-place-form-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

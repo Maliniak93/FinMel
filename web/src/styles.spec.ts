@@ -95,14 +95,21 @@ describe('global styles', () => {
     expect(styles).toMatch(/focus-visible|outline-offset/);
   });
 
-  it('tokens define the spacing and radius scale', () => {
+  it('defines the 4px spacing grid', () => {
+    const tokens = read('src/skarbiec-tokens.css');
+    const spacing = Array.from(tokens.matchAll(/--sk-space-(\d+):\s*([^;]+);/g));
+
+    expect(spacing.map(([, step]) => Number(step))).toEqual(
+      Array.from({ length: 12 }, (_, index) => index + 1),
+    );
+    for (const [, step, value] of spacing) {
+      expect(value, `--sk-space-${step}`).toBe(`${Number(step) * 4}px`);
+    }
+  });
+
+  it('tokens define the radius scale', () => {
     const tokens = read('src/skarbiec-tokens.css');
 
-    expect(tokens).toMatch(/--sk-space-2:\s*9\.2px;/);
-    expect(tokens).toMatch(/--sk-space-3:\s*13\.8px;/);
-    expect(tokens).toMatch(/--sk-space-4:\s*18\.4px;/);
-    expect(tokens).toMatch(/--sk-space-6:\s*27\.6px;/);
-    expect(tokens).toMatch(/--sk-space-8:\s*36\.8px;/);
     expect(tokens).toMatch(/--sk-radius-md:\s*4px;/);
     expect(tokens).toMatch(/--sk-radius-lg:\s*7px;/);
   });

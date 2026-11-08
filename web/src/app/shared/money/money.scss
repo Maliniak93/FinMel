@@ -2,7 +2,7 @@
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.25rem 0.5rem;
+  gap: var(--sk-space-1) var(--sk-space-2);
 }
 
 .money--zero,
@@ -29,7 +29,7 @@
 }
 
 .money__tag {
-  padding: 0 0.5rem;
+  padding: 0 var(--sk-space-2);
   border: 1px dashed var(--mat-sys-outline);
   border-radius: 999px;
   color: var(--mat-sys-on-surface-variant);

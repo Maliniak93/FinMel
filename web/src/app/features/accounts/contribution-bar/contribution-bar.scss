@@ -1,7 +1,7 @@
 .contribution-bar {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--sk-space-1);
   min-width: 200px;
   font-size: var(--sk-text-sm);
   --contribution-color: var(--sk-accent-stroke);
@@ -40,7 +40,7 @@
 .contribution-bar__text {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sk-space-1);
   margin: 0;
   color: var(--mat-sys-on-surface-variant);
 }

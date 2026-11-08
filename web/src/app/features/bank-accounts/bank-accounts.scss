@@ -1,7 +1,7 @@
 @use '../../shared/ruled-table' as ruled;
 
 .bank-accounts__variants {
-  margin-bottom: 16px;
+  margin-bottom: var(--sk-space-4);
 }
 
 .bank-accounts__table {
@@ -18,6 +18,6 @@
 }
 
 .bank-accounts__no-data {
-  padding: 16px;
+  padding: var(--sk-space-4);
   opacity: 0.7;
 }

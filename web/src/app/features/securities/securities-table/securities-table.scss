@@ -3,7 +3,7 @@
 .securities-table__header {
   display: flex;
   justify-content: flex-end;
-  margin: 16px 0;
+  margin: var(--sk-space-4) 0;
 }
 
 .securities-table__table {
@@ -20,7 +20,7 @@
 }
 
 .securities-table__percent {
-  margin-inline-start: 4px;
+  margin-inline-start: var(--sk-space-1);
 }
 
 .securities-table__actions {
@@ -28,7 +28,7 @@
 }
 
 .securities-table__filter {
-  margin: 16px 0;
+  margin: var(--sk-space-4) 0;
 }
 
 .securities-table__delete {

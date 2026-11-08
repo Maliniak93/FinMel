@@ -5,10 +5,10 @@
 
 .recurring-expense-form-dialog__mode {
   display: flex;
-  margin-bottom: 16px;
+  margin-bottom: var(--sk-space-4);
 }
 
 .recurring-expense-form-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

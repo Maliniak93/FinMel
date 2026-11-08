@@ -143,7 +143,7 @@ h1 {
 }
 
 .sk-section-title {
-  margin: 0 0 12px;
+  margin: 0 0 var(--sk-space-3);
   font-size: var(--sk-text-2xl);
   font-weight: 600;
 }
@@ -186,7 +186,7 @@ input.app-amount {
 .mat-mdc-form-field-error::before {
   content: 'error';
   display: inline-block;
-  margin-inline-end: 4px;
+  margin-inline-end: var(--sk-space-1);
   font-family: 'Material Symbols Outlined';
   font-size: var(--sk-text-lg);
   line-height: 1;

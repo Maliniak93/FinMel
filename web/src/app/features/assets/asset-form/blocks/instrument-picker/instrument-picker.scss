@@ -5,14 +5,14 @@
 }
 
 .asset-form__new-listing {
-  margin-left: 8px;
+  margin-left: var(--sk-space-2);
   font-size: var(--sk-text-xs);
   font-weight: 400;
   color: var(--mat-sys-primary);
 }
 
 .asset-form__provider-unavailable {
-  margin: -8px 0 8px;
+  margin: -8px 0 var(--sk-space-2);
   font-size: var(--sk-text-base);
   color: var(--mat-sys-error);
 }

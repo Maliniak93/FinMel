@@ -19,3 +19,11 @@ test("rejects literal font-size", async () => {
   assert.equal((await lint("a { font-size: 1.1rem; }")).length, 1);
   assert.equal((await lint("a { font-size: var(--sk-text-base); }")).length, 0);
 });
+
+test("rejects off-grid spacing and allows exceptions", async () => {
+  assert.equal((await lint("a { padding: 10px; }")).length, 1);
+  assert.equal((await lint("a { gap: 0.5rem; }")).length, 1);
+  assert.equal((await lint("a { padding: 1px; }")).length, 0);
+  assert.equal((await lint("a { margin: -8px; }")).length, 0);
+  assert.equal((await lint("a { padding: var(--sk-space-2); }")).length, 0);
+});

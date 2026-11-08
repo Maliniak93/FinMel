@@ -1,13 +1,13 @@
 :host {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .allocation-bar__bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sk-space-3);
 }
 
 .allocation-bar__bar-label {
@@ -38,7 +38,7 @@
 .allocation-bar__legend {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sk-space-1);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -47,7 +47,7 @@
 .allocation-bar__legend-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sk-space-3);
 }
 
 .allocation-bar__swatch {

@@ -1,18 +1,18 @@
 .cash-page__totals {
-  margin-bottom: 24px;
+  margin-bottom: var(--sk-space-6);
 }
 
 .cash-page__total-main {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--sk-space-3);
 }
 
 .cash-page__total-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 20px;
+  gap: var(--sk-space-1) var(--sk-space-5);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -21,7 +21,7 @@
 .cash-page__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--sk-space-4);
 }
 
 .cash-place--archived {
@@ -31,8 +31,8 @@
 .cash-place__header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-top: 16px;
+  gap: var(--sk-space-3);
+  padding-top: var(--sk-space-4);
 }
 
 .cash-place__name {
@@ -47,8 +47,8 @@
 .cash-place__group {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 8px;
+  gap: var(--sk-space-2);
+  margin: 0 0 var(--sk-space-2);
   color: var(--mat-sys-on-surface-variant);
 }
 
@@ -67,8 +67,8 @@
 .cash-place__balance {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 0;
+  gap: var(--sk-space-3);
+  padding: var(--sk-space-1) 0;
   border-top: 1px solid var(--mat-sys-outline-variant);
 }
 
@@ -83,5 +83,5 @@
 .cash-place__balance-menu {
   width: 36px;
   height: 36px;
-  padding: 6px;
+  padding: var(--sk-space-1);
 }

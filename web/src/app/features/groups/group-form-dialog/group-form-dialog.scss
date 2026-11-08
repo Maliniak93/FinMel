@@ -4,7 +4,7 @@
 }
 
 .group-form-dialog__colors {
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
   padding: 0;
   border: 0;
 }
@@ -12,8 +12,8 @@
 .group-form-dialog__palette {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: var(--sk-space-2);
+  margin-top: var(--sk-space-2);
 }
 
 .group-form-dialog__swatch {
@@ -47,15 +47,15 @@
 }
 
 .group-form-dialog__caption {
-  margin: 8px 0 0;
+  margin: var(--sk-space-2) 0 0;
   color: var(--mat-sys-on-surface-variant);
 }
 
 .group-form-dialog__kind {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 0 0 16px;
+  gap: var(--sk-space-2);
+  margin: 0 0 var(--sk-space-4);
 }
 
 .group-form-dialog__legend {
@@ -80,7 +80,7 @@
 }
 
 .group-form-dialog__allocation {
-  margin: 0 0 var(--sk-space-4);
+  margin: 0 0 var(--sk-space-5);
   padding: 0;
   padding-top: var(--sk-space-3);
   border: 0;
@@ -96,7 +96,7 @@
 .group-form-dialog__allocation-row {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--sk-space-2);
 }
 
 .group-form-dialog__allocation-class {
@@ -108,10 +108,10 @@
 }
 
 .group-form-dialog__allocation-sum {
-  margin: 4px 0 8px;
+  margin: var(--sk-space-1) 0 var(--sk-space-2);
 }
 
 .group-form-dialog__error {
   color: var(--mat-sys-error);
-  margin: 4px 0 8px;
+  margin: var(--sk-space-1) 0 var(--sk-space-2);
 }

@@ -1,12 +1,12 @@
 .settle-deposit-dialog__name {
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
   font-weight: 400;
 }
 
 .settle-deposit-dialog__summary {
   display: flex;
-  gap: 24px;
-  margin: 0 0 16px;
+  gap: var(--sk-space-6);
+  margin: 0 0 var(--sk-space-4);
 
   dt {
     opacity: 0.7;
@@ -21,7 +21,7 @@
 .settle-deposit-dialog__loading {
   display: flex;
   justify-content: center;
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
 }
 
 .settle-deposit-dialog__field {
@@ -31,7 +31,7 @@
 
 .settle-deposit-dialog__row {
   display: flex;
-  gap: 12px;
+  gap: var(--sk-space-3);
 
   .settle-deposit-dialog__field {
     flex: 1;
@@ -40,16 +40,16 @@
 
 .settle-deposit-dialog__pay-out {
   display: block;
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }
 
 .settle-deposit-dialog__moves-out {
-  margin: 0 0 16px;
+  margin: 0 0 var(--sk-space-4);
   opacity: 0.7;
   font-size: var(--sk-text-xs);
 }
 
 .settle-deposit-dialog__error {
   color: var(--mat-sys-error);
-  margin: 0 0 8px;
+  margin: 0 0 var(--sk-space-2);
 }

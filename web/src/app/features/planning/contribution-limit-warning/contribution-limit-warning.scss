@@ -1,6 +1,6 @@
 .contribution-limit-warning {
-  margin: 0 0 8px;
-  padding: 8px 12px;
+  margin: 0 0 var(--sk-space-2);
+  padding: var(--sk-space-2) var(--sk-space-3);
   border-radius: var(--mat-sys-corner-small);
   background: var(--sk-warning-container);
   color: var(--sk-warning);

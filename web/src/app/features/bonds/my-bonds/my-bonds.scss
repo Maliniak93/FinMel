@@ -5,8 +5,8 @@
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
-  margin: 16px 0;
+  gap: var(--sk-space-4);
+  margin: var(--sk-space-4) 0;
 }
 
 .my-bonds__table {
@@ -19,7 +19,7 @@
 }
 
 .my-bonds__no-data {
-  padding: 16px;
+  padding: var(--sk-space-4);
   opacity: 0.7;
 }
 
@@ -35,11 +35,11 @@
 .my-bonds__periods {
   width: 100%;
   border-collapse: collapse;
-  margin: 8px 0 16px;
+  margin: var(--sk-space-2) 0 var(--sk-space-4);
 
   th,
   td {
-    padding: 4px 8px;
+    padding: var(--sk-space-1) var(--sk-space-2);
     text-align: left;
   }
 }

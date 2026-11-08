@@ -10,6 +10,6 @@
   display: inline-block;
   width: 12px;
   height: 12px;
-  margin-right: 8px;
+  margin-right: var(--sk-space-2);
   border-radius: 50%;
 }

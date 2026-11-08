@@ -5,13 +5,13 @@
 .cascade {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
+  gap: var(--sk-space-4);
 }
 
 .cascade__column {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--sk-space-3);
   min-width: 0;
 }
 
@@ -26,8 +26,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
-  column-gap: 16px;
-  row-gap: 4px;
+  column-gap: var(--sk-space-4);
+  row-gap: var(--sk-space-1);
 }
 
 .cascade__row:not(:last-child) {
@@ -76,7 +76,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 4px;
+  gap: var(--sk-space-1);
   color: var(--mat-sys-error);
 }
 
@@ -88,11 +88,11 @@
 
 .cascade__split {
   list-style: none;
-  margin: 12px 0 0;
-  padding: 0 0 0 16px;
+  margin: var(--sk-space-3) 0 0;
+  padding: 0 0 0 var(--sk-space-4);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sk-space-1);
   font-size: var(--sk-text-base);
   color: var(--mat-sys-on-surface-variant);
 }
@@ -100,5 +100,5 @@
 .cascade__split-row {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--sk-space-4);
 }

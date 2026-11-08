@@ -53,13 +53,13 @@ describe('AuthShell', () => {
     expect(scss).toMatch(/\.auth-shell__title\s*\{[^}]*text-align:\s*left/);
   });
 
-  it('places the language switch 24 px from the top and 32 px from the right', () => {
+  it('places the language switch on the space-6 top and space-8 right tokens', () => {
     const scss = readFileSync(
       resolve(process.cwd(), 'src/app/features/auth/auth-shell/auth-shell.scss'),
       'utf8',
     );
 
-    expect(scss).toMatch(/\.auth-shell__language\s*\{[^}]*top:\s*24px/);
-    expect(scss).toMatch(/\.auth-shell__language\s*\{[^}]*right:\s*32px/);
+    expect(scss).toMatch(/\.auth-shell__language\s*\{[^}]*top:\s*var\(--sk-space-6\)/);
+    expect(scss).toMatch(/\.auth-shell__language\s*\{[^}]*right:\s*var\(--sk-space-8\)/);
   });
 });

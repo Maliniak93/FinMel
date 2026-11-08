@@ -1019,7 +1019,7 @@ describe('dashboard stylesheet', () => {
     const scss = dashboardStylesheet();
     const separator = (body: string) =>
       /border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/.test(body) &&
-      /padding-bottom:\s*var\(--sk-space-8\)/.test(body);
+      /padding-bottom:\s*var\(--sk-space-9\)/.test(body);
     const pairRules = [
       ruleBodies(scss, '.dashboard-page__pair'),
       ruleBodies(scss, '.dashboard-page__pair:not(:last-child)'),
@@ -1080,7 +1080,7 @@ describe('dashboard stylesheet', () => {
     expect(wide).toMatch(
       /\.dashboard-page__hero\s*\{[^}]*grid-template-areas:\s*["']value history["']\s*["']structure history["']/,
     );
-    expect(wide).toMatch(/\.dashboard-page__hero\s*\{[^}]*row-gap:\s*var\(--sk-space-8\)/);
+    expect(wide).toMatch(/\.dashboard-page__hero\s*\{[^}]*row-gap:\s*var\(--sk-space-9\)/);
     expect(scss).toMatch(/\.dashboard-page__value\s*\{[^}]*grid-area:\s*value/);
     expect(scss).toMatch(/\.dashboard-page__structure\s*\{[^}]*grid-area:\s*structure/);
     expect(scss).toMatch(/\.dashboard-page__history\s*\{[^}]*grid-area:\s*history/);
@@ -1157,7 +1157,7 @@ describe('dashboard stylesheet', () => {
 
     expect(styles).not.toMatch(/#[0-9a-fA-F]{3,6}\b|rgb\(/);
     expect(scss).toMatch(/var\(--mat-sys-outline-variant\)/);
-    expect(scss).toMatch(/var\(--sk-space-8\)/);
+    expect(scss).toMatch(/var\(--sk-space-9\)/);
   });
 });
 

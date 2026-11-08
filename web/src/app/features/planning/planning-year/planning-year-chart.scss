@@ -5,7 +5,7 @@
 .year-chart__plot {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  gap: 4px;
+  gap: var(--sk-space-1);
   align-items: start;
 }
 
@@ -13,7 +13,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: var(--sk-space-1);
   min-width: 0;
 }
 
@@ -83,15 +83,15 @@
 .year-chart__legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-block-start: 8px;
+  gap: var(--sk-space-4);
+  margin-block-start: var(--sk-space-2);
   font-size: var(--sk-text-xs);
 }
 
 .year-chart__legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--sk-space-1);
 }
 
 .year-chart__swatch {

@@ -1,7 +1,7 @@
 .watchlist-item-dialog__content {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sk-space-2);
   min-width: 360px;
 }
 
