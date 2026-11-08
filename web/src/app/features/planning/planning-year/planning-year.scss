@@ -63,14 +63,14 @@
 
 .planning-year__incomplete {
   margin-inline-start: 8px;
-  font-size: 0.75rem;
+  font-size: var(--sk-text-xs);
   font-weight: 400;
   text-transform: none;
 }
 
 .planning-year__deficit {
   margin-inline-start: 4px;
-  font-size: 0.75rem;
+  font-size: var(--sk-text-xs);
   color: var(--sk-negative);
 }
 

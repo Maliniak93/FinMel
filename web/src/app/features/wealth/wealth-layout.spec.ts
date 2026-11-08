@@ -84,7 +84,7 @@ describe('WealthLayout', () => {
     const at = styles.indexOf('mat.tabs-overrides(');
     expect(at).toBeGreaterThanOrEqual(0);
     const tabs = styles.slice(at, styles.indexOf('  );', at));
-    expect(tabs).toMatch(/17px/);
+    expect(tabs).toMatch(/label-text-size:\s*var\(--sk-text-lg\)/);
     expect(tabs).toMatch(/2px/);
     expect(tabs).toMatch(/1px/);
     expect(tabs).toContain('--sk-accent-stroke');

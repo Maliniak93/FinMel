@@ -40,7 +40,7 @@
 
 .todo-card__meta {
   grid-area: meta;
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   color: var(--mat-sys-on-surface-variant);
 }
 

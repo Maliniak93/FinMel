@@ -42,7 +42,7 @@
 .group-form-dialog__swatch-cross {
   width: 20px;
   height: 20px;
-  font-size: 20px;
+  font-size: var(--sk-text-xl);
   color: var(--mat-sys-on-surface);
 }
 
@@ -88,8 +88,8 @@
 
   legend {
     padding: 0;
-    font-family: var(--mat-sys-headline-small-font);
-    font-size: 18px;
+    font-family: var(--mat-sys-brand-family);
+    font-size: var(--sk-text-lg);
   }
 }
 

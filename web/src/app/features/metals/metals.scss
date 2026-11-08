@@ -16,7 +16,7 @@
 
 .metals-page__price-date {
   opacity: 0.7;
-  font-size: 0.875em;
+  font-size: var(--sk-text-xs);
 }
 
 .metals-page__prices-error {
@@ -34,7 +34,7 @@
 }
 
 .metals-page__muted {
-  font-size: 0.85em;
+  font-size: var(--sk-text-xs);
   opacity: 0.7;
 }
 

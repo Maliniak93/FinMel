@@ -40,8 +40,27 @@ describe('SummaryStrip', () => {
     expect(scss).toMatch(/border-bottom:\s*1px solid var\(--mat-sys-outline-variant\)/);
     expect(scss).toMatch(/border-left:\s*1px solid var\(--mat-sys-outline-variant\)/);
     const valueRules = rulesFor(scss, /summary-strip__value/);
-    expect(valueRules).toMatch(/font-size:\s*28px/);
+    expect(valueRules).toMatch(/font-size:\s*var\(--sk-text-/);
     expect(valueRules).toMatch(/brand-family|headline/);
+  });
+
+  it('label and amount are not smaller than xs', () => {
+    const scss = readStylesheet('src/app/shared/summary-strip/summary-strip.scss');
+    const tokens = readStylesheet('src/skarbiec-tokens.css');
+    const px = (token: string) =>
+      Number(tokens.match(new RegExp(`--sk-text-${token}:\\s*(\\d+(?:\\.\\d+)?)px`))?.[1] ?? 0);
+
+    for (const selector of [/summary-strip__label/, /summary-strip__value/]) {
+      const sizes = Array.from(rulesFor(scss, selector).matchAll(/font-size:\s*([^;]+);/g)).map(
+        (match) => match[1].trim(),
+      );
+      expect(sizes.length, String(selector)).toBeGreaterThan(0);
+      for (const size of sizes) {
+        const token = size.match(/^var\(--sk-text-(xs|sm|base|lg|xl|2xl|3xl)\)$/)?.[1];
+        expect(token, `${selector} font-size ${size}`).toBeDefined();
+        expect(px(token!)).toBeGreaterThanOrEqual(px('xs'));
+      }
+    }
   });
 
   it('renders each label with its amount and a dash for a missing one', async () => {

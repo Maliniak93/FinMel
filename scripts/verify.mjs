@@ -1096,6 +1096,7 @@ async function runWebChecks() {
   const staticChecks = [
     ["web-typecheck", ["run", "typecheck"]],
     ["web-lint", ["run", "lint"]],
+    ["web-lint-styles", ["run", "lint:styles"]],
     ["web-format", ["run", "format:check"]],
   ];
   const sequentialSteps = [
@@ -1103,7 +1104,7 @@ async function runWebChecks() {
     ["web-test", ["test", "--", "--watch=false"]],
   ];
 
-  console.log("\n==> web checks (typecheck, lint, format:check in parallel; then build, test)");
+  console.log("\n==> web checks (typecheck, lint, lint:styles, format:check in parallel; then build, test)");
   const staticResults = await Promise.all(
     staticChecks.map(([name, npmArgs]) => step(name, () => runCommand(NPM, npmArgs, { cwd: WEB_DIR }), { block: true })),
   );

@@ -48,7 +48,7 @@ describe('AuthShell', () => {
       'utf8',
     );
 
-    expect(scss).toMatch(/\.auth-shell__title\s*\{[^}]*font-size:\s*26px/);
+    expect(scss).toMatch(/\.auth-shell__title\s*\{[^}]*font-size:\s*var\(--sk-text-2xl\)/);
     expect(scss).toMatch(/\.auth-shell__title\s*\{[^}]*font-weight:\s*600/);
     expect(scss).toMatch(/\.auth-shell__title\s*\{[^}]*text-align:\s*left/);
   });

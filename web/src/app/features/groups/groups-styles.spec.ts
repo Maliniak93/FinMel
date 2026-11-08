@@ -47,14 +47,14 @@ describe('Grupy stylesheets', () => {
     );
   });
 
-  it('draws the dialog allocation fieldset with a top rule, an 18 px legend and a 10 px live bar', () => {
+  it('draws the dialog allocation fieldset with a top rule, a legend on the lg text size and a 10 px live bar', () => {
     expect(dialog).toMatch(
       /\.group-form-dialog__allocation\s*\{[^}]*border-top:\s*1px solid var\(--mat-sys-outline-variant\)/,
     );
     expect(dialog).toMatch(
       /\.group-form-dialog__allocation\s*\{[^}]*padding-top:\s*var\(--sk-space-3\)/,
     );
-    expect(dialog).toMatch(/legend\s*\{[^}]*font-size:\s*18px/);
+    expect(dialog).toMatch(/legend\s*\{[^}]*font-size:\s*var\(--sk-text-lg\)/);
     expect(dialog).toMatch(/\.group-form-dialog__live-bar\s*\{[^}]*height:\s*10px/);
   });
 

@@ -51,7 +51,7 @@
 }
 
 .year-chart__label {
-  font-size: 0.75rem;
+  font-size: var(--sk-text-xs);
   text-transform: capitalize;
 }
 
@@ -64,7 +64,7 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  font-size: 0.6875rem;
+  font-size: var(--sk-text-xs);
   line-height: 1.2;
   text-align: center;
   overflow-wrap: anywhere;
@@ -72,7 +72,7 @@
   mat-icon {
     width: 14px;
     height: 14px;
-    font-size: 14px;
+    font-size: var(--sk-text-base);
   }
 }
 
@@ -85,7 +85,7 @@
   flex-wrap: wrap;
   gap: 16px;
   margin-block-start: 8px;
-  font-size: 0.75rem;
+  font-size: var(--sk-text-xs);
 }
 
 .year-chart__legend-item {
@@ -121,7 +121,7 @@
   }
 
   .year-chart__label {
-    font-size: 0.625rem;
+    font-size: var(--sk-text-xs);
   }
 
   .year-chart__mark-text {

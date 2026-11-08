@@ -17,7 +17,7 @@
 
 .cascade__title {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   font-weight: 600;
   color: var(--mat-sys-on-surface-variant);
 }
@@ -83,7 +83,7 @@
 .cascade__deficit mat-icon {
   width: 18px;
   height: 18px;
-  font-size: 18px;
+  font-size: var(--sk-text-lg);
 }
 
 .cascade__split {
@@ -93,7 +93,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 0.875rem;
+  font-size: var(--sk-text-base);
   color: var(--mat-sys-on-surface-variant);
 }
 

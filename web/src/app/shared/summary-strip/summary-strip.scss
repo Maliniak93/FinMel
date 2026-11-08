@@ -29,20 +29,20 @@
 .summary-strip__label {
   color: var(--mat-sys-on-surface-variant);
   font: var(--mat-sys-label-medium);
-  font-size: 11px;
+  font-size: var(--sk-text-xs);
   text-transform: uppercase;
 }
 
 .summary-strip__value {
   margin: 0;
   font-family: var(--mat-sys-brand-family);
-  font-size: 28px;
+  font-size: var(--sk-text-2xl);
   line-height: 1.2;
 }
 
 .summary-strip__gain {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--sk-text-base);
 }
 
 .summary-strip__caption {
@@ -57,11 +57,11 @@
   }
 
   .summary-strip__label {
-    font-size: 10px;
+    font-size: var(--sk-text-xs);
   }
 
   .summary-strip__value {
-    font-size: 14px;
+    font-size: var(--sk-text-base);
     overflow-wrap: anywhere;
   }
 }

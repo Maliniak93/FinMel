@@ -518,7 +518,8 @@ describe('WealthAll', () => {
     const size = declared(chevronRules, 'width');
     expect(size).toBeDefined();
     expect(declared(chevronRules, 'height')).toBe(size);
-    expect(declared(chevronRules, 'font-size')).toBe(size);
+    expect(size).toBe('24px');
+    expect(declared(chevronRules, 'font-size')).toBe('var(--sk-text-2xl)');
   });
 
   it('shows interest to settle in the error tone', async () => {

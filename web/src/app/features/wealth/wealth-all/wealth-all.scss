@@ -7,7 +7,7 @@
 }
 
 .wealth-all__total {
-  font-size: 2rem;
+  font-size: var(--sk-text-2xl);
   line-height: 1.2;
 }
 
@@ -94,7 +94,7 @@
 .wealth-all__actions mat-icon {
   width: 16px;
   height: 16px;
-  font-size: 16px;
+  font-size: var(--sk-text-lg);
 }
 
 .wealth-all__section th {
@@ -122,7 +122,7 @@
 .wealth-all__toggle mat-icon {
   width: 24px;
   height: 24px;
-  font-size: 24px;
+  font-size: var(--sk-text-2xl);
 }
 
 .wealth-all__toggle--open mat-icon {
@@ -130,7 +130,7 @@
 }
 
 .wealth-all__total-gain {
-  font-size: 1rem;
+  font-size: var(--sk-text-lg);
 }
 
 .wealth-all__section-link {
@@ -162,17 +162,17 @@
   padding: 1px 6px;
   border: 1px solid var(--mat-sys-outline-variant);
   border-radius: 4px;
-  font-size: 0.75rem;
+  font-size: var(--sk-text-xs);
   color: var(--mat-sys-on-surface-variant);
 }
 
 .wealth-all__subtitle {
-  font-size: 0.8125rem;
+  font-size: var(--sk-text-sm);
   color: var(--mat-sys-on-surface-variant);
 }
 
 .wealth-all__change {
-  font-size: 0.8125rem;
+  font-size: var(--sk-text-sm);
 }
 
 @media (prefers-reduced-motion: no-preference) {

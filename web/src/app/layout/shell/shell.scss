@@ -24,7 +24,7 @@
 .shell__nav mat-icon {
   width: 18px;
   height: 18px;
-  font-size: 18px;
+  font-size: var(--sk-text-lg);
 }
 
 .shell__nav-body {
@@ -39,7 +39,7 @@
   padding: 0 var(--sk-space-6) var(--sk-space-6);
   color: var(--mat-sys-on-surface);
   font-family: var(--mat-sys-brand-family);
-  font-size: 26px;
+  font-size: var(--sk-text-2xl);
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.1;
@@ -66,7 +66,7 @@
   background: transparent;
   color: var(--mat-sys-on-surface);
   font: inherit;
-  font-size: 15px;
+  font-size: var(--sk-text-lg);
   text-decoration: none;
   cursor: pointer;
 }
@@ -118,7 +118,7 @@
 
   ::ng-deep app-language-switch button.mat-mdc-button {
     height: 36px;
-    font-size: 13px;
+    font-size: var(--sk-text-sm);
     letter-spacing: 0.06em;
   }
 }
@@ -131,7 +131,7 @@
   border: 1px solid var(--sk-negative);
   border-radius: 10px;
   color: var(--sk-negative);
-  font-size: 11px;
+  font-size: var(--sk-text-xs);
   line-height: 18px;
   text-align: center;
 }
@@ -145,7 +145,7 @@
     margin-right: 0;
     padding: 6px 2px;
     border-radius: 0;
-    font-size: 11px;
+    font-size: var(--sk-text-xs);
     text-align: center;
   }
 
@@ -164,7 +164,7 @@
     min-width: 16px;
     padding: 0 4px;
     background: var(--mat-sys-surface);
-    font-size: 10px;
+    font-size: var(--sk-text-xs);
     line-height: 14px;
   }
 
@@ -238,13 +238,13 @@
 
   .shell__nav-label {
     flex: 0 0 auto;
-    font-size: 12px;
+    font-size: var(--sk-text-xs);
   }
 
   mat-icon {
     width: 20px;
     height: 20px;
-    font-size: 20px;
+    font-size: var(--sk-text-xl);
   }
 
   .shell__badge {
@@ -256,7 +256,7 @@
     padding: 0 4px;
     border-radius: 8px;
     background: var(--mat-sys-surface);
-    font-size: 10px;
+    font-size: var(--sk-text-xs);
     line-height: 14px;
   }
 }

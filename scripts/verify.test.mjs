@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -278,4 +278,10 @@ test("migrations step", async () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("runs the style lint with the web checks", () => {
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+  assert.match(readFileSync(path.join(root, "scripts", "verify.mjs"), "utf8"), /lint:styles/);
+  assert.match(readFileSync(path.join(root, ".github", "workflows", "ci.yml"), "utf8"), /npm run lint:styles/);
 });
