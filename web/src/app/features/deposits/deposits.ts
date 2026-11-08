@@ -18,6 +18,7 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { confirmSetAssetArchived } from '../../shared/asset-archive';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { formatDate, formatPercent, formatPercentNumber } from '../../shared/format';
 import { Money } from '../../shared/money/money';
@@ -45,6 +46,7 @@ import {
 @Component({
   selector: 'app-deposits',
   imports: [
+    PageHeader,
     MatButtonModule,
     EmptyState,
     MatDividerModule,

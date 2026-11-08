@@ -1,6 +1,6 @@
 <mat-card class="upcoming-card">
   <mat-card-content>
-    <h2 class="upcoming-card__title">{{ 'dashboard.upcoming.title' | transloco }}</h2>
+    <h2 class="sk-section-title">{{ 'dashboard.upcoming.title' | transloco }}</h2>
 
     @if (loadError(); as error) {
       <app-section-error [message]="error.message" (retry)="reload()" />

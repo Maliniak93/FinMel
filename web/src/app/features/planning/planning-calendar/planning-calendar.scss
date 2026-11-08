@@ -12,7 +12,7 @@
 .planning-calendar__weekdays {
   border-top: 1px solid var(--mat-sys-outline-variant);
   border-left: 1px solid var(--mat-sys-outline-variant);
-  font-weight: 500;
+  font-weight: 400;
   text-align: center;
 
   span {
@@ -24,10 +24,6 @@
 
 .planning-calendar__grid {
   border-left: 1px solid var(--mat-sys-outline-variant);
-}
-
-.planning-calendar__details h3 {
-  font-size: 20px;
 }
 
 .planning-calendar__cell {
@@ -62,7 +58,7 @@
 }
 
 .planning-calendar__day {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .planning-calendar__cell--today .planning-calendar__day {
@@ -163,5 +159,5 @@
 
 .planning-calendar__detail .planning-calendar__name {
   flex: 1 1 8rem;
-  font-weight: 500;
+  font-weight: 400;
 }

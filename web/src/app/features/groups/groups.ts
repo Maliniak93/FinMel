@@ -19,6 +19,7 @@ import { getApiReportingDashboard } from '../../api/reporting';
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/empty-state/empty-state';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { GroupList } from '../../shared/group-select/group-list';
 import { Money } from '../../shared/money/money';
 import { SectionError } from '../../shared/section-error/section-error';
@@ -36,6 +37,7 @@ const SIDE_PANEL_QUERY = '(min-width: 960px)';
 @Component({
   selector: 'app-groups',
   imports: [
+    PageHeader,
     MatButtonModule,
     EmptyState,
     GroupAssetsPanel,

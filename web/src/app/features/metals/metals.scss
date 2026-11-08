@@ -1,12 +1,5 @@
 @use '../../shared/ruled-table' as ruled;
 
-.metals-page__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
 .metals-page__prices {
   display: flex;
   flex-wrap: wrap;
@@ -47,10 +40,6 @@
 
 .metals-page__actions {
   text-align: end;
-}
-
-.metals-page__header mat-slide-toggle {
-  margin-left: auto;
 }
 
 .metals-page__no-data {

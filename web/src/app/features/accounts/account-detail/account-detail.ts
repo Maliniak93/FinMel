@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, input, resource, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -23,6 +24,7 @@ import {
 import { getApiReportingDashboard } from '../../../api/reporting';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { PageHeader } from '../../../shared/page-header/page-header';
 import {
   formatDate,
   formatMonth,
@@ -54,6 +56,8 @@ const DEFAULT_PAGE_SIZE = 20;
 @Component({
   selector: 'app-account-detail',
   imports: [
+    NgTemplateOutlet,
+    PageHeader,
     MatButtonModule,
     MatIconModule,
     MatSelectModule,

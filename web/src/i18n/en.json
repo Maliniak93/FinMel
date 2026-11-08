@@ -1096,6 +1096,7 @@
     "paymentLeadDaysFailed": "Could not save the reminder lead time."
   },
   "securities": {
+    "title": "Stocks & ETFs",
     "tabs": {
       "stocks": "Stocks",
       "etfs": "ETFs"
@@ -1195,6 +1196,7 @@
     }
   },
   "deposits": {
+    "title": "Deposits",
     "add": "Add deposit",
     "empty": "You don't have any term deposits yet.",
     "status": {
@@ -1291,6 +1293,7 @@
     }
   },
   "bankAccounts": {
+    "title": "Bank accounts",
     "add": "Add account",
     "addFirst": "Add your first bank account",
     "empty": "You don't have any bank accounts yet.",
@@ -1347,6 +1350,7 @@
     }
   },
   "accounts": {
+    "title": "Investment accounts",
     "showArchived": "Show archived",
     "outsideNetWorthLabel": "Outside net worth",
     "newAccount": "New account",

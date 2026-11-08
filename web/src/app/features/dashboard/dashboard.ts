@@ -19,6 +19,7 @@ import { assetClassColor, groupColor } from '../../shared/colors';
 import { changeDirection } from '../../shared/change-direction';
 import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
 import { EmptyState } from '../../shared/empty-state/empty-state';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { ALLOCATION_DEVIATION_PP } from '../../shared/allocation-bar/allocation-bar';
 import { GoalProgress } from '../../shared/goal-progress/goal-progress';
 import { SectionError } from '../../shared/section-error/section-error';
@@ -95,6 +96,7 @@ function toGrosze(amount: number | string): number {
     RouterLink,
     TranslocoPipe,
     EmptyState,
+    PageHeader,
     GoalProgress,
     NetWorthChart,
     SectionError,

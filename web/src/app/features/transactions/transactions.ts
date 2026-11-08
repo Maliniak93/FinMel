@@ -23,6 +23,7 @@ import { readProblemDetails } from '../../core/auth/problem-details';
 import { groupColor } from '../../shared/colors';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { EmptyState } from '../../shared/empty-state/empty-state';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { formatDate, formatMoney, formatMonth, formatQuantity } from '../../shared/format';
 import { Gain } from '../../shared/gain/gain';
 import { GroupList } from '../../shared/group-select/group-list';
@@ -65,6 +66,7 @@ function toNumber(value: number | string | null | undefined): number | null {
 @Component({
   selector: 'app-transactions',
   imports: [
+    PageHeader,
     EmptyState,
     MatButtonModule,
     Gain,

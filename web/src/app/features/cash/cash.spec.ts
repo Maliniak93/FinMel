@@ -196,6 +196,21 @@ describe('Cash', () => {
       .filter((request: Request) => request.method !== 'GET');
   }
 
+  it('puts the title and the add button in the page header, and titles the places', async () => {
+    await setup();
+
+    expect(element().querySelectorAll('app-page-header h1')).toHaveLength(1);
+    expect(element().querySelector('app-page-header h1')?.textContent?.trim()).toBe('Cash');
+    expect(element().querySelector('app-page-header button[actions]')?.textContent).toContain(
+      'Add place',
+    );
+    for (const name of element().querySelectorAll('.cash-place__name')) {
+      expect(name.classList.contains('sk-section-title')).toBe(true);
+    }
+    await switchLanguage(fixture, 'pl');
+    expect(element().querySelector('app-page-header h1')?.textContent?.trim()).toBe('Gotówka');
+  });
+
   it('renders the totals strip and balance rows', async () => {
     await setup();
     const strip = element().querySelector<HTMLElement>('.cash-page__totals')!;

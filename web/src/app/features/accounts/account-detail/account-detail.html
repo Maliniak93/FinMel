@@ -1,4 +1,4 @@
-<div class="account-detail">
+<ng-template #back>
   <a
     data-testid="breadcrumb"
     class="account-detail__back"
@@ -11,44 +11,44 @@
           : { tab: (isBank() ? 'shell.nav.bankAccounts' : 'shell.nav.accounts') | transloco }
     }}
   </a>
+</ng-template>
 
+<div class="account-detail">
   @if (accountResource.error(); as loadError) {
+    <ng-container [ngTemplateOutlet]="back" />
     <app-section-error [message]="loadError.message" (retry)="accountResource.reload()" />
   } @else if (accountResource.hasValue()) {
     @let account = accountResource.value();
-    <div class="account-detail__header">
-      <div>
-        <h1 class="account-detail__title">{{ account.name }}</h1>
-        <div class="account-detail__meta">
-          <app-status-chip
-            [label]="accountTypeLabel(account.type) | transloco"
-            icon="account_balance"
-          />
-          @if (account.bank; as bank) {
-            <app-status-chip [label]="bankVariantLabel(bank.variant) | transloco" icon="savings" />
-            @if (bank.bankName) {
-              <app-status-chip [label]="bank.bankName" icon="apartment" />
-            }
-            <app-status-chip [label]="account.currency" icon="payments" />
-            <app-status-chip
-              [label]="formatPercent(bank.annualInterestRatePercent)"
-              icon="percent"
-            />
-          } @else {
-            <app-status-chip [label]="taxWrapperLabel(account.wrapper) | transloco" icon="shield" />
-          }
-          @if (account.outsideNetWorth) {
-            <app-status-chip
-              [label]="'accounts.outsideNetWorthLabel' | transloco"
-              icon="visibility_off"
-            />
-          }
-          @if (account.isArchived) {
-            <app-status-chip [label]="'common.archived' | transloco" icon="inventory_2" />
-          }
-        </div>
+    <app-page-header [title]="account.name">
+      <div breadcrumb>
+        <ng-container [ngTemplateOutlet]="back" />
       </div>
-      <div class="account-detail__actions">
+      <div subtitle class="account-detail__meta">
+        <app-status-chip
+          [label]="accountTypeLabel(account.type) | transloco"
+          icon="account_balance"
+        />
+        @if (account.bank; as bank) {
+          <app-status-chip [label]="bankVariantLabel(bank.variant) | transloco" icon="savings" />
+          @if (bank.bankName) {
+            <app-status-chip [label]="bank.bankName" icon="apartment" />
+          }
+          <app-status-chip [label]="account.currency" icon="payments" />
+          <app-status-chip [label]="formatPercent(bank.annualInterestRatePercent)" icon="percent" />
+        } @else {
+          <app-status-chip [label]="taxWrapperLabel(account.wrapper) | transloco" icon="shield" />
+        }
+        @if (account.outsideNetWorth) {
+          <app-status-chip
+            [label]="'accounts.outsideNetWorthLabel' | transloco"
+            icon="visibility_off"
+          />
+        }
+        @if (account.isArchived) {
+          <app-status-chip [label]="'common.archived' | transloco" icon="inventory_2" />
+        }
+      </div>
+      <div actions class="account-detail__actions">
         <button
           mat-flat-button
           color="primary"
@@ -115,7 +115,7 @@
           }
         }
       </div>
-    </div>
+    </app-page-header>
 
     @if (account.contribution; as contribution) {
       <div class="account-detail__contribution">
@@ -141,7 +141,7 @@
     <app-summary-strip [items]="summary()" />
 
     @if (!account.bank) {
-      <h2>{{ 'accounts.detail.holdings' | transloco }}</h2>
+      <h2 class="sk-section-title">{{ 'accounts.detail.holdings' | transloco }}</h2>
       @if (holdingsResource.error(); as holdingsError) {
         <app-section-error [message]="holdingsError.message" (retry)="holdingsResource.reload()" />
       } @else if (holdingsResource.isLoading() && !holdingsResource.hasValue()) {
@@ -171,7 +171,7 @@
     }
 
     @if (account.bank) {
-      <h2>{{ 'accounts.detail.deposits' | transloco }}</h2>
+      <h2 class="sk-section-title">{{ 'accounts.detail.deposits' | transloco }}</h2>
       @if (depositsResource.error(); as depositsError) {
         <app-section-error [message]="depositsError.message" (retry)="depositsResource.reload()" />
       } @else if (depositsResource.isLoading() && !depositsResource.hasValue()) {
@@ -205,7 +205,7 @@
       }
     }
 
-    <h2>{{ 'accounts.detail.cashHistory' | transloco }}</h2>
+    <h2 class="sk-section-title">{{ 'accounts.detail.cashHistory' | transloco }}</h2>
     @if (historyResource.error(); as historyError) {
       <app-section-error [message]="historyError.message" (retry)="historyResource.reload()" />
     } @else if (historyResource.isLoading() && !historyResource.hasValue()) {
@@ -302,6 +302,7 @@
       }
     }
   } @else {
+    <ng-container [ngTemplateOutlet]="back" />
     <app-skeleton [rows]="4" />
   }
 </div>

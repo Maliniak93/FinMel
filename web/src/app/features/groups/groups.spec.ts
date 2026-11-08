@@ -260,6 +260,18 @@ describe('Groups', () => {
       .filter((r: Request) => r.method === 'PUT' && r.url.includes('/asset-groups/assignment'));
   }
 
+  it('puts the title, the add button and the counter line in the page header', async () => {
+    await setup();
+
+    const header = element().querySelector('app-page-header')!;
+    expect(element().querySelectorAll('h1')).toHaveLength(1);
+    expect(header.querySelector('h1')?.textContent?.trim()).toBe('Groups');
+    expect(header.querySelector('button[data-testid="add-group"]')).not.toBeNull();
+    expect(
+      header.querySelector('.page-header__subtitle [data-testid="group-counter"]'),
+    ).not.toBeNull();
+  });
+
   it('renders groups', async () => {
     await setup();
 

@@ -2,12 +2,7 @@
   display: block;
 }
 
-.wealth-all__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+.wealth-all__summary {
   margin-bottom: 16px;
 }
 
@@ -87,7 +82,7 @@
 
   thead th {
     color: var(--mat-sys-on-surface-variant);
-    font-weight: 500;
+    font-weight: 400;
     border-bottom: 1px solid var(--mat-sys-outline-variant);
   }
 }
@@ -159,7 +154,7 @@
 
 .wealth-all__name {
   color: inherit;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .wealth-all__tag {

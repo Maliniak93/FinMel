@@ -139,6 +139,18 @@ describe('WealthAll', () => {
     return rules.match(new RegExp(`(?:^|[\\s;{])${property}:\\s*([^;]+);`))?.[1].trim();
   }
 
+  it('puts the title, the as-of line and the new asset button in the page header', async () => {
+    await setup();
+
+    const header = root().querySelector('app-page-header')!;
+    expect(root().querySelectorAll('app-page-header h1')).toHaveLength(1);
+    expect(header.querySelector('h1')?.textContent?.trim()).toBe('Wealth');
+    expect(header.querySelector('.page-header__subtitle')?.textContent).toContain(
+      `As of ${formatDate(ASOF)}`,
+    );
+    expect(header.querySelector('button[actions]')?.textContent).toContain('New asset');
+  });
+
   it('renders sections and total', async () => {
     await setup();
     await expandAll();

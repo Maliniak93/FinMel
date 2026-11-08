@@ -1,14 +1,5 @@
 @use '../../shared/ruled-table' as ruled;
 
-.deposits-page__header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
 .deposits-page__table {
   @include ruled.ruled-table;
   width: 100%;

@@ -1,14 +1,17 @@
 <div class="metals-page">
-  <div class="metals-page__header">
-    <h1>{{ 'metals.title' | transloco }}</h1>
-    <mat-slide-toggle [checked]="showArchived()" (change)="showArchived.set($event.checked)">
+  <app-page-header [title]="'metals.title' | transloco">
+    <mat-slide-toggle
+      actions
+      [checked]="showArchived()"
+      (change)="showArchived.set($event.checked)"
+    >
       {{ 'assetArchive.showArchived' | transloco }}
     </mat-slide-toggle>
-    <button mat-flat-button color="primary" type="button" (click)="openAddDialog()">
+    <button actions mat-flat-button color="primary" type="button" (click)="openAddDialog()">
       <mat-icon>add</mat-icon>
       {{ 'metals.add' | transloco }}
     </button>
-  </div>
+  </app-page-header>
 
   <section class="metals-page__prices" [attr.aria-label]="'metals.prices' | transloco">
     @if (pricesResource.error(); as pricesError) {

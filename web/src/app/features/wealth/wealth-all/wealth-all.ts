@@ -14,6 +14,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { formatDate } from '../../../shared/format';
 import { groupColor } from '../../../shared/colors';
 import { EmptyState } from '../../../shared/empty-state/empty-state';
+import { PageHeader } from '../../../shared/page-header/page-header';
 import { Gain } from '../../../shared/gain/gain';
 import { GroupList } from '../../../shared/group-select/group-list';
 import { Money } from '../../../shared/money/money';
@@ -72,6 +73,7 @@ const FLAG_VIEWS: Record<WealthFlag, FlagView> = {
     MatMenuModule,
     MatSelectModule,
     MatSlideToggleModule,
+    PageHeader,
     Money,
     RouterLink,
     SectionError,

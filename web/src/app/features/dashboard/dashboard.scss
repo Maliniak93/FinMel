@@ -19,13 +19,6 @@
   margin-top: 8px;
 }
 
-.dashboard-page__header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-}
-
 .dashboard-page__hero,
 .dashboard-page__pair {
   display: grid;
@@ -105,12 +98,6 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
-.dashboard-page__card-title {
-  margin: 0 0 12px;
-  font-size: 1.125rem;
-  font-weight: 500;
-}
-
 .dashboard-page__net-worth-row {
   display: flex;
   align-items: center;
@@ -148,7 +135,7 @@
 }
 
 .dashboard-page__as-of {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 0.875rem;
   opacity: 0.7;
 }
@@ -160,15 +147,14 @@
   min-width: 0;
 }
 
-.dashboard-page__todo-head {
+.dashboard-page__todo-top {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 16px;
 
-  .dashboard-page__card-title {
+  .sk-section-title {
     margin: 0;
-    font-size: 24px;
   }
 }
 

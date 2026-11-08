@@ -1,24 +1,25 @@
-<header class="wealth-all__header">
-  <div class="wealth-all__summary">
-    <div class="wealth-all__total sk-num" data-testid="total">
-      <app-money [amount]="data.total()" />
-    </div>
-    @if (data.totalGain(); as gain) {
-      <div class="wealth-all__total-gain" data-testid="total-gain">
-        <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
-      </div>
-    }
-    @if (data.asOf(); as asOf) {
-      <div class="wealth-all__as-of">
-        {{ 'wealth.asOf' | transloco: { date: formatDate(asOf) } }}
-      </div>
-    }
-  </div>
-  <button mat-flat-button type="button" [matMenuTriggerFor]="newAssetMenu">
+<app-page-header [title]="'shell.nav.wealth' | transloco">
+  <button actions mat-flat-button type="button" [matMenuTriggerFor]="newAssetMenu">
     <mat-icon>add</mat-icon>
     {{ 'assets.newAsset' | transloco }}
   </button>
-</header>
+  @if (data.asOf(); as asOf) {
+    <div subtitle class="wealth-all__as-of">
+      {{ 'wealth.asOf' | transloco: { date: formatDate(asOf) } }}
+    </div>
+  }
+</app-page-header>
+
+<div class="wealth-all__summary">
+  <div class="wealth-all__total sk-num" data-testid="total">
+    <app-money [amount]="data.total()" />
+  </div>
+  @if (data.totalGain(); as gain) {
+    <div class="wealth-all__total-gain" data-testid="total-gain">
+      <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
+    </div>
+  }
+</div>
 
 <mat-menu #newAssetMenu="matMenu">
   @for (entry of newAssetEntries; track entry.labelKey) {

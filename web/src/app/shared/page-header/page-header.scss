@@ -1,18 +1,30 @@
 :host {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
+  display: block;
   margin-bottom: 16px;
 }
 
-.page-header__title {
-  margin: 0;
-}
-
-.page-header__actions {
+.page-header__row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.page-header__breadcrumb,
+.page-header__subtitle {
+  &:empty {
+    display: none;
+  }
+}
+
+.page-header__breadcrumb {
+  margin-bottom: 8px;
+}
+
+.page-header__subtitle {
+  margin-top: 8px;
+}
+
+.page-header__title {
+  margin: 0 auto 0 0;
 }

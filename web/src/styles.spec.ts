@@ -115,6 +115,17 @@ describe('global styles', () => {
     expect(block).toMatch(/margin:\s*0\b/);
   });
 
+  it('section titles are 24 px and sub titles 20 px, both weight 600', () => {
+    const styles = read('src/styles.scss');
+    const main = ruleBodies(styles, '.sk-section-title ')[0] ?? '';
+    const sub = ruleBodies(styles, '.sk-section-title--sub')[0] ?? '';
+
+    expect(main).toMatch(/font-size:\s*24px/);
+    expect(main).toMatch(/font-weight:\s*600/);
+    expect(sub).toMatch(/font-size:\s*20px/);
+    expect(sub).toMatch(/font-weight:\s*600/);
+  });
+
   it('rounds the outer corners of the first and last button toggle with the group radius', () => {
     const styles = read('src/styles.scss');
     const innerRadius =

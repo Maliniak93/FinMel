@@ -27,7 +27,7 @@
 .planning-page__month {
   min-width: 10rem;
   text-align: center;
-  font-weight: 500;
+  font-weight: 400;
   text-transform: capitalize;
 }
 
@@ -99,7 +99,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--sk-positive);
 
   mat-icon {
@@ -133,17 +133,13 @@
 
   dd {
     margin: 0;
-    font-weight: 500;
+    font-weight: 400;
   }
 }
 
 .planning-balance__difference {
   border-top: 1px solid var(--mat-sys-outline-variant);
   padding-top: var(--sk-space-2);
-}
-
-h2 {
-  font-size: 22px;
 }
 
 .planning-section__incomplete {
@@ -174,7 +170,7 @@ h2 {
 }
 
 .planning-definition__name {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .planning-definition__details {
@@ -193,18 +189,6 @@ h2 {
 
 .planning-definition__rule-part:not(:last-child)::after {
   content: ' · ';
-}
-
-.planning-page__title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.planning-page__add {
-  display: flex;
-  gap: 8px;
 }
 
 .planning-page__warning {
@@ -243,7 +227,7 @@ h2 {
 
 .planning-overdue__amount {
   text-align: end;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .planning-overdue__actions {
@@ -300,11 +284,11 @@ h2 {
 }
 
 @media (max-width: 719.98px) {
-  .planning-page__add .planning-page__add-label {
+  .planning-page__add-label {
     display: none;
   }
 
-  .planning-page__add button {
+  app-page-header button {
     min-width: 44px;
     min-height: 44px;
     padding: 0;

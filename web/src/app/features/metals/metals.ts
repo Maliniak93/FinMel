@@ -19,6 +19,7 @@ import {
 import { readProblemDetails } from '../../core/auth/problem-details';
 import { confirmSetAssetArchived } from '../../shared/asset-archive';
 import { confirmRemoveAsset } from '../../shared/confirm-remove-asset';
+import { PageHeader } from '../../shared/page-header/page-header';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { formatDate, formatQuantity } from '../../shared/format';
 import { Gain } from '../../shared/gain/gain';
@@ -52,6 +53,7 @@ function sumInGrosze(amounts: readonly number[]): number {
     MatMenuModule,
     MatSlideToggleModule,
     MatTableModule,
+    PageHeader,
     Money,
     RouterLink,
     SectionError,

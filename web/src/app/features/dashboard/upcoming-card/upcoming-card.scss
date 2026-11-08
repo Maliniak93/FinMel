@@ -1,9 +1,3 @@
-.upcoming-card__title {
-  margin: 0 0 12px;
-  font-size: 1.125rem;
-  font-weight: 500;
-}
-
 .upcoming-card__state {
   display: flex;
   flex-direction: column;
@@ -67,5 +61,5 @@
 .upcoming-card__amount {
   grid-area: amount;
   align-self: center;
-  font-weight: 500;
+  font-weight: 400;
 }

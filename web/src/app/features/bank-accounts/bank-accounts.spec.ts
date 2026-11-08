@@ -251,7 +251,21 @@ describe('BankAccounts', () => {
     const empty = (fixture.nativeElement as HTMLElement).querySelector('app-empty-state');
     expect(empty).not.toBeNull();
     expect(empty?.querySelector('button')).not.toBeNull();
-    expect((fixture.nativeElement as HTMLElement).querySelector('h1')).toBeNull();
+    expect(
+      (fixture.nativeElement as HTMLElement)
+        .querySelector('app-page-header h1')
+        ?.textContent?.trim(),
+    ).toBe('Bank accounts');
+  });
+
+  it('puts the add button and the archived toggle in the page header actions', async () => {
+    await setup();
+    const element = fixture.nativeElement as HTMLElement;
+
+    expect(element.querySelector('app-page-header button[actions]')?.textContent).toContain(
+      'Add account',
+    );
+    expect(element.querySelector('app-page-header mat-slide-toggle[actions]')).not.toBeNull();
   });
 
   it('links each row to its account page', async () => {

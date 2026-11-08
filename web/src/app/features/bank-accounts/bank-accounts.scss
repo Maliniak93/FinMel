@@ -1,14 +1,5 @@
 @use '../../shared/ruled-table' as ruled;
 
-.bank-accounts__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
 .bank-accounts__variants {
   margin-bottom: 16px;
 }

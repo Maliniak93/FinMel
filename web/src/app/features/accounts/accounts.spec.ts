@@ -371,7 +371,14 @@ describe('Accounts', () => {
     const element = fixture.nativeElement as HTMLElement;
     const strip = element.querySelector<HTMLElement>('[data-testid="summary-strip"]');
 
-    expect(element.querySelector('h1')).toBeNull();
+    expect(element.querySelectorAll('app-page-header h1')).toHaveLength(1);
+    expect(element.querySelector('app-page-header h1')?.textContent?.trim()).toBe(
+      'Investment accounts',
+    );
+    expect(element.querySelector('app-page-header button[actions]')?.textContent).toContain(
+      'New account',
+    );
+    expect(element.querySelector('app-page-header mat-slide-toggle[actions]')).not.toBeNull();
     expect(strip).not.toBeNull();
     const stripText = (strip!.textContent ?? '').replace(/\s+/g, ' ');
     expect(stripText).toContain('Total');

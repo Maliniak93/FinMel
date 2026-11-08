@@ -124,6 +124,18 @@ describe('Metals', () => {
     );
   }
 
+  it('shows one page title with its buttons, and the as-of date only in the price rows', async () => {
+    await setup();
+
+    const header = element().querySelector('app-page-header')!;
+    expect(element().querySelectorAll('h1')).toHaveLength(1);
+    expect(header.querySelector('h1')?.textContent?.trim()).toBe('Precious metals');
+    expect(header.querySelector('button[actions]')?.textContent).toContain('Add precious metal');
+    expect(header.querySelector('mat-slide-toggle[actions]')).not.toBeNull();
+    expect(header.querySelector('.page-header__subtitle')?.textContent?.trim()).toBe('');
+    expect(element().querySelector('.metals-page__prices')?.textContent).toContain('as of');
+  });
+
   it('shows the price header with both metals, silver without a price as a dash', async () => {
     await setup();
 

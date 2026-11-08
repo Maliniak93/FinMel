@@ -1,22 +1,23 @@
 <div class="bank-accounts">
+  <app-page-header [title]="'bankAccounts.title' | transloco">
+    <mat-slide-toggle
+      actions
+      [checked]="includeArchived()"
+      (change)="includeArchived.set($event.checked)"
+    >
+      {{ 'bankAccounts.showArchived' | transloco }}
+    </mat-slide-toggle>
+    <button actions mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
+      <mat-icon>add</mat-icon>
+      {{ 'bankAccounts.add' | transloco }}
+    </button>
+  </app-page-header>
+
   @if (accountsResource.error(); as loadError) {
     <app-section-error [message]="loadError.message" (retry)="accountsResource.reload()" />
   } @else if (accountsResource.isLoading() && !accountsResource.hasValue()) {
     <app-skeleton [rows]="4" />
   } @else if (accountsResource.hasValue()) {
-    <div class="bank-accounts__toolbar">
-      <mat-slide-toggle
-        [checked]="includeArchived()"
-        (change)="includeArchived.set($event.checked)"
-      >
-        {{ 'bankAccounts.showArchived' | transloco }}
-      </mat-slide-toggle>
-      <button mat-flat-button color="primary" type="button" (click)="openCreateDialog()">
-        <mat-icon>add</mat-icon>
-        {{ 'bankAccounts.add' | transloco }}
-      </button>
-    </div>
-
     @if (accountsResource.value().length === 0) {
       <app-empty-state icon="account_balance" [message]="'bankAccounts.empty' | transloco">
         <button action mat-flat-button color="primary" type="button" (click)="openCreateDialog()">

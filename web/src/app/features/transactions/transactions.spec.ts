@@ -556,7 +556,13 @@ describe('Transactions', () => {
       const tab = element.querySelector<HTMLAnchorElement>('a[href="/wealth/securities"]');
       expect(home?.textContent).toContain('Wealth');
       expect(tab?.textContent).toContain('Stock');
-      expect(textOf(element.querySelector('h1'))).toBe('Transactions — Apple');
+      expect(element.querySelectorAll('h1')).toHaveLength(1);
+      expect(textOf(element.querySelector('app-page-header h1'))).toBe('Transactions — Apple');
+      expect(home?.closest('.page-header__breadcrumb')).not.toBeNull();
+      expect(
+        element.querySelector('.page-header__subtitle .transactions-page__summary'),
+      ).not.toBeNull();
+      expect(element.querySelector('.page-header__row button')?.textContent).toContain('Sell');
       expect(pageText()).toContain('Retirement');
       expect(pageText()).toContain('Long term');
     });

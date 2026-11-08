@@ -4,23 +4,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-bottom: 8px;
   text-decoration: none;
   color: var(--mat-sys-on-surface-variant);
   font-size: 0.875rem;
 }
 
-.account-detail__title {
-  margin: 0 0 8px;
-}
-
-.account-detail__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
+.account-detail > .account-detail__back {
+  margin-bottom: 8px;
 }
 
 .account-detail__meta {
@@ -33,6 +23,7 @@
 
 .account-detail__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
