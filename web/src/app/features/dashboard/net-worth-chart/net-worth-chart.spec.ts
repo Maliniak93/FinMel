@@ -18,6 +18,7 @@ import { provideI18nTesting } from '../../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../../shared/format';
 import { ASSET_CLASS } from '../../assets/asset-class';
 import { menuItem, openFilterMenu } from '../testing/dashboard-fixtures';
+import { niceTicks } from './chart-scale';
 import { NetWorthChart } from './net-worth-chart';
 
 function normalised(text: string): string {
@@ -250,7 +251,7 @@ describe('NetWorthChart', () => {
     const gridlines = element.querySelectorAll('.net-worth-chart__gridline');
     const yLabels = textsOf(element, '.net-worth-chart__y-label');
     const xLabels = textsOf(element, '.net-worth-chart__x-label');
-    const area = element.querySelector('path.net-worth-chart__area');
+    const line = element.querySelector('path.net-worth-chart__line');
 
     expect(gridlines.length).toBeGreaterThanOrEqual(4);
     expect(gridlines.length).toBeLessThanOrEqual(6);
@@ -260,7 +261,7 @@ describe('NetWorthChart', () => {
     }
     expect(xLabels.length).toBeGreaterThanOrEqual(1);
     expect(xLabels.length).toBeLessThanOrEqual(3);
-    expect(area?.getAttribute('d')).toBeTruthy();
+    expect(line?.getAttribute('d')).toBeTruthy();
     expect(element.querySelector('svg')?.getAttribute('aria-label')).toContain(formatMoney(10000));
     expect(element.querySelector('svg')?.getAttribute('aria-label')).toContain(formatMoney(10500));
   });
@@ -320,7 +321,6 @@ describe('NetWorthChart', () => {
     const element = await setup(yearPoints, '1Y', CLASSES, ASSET_CLASS.Etf);
 
     expect(paintOf(element.querySelector('path.net-worth-chart__line'))).toMatch(ETF_COLOUR);
-    expect(paintOf(element.querySelector('path.net-worth-chart__area'))).toMatch(ETF_COLOUR);
     expect(textOutsideControls(element)).toContain('ETF');
     expect(element.querySelector('svg')?.getAttribute('aria-label')).toContain('ETF');
 
@@ -334,7 +334,6 @@ describe('NetWorthChart', () => {
     const element = await setup(yearPoints, '1Y', CLASSES, null);
 
     expect(paintOf(element.querySelector('path.net-worth-chart__line'))).not.toMatch(ETF_COLOUR);
-    expect(paintOf(element.querySelector('path.net-worth-chart__area'))).not.toMatch(ETF_COLOUR);
     expect(textOutsideControls(element)).not.toContain('ETF');
     expect(element.querySelector('svg')?.getAttribute('aria-label') ?? '').not.toContain('ETF');
 
@@ -627,5 +626,200 @@ describe('NetWorthChart', () => {
     );
     expect(element.querySelector('mat-button-toggle-group')).not.toBeNull();
     expect(element.querySelector('.net-worth-chart__filter')).not.toBeNull();
+  });
+
+  function chartElement(element: HTMLElement): SVGElement {
+    return element.querySelector('svg.net-worth-chart__svg') as SVGElement;
+  }
+
+  async function pressKey(element: HTMLElement, key: string): Promise<void> {
+    chartElement(element).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    await fixture.whenStable();
+  }
+
+  async function blurChart(element: HTMLElement): Promise<void> {
+    const chart = chartElement(element);
+    chart.dispatchEvent(new FocusEvent('blur'));
+    chart.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    await fixture.whenStable();
+  }
+
+  function tooltipText(element: HTMLElement): string {
+    return normalised(textOf(element.querySelector('.net-worth-chart__tooltip')));
+  }
+
+  function liveText(element: HTMLElement): string {
+    return normalised(textOf(element.querySelector('[aria-live="polite"]')));
+  }
+
+  it('draws only the line without an area fill', async () => {
+    const element = await setup(yearPoints);
+
+    const areaClass = ['net-worth-chart', 'area'].join('__');
+    expect(element.querySelector(`.${areaClass}`)).toBeNull();
+    expect(stylesheet()).not.toContain(areaClass);
+    const line = element.querySelector('.net-worth-chart__line');
+    expect(line).not.toBeNull();
+    expect(line?.getAttribute('d')).toBeTruthy();
+  });
+
+  it('keeps the y axis fitted to the data', async () => {
+    const element = await setup(yearPoints);
+
+    const expected = niceTicks(10000, 11000, 5);
+
+    expect(element.querySelectorAll('.net-worth-chart__gridline').length).toBe(expected.length);
+    expect(element.querySelectorAll('.net-worth-chart__y-label').length).toBe(expected.length);
+  });
+
+  it('is a keyboard stop with a visible focus outline', async () => {
+    const element = await setup(yearPoints);
+
+    const chart = chartElement(element);
+    expect(chart.getAttribute('tabindex')).toBe('0');
+    expect(chart.getAttribute('aria-label')).toBeTruthy();
+    expect(ruleOf(stylesheet(), '.net-worth-chart__svg:focus-visible')).toMatch(/outline:/);
+  });
+
+  it('moves the point with the arrow keys and stops at the ends', async () => {
+    const element = await setup(yearPoints);
+
+    await pressKey(element, 'ArrowLeft');
+    expect(tooltipText(element)).toContain(formatDate('2026-08-01'));
+
+    await pressKey(element, 'ArrowLeft');
+    expect(tooltipText(element)).toContain(formatDate('2026-07-01'));
+
+    await pressKey(element, 'ArrowLeft');
+    expect(tooltipText(element)).toContain(formatDate('2026-06-01'));
+
+    await pressKey(element, 'ArrowLeft');
+    expect(tooltipText(element)).toContain(formatDate('2026-06-01'));
+
+    await pressKey(element, 'ArrowRight');
+    expect(tooltipText(element)).toContain(formatDate('2026-07-01'));
+
+    await pressKey(element, 'ArrowRight');
+    await pressKey(element, 'ArrowRight');
+    expect(tooltipText(element)).toContain(formatDate('2026-08-01'));
+  });
+
+  it('selects the last point on the first arrow key', async () => {
+    const left = await setup(yearPoints);
+    expect(left.querySelector('.net-worth-chart__tooltip')).toBeNull();
+    await pressKey(left, 'ArrowLeft');
+    expect(tooltipText(left)).toContain(formatDate('2026-08-01'));
+    fixture.destroy();
+    TestBed.resetTestingModule();
+
+    const right = await setup(yearPoints);
+    await pressKey(right, 'ArrowRight');
+    expect(tooltipText(right)).toContain(formatDate('2026-08-01'));
+  });
+
+  it('jumps to the first and last point with Home and End', async () => {
+    const element = await setup(yearPoints);
+
+    await pressKey(element, 'Home');
+    expect(tooltipText(element)).toContain(formatDate('2026-06-01'));
+
+    await pressKey(element, 'End');
+    expect(tooltipText(element)).toContain(formatDate('2026-08-01'));
+  });
+
+  it('hides the tooltip on Escape and on blur', async () => {
+    const element = await setup(yearPoints);
+
+    await pressKey(element, 'Home');
+    expect(element.querySelector('.net-worth-chart__tooltip')).not.toBeNull();
+    expect(liveText(element)).not.toBe('');
+
+    await pressKey(element, 'Escape');
+    expect(element.querySelector('.net-worth-chart__tooltip')).toBeNull();
+    expect(element.querySelector('.net-worth-chart__guide')).toBeNull();
+    expect(element.querySelector('.net-worth-chart__marker')).toBeNull();
+    expect(liveText(element)).toBe('');
+
+    await pressKey(element, 'End');
+    expect(element.querySelector('.net-worth-chart__tooltip')).not.toBeNull();
+
+    await blurChart(element);
+    expect(element.querySelector('.net-worth-chart__tooltip')).toBeNull();
+    expect(liveText(element)).toBe('');
+  });
+
+  it('shows the same tooltip for keyboard and pointer', async () => {
+    const element = await setup(yearPoints);
+
+    hoverPlot(element, 150);
+    await fixture.whenStable();
+    const pointer = tooltipText(element);
+    const pointerClass = element.querySelector('.net-worth-chart__tooltip')?.className;
+    element
+      .querySelector('.net-worth-chart__plot')
+      ?.dispatchEvent(new MouseEvent('pointerleave', { bubbles: true }));
+    await fixture.whenStable();
+
+    await pressKey(element, 'Home');
+    await pressKey(element, 'ArrowRight');
+
+    expect(tooltipText(element)).toBe(pointer);
+    expect(element.querySelector('.net-worth-chart__tooltip')?.className).toBe(pointerClass);
+    expect(element.querySelector('.net-worth-chart__guide')).not.toBeNull();
+    expect(element.querySelector('.net-worth-chart__marker')).not.toBeNull();
+  });
+
+  it('announces the selected point in a polite live region', async () => {
+    const element = await setup(yearPoints);
+
+    await pressKey(element, 'Home');
+
+    expect(liveText(element)).toBe(
+      normalised(`${formatDate('2026-06-01')}: ${formatMoney(10000)}`),
+    );
+
+    await pressKey(element, 'End');
+
+    expect(liveText(element)).toBe(
+      normalised(`${formatDate('2026-08-01')}: ${formatMoney(10500)}`),
+    );
+
+    fixture.destroy();
+    TestBed.resetTestingModule();
+    const incomplete = await setup(dailyPoints('2026-08', 3, (i) => i === 2));
+    await pressKey(incomplete, 'End');
+    const note = textOf(incomplete.querySelector('.net-worth-chart__tooltip-incomplete'));
+    expect(note).not.toBe('');
+    expect(liveText(incomplete)).toContain(normalised(note));
+    expect(liveText(incomplete)).toContain(`${formatDate('2026-08-03')}: `);
+  });
+
+  it('does not announce on pointer moves', async () => {
+    const element = await setup(yearPoints);
+    expect(liveText(element)).toBe('');
+
+    hoverPlot(element, 0);
+    await fixture.whenStable();
+    expect(liveText(element)).toBe('');
+
+    await pressKey(element, 'End');
+    const announced = liveText(element);
+
+    hoverPlot(element, 150);
+    await fixture.whenStable();
+    expect(liveText(element)).toBe(announced);
+  });
+
+  it('has no keyboard stop or live region with fewer than two points', async () => {
+    const element = await setup([]);
+
+    for (const points of [[], yearPoints.slice(0, 1)]) {
+      fixture.componentRef.setInput('points', points);
+      await fixture.whenStable();
+
+      expect(element.querySelector('.net-worth-chart__empty')).not.toBeNull();
+      expect(element.querySelector('svg')).toBeNull();
+      expect(element.querySelector('[aria-live]')).toBeNull();
+    }
   });
 });

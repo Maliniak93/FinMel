@@ -132,6 +132,7 @@ export class NetWorthChart {
   );
 
   private readonly hoveredIndex = signal<number | null>(null);
+  private readonly announcedIndex = signal<number | null>(null);
 
   constructor() {
     const destroyRef = inject(DestroyRef);
@@ -208,7 +209,6 @@ export class NetWorthChart {
     }
 
     const line = coordinates.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join('L');
-    const bottom = MARGIN.top + plotHeight;
     const first = coordinates[0];
     const last = coordinates[coordinates.length - 1];
 
@@ -223,7 +223,6 @@ export class NetWorthChart {
       coordinates,
       bands,
       linePath: `M${line}`,
-      areaPath: `M${line}L${last.x.toFixed(2)},${bottom}L${first.x.toFixed(2)},${bottom}Z`,
       yTicks: yTicks.map((value) => ({ value, y: toY(value) })),
       xTickUnit: xTickUnit(range, firstDate, lastDate),
       xTicks: xTicks(range, firstDate, lastDate).map((date) => ({ date, x: toX(date.getTime()) })),
@@ -236,6 +235,12 @@ export class NetWorthChart {
     const chart = this.chart();
     const index = this.hoveredIndex();
     return chart && index !== null ? chart.coordinates[index] : null;
+  });
+
+  protected readonly announced = computed(() => {
+    const chart = this.chart();
+    const index = this.announcedIndex();
+    return chart && index !== null ? (chart.coordinates[index] ?? null) : null;
   });
 
   protected requestCustomRange(): void {
@@ -284,5 +289,43 @@ export class NetWorthChart {
 
   protected onPointerLeave(): void {
     this.hoveredIndex.set(null);
+  }
+
+  protected onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      this.clearSelection();
+      return;
+    }
+    const chart = this.chart();
+    if (!chart) {
+      return;
+    }
+    const last = chart.coordinates.length - 1;
+    const current = this.hoveredIndex();
+    let next: number;
+    switch (event.key) {
+      case 'ArrowLeft':
+        next = current === null ? last : Math.max(0, current - 1);
+        break;
+      case 'ArrowRight':
+        next = current === null ? last : Math.min(last, current + 1);
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = last;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    this.hoveredIndex.set(next);
+    this.announcedIndex.set(next);
+  }
+
+  protected clearSelection(): void {
+    this.hoveredIndex.set(null);
+    this.announcedIndex.set(null);
   }
 }

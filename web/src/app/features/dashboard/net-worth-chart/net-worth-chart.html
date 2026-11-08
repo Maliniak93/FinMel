@@ -94,6 +94,9 @@
       <svg
         class="net-worth-chart__svg"
         role="img"
+        tabindex="0"
+        (keydown)="onKeydown($event)"
+        (blur)="clearSelection()"
         [attr.viewBox]="'0 0 ' + width() + ' ' + height()"
         [attr.aria-label]="
           chartLabelKey()
@@ -144,7 +147,6 @@
             [attr.height]="plotHeight()"
           />
         }
-        <path class="net-worth-chart__area" [attr.d]="view.areaPath" [style.fill]="seriesColor()" />
         <path
           class="net-worth-chart__line"
           [attr.d]="view.linePath"
@@ -187,6 +189,14 @@
           (pointerleave)="onPointerLeave()"
         />
       </svg>
+      <div class="net-worth-chart__live" aria-live="polite">
+        @if (announced(); as point) {
+          {{ formatDate(point.date) + ': ' + formatMoney(point.value) }}
+          @if (point.isIncomplete) {
+            {{ 'netWorthChart.incompleteValue' | transloco }}
+          }
+        }
+      </div>
       @if (hovered(); as point) {
         <div
           class="net-worth-chart__tooltip"
