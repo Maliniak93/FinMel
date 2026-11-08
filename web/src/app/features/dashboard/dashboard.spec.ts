@@ -36,12 +36,16 @@ import {
   dashboardWithClasses,
   dashboardWithGroups,
   groups,
+  INVESTMENTS_GROUP_ID,
   RETIREMENT_GROUP_ID,
   CUSHION_GROUP_ID,
   jsonResponse,
   lastHistoryParams,
+  manyGroups,
   menuItem,
   openFilterMenu,
+  resizeDashboardTo,
+  stubResizeObserver,
   mockApi,
   accountResponse,
   overdueExpenseItem,
@@ -97,6 +101,7 @@ describe('Dashboard', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
+    vi.unstubAllGlobals();
     await restoreEnglish();
   });
 
@@ -985,6 +990,168 @@ describe('Dashboard', () => {
       expect(textOf(ungrouped)).toContain('Bez grupy');
       expect(progressOf(ungrouped)).toBeUndefined();
       expect(normalised(textOf(ungrouped))).toMatch(/%\s*majątku/);
+    });
+
+    function visibleRows(element: HTMLElement): HTMLElement[] {
+      return groupRows(element).filter((row) => row.closest('[inert]') === null);
+    }
+
+    function buttonWith(element: HTMLElement, text: string): HTMLButtonElement | undefined {
+      return [...element.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+        textOf(button).includes(text),
+      );
+    }
+
+    async function click(button: HTMLElement): Promise<void> {
+      button.click();
+      await fixture.whenStable();
+      fixture.detectChanges();
+    }
+
+    async function setupMany(width: number | null, count = 8): Promise<HTMLElement> {
+      const observers = stubResizeObserver();
+      const many = manyGroups(count);
+      await setup(jsonResponse(many.dashboard), undefined, { groups: jsonResponse(many.groups) });
+      await switchLanguage(fixture, 'pl');
+      if (width !== null) {
+        resizeDashboardTo(observers, width);
+        await fixture.whenStable();
+        fixture.detectChanges();
+      }
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    const NAMES_BY_VALUE = [
+      'Grupa H',
+      'Grupa G',
+      'Grupa F',
+      'Grupa E',
+      'Grupa D',
+      'Grupa C',
+      'Grupa B',
+      'Grupa A',
+    ];
+
+    it('orders groups by value', async () => {
+      await setup(
+        jsonResponse(
+          dashboardWithGroups([
+            { groupId: RETIREMENT_GROUP_ID, valuePln: 75000, percentage: 40 },
+            { groupId: INVESTMENTS_GROUP_ID, valuePln: 28000, percentage: 15 },
+            { groupId: CUSHION_GROUP_ID, valuePln: 28000, percentage: 15 },
+            { groupId: null, valuePln: 50000, percentage: 30 },
+          ]),
+        ),
+        undefined,
+        { groups: jsonResponse(groups) },
+      );
+      await switchLanguage(fixture, 'pl');
+
+      expect(
+        groupRows(fixture.nativeElement as HTMLElement).map((row) => textOf(row).split(' ')[0]),
+      ).toEqual(['Emerytura', 'Bez', 'Inwestycje', 'Poduszka']);
+    });
+
+    it('narrow groups cap at five and expand', async () => {
+      const element = await setupMany(600);
+
+      expect(visibleRows(element).map((row) => textOf(row).slice(0, 7))).toEqual(
+        NAMES_BY_VALUE.slice(0, 5),
+      );
+      const button = buttonWith(element, 'Pokaż wszystkie (8)');
+      expect(button).toBeDefined();
+      expect(button?.getAttribute('aria-expanded')).toBe('false');
+
+      await click(button as HTMLElement);
+      expect(groupRows(element).map((row) => textOf(row).slice(0, 7))).toEqual(NAMES_BY_VALUE);
+      expect(visibleRows(element)).toHaveLength(8);
+      const folded = buttonWith(element, 'Zwiń');
+      expect(folded?.getAttribute('aria-expanded')).toBe('true');
+
+      await click(folded as HTMLElement);
+      expect(visibleRows(element)).toHaveLength(5);
+      expect(buttonWith(element, 'Pokaż wszystkie (8)')).toBeDefined();
+    });
+
+    it('no group button when there is nothing to fold', async () => {
+      const fiveNarrow = await setupMany(600, 5);
+      expect(visibleRows(fiveNarrow)).toHaveLength(5);
+      expect(buttonWith(fiveNarrow, 'Pokaż wszystkie')).toBeUndefined();
+      expect(buttonWith(fiveNarrow, 'Zwiń')).toBeUndefined();
+
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      fetchSpy.mockRestore();
+      const eightWide = await setupMany(900, 8);
+      expect(visibleRows(eightWide).map((row) => textOf(row).slice(0, 7))).toEqual(NAMES_BY_VALUE);
+      expect(buttonWith(eightWide, 'Pokaż wszystkie')).toBeUndefined();
+    });
+
+    it('narrow structure folds its class list', async () => {
+      const element = await setupMany(600, 3);
+      const list = element.querySelector<HTMLElement>('.dashboard-page__structure-list');
+
+      expect(element.querySelector('app-split-bar')).not.toBeNull();
+      expect(list?.closest('[inert]')).not.toBeNull();
+      const open = buttonWith(element, 'Pokaż szczegóły');
+      expect(open).toBeDefined();
+
+      await click(open as HTMLElement);
+      expect(list?.closest('[inert]')).toBeNull();
+      expect(buttonWith(element, 'Ukryj szczegóły')?.getAttribute('aria-expanded')).toBe('true');
+
+      fixture.destroy();
+      TestBed.resetTestingModule();
+      fetchSpy.mockRestore();
+      const wide = await setupMany(900, 3);
+      expect(
+        wide.querySelector<HTMLElement>('.dashboard-page__structure-list')?.closest('[inert]'),
+      ).toBeNull();
+      expect(buttonWith(wide, 'Pokaż szczegóły')).toBeUndefined();
+      expect(buttonWith(wide, 'Ukryj szczegóły')).toBeUndefined();
+    });
+
+    it('folded dashboard content is out of the tab order', async () => {
+      const element = await setupMany(600);
+
+      const folded = groupRows(element).filter((row) => row.closest('[inert]') !== null);
+      expect(folded).toHaveLength(3);
+      const structureList = element.querySelector<HTMLElement>('.dashboard-page__structure-list');
+      expect(structureList?.closest('[inert]')).not.toBeNull();
+
+      for (const text of ['Pokaż wszystkie (8)', 'Pokaż szczegóły']) {
+        const button = buttonWith(element, text);
+        expect(button?.getAttribute('aria-expanded')).toBe('false');
+        const controlled = button?.getAttribute('aria-controls');
+        expect(controlled).toBeTruthy();
+        expect(element.querySelector(`#${controlled}`)).not.toBeNull();
+      }
+    });
+
+    it('expand state is not remembered', async () => {
+      const observers = stubResizeObserver();
+      const many = manyGroups(8);
+      await setup(jsonResponse(many.dashboard), undefined, { groups: jsonResponse(many.groups) });
+      await switchLanguage(fixture, 'pl');
+      resizeDashboardTo(observers, 600);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const first = fixture.nativeElement as HTMLElement;
+      await click(buttonWith(first, 'Pokaż wszystkie (8)') as HTMLElement);
+      await click(buttonWith(first, 'Pokaż szczegóły') as HTMLElement);
+      expect(visibleRows(first)).toHaveLength(8);
+
+      fixture.destroy();
+      fixture = TestBed.createComponent(Dashboard);
+      await fixture.whenStable();
+      resizeDashboardTo(observers, 600);
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const second = fixture.nativeElement as HTMLElement;
+
+      expect(visibleRows(second)).toHaveLength(5);
+      expect(buttonWith(second, 'Pokaż wszystkie (8)')).toBeDefined();
+      expect(buttonWith(second, 'Pokaż szczegóły')).toBeDefined();
     });
 
     it('flags class shares that drift from the allocation', async () => {

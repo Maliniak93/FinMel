@@ -106,6 +106,89 @@ export function dashboardWithGroups(
   };
 }
 
+export function manyGroups(count: number): {
+  groups: AssetGroupResponse[];
+  dashboard: DashboardResponse;
+} {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const manyGroupsList: AssetGroupResponse[] = Array.from({ length: count }, (_, index) => ({
+    ...groups[1],
+    id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`,
+    name: `Grupa ${letters[index]}`,
+  }));
+  return {
+    groups: manyGroupsList,
+    dashboard: dashboardWithGroups(
+      manyGroupsList.map((group, index) => ({
+        groupId: group.id,
+        valuePln: (index + 1) * 1000,
+        percentage: 5,
+      })),
+    ),
+  };
+}
+
+interface FakeResizeObserver {
+  callback: ResizeObserverCallback;
+  targets: Element[];
+  disconnected: boolean;
+}
+
+export function stubResizeObserver(): FakeResizeObserver[] {
+  const observers: FakeResizeObserver[] = [];
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      private readonly state: FakeResizeObserver;
+      constructor(callback: ResizeObserverCallback) {
+        this.state = { callback, targets: [], disconnected: false };
+        observers.push(this.state);
+      }
+      observe(target: Element): void {
+        this.state.targets.push(target);
+      }
+      unobserve(target: Element): void {
+        this.state.targets = this.state.targets.filter((candidate) => candidate !== target);
+      }
+      disconnect(): void {
+        this.state.disconnected = true;
+      }
+    },
+  );
+  return observers;
+}
+
+export function resizeDashboardTo(observers: FakeResizeObserver[], width: number): void {
+  for (const observer of observers) {
+    if (observer.disconnected) {
+      continue;
+    }
+    const entries = observer.targets
+      .filter((target) => target.classList.contains('dashboard-page'))
+      .map(
+        (target) =>
+          ({
+            target,
+            contentRect: {
+              width,
+              height: 800,
+              x: 0,
+              y: 0,
+              top: 0,
+              left: 0,
+              right: width,
+              bottom: 800,
+            },
+            contentBoxSize: [{ inlineSize: width, blockSize: 800 }],
+            borderBoxSize: [{ inlineSize: width, blockSize: 800 }],
+          }) as unknown as ResizeObserverEntry,
+      );
+    if (entries.length > 0) {
+      observer.callback(entries, {} as ResizeObserver);
+    }
+  }
+}
+
 export const dashboardWithClasses: DashboardResponse = {
   ...dashboard,
   byAssetClass: [

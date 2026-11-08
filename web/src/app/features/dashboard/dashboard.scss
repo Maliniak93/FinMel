@@ -200,6 +200,14 @@
   border-bottom: none;
 }
 
+.dashboard-page__group-rows--head > .dashboard-page__group-row:last-child {
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.dashboard-page__fold-toggle {
+  margin-top: var(--sk-space-2);
+}
+
 .dashboard-page__group-name {
   display: inline-flex;
   align-items: center;
