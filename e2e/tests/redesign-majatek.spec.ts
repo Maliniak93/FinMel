@@ -8,7 +8,7 @@ function pln(amount: string): RegExp {
 
 const WIDE = { width: 1280, height: 800 };
 const RAIL = { width: 1000, height: 800 };
-const NARROW = { width: 600, height: 800 };
+const NARROW = { width: 599, height: 800 };
 
 const TAB_NAMES = [
   'Wszystko',

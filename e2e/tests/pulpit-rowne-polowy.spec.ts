@@ -472,7 +472,7 @@ test('pulpit: three rows split evenly with two separator lines', async ({
   });
 
   await test.step('Krok 14: below the threshold one column stays with the separators', async () => {
-    await setDashboardWidth(page, 690);
+    await setDashboardWidth(page, 570);
     await expect(async () => {
       const structure = await box(page.locator('.dashboard-page__structure'));
       const history = await box(page.locator('.dashboard-page__history'));

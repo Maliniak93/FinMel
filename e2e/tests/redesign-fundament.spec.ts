@@ -7,7 +7,7 @@ const FOUR_TWENTY_EUR = /420,00\sEUR/;
 
 const WIDE = { width: 1280, height: 800 };
 const RAIL = { width: 1000, height: 800 };
-const NARROW = { width: 600, height: 800 };
+const NARROW = { width: 599, height: 800 };
 
 function sidebar(page: Page): Locator {
   return page.locator('mat-sidenav');
