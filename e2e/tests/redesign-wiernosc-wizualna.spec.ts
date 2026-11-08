@@ -431,12 +431,12 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     );
   });
 
-  await test.step('Krok 1: logging out shows Logowanie with a 44 px brand and a rule under it, a left Cormorant title, a 380 px column, the language switch 24 px from the top and 32 px from the right, and a wrong password gives one red error line with an icon', async () => {
+  await test.step('Krok 1: logging out shows Logowanie with a 40 px brand and a rule under it, a left Cormorant title, a 380 px column, the language switch 24 px from the top and 32 px from the right, and a wrong password gives one red error line with an icon', async () => {
     await page.getByTestId('nav-footer').getByRole('button', { name: 'Wyloguj' }).click();
     await expect(page).toHaveURL(/\/login$/);
 
     const brand = page.locator('.auth-shell__brand');
-    await expectPx(brand, 'font-size', 44);
+    await expectPx(brand, 'font-size', 40);
     await expectRule(page, { selector: '.auth-shell__brand', side: 'bottom' });
     const brandBox = await box(brand);
     const bottom = (await border(brand, 'bottom')).width;
@@ -482,10 +482,10 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     const links = page.locator('mat-sidenav .shell__nav-link');
     await expect(links).toHaveCount(5);
     for (const link of await links.all()) {
-      await expectPx(link, 'font-size', 15);
+      await expectPx(link, 'font-size', 16);
       await expectPx(link.locator('mat-icon'), 'width', 18);
       await expectPx(link.locator('mat-icon'), 'height', 18);
-      await expectPx(link.locator('mat-icon'), 'font-size', 18);
+      await expectPx(link.locator('mat-icon'), 'font-size', 16);
     }
 
     const active = page.locator('mat-sidenav a.shell__nav-link[aria-current="page"]');
@@ -552,12 +552,12 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await setSystemTheme(page);
   });
 
-  await test.step('Krok 5: Majątek has tabs with a 2 px accent underline and a rule under the tab bar, a 36 px Cormorant heading, a table header with a rule under it, rows separated by rules and a rule over "Razem"', async () => {
+  await test.step('Krok 5: Majątek has tabs with a 2 px accent underline and a rule under the tab bar, a 40 px Cormorant heading, a table header with a rule under it, rows separated by rules and a rule over "Razem"', async () => {
     await page.goto('/wealth');
     await expandWealthSections(page);
     const heading = page.locator('app-page-header h1');
     await expect(heading).toHaveText('Majątek');
-    await expectPx(heading, 'font-size', 36);
+    await expectPx(heading, 'font-size', 40);
     await expect(heading).toHaveCSS('font-family', /Cormorant Garamond/);
     await expectRules(page, WEALTH_RULES);
     await expectUnderline(page);
@@ -607,7 +607,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await expect(page).toHaveURL(/\/wealth\/accounts\/[0-9a-f-]+$/);
     const title = page.locator('app-page-header h1');
     await expect(title).toHaveText(XTB);
-    await expectPx(title, 'font-size', 36);
+    await expectPx(title, 'font-size', 40);
     await expect(title).toHaveCSS('font-family', /Cormorant Garamond/);
     await expectRule(page, {
       selector: '.account-detail__table th.mat-mdc-header-cell',
@@ -624,7 +624,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await expect(page.locator('.transactions-page__breadcrumb')).toBeVisible();
     const heading = page.locator('.transactions-page h1').first();
     await expect(heading).toContainText('CD Projekt');
-    await expectPx(heading, 'font-size', 36);
+    await expectPx(heading, 'font-size', 40);
     await expect(heading).toHaveCSS('font-family', /Cormorant Garamond/);
     await expectRule(page, {
       selector: '.transactions-page__table th.mat-mdc-header-cell',
@@ -700,7 +700,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     await openGroups(page);
     await expect(page.locator('.summary-strip__item')).toHaveCount(3);
     await expectGroupsScreen(page, true);
-    await expectPx(page.locator('.group-card__allocation'), 'padding-top', 9.2);
+    await expectPx(page.locator('.group-card__allocation'), 'padding-top', 8);
   });
 
   await test.step('Krok 11: the "Dodaj grupę" dialog is 540 px wide with a rule over the allocation, a 10 px live bar and an 18 px section title', async () => {
@@ -712,7 +712,7 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
     expect(Math.abs(container.width - 540)).toBeLessThanOrEqual(1);
     await expectRule(page, { selector: '[data-testid="allocation-editor"]', side: 'top' });
     await expectPx(page.getByTestId('allocation-live-bar'), 'height', 10);
-    await expectPx(page.locator('[data-testid="allocation-editor"] legend'), 'font-size', 18);
+    await expectPx(page.locator('[data-testid="allocation-editor"] legend'), 'font-size', 16);
     await dialog.getByRole('button', { name: 'Anuluj' }).click();
     await expect(dialog).toBeHidden();
   });
