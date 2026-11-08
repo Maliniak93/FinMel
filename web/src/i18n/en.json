@@ -479,8 +479,12 @@
     "staleCount": "The valuation of {{ count }} holdings hasn't refreshed in a while",
     "addAccount": "Add account",
     "allocation": "Allocation",
+    "showDetails": "Show details",
+    "hideDetails": "Hide details",
     "groups": {
       "title": "By group",
+      "showAll": "Show all ({{ count }})",
+      "fold": "Fold",
       "ungrouped": "No group",
       "hint": "Split your wealth into groups such as retirement or an emergency cushion to see how it divides.",
       "link": "Manage groups",

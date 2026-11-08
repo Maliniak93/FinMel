@@ -1,5 +1,16 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { Component, computed, inject, linkedSignal, resource, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  afterNextRender,
+  computed,
+  inject,
+  linkedSignal,
+  resource,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialog } from '@angular/material/dialog';
@@ -24,6 +35,7 @@ import { EmptyState } from '../../shared/empty-state/empty-state';
 import { PageHeader } from '../../shared/page-header/page-header';
 import { ALLOCATION_DEVIATION_PP } from '../../shared/allocation-bar/allocation-bar';
 import { GoalProgress } from '../../shared/goal-progress/goal-progress';
+import { Collapse } from '../../shared/collapse/collapse';
 import { SectionError } from '../../shared/section-error/section-error';
 import { SplitBar, type SplitBarSegment } from '../../shared/split-bar/split-bar';
 import { assetClassLabel, assetClassPage } from '../assets/asset-class';
@@ -46,6 +58,8 @@ import { customRangeLabel, type CustomRange } from './range-label';
 const OVERDUE_KINDS: ReadonlySet<string> = new Set(['OverdueIncome', 'OverdueExpense']);
 const UNGROUPED_KEY = 'ungrouped';
 const MAX_BAR_PERCENT = 100;
+const VISIBLE_GROUPS = 5;
+const NARROW_BELOW_PX = 720;
 
 interface GroupProgress {
   readonly percent: number;
@@ -99,6 +113,7 @@ function toGrosze(amount: number | string): number {
     NgTemplateOutlet,
     RouterLink,
     TranslocoPipe,
+    Collapse,
     EmptyState,
     PageHeader,
     GoalProgress,
@@ -117,6 +132,26 @@ function toGrosze(amount: number | string): number {
 })
 export class Dashboard {
   private readonly planningState = inject(PlanningState);
+  private readonly page = viewChild<ElementRef<HTMLElement>>('page');
+
+  constructor() {
+    const destroyRef = inject(DestroyRef);
+    afterNextRender(() => {
+      const element = this.page()?.nativeElement;
+      if (!element || typeof ResizeObserver === 'undefined') {
+        return;
+      }
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries.filter((candidate) => candidate.target === element).at(-1);
+        if (entry) {
+          const width = entry.contentBoxSize?.[0]?.inlineSize ?? entry.contentRect.width;
+          this.narrow.set(width < NARROW_BELOW_PX);
+        }
+      });
+      observer.observe(element);
+      destroyRef.onDestroy(() => observer.disconnect());
+    });
+  }
 
   protected readonly hasOverdue = computed(() =>
     this.planningState.todo().some((item) => OVERDUE_KINDS.has(item.kind)),
@@ -419,8 +454,25 @@ export class Dashboard {
         isUngrouped: true,
       });
     }
-    return rows;
+    const locale = activeLocale();
+    return rows.sort((a, b) => b.valuePln - a.valuePln || a.label.localeCompare(b.label, locale));
   });
+
+  protected readonly narrow = signal(false);
+  protected readonly groupsExpanded = signal(false);
+  protected readonly structureExpanded = signal(false);
+
+  protected readonly foldGroups = computed(
+    () => this.narrow() && this.groupRows().length > VISIBLE_GROUPS,
+  );
+
+  protected readonly leadingGroupRows = computed(() =>
+    this.foldGroups() ? this.groupRows().slice(0, VISIBLE_GROUPS) : this.groupRows(),
+  );
+
+  protected readonly foldedGroupRows = computed(() =>
+    this.foldGroups() ? this.groupRows().slice(VISIBLE_GROUPS) : [],
+  );
 
   protected readonly groupOptions = computed<NetWorthChartGroup[]>(() => {
     if (!this.groupsResource.hasValue() || this.groupsResource.value().length === 0) {

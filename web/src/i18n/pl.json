@@ -479,8 +479,12 @@
     "staleCount": "Wycena {{ count }} pozycji od dawna się nie odświeżyła",
     "addAccount": "Dodaj rachunek",
     "allocation": "Struktura majątku",
+    "showDetails": "Pokaż szczegóły",
+    "hideDetails": "Ukryj szczegóły",
     "groups": {
       "title": "Wg grup",
+      "showAll": "Pokaż wszystkie ({{ count }})",
+      "fold": "Zwiń",
       "ungrouped": "Bez grupy",
       "hint": "Podziel majątek na grupy, np. emeryturę albo poduszkę finansową, aby zobaczyć jego strukturę.",
       "link": "Przejdź do grup",
