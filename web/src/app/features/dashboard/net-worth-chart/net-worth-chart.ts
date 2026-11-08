@@ -8,6 +8,7 @@ import {
   effect,
   inject,
   input,
+  linkedSignal,
   model,
   output,
   signal,
@@ -43,6 +44,7 @@ const MARGIN = { top: 12, right: 16, bottom: 28, left: 64 };
 const Y_TICK_COUNT = 5;
 const Y_LABEL_FRACTION_DIGITS = 2;
 const BAND_LABEL_MIN_WIDTH = 200;
+const OUTGOING_FALLBACK_MS = 400;
 
 export interface NetWorthChartGroup {
   readonly key: string;
@@ -62,6 +64,53 @@ interface ChartBand {
   readonly width: number;
   readonly lastDate: string;
   readonly showLabel: boolean;
+}
+
+interface ChartView {
+  readonly times: readonly number[];
+  readonly xMin: number;
+  readonly xSpan: number;
+  readonly coordinates: readonly ChartPoint[];
+  readonly bands: readonly ChartBand[];
+  readonly linePath: string;
+  readonly yTicks: readonly { value: number; y: number }[];
+  readonly xTickUnit: ReturnType<typeof xTickUnit>;
+  readonly xTicks: readonly { date: Date; x: number }[];
+  readonly first: ChartPoint;
+  readonly last: ChartPoint;
+}
+
+interface ChartFrame {
+  readonly view: ChartView;
+  readonly width: number;
+  readonly height: number;
+  readonly plotWidth: number;
+  readonly plotHeight: number;
+  readonly rangeText: string;
+  readonly assetClass: AssetClass | null;
+  readonly groupLabel: string | null;
+  readonly seriesColor: string | null;
+  readonly chartLabelKey: string;
+  readonly classLabelKey: string;
+}
+
+interface ChartState {
+  readonly frame: ChartFrame | null;
+  readonly outgoing: ChartFrame | null;
+  readonly loading: boolean;
+}
+
+interface ChartLayer {
+  readonly key: 'outgoing' | 'current';
+  readonly frame: ChartFrame;
+  readonly outgoing: boolean;
+}
+
+function prefersReducedMotion(): boolean {
+  return (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
 }
 
 @Component({
@@ -148,6 +197,13 @@ export class NetWorthChart {
   constructor() {
     const destroyRef = inject(DestroyRef);
     effect(() => this.observe(this.canvas()?.nativeElement ?? null));
+    effect((onCleanup) => {
+      if (!this.crossfading()) {
+        return;
+      }
+      const timer = setTimeout(() => this.dropOutgoing(), OUTGOING_FALLBACK_MS);
+      onCleanup(() => clearTimeout(timer));
+    });
     destroyRef.onDestroy(() => {
       this.observer?.disconnect();
       this.rangeObserver?.disconnect();
@@ -208,7 +264,7 @@ export class NetWorthChart {
     this.observer.observe(element);
   }
 
-  protected readonly chart = computed(() => {
+  private readonly chart = computed<ChartView | null>(() => {
     const raw = this.points();
     if (raw.length < 2) {
       return null;
@@ -277,14 +333,67 @@ export class NetWorthChart {
     };
   });
 
+  private readonly live = computed<ChartFrame | null>(() => {
+    const view = this.chart();
+    if (!view) {
+      return null;
+    }
+    return {
+      view,
+      width: this.width(),
+      height: this.height(),
+      plotWidth: this.plotWidth(),
+      plotHeight: this.plotHeight(),
+      rangeText: this.rangeLabel() ?? this.range(),
+      assetClass: this.assetClass(),
+      groupLabel: this.groupLabel(),
+      seriesColor: this.seriesColor(),
+      chartLabelKey: this.chartLabelKey(),
+      classLabelKey: this.classLabelKey(),
+    };
+  });
+
+  protected readonly state = linkedSignal<
+    { loading: boolean; error: string | null; live: ChartFrame | null },
+    ChartState
+  >({
+    source: () => ({ loading: this.loading(), error: this.loadError(), live: this.live() }),
+    computation: (source, previous) => {
+      const before = previous?.value;
+      if (source.error) {
+        return { frame: null, outgoing: null, loading: source.loading };
+      }
+      if (source.loading) {
+        return { frame: before?.frame ?? null, outgoing: null, loading: true };
+      }
+      const outgoing = before?.loading ? before.frame : (before?.outgoing ?? null);
+      return {
+        frame: source.live,
+        outgoing: source.live && !prefersReducedMotion() ? outgoing : null,
+        loading: false,
+      };
+    },
+  });
+
+  protected readonly layers = computed<readonly ChartLayer[]>(() => {
+    const { frame, outgoing } = this.state();
+    if (!frame) {
+      return [];
+    }
+    const current: ChartLayer = { key: 'current', frame, outgoing: false };
+    return outgoing ? [{ key: 'outgoing', frame: outgoing, outgoing: true }, current] : [current];
+  });
+
+  protected readonly crossfading = computed(() => this.state().outgoing !== null);
+
   protected readonly hovered = computed(() => {
-    const chart = this.chart();
+    const chart = this.state().frame?.view;
     const index = this.hoveredIndex();
     return chart && index !== null ? chart.coordinates[index] : null;
   });
 
   protected readonly announced = computed(() => {
-    const chart = this.chart();
+    const chart = this.state().frame?.view;
     const index = this.announcedIndex();
     return chart && index !== null ? (chart.coordinates[index] ?? null) : null;
   });
@@ -314,8 +423,12 @@ export class NetWorthChart {
     return ratio < 0.2 ? 'start' : ratio > 0.8 ? 'end' : 'center';
   }
 
+  protected dropOutgoing(): void {
+    this.state.update((state) => (state.outgoing ? { ...state, outgoing: null } : state));
+  }
+
   protected onPointerMove(event: PointerEvent): void {
-    const chart = this.chart();
+    const chart = this.state().frame?.view;
     if (!chart) {
       return;
     }
@@ -342,7 +455,7 @@ export class NetWorthChart {
       this.clearSelection();
       return;
     }
-    const chart = this.chart();
+    const chart = this.state().frame?.view;
     if (!chart) {
       return;
     }
