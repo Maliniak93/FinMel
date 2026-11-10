@@ -1,7 +1,12 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { mediaBlock, readStylesheet, rulesFor } from '../../../testing/stylesheet';
+import {
+  mediaBlock,
+  nestedRuleBodies,
+  readStylesheet,
+  rulesFor,
+} from '../../../testing/stylesheet';
 
 const MAJATEK_DIRS = [
   'src/app/features/wealth',
@@ -128,7 +133,7 @@ describe('Majątek stylesheets', () => {
 
   it('wealth search label and input take typography from the group field select value', () => {
     const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
-    const search = rulesFor(css, /__search/);
+    const search = nestedRuleBodies(css, /__search$/);
     expect(search).toMatch(/container-text-font:\s*var\(--mat-select-trigger-text-font/);
     expect(search).toMatch(/container-text-size:\s*var\(--mat-select-trigger-text-size/);
     expect(search).toMatch(/container-text-weight:\s*var\(--mat-select-trigger-text-weight/);
@@ -141,5 +146,15 @@ describe('Majątek stylesheets', () => {
     expect(search).toMatch(
       /outlined-label-text-color:\s*var\(--mat-select-enabled-trigger-text-color/,
     );
+  });
+
+  it('wealth search icon ends at the button icon-to-text spacing', () => {
+    const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    const prefix = nestedRuleBodies(css, /__search .*icon-prefix$/);
+    expect(prefix, 'icon-prefix container').toMatch(
+      /padding-right:\s*var\(--sk-space-2\)|padding:\s*0\s+var\(--sk-space-2\)\s+0\s+0\b/,
+    );
+    const icon = nestedRuleBodies(css, /__search .*mat-icon$/);
+    expect(icon, 'prefixed mat-icon').toMatch(/padding-right:\s*0\b|padding:\s*0\s+0\s+0\s+12px/);
   });
 });

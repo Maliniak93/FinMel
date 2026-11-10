@@ -38,6 +38,14 @@
   --mat-form-field-outlined-label-text-weight: var(--mat-select-trigger-text-weight);
   --mat-form-field-outlined-label-text-tracking: var(--mat-select-trigger-text-tracking);
   --mat-form-field-outlined-label-text-color: var(--mat-select-enabled-trigger-text-color);
+
+  ::ng-deep .mat-mdc-form-field-icon-prefix {
+    padding-right: var(--sk-space-2);
+
+    > .mat-icon {
+      padding-right: 0;
+    }
+  }
 }
 
 .wealth-all__group {
