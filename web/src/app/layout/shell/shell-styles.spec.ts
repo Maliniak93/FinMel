@@ -40,12 +40,22 @@ describe('Shell styles', () => {
     expect(shell).toMatch(/\.shell__nav-footer\s*\{[^}]*flex:\s*0 0 auto/);
   });
 
-  it('gives a hovered sidenav item the selected width, a weaker tint and no left accent', () => {
-    const hover = rulesFor(shell, /\.shell__nav-link:hover\s*$/);
-    expect(hover).toMatch(/margin-right:\s*var\(--sk-space-3\)/);
-    expect(hover).toMatch(/border-radius:\s*0 var\(--sk-radius-md\) var\(--sk-radius-md\) 0/);
+  it('keeps a sidenav link the same shape with and without hover', () => {
+    const link = shell.match(/^\.shell__nav-link\s*\{([^}]*)\}/m)?.[1] ?? '';
+    const hover = shell.match(/^\.shell__nav-link:hover\s*\{([^}]*)\}/m)?.[1] ?? '';
+    const rail =
+      shell.match(/\.shell__nav--rail\s*\{\s*\.shell__nav-link\s*\{([^}]*)\}/)?.[1] ?? '';
+    const bottom =
+      shell.match(/\.shell__bottom-nav\s*\{[^}]*?\.shell__nav-link\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(link).toMatch(/margin-right:\s*var\(--sk-space-3\)/);
+    expect(link).toMatch(/border-radius:\s*0 var\(--sk-radius-md\) var\(--sk-radius-md\) 0/);
+    expect(hover).not.toMatch(/margin/);
+    expect(hover).not.toMatch(/border-radius/);
     expect(hover).toMatch(/color-mix\(in srgb,\s*var\(--sk-accent-tint\)\s*50%,\s*transparent\)/);
-    expect(hover).not.toMatch(/border-left/);
+    expect(rail).toMatch(/margin-right:\s*0;/);
+    expect(rail).toMatch(/border-radius:\s*0;/);
+    expect(bottom).toMatch(/margin-right:\s*0;/);
+    expect(bottom).toMatch(/border-radius:\s*0;/);
   });
 
   it('keeps the selected sidenav item tinted with its accent while it is hovered', () => {
