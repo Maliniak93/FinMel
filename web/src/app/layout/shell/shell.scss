@@ -60,9 +60,11 @@
   box-sizing: border-box;
   gap: var(--sk-space-3);
   min-height: 44px;
+  margin-right: var(--sk-space-3);
   padding: 0 var(--sk-space-7);
   border: 0;
   border-left: 2px solid transparent;
+  border-radius: 0 var(--sk-radius-md) var(--sk-radius-md) 0;
   background: transparent;
   color: var(--mat-sys-on-surface);
   font: inherit;
@@ -76,14 +78,10 @@
 }
 
 .shell__nav-link:hover {
-  margin-right: var(--sk-space-3);
-  border-radius: 0 var(--sk-radius-md) var(--sk-radius-md) 0;
   background: color-mix(in srgb, var(--sk-accent-tint) 50%, transparent);
 }
 
 .shell__nav-link--active {
-  margin-right: var(--sk-space-3);
-  border-radius: 0 var(--sk-radius-md) var(--sk-radius-md) 0;
   border-left-color: var(--sk-accent-stroke);
   background: var(--sk-accent-tint);
   color: var(--mat-sys-primary);
