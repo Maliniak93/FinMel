@@ -81,6 +81,42 @@ export function stubViewport(initialWidth: number): ViewportStub {
   };
 }
 
+export function stubReducedMotion(reduce: boolean): { restore(): void } {
+  const original = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+
+  const matchMedia = (query: string) => ({
+    get matches() {
+      return reduce && query.includes('prefers-reduced-motion: reduce');
+    },
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+    onchange: null,
+  });
+
+  for (const target of [window, globalThis]) {
+    Object.defineProperty(target, 'matchMedia', {
+      value: matchMedia,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  return {
+    restore() {
+      if (original) {
+        Object.defineProperty(window, 'matchMedia', original);
+      } else {
+        delete (window as unknown as Record<string, unknown>)['matchMedia'];
+        delete (globalThis as unknown as Record<string, unknown>)['matchMedia'];
+      }
+    },
+  };
+}
+
 export function stubMatchMedia(initialDark: boolean): MatchMediaStub {
   let dark = initialDark;
   const listeners = new Set<Listener>();

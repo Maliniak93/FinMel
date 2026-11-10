@@ -5,10 +5,12 @@ import {
   ElementRef,
   afterNextRender,
   computed,
+  effect,
   inject,
   linkedSignal,
   resource,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
@@ -30,6 +32,9 @@ import { activeLocale } from '../../core/i18n/language';
 import { PlanningState } from '../../core/planning/planning-state';
 import { assetClassColor, groupColor } from '../../shared/colors';
 import { changeDirection } from '../../shared/change-direction';
+import { readMotionMs } from '../../shared/motion/motion-duration';
+import { createNumberTween } from '../../shared/motion/number-tween';
+import { prefersReducedMotion } from '../../shared/motion/reduced-motion';
 import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
 import { EmptyState } from '../../shared/empty-state/empty-state';
 import { PageHeader } from '../../shared/page-header/page-header';
@@ -99,6 +104,40 @@ interface GroupRow {
   readonly isUngrouped: boolean;
 }
 
+const FALLBACK_TWEEN_MS = 420;
+
+interface ChangeLabels {
+  readonly range: string;
+  readonly classKey: string | null;
+  readonly group: string | null;
+}
+
+interface ChangeFigures {
+  readonly key: string;
+  readonly amount: number;
+  readonly percent: number | null;
+  readonly sign: string;
+  readonly direction: ReturnType<typeof changeDirection>;
+  readonly labels: ChangeLabels;
+}
+
+interface ShownFigures {
+  readonly amount: number;
+  readonly percent: number | null;
+  readonly decimals: number;
+}
+
+interface LabelSwap {
+  readonly current: ChangeLabels | null;
+  readonly range: string | null;
+  readonly classKey: string | null;
+  readonly group: string | null;
+}
+
+function decimalsOf(value: number | null): number {
+  return value === null ? 0 : (String(value).split('.')[1] ?? '').length;
+}
+
 function toGrosze(amount: number | string): number {
   return Math.round(Number(amount) * 100);
 }
@@ -136,6 +175,11 @@ export class Dashboard {
 
   constructor() {
     const destroyRef = inject(DestroyRef);
+    destroyRef.onDestroy(() => this.tween.cancel());
+    effect(() => {
+      const target = this.change();
+      untracked(() => this.applyChange(target));
+    });
     afterNextRender(() => {
       const element = this.page()?.nativeElement;
       if (!element || typeof ResizeObserver === 'undefined') {
@@ -244,7 +288,7 @@ export class Dashboard {
           readProblemDetails(result.error).detail ?? translate('netWorthChart.loadFailed'),
         );
       }
-      return result.data;
+      return result.data === undefined ? undefined : { ...result.data, loadedFor: params };
     },
   });
 
@@ -292,7 +336,7 @@ export class Dashboard {
     this.historyResource.hasValue() ? this.historyResource.value().points : [],
   );
 
-  protected readonly change = computed(() => {
+  private readonly loadedChange = computed<ChangeFigures | null>(() => {
     if (!this.historyResource.hasValue()) {
       return null;
     }
@@ -306,13 +350,156 @@ export class Dashboard {
         ? null
         : Number(history.changePercent);
     const direction = changeDirection(amount, percent, 4);
+    const { range, custom, assetClass, group } = history.loadedFor;
+    const customLoaded = range === 'CUSTOM' ? custom : null;
+    activeLocale();
     return {
+      key: customLoaded === null ? range : `${range}:${customLoaded.from}:${customLoaded.to}`,
       amount,
       percent,
       sign: direction === 'neutral' || (percent ?? 0) <= 0 ? '' : '+',
       direction,
+      labels: {
+        range: customLoaded === null ? range : customRangeLabel(customLoaded),
+        classKey: assetClass === null ? null : assetClassLabel(assetClass),
+        group: this.groupOptions().find((option) => option.key === group)?.label ?? null,
+      },
     };
   });
+
+  protected readonly change = linkedSignal<
+    { next: ChangeFigures | null; loading: boolean },
+    ChangeFigures | null
+  >({
+    source: () => ({ next: this.loadedChange(), loading: this.historyResource.isLoading() }),
+    computation: ({ next, loading }, previous) =>
+      next ?? (loading ? (previous?.value ?? null) : null),
+  });
+
+  private readonly labelsInput = computed(() => this.change()?.labels ?? null, {
+    equal: (a, b) =>
+      a === b ||
+      (a !== null &&
+        b !== null &&
+        a.range === b.range &&
+        a.classKey === b.classKey &&
+        a.group === b.group),
+  });
+
+  protected readonly labelSwap = linkedSignal<ChangeLabels | null, LabelSwap>({
+    source: this.labelsInput,
+    computation: (next, previous) => {
+      const before = previous?.value.current ?? null;
+      const fade = next !== null && before !== null && !prefersReducedMotion();
+      const outgoing = (from: string | null, to: string | null): string | null =>
+        fade && from !== null && from !== to ? from : null;
+      return {
+        current: next,
+        range: outgoing(before?.range ?? null, next?.range ?? null),
+        classKey: outgoing(before?.classKey ?? null, next?.classKey ?? null),
+        group: outgoing(before?.group ?? null, next?.group ?? null),
+      };
+    },
+  });
+
+  protected dropOutgoing(slot: 'range' | 'classKey' | 'group'): void {
+    this.labelSwap.update((swap) => ({ ...swap, [slot]: null }));
+  }
+
+  private readonly shown = signal<ShownFigures | null>(null);
+  protected readonly animating = signal(false);
+  private shownKey: string | null = null;
+  private pendingFinal: ShownFigures | null = null;
+  private readonly tween = createNumberTween();
+
+  protected readonly displayed = computed<ShownFigures | null>(() => {
+    const shown = this.shown();
+    if (shown !== null) {
+      return shown;
+    }
+    const change = this.change();
+    return change === null
+      ? null
+      : { amount: change.amount, percent: change.percent, decimals: decimalsOf(change.percent) };
+  });
+
+  protected amountLabel(figures: ShownFigures): string {
+    return formatSignedMoney(figures.amount);
+  }
+
+  protected percentLabel(figures: ShownFigures, change: ChangeFigures): string {
+    if (figures.percent === null) {
+      return '';
+    }
+    if (!this.animating()) {
+      return `(${change.sign}${formatPercent(figures.percent)})`;
+    }
+    const text = new Intl.NumberFormat(activeLocale(), {
+      minimumFractionDigits: figures.decimals,
+      maximumFractionDigits: figures.decimals,
+    }).format(figures.percent);
+    return `(${figures.percent > 0 ? '+' : ''}${text} %)`;
+  }
+
+  private applyChange(target: ChangeFigures | null): void {
+    if (target === null) {
+      this.tween.cancel();
+      this.animating.set(false);
+      this.shownKey = null;
+      this.shown.set(null);
+      return;
+    }
+    const final: ShownFigures = {
+      amount: target.amount,
+      percent: target.percent,
+      decimals: decimalsOf(target.percent),
+    };
+    const from = this.shown();
+    const sameKey = this.shownKey === target.key;
+    const pending = this.pendingFinal;
+    if (
+      this.tween.running() &&
+      sameKey &&
+      pending !== null &&
+      pending.amount === final.amount &&
+      pending.percent === final.percent
+    ) {
+      return;
+    }
+    this.shownKey = target.key;
+    this.pendingFinal = final;
+    if (from === null || sameKey || prefersReducedMotion()) {
+      this.tween.cancel();
+      this.animating.set(false);
+      this.shown.set(final);
+      return;
+    }
+    const bothPercent = from.percent !== null && target.percent !== null;
+    this.animating.set(true);
+    if (!bothPercent) {
+      this.shown.set({ ...from, percent: target.percent, decimals: final.decimals });
+    }
+    this.tween.start(
+      readMotionMs('--sk-motion-duration-long', FALLBACK_TWEEN_MS),
+      (eased) => {
+        const percent =
+          bothPercent && from.percent !== null && target.percent !== null
+            ? Number(
+                (from.percent + (target.percent - from.percent) * eased).toFixed(final.decimals),
+              )
+            : target.percent;
+        this.shown.set({
+          amount: from.amount + (target.amount - from.amount) * eased,
+          percent,
+          decimals: final.decimals,
+        });
+      },
+      () => {
+        this.animating.set(false);
+        this.shown.set(final);
+      },
+    );
+  }
 
   protected readonly structureRows = computed<StructureRow[]>(() =>
     this.dashboardResource.hasValue()
@@ -483,8 +670,4 @@ export class Dashboard {
       { key: UNGROUPED_KEY, label: this.ungroupedLabel() },
     ];
   });
-
-  protected readonly selectedGroupLabel = computed(
-    () => this.groupOptions().find((option) => option.key === this.group())?.label ?? null,
-  );
 }
