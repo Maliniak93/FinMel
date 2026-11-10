@@ -13,12 +13,13 @@
         [style.width.px]="thumb()?.width"
       ></span>
       @for (option of ranges; track option) {
-        <mat-button-toggle [value]="option" (change)="range.set(option)">{{
+        <mat-button-toggle [value]="option" disableRipple (change)="range.set(option)">{{
           option
         }}</mat-button-toggle>
       }
       <mat-button-toggle
         [value]="customRange"
+        disableRipple
         [disabled]="firstDate() === null"
         (change)="requestCustomRange()"
         >{{ 'netWorthChart.customRange' | transloco }}</mat-button-toggle
