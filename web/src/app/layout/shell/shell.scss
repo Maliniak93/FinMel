@@ -216,12 +216,8 @@
 }
 
 .shell__page {
-  max-width: 1200px;
-  margin-inline: auto;
-}
-
-.shell__page[data-content-width='wide'] {
   max-width: 1440px;
+  margin-inline: auto;
 }
 
 .shell__bottom-nav {

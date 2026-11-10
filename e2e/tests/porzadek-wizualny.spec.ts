@@ -19,8 +19,7 @@ const TYPE_BUY = 0;
 const EXTRA_WIDE = { width: 1900, height: 1000 };
 const NARROW = { width: 1100, height: 900 };
 
-const DEFAULT_LIMIT = 1200;
-const WIDE_LIMIT = 1440;
+const PAGE_LIMIT = 1440;
 
 const ACCOUNT = 'Główne';
 const GOLD = 'Złoto 10 g';
@@ -78,14 +77,9 @@ async function contentMetrics(page: Page): Promise<ContentMetrics> {
   });
 }
 
-async function expectLimit(page: Page, limit: number): Promise<void> {
-  if (limit === WIDE_LIMIT) {
-    await expect(page.locator('.shell__page')).toHaveAttribute('data-content-width', 'wide');
-  } else {
-    await expect(page.locator('.shell__page')).not.toHaveAttribute('data-content-width', /.+/);
-  }
+async function expectLimit(page: Page): Promise<void> {
   const metrics = await contentMetrics(page);
-  expect(Math.abs(metrics.width - limit)).toBeLessThanOrEqual(1);
+  expect(Math.abs(metrics.width - PAGE_LIMIT)).toBeLessThanOrEqual(1);
   expect(Math.abs(metrics.left - metrics.right)).toBeLessThanOrEqual(1);
   expect(metrics.left).toBeGreaterThan(metrics.padLeft);
 }
@@ -243,7 +237,7 @@ async function login(
   return ((await response.json()) as { accessToken: string }).accessToken;
 }
 
-test('porządek wizualny: content width limit of 1200 px and 1440 px', async ({
+test('porządek wizualny: content width limit of 1440 px on every page', async ({
   signedInPage: page,
   request,
   user,
@@ -254,10 +248,10 @@ test('porządek wizualny: content width limit of 1200 px and 1440 px', async ({
   const account = await createBankAccount(request, token);
   const goldId = await buyGold(request, token, account.cashAssetId);
 
-  await test.step('Krok 1: Pulpit at 1900 px is centred, at most 1200 px wide, with the scrollbar at the window edge', async () => {
+  await test.step('Krok 1: Pulpit at 1900 px is centred, 1440 px wide, with the scrollbar at the window edge', async () => {
     await page.goto('/dashboard');
     await expect(heading(page, 'Pulpit')).toBeVisible();
-    await expectLimit(page, DEFAULT_LIMIT);
+    await expectLimit(page);
     const metrics = await contentMetrics(page);
     expect(metrics.overflowY).toBe('auto');
     expect(Math.abs(metrics.mainRight - EXTRA_WIDE.width)).toBeLessThanOrEqual(1);
@@ -267,26 +261,26 @@ test('porządek wizualny: content width limit of 1200 px and 1440 px', async ({
     await page.setViewportSize(NARROW);
     await expect(async () => {
       const metrics = await contentMetrics(page);
-      expect(metrics.width).toBeLessThan(DEFAULT_LIMIT);
+      expect(metrics.width).toBeLessThan(PAGE_LIMIT);
       expect(Math.abs(metrics.left - metrics.padLeft)).toBeLessThanOrEqual(1);
       expect(Math.abs(metrics.right - metrics.padRight)).toBeLessThanOrEqual(1);
     }).toPass({ timeout: 10_000 });
   });
 
-  await test.step('Krok 3: Grupy and Ustawienia share the 1200 px limit at 1900 px', async () => {
+  await test.step('Krok 3: Grupy and Ustawienia have the 1440 px limit at 1900 px', async () => {
     await page.setViewportSize(EXTRA_WIDE);
     await page.goto('/groups');
     await expect(page).toHaveURL(/\/groups$/);
-    await expectLimit(page, DEFAULT_LIMIT);
+    await expectLimit(page);
     await page.goto('/settings');
     await expect(page).toHaveURL(/\/settings$/);
-    await expectLimit(page, DEFAULT_LIMIT);
+    await expectLimit(page);
   });
 
-  await test.step('Krok 4: Lokaty are centred and at most 1440 px wide, wider than Pulpit', async () => {
+  await test.step('Krok 4: Lokaty are centred at the same 1440 px limit as Pulpit', async () => {
     await page.goto('/wealth/deposits');
     await expect(page).toHaveURL(/\/wealth\/deposits$/);
-    await expectLimit(page, WIDE_LIMIT);
+    await expectLimit(page);
   });
 
   await test.step('Krok 5: switching the Majątek tabs does not change the width', async () => {
@@ -296,14 +290,14 @@ test('porządek wizualny: content width limit of 1200 px and 1440 px', async ({
         'aria-selected',
         'true',
       );
-      await expectLimit(page, WIDE_LIMIT);
+      await expectLimit(page);
     }
   });
 
   await test.step('Krok 6: the transactions page of the gold asset has the 1440 px limit', async () => {
     await page.goto(`/wealth/assets/${goldId}/transactions`);
     await expect(page).toHaveURL(/\/transactions$/);
-    await expectLimit(page, WIDE_LIMIT);
+    await expectLimit(page);
   });
 
   await test.step('Krok 7: Planowanie, annual tab, has 1440 px and its table needs no horizontal scroll', async () => {
@@ -328,7 +322,7 @@ test('porządek wizualny: content width limit of 1200 px and 1440 px', async ({
       'aria-selected',
       'true',
     );
-    await expectLimit(page, WIDE_LIMIT);
+    await expectLimit(page);
     await expect(page.locator('table').first()).toBeVisible();
     const overflow = await page.evaluate(() =>
       Array.from(document.querySelectorAll('table')).map((table) => {
@@ -344,6 +338,40 @@ test('porządek wizualny: content width limit of 1200 px and 1440 px', async ({
     );
     for (const value of overflow) {
       expect(value).toBeLessThanOrEqual(1);
+    }
+  });
+
+  await test.step('Krok 8: the content edges do not move between Pulpit, Majątek, Grupy, Planowanie and Ustawienia', async () => {
+    const edges: { left: number; right: number }[] = [];
+    for (const path of ['/dashboard', '/wealth/deposits', '/groups', '/planning', '/settings']) {
+      await page.goto(path);
+      await expect(page.locator('.shell__page')).toBeVisible();
+      const metrics = await contentMetrics(page);
+      edges.push({ left: metrics.left, right: metrics.right });
+    }
+    const lefts = edges.map((edge) => edge.left);
+    const rights = edges.map((edge) => edge.right);
+    expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(1);
+    expect(Math.max(...rights) - Math.min(...rights)).toBeLessThanOrEqual(1);
+  });
+
+  await test.step('Krok 9: Pulpit, Grupy and Ustawienia show no horizontal scroll at 1440 px and at 1900 px', async () => {
+    for (const width of [1440, 1900]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const path of ['/dashboard', '/groups', '/settings']) {
+        await page.goto(path);
+        await expect(page.locator('.shell__page')).toBeVisible();
+        const overflow = await page.evaluate(() => {
+          const main = document.querySelector('.shell__content') as HTMLElement;
+          const root = document.scrollingElement as HTMLElement;
+          return {
+            main: main.scrollWidth - main.clientWidth,
+            root: root.scrollWidth - root.clientWidth,
+          };
+        });
+        expect(overflow.main).toBeLessThanOrEqual(1);
+        expect(overflow.root).toBeLessThanOrEqual(1);
+      }
     }
   });
 });

@@ -58,25 +58,13 @@ export class Shell {
   protected readonly settingsLink = SETTINGS_LINK;
 
   private readonly router = inject(Router);
-  private readonly navigation = toSignal(
+  private readonly url = toSignal(
     this.router.events.pipe(
       filter((event) => event instanceof NavigationEnd),
-      map(() => ({ url: this.router.url, contentWidth: this.activeContentWidth() })),
+      map(() => this.router.url),
     ),
-    { initialValue: { url: this.router.url, contentWidth: this.activeContentWidth() } },
+    { initialValue: this.router.url },
   );
-  private readonly url = computed(() => this.navigation().url);
-  protected readonly contentWidth = computed(() => this.navigation().contentWidth);
-
-  private activeContentWidth(): string | null {
-    let route = this.router.routerState.snapshot.root;
-    while (route.firstChild) {
-      route = route.firstChild;
-    }
-    const width: unknown = route.data['contentWidth'];
-
-    return typeof width === 'string' ? width : null;
-  }
 
   protected isActive(path: string): boolean {
     const [pathname] = this.url().split('#')[0].split('?');

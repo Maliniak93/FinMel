@@ -374,6 +374,16 @@ describe.each(LAYOUTS)('Shell actions (%s layout)', (layout) => {
 describe('Shell page width', () => {
   const NARROW_WIDTH = 1000;
   const WIDE_SCREEN = 1900;
+  const PAGE_LIMIT = '1440px';
+  const ROUTES = [
+    '/dashboard',
+    '/groups',
+    '/settings',
+    '/wealth/deposits',
+    '/wealth/assets/1/transactions',
+    '/wealth/accounts/1',
+    '/planning',
+  ];
 
   async function mountRouted(width: number): Promise<RouterTestingHarness> {
     viewport = stubViewport(width);
@@ -404,46 +414,42 @@ describe('Shell page width', () => {
     return page!;
   }
 
-  it('caps the page at 1200px and centres it on default routes', async () => {
+  it('caps the page at 1440px and centres it on every shell route', async () => {
     const harness = await mountRouted(WIDE_SCREEN);
 
-    for (const url of ['/dashboard', '/groups', '/settings']) {
-      const page = await pageAt(harness, url);
-      expect(page.getAttribute('data-content-width'), url).not.toBe('wide');
+    for (const url of ROUTES) {
+      const style = getComputedStyle(await pageAt(harness, url));
+      expect(style.maxWidth, url).toBe(PAGE_LIMIT);
+      expect(style.marginInline, url).toBe('auto');
     }
   });
 
-  it('widens the page to 1440px on wealth and planning routes', async () => {
+  it('keeps the same page width when navigating between sections', async () => {
     const harness = await mountRouted(WIDE_SCREEN);
+    const widths: string[] = [];
 
     for (const url of [
       '/wealth/deposits',
-      '/wealth/assets/1/transactions',
-      '/wealth/accounts/1',
+      '/dashboard',
       '/planning',
+      '/groups',
+      '/wealth/accounts/1',
+      '/settings',
     ]) {
-      const page = await pageAt(harness, url);
-      expect(page.getAttribute('data-content-width'), url).toBe('wide');
+      widths.push(getComputedStyle(await pageAt(harness, url)).maxWidth);
+    }
+
+    for (const width of widths) {
+      expect(width).toBe(PAGE_LIMIT);
     }
   });
 
-  it('follows the active route when navigating between widths', async () => {
-    const harness = await mountRouted(WIDE_SCREEN);
-
-    expect((await pageAt(harness, '/wealth/deposits')).getAttribute('data-content-width')).toBe(
-      'wide',
-    );
-    expect((await pageAt(harness, '/dashboard')).getAttribute('data-content-width')).not.toBe(
-      'wide',
-    );
-    expect((await pageAt(harness, '/wealth/cash')).getAttribute('data-content-width')).toBe('wide');
-  });
-
-  it('does not narrow the page below 1200px', async () => {
+  it('does not narrow the page below 1440px', async () => {
     const harness = await mountRouted(NARROW_WIDTH);
 
     for (const url of ['/dashboard', '/wealth/deposits']) {
       const page = await pageAt(harness, url);
+      expect(getComputedStyle(page).maxWidth, url).toBe(PAGE_LIMIT);
       expect(page.style.maxWidth, url).toBe('');
       expect(page.style.marginInline, url).toBe('');
       expect(page.style.width, url).toBe('');
