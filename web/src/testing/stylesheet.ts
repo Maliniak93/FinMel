@@ -12,6 +12,42 @@ export function rulesFor(css: string, selector: RegExp): string {
     .join('\n');
 }
 
+export function nestedRuleBodies(css: string, selector: RegExp): string {
+  const rules: { selector: string; body: string }[] = [];
+  const stack: { selector: string; body: string }[] = [];
+  let text = '';
+  for (const char of css) {
+    if (char === '{') {
+      const local = text.trim();
+      const parent = stack.length ? stack[stack.length - 1].selector : '';
+      const full = local.includes('&')
+        ? local.replaceAll('&', parent)
+        : parent
+          ? `${parent} ${local}`
+          : local;
+      stack.push({ selector: full, body: '' });
+      text = '';
+    } else if (char === ';') {
+      if (stack.length) {
+        stack[stack.length - 1].body += `${text};`;
+      }
+      text = '';
+    } else if (char === '}') {
+      const rule = stack.pop();
+      if (rule) {
+        rules.push({ selector: rule.selector, body: rule.body + text });
+      }
+      text = '';
+    } else {
+      text += char;
+    }
+  }
+  return rules
+    .filter((rule) => selector.test(rule.selector))
+    .map((rule) => rule.body)
+    .join('\n');
+}
+
 export function ruleBodies(css: string, selector: string): string {
   const pattern = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return Array.from(
