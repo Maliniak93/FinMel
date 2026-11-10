@@ -324,11 +324,13 @@ test('szlif ui: dashboard folds on a narrow window and the badge turns red only 
         await expect(page.getByRole('button', { name: 'Pokaż wszystkie (9)' })).toBeVisible({
           timeout: 2_000,
         });
+        await expect(groupNames(page).first()).toHaveText('Bez grupy', { timeout: 2_000 });
+        await expect(page.getByTestId('group-row').first()).toContainText(pln('9 000,00'), {
+          timeout: 2_000,
+        });
       },
     );
     await expect(visibleGroupRows(page)).toHaveCount(5);
-    await expect(groupNames(page).first()).toHaveText('Bez grupy');
-    await expect(page.getByTestId('group-row').first()).toContainText(pln('9 000,00'));
   });
 
   await test.step('Krok 8: back at 1440 px all nine rows in the same order, class list open, no fold buttons', async () => {
