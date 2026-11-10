@@ -3,12 +3,15 @@
     <mat-button-toggle-group
       class="net-worth-chart__ranges"
       [value]="range()"
+      hideSingleSelectionIndicator
       [attr.aria-label]="'netWorthChart.rangeLabel' | transloco"
     >
       <span
         class="net-worth-chart__thumb"
         aria-hidden="true"
         [class.net-worth-chart__thumb--animated]="thumbAnimated()"
+        [class.net-worth-chart__thumb--start]="thumbEdge() === 'start'"
+        [class.net-worth-chart__thumb--end]="thumbEdge() === 'end'"
         [style.left.px]="thumb()?.left"
         [style.width.px]="thumb()?.width"
       ></span>

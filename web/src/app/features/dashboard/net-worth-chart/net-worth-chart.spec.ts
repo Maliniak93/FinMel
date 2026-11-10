@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatButtonToggleGroup } from '@angular/material/button-toggle';
+import { By } from '@angular/platform-browser';
 import { vi } from 'vitest';
 
 import {
@@ -12,7 +14,13 @@ import {
   textOf,
   textsOf,
 } from '../../../../testing/i18n';
-import { rulesFor } from '../../../../testing/stylesheet';
+import {
+  allMediaBlocks,
+  type Corner,
+  cornerRadii,
+  rulesFor,
+  transitionsOf,
+} from '../../../../testing/stylesheet';
 
 import type { NetWorthHistoryResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
@@ -243,14 +251,99 @@ describe('NetWorthChart', () => {
     );
   });
 
-  it('range thumb is a rounded pill with the accent ring', async () => {
-    await TestBed.configureTestingModule({ providers: [provideI18nTesting()] }).compileComponents();
-    const thumb = rulesFor(stylesheet(), /net-worth-chart__thumb(?![\w-])/);
+  it('range thumb rounds only the outer edge', async () => {
+    const element = await setup(yearPoints, '1Y', undefined, undefined, '2025-01-10');
+    const scss = stylesheet();
+    const base = rulesFor(scss, /net-worth-chart__thumb(?![\w-])/);
+    const inner =
+      /^calc\(\s*var\(--mat-button-toggle-shape, var\(--mat-sys-corner-extra-large\)\) - 1px\s*\)$/;
+    const thumb = () =>
+      element.querySelector<HTMLElement>('mat-button-toggle-group .net-worth-chart__thumb')!;
+    expect(base).toMatch(/box-shadow:\s*inset 0 0 0 1px var\(--sk-accent-stroke\)/);
 
-    expect(thumb).toMatch(
-      /border-radius:\s*calc\(\s*var\(--mat-button-toggle-shape, var\(--mat-sys-corner-extra-large\)\) - 1px\s*\)/,
+    const cases: { range: string; edge: 'start' | 'end' | null; rounded: Corner[] }[] = [
+      { range: '1M', edge: 'start', rounded: ['top-left', 'bottom-left'] },
+      { range: '1Y', edge: null, rounded: [] },
+      { range: 'YTD', edge: null, rounded: [] },
+      { range: 'MAX', edge: null, rounded: [] },
+      { range: 'CUSTOM', edge: 'end', rounded: ['top-right', 'bottom-right'] },
+    ];
+    for (const { range, edge, rounded } of cases) {
+      fixture.componentRef.setInput('range', range);
+      await fixture.whenStable();
+      expect(thumb().classList.contains('net-worth-chart__thumb--start'), range).toBe(
+        edge === 'start',
+      );
+      expect(thumb().classList.contains('net-worth-chart__thumb--end'), range).toBe(edge === 'end');
+
+      const modifier = edge
+        ? rulesFor(scss, new RegExp(`net-worth-chart__thumb--${edge}(?![\\w-])`))
+        : '';
+      const radii = cornerRadii(`${base}\n${modifier}`);
+      for (const corner of ['top-left', 'top-right', 'bottom-right', 'bottom-left'] as const) {
+        if (rounded.includes(corner)) {
+          expect(radii[corner], `${range} ${corner}`).toMatch(inner);
+        } else {
+          expect(radii[corner] ?? '0', `${range} ${corner}`).toMatch(/^0(px)?$/);
+        }
+      }
+    }
+
+    fixture.componentRef.setInput('range', '1M');
+    fixture.componentRef.setInput('loading', true);
+    await fixture.whenStable();
+    expect(thumb().classList).toContain('net-worth-chart__thumb--start');
+
+    fixture.componentRef.setInput('loading', false);
+    fixture.componentRef.setInput('loadError', 'Could not load history.');
+    fixture.componentRef.setInput('range', 'CUSTOM');
+    await fixture.whenStable();
+    expect(thumb().classList).toContain('net-worth-chart__thumb--end');
+  });
+
+  it('range toggles show no check mark and keep their width', async () => {
+    const element = await setup(yearPoints, '1Y', undefined, undefined, '2025-01-10');
+    const group = fixture.debugElement
+      .query(By.directive(MatButtonToggleGroup))
+      .injector.get(MatButtonToggleGroup);
+
+    expect(group.hideSingleSelectionIndicator).toBe(true);
+    expect(element.querySelectorAll('mat-button-toggle-group mat-pseudo-checkbox')).toHaveLength(0);
+
+    const buttons = rulesFor(
+      stylesheet(),
+      /net-worth-chart__ranges.*mat-button-toggle-button(?![\w-])/,
     );
-    expect(thumb).toMatch(/box-shadow:\s*inset 0 0 0 1px var\(--sk-accent-stroke\)/);
+    expect(buttons).toMatch(/transition\s*:/);
+    expect(transitionsOf(buttons).map((transition) => transition.property)).not.toContain(
+      'padding',
+    );
+  });
+
+  it('thumb shape and label colour share one transition', async () => {
+    await TestBed.configureTestingModule({ providers: [provideI18nTesting()] }).compileComponents();
+    const motion = allMediaBlocks(stylesheet(), '(prefers-reduced-motion: no-preference)');
+    const timing = 'var(--sk-motion-duration) var(--sk-motion-easing)';
+
+    const thumb = transitionsOf(rulesFor(motion, /net-worth-chart__thumb--animated(?![\w-])/));
+    expect(thumb).toContainEqual({ property: 'left', timing });
+    expect(thumb).toContainEqual({ property: 'width', timing });
+    const shaped = thumb.filter((transition) => transition.timing === timing);
+    const covers = (corner: string) =>
+      shaped.some(
+        (transition) => transition.property === corner || transition.property === 'border-radius',
+      );
+    for (const corner of [
+      'border-top-left-radius',
+      'border-top-right-radius',
+      'border-bottom-right-radius',
+      'border-bottom-left-radius',
+    ]) {
+      expect(covers(corner), corner).toBe(true);
+    }
+
+    const label = transitionsOf(rulesFor(motion, /net-worth-chart__ranges/));
+    expect(label).toContainEqual({ property: 'color', timing });
   });
 
   it('checked range toggle paints nothing of its own', async () => {
@@ -299,19 +392,26 @@ describe('NetWorthChart', () => {
       const left = parseFloat(thumb().style.left);
       return { left, right: left + parseFloat(thumb().style.width) };
     };
+    const startEdge = () => thumb().classList.contains('net-worth-chart__thumb--start');
+    const endEdge = () => thumb().classList.contains('net-worth-chart__thumb--end');
     const pick = async (index: number) => {
       radios(element)[index].click();
       await fixture.whenStable();
     };
 
+    expect(startEdge()).toBe(true);
     await pick(1);
+    expect(startEdge()).toBe(false);
     const oneYear = edges();
     await pick(0);
+    expect(startEdge()).toBe(true);
     const oneMonth = edges();
     expect(oneMonth.left).toBeLessThan(oneYear.left);
     expect(oneMonth.right).toBeLessThan(oneYear.right);
 
     await pick(2);
+    expect(startEdge()).toBe(false);
+    expect(endEdge()).toBe(false);
     const ytd = edges();
     expect(ytd.left).toBeGreaterThan(oneMonth.left);
     expect(ytd.right).toBeGreaterThan(oneMonth.right);
