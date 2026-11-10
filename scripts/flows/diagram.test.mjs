@@ -83,8 +83,8 @@ test("build gives a step with a tiered agent the start and escalated level rows 
     const startAt = tiered.indexOf("poziom startowy");
     const escalationAt = tiered.indexOf("eskalacja");
     assert.ok(startAt >= 0 && escalationAt > startAt, "start level then escalation headings in the step panel");
-    const sections = { startLevel: tiered.slice(startAt, escalationAt), escalatedLevel: tiered.slice(escalationAt) };
-    for (const name of ["startLevel", "escalatedLevel"]) {
+    const sections = { "LEVELS.implementer": tiered.slice(startAt, escalationAt), "LEVELS.escalation": tiered.slice(escalationAt) };
+    for (const name of ["LEVELS.implementer", "LEVELS.escalation"]) {
       assert.ok(rowsOf(name).length > 0, `${name} has rows`);
       const section = sections[name];
       for (const row of rowsOf(name)) assert.ok(section.includes(text(row)), `${name} row "${row}" shown in the step panel`);

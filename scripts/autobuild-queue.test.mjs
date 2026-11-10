@@ -391,7 +391,7 @@ test("dry-run prints the CI policy", () => {
 
 test("docs no longer mention delay and describe the window", () => {
   const read = (f) => readFileSync(path.join(root, f), "utf8");
-  for (const f of ["CLAUDE.md", "skarbiec-plan/workflow.md", "scripts/autobuild.mjs"]) assert.doesNotMatch(read(f), /--delay/, f);
-  assert.match(read("skarbiec-plan/workflow.md"), /--until/);
+  for (const f of ["CLAUDE.md", "skarbiec-plan/runbooks/autobuild.md", "scripts/autobuild.mjs"]) assert.doesNotMatch(read(f), /--delay/, f);
+  assert.match(read("skarbiec-plan/runbooks/autobuild.md"), /--until/);
   assert.match(read("CLAUDE.md"), /--until/);
 });

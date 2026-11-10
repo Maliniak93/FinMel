@@ -126,12 +126,15 @@ const BUILD_FEATURE = `export const meta = {
 }
 
 const OPUS = 'claude-opus-5-5'
-const startLevel =
-  tier >= 2 ? { model: 'sonnet', effort: 'high' } : noTests ? { model: 'haiku', effort: 'high' } : { model: 'sonnet', effort: 'medium' }
-const escalatedLevel = { model: OPUS, effort: tier >= 2 ? 'high' : 'medium' }
-const e2eStartLevel = { model: 'sonnet', effort: tier >= 2 ? 'high' : 'medium' }
-const testWriter = tier >= 2 ? { model: 'sonnet', effort: 'medium' } : { model: 'haiku', effort: 'high' }
-const reviewEffort = tier >= 2 ? 'high' : 'medium'
+const LEVELS = {
+  testWriter: { 1: { model: 'haiku', effort: 'high' }, 2: { model: 'sonnet', effort: 'medium' } },
+  implementer: { 1: { model: 'sonnet', effort: 'medium' }, 2: { model: 'sonnet', effort: 'high' } },
+  skipTestsImplementer: { 1: { model: 'haiku', effort: 'high' }, 2: { model: 'sonnet', effort: 'high' } },
+  e2e: { 1: { model: 'sonnet', effort: 'medium' }, 2: { model: 'sonnet', effort: 'high' } },
+  escalation: { 1: { model: OPUS, effort: 'medium' }, 2: { model: OPUS, effort: 'high' } },
+  review: { 1: { model: OPUS, effort: 'medium' }, 2: { model: OPUS, effort: 'high' } },
+  reReview: { 1: { model: OPUS, effort: 'medium' }, 2: { model: OPUS, effort: 'medium' } },
+}
 
 await step('implementer', 'Implement', ['go'])
 await step('scout', 'Scout', ['go'])

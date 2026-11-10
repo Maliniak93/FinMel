@@ -44,7 +44,7 @@ No reproduction → stop and say exactly what you tried and what you saw. Do not
 
 ## 2. Localize the root cause
 
-- Facts spread over many files → one `Explore` subagent (runs on Haiku) with a narrow question; read only the files it names.
+- Facts spread over many files → one `Explore` subagent with a narrow question; read only the files it names.
 - Follow the failure to its cause, not its first symptom: a 500 is a symptom, an unregistered handler is a cause;
   a stale dashboard value is a symptom, a consumer that never publishes is a cause.
 - State the root cause with evidence you saw — a quoted line, a test output, a trace. No evidence, no claim.

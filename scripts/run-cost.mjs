@@ -9,17 +9,20 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { HISTORY } from "./claude-history.mjs";
 
 // USD per million tokens at list price. The haiku-5-5-long tier applies above 100k prompt tokens per request.
 const PRICES = {
+  fable: { input: 8, output: 40, cacheRead: 0.2 },
   opus: { input: 4, output: 20, cacheRead: 0.2 },
-  sonnet: { input: 2, output: 10, cacheRead: 0.2 },
+  sonnet: { input: 2, output: 10, cacheRead: 0.1 },
   "haiku-5-5": { input: 0.1, output: 0.5, cacheRead: 0.01 },
   "haiku-5-5-long": { input: 0.5, output: 2.5, cacheRead: 0.05 },
   "haiku-4-5": { input: 1, output: 5, cacheRead: 0.1 },
 };
 const LONG_PROMPT_TOKENS = 100e3;
+export const unpriced = new Set();
 
 function parseArgs(argv) {
   const args = { since: null, issue: null, runs: 15, json: false, sessions: false, timeline: false };
@@ -57,7 +60,8 @@ function bashClass(command) {
   return "other";
 }
 
-function priceOf(model, promptTokens) {
+export function priceOf(model, promptTokens) {
+  if (/^claude-fable-/.test(model)) return PRICES.fable;
   if (/^claude-opus-/.test(model)) return PRICES.opus;
   if (/^claude-sonnet-/.test(model)) return PRICES.sonnet;
   if (model === "claude-haiku-5-5") return promptTokens > LONG_PROMPT_TOKENS ? PRICES["haiku-5-5-long"] : PRICES["haiku-5-5"];
@@ -65,13 +69,16 @@ function priceOf(model, promptTokens) {
   return null;
 }
 
-function callCost(model, u) {
+export function callCost(model, u) {
   const input = u.input_tokens || 0;
   const cacheRead = u.cache_read_input_tokens || 0;
   const cacheWrite = u.cache_creation_input_tokens || 0;
   const oneHourWrite = u.cache_creation?.ephemeral_1h_input_tokens || 0;
   const p = priceOf(model, input + cacheRead + cacheWrite);
-  if (!p) return 0;
+  if (!p) {
+    unpriced.add(model);
+    return 0;
+  }
   const usd =
     input * p.input +
     (cacheWrite - oneHourWrite) * p.input * 1.25 +
@@ -162,9 +169,8 @@ function collectRuns() {
             .filter((x) => x.endsWith(".jsonl"))
             .map((x) => {
               const meta = readJson(path.join(agentDir, x.replace(/\.jsonl$/, ".meta.json"))) || {};
-              return { type: meta.agentType || "?", phase: meta.workflowPhase || null, ...agentUsage(path.join(agentDir, x)) };
+              return { type: meta.agentType || "?", phase: meta.workflowPhase || null, label: meta.description || "", ...agentUsage(path.join(agentDir, x)) };
             })
-            .filter((a) => a.calls > 0)
         : [];
       const result = run.result || {};
       runs.push({
@@ -180,7 +186,8 @@ function collectRuns() {
         deviations: Array.isArray(result.deviations) ? result.deviations.length : null,
         minutes: Math.round((run.durationMs || 0) / 60000),
         cost: sum(agents, "cost"),
-        agents,
+        labels: agents.map((a) => a.label),
+        agents: agents.filter((a) => a.calls > 0),
       });
     }
   }
@@ -296,7 +303,7 @@ const D = (n) => `$${n.toFixed(1)}`;
 const short = (model) => String(model ?? "").replace(/^claude-/, "");
 const daysAgo = (n) => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
 
-function byType(agents) {
+export function byType(agents) {
   const groups = {};
   for (const a of agents) {
     const key = `${a.type}|${a.model}`;
@@ -378,19 +385,18 @@ function main() {
     return;
   }
 
-  let runs = collectRuns().filter((r) => r.workflow === "build-feature");
-  if (!runs.length) throw new Error("no build-feature runs found in the local history");
-  const newest = new Date(runs.at(-1).startedAt);
-  const since = args.since || new Date(newest.getTime() - 30 * 864e5).toISOString().slice(0, 10);
-  runs = runs.filter((r) => String(r.startedAt) >= since && (args.issue == null || r.issue === args.issue));
+  report(args);
+}
 
+export const isEscalated = (label) => /\(escalated\)/.test(label);
+export const isReReview = (label) => /^re-review/.test(label);
+
+export function summarize(runs) {
   const allAgents = runs.flatMap((r) => r.agents);
-  const types = byType(allAgents);
   const totalRead = sum(allAgents, "cacheRead");
-  const summary = {
-    since,
+  return {
     runs: runs.length,
-    shipped: runs.filter((r) => r.status === "shipped").length,
+    ready: runs.filter((r) => r.status === "ready").length,
     blocked: runs.filter((r) => r.status === "blocked").length,
     cacheRead: totalRead,
     cacheWrite: sum(allAgents, "cacheWrite"),
@@ -399,18 +405,72 @@ function main() {
     cost: sum(runs, "cost"),
     costPerRun: runs.length ? sum(runs, "cost") / runs.length : 0,
   };
+}
+
+export function byTier(runs) {
+  const groups = {};
+  for (const r of runs) {
+    const g = (groups[r.tier ?? "?"] ??= { tier: r.tier ?? "?", runs: 0, ready: 0, blocked: 0, blockedAt: {}, escalated: 0, reReviewed: 0, cost: 0, minutes: 0 });
+    g.runs++;
+    if (r.status === "ready") g.ready++;
+    if (r.status === "blocked") {
+      g.blocked++;
+      const stage = r.stage || "?";
+      g.blockedAt[stage] = (g.blockedAt[stage] || 0) + 1;
+    }
+    if (r.labels.some(isEscalated)) g.escalated++;
+    if (r.labels.some(isReReview)) g.reReviewed++;
+    g.cost += r.cost;
+    g.minutes += r.minutes;
+  }
+  return Object.values(groups)
+    .map((g) => ({ ...g, costPerRun: g.cost / g.runs, minutesPerRun: g.minutes / g.runs }))
+    .sort((a, b) => String(a.tier).localeCompare(String(b.tier)));
+}
+
+function report(args) {
+  let runs = collectRuns().filter((r) => r.workflow === "build-feature");
+  if (!runs.length) throw new Error("no build-feature runs found in the local history");
+  const newest = new Date(runs.at(-1).startedAt);
+  const since = args.since || new Date(newest.getTime() - 30 * 864e5).toISOString().slice(0, 10);
+  runs = runs.filter((r) => String(r.startedAt) >= since && (args.issue == null || r.issue === args.issue));
+
+  const types = byType(runs.flatMap((r) => r.agents));
+  const tiers = byTier(runs);
+  const summary = { since, ...summarize(runs) };
+  const totalRead = summary.cacheRead;
 
   if (args.json) {
-    console.log(JSON.stringify({ summary, byType: types, runs }, null, 2));
+    console.log(JSON.stringify({ summary, byTier: tiers, byType: types, runs }, null, 2));
     return;
   }
 
-  console.log(`build-feature runs since ${since}${args.issue != null ? ` for #${args.issue}` : ""}: ${summary.runs} (${summary.shipped} shipped, ${summary.blocked} blocked)`);
+  console.log(`build-feature runs since ${since}${args.issue != null ? ` for #${args.issue}` : ""}: ${summary.runs} (${summary.ready} ready, ${summary.blocked} blocked)`);
   console.log(
     `cache read ${M(summary.cacheRead)} · cache write ${M(summary.cacheWrite)} · output ${K(summary.output)} · cache read per run ${M(summary.perRun)} · cost ${D(summary.cost)} · ${D(summary.costPerRun)} per run\n`,
   );
 
-  console.log("By agent type");
+  console.log("By tier");
+  console.log(
+    table(
+      tiers.map((t) => ({
+        tier: t.tier,
+        runs: t.runs,
+        ready: t.ready,
+        blocked: t.blocked,
+        "blocked at": Object.entries(t.blockedAt)
+          .map(([stage, n]) => `${stage} ${n}`)
+          .join(", "),
+        escalated: t.escalated,
+        "re-reviewed": t.reReviewed,
+        "$/run": D(t.costPerRun),
+        "min/run": Math.round(t.minutesPerRun),
+      })),
+      ["tier", "runs", "ready", "blocked", "blocked at", "escalated", "re-reviewed", "$/run", "min/run"],
+    ),
+  );
+
+  console.log("\nBy agent type");
   console.log(
     table(
       types.map((t) => {
@@ -423,12 +483,14 @@ function main() {
           "cache read": M(t.cacheRead),
           share: `${Math.round((t.cacheRead / (totalRead || 1)) * 100)}%`,
           "cache write": M(t.cacheWrite),
+          "write/agent": K(t.cacheWrite / t.agents),
           "max ctx": K(t.maxContext),
           "bash explore": `${Math.round(((t.bash.explore || 0) / bashTotal) * 100)}%`,
           $: D(t.cost),
+          "$/agent": D(t.cost / t.agents),
         };
       }),
-      ["agent", "model", "agents", "calls/agent", "cache read", "share", "cache write", "max ctx", "bash explore", "$"],
+      ["agent", "model", "agents", "calls/agent", "cache read", "share", "cache write", "write/agent", "max ctx", "bash explore", "$", "$/agent"],
     ),
   );
 
@@ -455,9 +517,12 @@ function main() {
   console.log("\n(test-writer / implementer: model calls / largest context reached)");
 }
 
-try {
-  main();
-} catch (err) {
-  console.error(`run-cost.mjs: ${err.message}`);
-  process.exit(1);
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  try {
+    main();
+    if (unpriced.size) console.error(`unpriced models: ${[...unpriced].join(", ")}`);
+  } catch (err) {
+    console.error(`run-cost.mjs: ${err.message}`);
+    process.exit(1);
+  }
 }

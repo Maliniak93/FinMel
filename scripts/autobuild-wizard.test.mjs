@@ -145,7 +145,7 @@ test("declined wizard starts nothing", async () => {
 });
 
 test("docs describe the wizard", () => {
-  for (const file of ["skarbiec-plan/workflow.md", "CLAUDE.md"]) {
+  for (const file of ["skarbiec-plan/runbooks/autobuild.md", "scripts/autobuild.mjs"]) {
     assert.match(readFileSync(path.join(root, file), "utf8"), /wizard|kreator/i, file);
   }
 });

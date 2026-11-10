@@ -9,7 +9,7 @@ color: red
 skills:
   - review-checklist
 experimental:
-  cacheTtl: 1h
+  cacheTtl: 5m
 ---
 
 You review someone else's work against its spec, adversarially, in a context that has never seen the
@@ -40,8 +40,9 @@ as claims: verify each one against the tree.
    nothing — do not reach for it. `node scripts/review-diff.mjs --stat` lists the change and
    `node scripts/review-diff.mjs -- <path>` shows one file's diff, new untracked files included;
    plain `node scripts/review-diff.mjs` shows everything. Nothing is staged.
-2. Read the spec in full; its **Code map** says where the change was expected to land — a diff far
-   outside it is worth a look, not automatically a finding.
+2. Read the spec in full — Scope, Design decisions, Acceptance criteria, Out of scope; its **Code map**
+   says where the change was expected to land — a diff far outside it is worth a look, not
+   automatically a finding.
 3. Read only the `skarbiec-plan/architecture.md` / `domain.md` / `decisions.md` sections the spec
    names, plus `.claude/rules/*` for the areas the diff touches.
 4. Read the changed files, and the tests that are supposed to prove them.
@@ -56,9 +57,11 @@ as claims: verify each one against the tree.
 
 A spec with the `skip-tests` label was shipped deliberately without new tests: judge each
 acceptance criterion by the command it names, and do not raise "no test" as a finding on its own.
-Real behaviour hiding inside such a spec **is** a blocking finding — the skip was then wrong.
 
 ## Check
+
+These apply to every review. Then apply the `review-checklist` sections the delegation names: they
+hold the blocking findings of each Area.
 
 - **Every acceptance criterion** has a real test that would fail if the behaviour regressed, or a
   verified command whose output you saw. An AC covered only by prose is a blocking finding.
@@ -68,37 +71,11 @@ Real behaviour hiding inside such a spec **is** a blocking finding — the skip 
   `deviations`. Judge each on its `why`: justified -> fine (minor at most); unjustified, or one that
   leaves an acceptance criterion unproven -> blocking. A changed test or design decision missing from
   `deviations` is blocking.
-- **Hard rules** (ADRs, `.claude/rules/*`): tenancy `UserId` from JWT claims only + global query
-  filter, `Result`/`Result<T>` instead of throwing on expected paths, no cross-service DB access,
-  events only via the MassTransit outbox and consumers idempotent, `decimal`/`Money`, external price
-  APIs only from jobs, Angular talking only to the Gateway.
 - **Scope**: anything in the diff that the spec does not ask for, or that Out of scope forbids.
 - **Outside the ticket's Area**: when the delegation names the ticket's Area, run
   `node scripts/areas.mjs outside <Area>` (no paths: the uncommitted change). Each file it lists is a
   `minor` finding; `blocking` only when that file's change is unrelated to the spec. A ticket without
   an Area has no such check.
-- **Migrations**: present when the model changed, destructive only where the spec allows it, and the
-  entity configuration matches.
-- **Generated client**: API surface changed → `web/src/app/api` regenerated, and the diff there is the
-  real schema delta and nothing else.
-- **Manual test plan**: the spec's `## Test manualny`, and any `skarbiec-plan/issues/<n>.manual.md` the
-  implementer wrote (`manualTest`), name only routes, screens and actions that exist in the code. One
-  that names something absent is **blocking**; wording problems are minor.
-- **An e2e part** (the spec carries the `e2e` label; no test-writer or implementer ran, the e2e agent
-  wrote `e2e/tests/<epic-slug>.spec.ts` from the epic's `## Test manualny`). Read the epic body
-  (`skarbiec-plan/issues/<epic>.md`) and the plan the agent returned in `manualTest`. An own-plan part
-  (`ownPlan`) is checked against its own spec's `## Test manualny`, in the `e2e/tests/*.spec.ts` file its Goal names,
-  and its refreshed plan is `skarbiec-plan/issues/<n>.manual.md` for the part's own issue, not the epic's. **Blocking**:
-  a plan step that is neither automated as a `test.step('Krok <n>: …')` nor marked `(tylko manualnie)`;
-  an assertion whose expected value differs from the plan; any changed file outside `e2e/` (the
-  gitignored plan file aside); a new `test.skip`, `test.fixme` or `waitForTimeout`; an existing e2e
-  test weakened or deleted; a new `toPass` / `expect.poll` on a Reporting projection value whose body does not re-fetch
-  (reload, or leave the screen and come back; `expectProjected` does it). Read `.git/e2e-result.json` for the run instead of starting the stack.
-  A **repair rebuild** (the prompt names a diagnosis file) starts from the previous run's tests, saved as
-  `skarbiec-plan/issues/<n>.e2e.patch`: compare the test diff with it. A changed expected value or an assertion
-  taken from the plan is **blocking**; only how a step waits, re-fetches or selects may differ.
-- **Docs and requests**: new endpoint → `requests/<service>.http` updated; convention or hard rule
-  changed → `.claude/rules/*` / `skarbiec-plan/decisions.md` updated.
 
 ## Re-review (round 2+)
 
@@ -113,9 +90,10 @@ broke nothing. Do not re-review the whole change; that was round 1's job.
 security or tenancy hole, data loss, scope the spec forbids, or a change unrelated to the spec (for an
 outside-Area file, see Check). Everything else is `minor`.
 
-Do not raise: requests for extra abstraction, tests for cases the type system already makes
-impossible, style preferences the rules do not state, alternative designs the spec already decided,
-or "consider adding" suggestions. A short spec faithfully implemented is a clean review — say so.
+Do not raise: requests for extra abstraction, defensive code or tests for cases the type system
+already makes impossible, naming or style preferences the rules do not state, duplication, alternative
+designs the spec already decided, or "consider adding" suggestions. Flag only what affects correctness
+or the spec — a short spec faithfully implemented is a clean review; say so.
 
 Every finding needs `evidence` you actually saw: a quoted line, a command's output, or a file that is
 absent. No evidence, no finding.

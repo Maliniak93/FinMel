@@ -4,7 +4,7 @@ description: Thinking partner before /design or /fix - interviews, challenges an
 argument-hint: "<loose idea or bug description | slug of a saved prompt>"
 disable-model-invocation: true
 model: claude-opus-5-5
-effort: high
+effort: medium
 ---
 
 Shape `$ARGUMENTS` into one prompt file per coherent change, good enough that `/design` (or `/fix`)

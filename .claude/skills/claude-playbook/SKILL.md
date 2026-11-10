@@ -13,13 +13,13 @@ The Claude setup is `.claude/` (agents in `agents/*.md`, skills and slash comman
 - One job per file, one home per rule: a rule is written once, in the playbook or rule file that owns it. Other files point to it by name instead of copying its text. Duplicated rule text is the first thing to delete when two copies drift apart.
 
 ## CLAUDE.md
-- Keep it at or under 75 lines (72 today). It loads into every session, so a detail moves to a playbook, a rule or `skarbiec-plan/` and CLAUDE.md keeps a pointer.
+- Keep it at or under 11,264 bytes (11 KB; `scripts/claude-setup.test.mjs` checks it). It loads into every session, so a detail moves to a playbook, a rule or `skarbiec-plan/` and CLAUDE.md keeps a pointer.
 - Edit in place: change the line that is wrong. Never append a correction, a dated note or a "previously" beside it.
 - The Commands table and the hard architecture rules are cited by other files. A change to either lands in the same change as the file it affects.
 
 ## Consistency with the process
 - A process change touches `skarbiec-plan/workflow.md` (the process), CLAUDE.md (its summary) and every skill and agent that runs that step, in one change. A skill describing a step that `workflow.md` no longer has is a defect.
-- Model and effort named in an agent or skill match the tier rules in `workflow.md` and CLAUDE.md.
+- Per-tier models and effort of the pipeline roles live only in the `LEVELS` object of `.claude/workflows/build-feature.js`; an agent's frontmatter `model` and `effort` are its default outside the workflow. No other file names a `<model>/<effort>` pair (`scripts/claude-setup.test.mjs`).
 
 ## No references to removed things
 When a skill, agent, script, flag or ADR is removed, grep its name across `.claude/`, `CLAUDE.md` and `skarbiec-plan/`. A remaining reference is a bug. `skarbiec-plan/archive/` is history and is exempt.
@@ -27,6 +27,6 @@ When a skill, agent, script, flag or ADR is removed, grep its name across `.clau
 ## Definition of done
 - Frontmatter is valid, `name` equals the folder, and a playbook is `user-invocable: false`.
 - Every rule has one home; no text is duplicated from another skill or agent.
-- CLAUDE.md is at or under 75 lines, and every line still agrees with `skarbiec-plan/workflow.md`.
+- CLAUDE.md is within its byte budget, and every line still agrees with `skarbiec-plan/workflow.md`.
 - The skills and agents touching a changed step agree with it; a grep for each removed name finds nothing outside `archive/`.
 - `node scripts/verify.mjs` is green.

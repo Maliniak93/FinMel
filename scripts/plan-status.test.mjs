@@ -141,12 +141,28 @@ test("band and dependency warnings", () => {
   }
 });
 
+test("output is the title line, a blank line, then the report", () => {
+  const sandbox = createSandbox(buildState({ issues: [{ number: 450, status: "Todo", title: "One", labels: ["spec"], area: "Scripts" }] }), { branch: "" });
+  try {
+    const { code, out, stdout } = sandbox.run("plan-status.mjs", []);
+
+    assert.equal(code, 0, out);
+    const [title, blank, first] = stdout.split("\n");
+    assert.equal(title, "# Plan status — live, from git and GitHub");
+    assert.equal(blank, "");
+    assert.ok(first.startsWith("| Issue |"), first);
+    assert.ok(!stdout.includes("<!--"), stdout);
+  } finally {
+    sandbox.cleanup();
+  }
+});
+
 test("board skill passes an area to --area", () => {
   const skill = readFileSync(path.join(root, ".claude", "skills", "board", "SKILL.md"), "utf8");
   assert.match(skill, /^argument-hint: "\[area\|P0-P3\]"$/m);
   assert.match(skill, /--area/);
   assert.match(skill, /--priority/);
-  assert.match(readFileSync(path.join(root, "skarbiec-plan", "workflow.md"), "utf8"), /re-read before every part/);
+  assert.match(readFileSync(path.join(root, "skarbiec-plan", "runbooks", "autobuild.md"), "utf8"), /re-read before every part/);
 });
 
 test("missing or unknown priority warns", () => {

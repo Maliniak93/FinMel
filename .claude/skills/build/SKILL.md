@@ -4,7 +4,7 @@ description: Build a spec issue from the FinMel GitHub project end-to-end - bran
 argument-hint: "#<issue> [--tier 1|2] [--skip tests,review] [--fresh] [+Nk]"
 disable-model-invocation: true
 model: haiku
-effort: low
+effort: medium
 ---
 
 You relay; scripts and the `build-feature` workflow do all the work. Decide nothing yourself. Run in a fresh session or `claude --model haiku "/build #<n>"`.
