@@ -35,7 +35,7 @@
   <div class="wealth-all__filters">
     <mat-form-field appearance="outline" class="wealth-all__search" subscriptSizing="dynamic">
       <mat-label>{{ 'wealth.search' | transloco }}</mat-label>
-      <mat-icon matPrefix>search</mat-icon>
+      <mat-icon matIconPrefix>search</mat-icon>
       <input matInput type="search" [value]="search()" (input)="onSearch($event)" />
     </mat-form-field>
 
@@ -141,6 +141,8 @@
                 <div class="wealth-all__change">
                   <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
                 </div>
+              } @else {
+                <div class="wealth-all__change" aria-hidden="true"></div>
               }
             </th>
             <th scope="colgroup" class="wealth-all__actions"></th>
@@ -198,6 +200,8 @@
                             <div class="wealth-all__change">
                               <app-gain [amount]="gain.amount / 100" [percent]="gain.percent" />
                             </div>
+                          } @else {
+                            <div class="wealth-all__change" aria-hidden="true"></div>
                           }
                         </td>
                         <td class="wealth-all__actions">

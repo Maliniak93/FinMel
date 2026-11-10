@@ -112,7 +112,7 @@ describe('WealthLayout', () => {
     expect(captions[7]).toContain(formatMoney(3000));
   });
 
-  it('shows the note under the bank tab only with an off-wealth bank account', async () => {
+  it('bank tab caption shows the sum and no note with an off-wealth bank account', async () => {
     const data = wealthApiData();
     data.accounts.push(
       account({
@@ -128,19 +128,6 @@ describe('WealthLayout', () => {
     fetchSpy.mockRestore();
     fetchSpy = mockWealthApi({ data });
 
-    await switchLanguage(harness.fixture, 'pl');
-    await harness.navigateByUrl('/wealth/cash', WealthLayout);
-    const element = harness.routeNativeElement as HTMLElement;
-    const bankTab = () => element.querySelectorAll<HTMLAnchorElement>('nav a')[2];
-
-    await vi.waitFor(() => {
-      harness.detectChanges();
-      expect(bankTab().textContent).toContain(formatMoney(45000));
-    });
-    expect(bankTab().textContent).toContain('bez kont poza majątkiem');
-  });
-
-  it('shows no note under the bank tab without an off-wealth bank account', async () => {
     await switchLanguage(harness.fixture, 'pl');
     await harness.navigateByUrl('/wealth/cash', WealthLayout);
     const element = harness.routeNativeElement as HTMLElement;

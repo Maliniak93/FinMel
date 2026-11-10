@@ -102,49 +102,6 @@ describe('WealthData', () => {
     expect(wealth.total()).toBe(115800);
   });
 
-  it('flags a bank account outside net worth', async () => {
-    const data = wealthApiData();
-    data.accounts.push(
-      account({
-        id: '56565656-5656-5656-5656-565656565656',
-        name: 'Revolut ROR',
-        type: 2,
-        cashBalance: 300,
-        outsideNetWorth: true,
-        groupId: null,
-        cashAssetId: 'b5656565-5656-5656-5656-565656565656',
-      }),
-    );
-    fetchSpy.mockRestore();
-    fetchSpy = mockWealthApi({ data });
-
-    const wealth = await loaded();
-
-    expect(wealth.bankOutsideNetWorth()).toBe(true);
-  });
-
-  it('does not flag an archived bank account outside net worth', async () => {
-    const data = wealthApiData();
-    data.accounts.push(
-      account({
-        id: '57575757-5757-5757-5757-575757575757',
-        name: 'Old Revolut ROR',
-        type: 2,
-        isArchived: true,
-        cashBalance: 0,
-        outsideNetWorth: true,
-        groupId: null,
-        cashAssetId: 'b5757575-5757-5757-5757-575757575757',
-      }),
-    );
-    fetchSpy.mockRestore();
-    fetchSpy = mockWealthApi({ data });
-
-    const wealth = await loaded();
-
-    expect(wealth.bankOutsideNetWorth()).toBe(false);
-  });
-
   it('bond and metal gains', async () => {
     const data = wealthApiData();
     const COI_ID = 'b0000000-0000-0000-0000-000000000002';

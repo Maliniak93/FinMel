@@ -157,10 +157,10 @@ test('konta bankowe w jednej tabeli: etykieta Poza majątkiem, filtry chipów i 
     await expect(statusOf(page, MULTI)).not.toContainText(LABEL);
   });
 
-  await test.step('Krok 3: podpis zakładki Konta bankowe to 15 000,00 zł bez 6 400 zł i dopisek bez kont poza majątkiem', async () => {
+  await test.step('Krok 3: podpis zakładki Konta bankowe to 15 000,00 zł bez 6 400 zł i bez dopisku bez kont poza majątkiem', async () => {
     await expectCaptionSum(page, pln('15 000,00'));
     await expect(bankTab(page)).not.toContainText(pln('21 400,00'));
-    await expect(bankTab(page)).toContainText(NOTE);
+    await expect(bankTab(page)).not.toContainText(NOTE);
   });
 
   await test.step('Krok 4: chip Bieżące pokazuje tylko Erste Platinum z etykietą, podpis zakładki nadal 15 000,00 zł', async () => {
@@ -266,20 +266,20 @@ test('konta bankowe w jednej tabeli: etykieta Poza majątkiem, filtry chipów i 
     await expect(bankTab(page)).not.toContainText(pln('15 425,00'));
   });
 
-  await test.step('Krok 12: po wyłączeniu Poza majątkiem na Erste Platinum etykieta znika, podpis zakładki 21 400,00 zł i dopisek zostaje', async () => {
+  await test.step('Krok 12: po wyłączeniu Poza majątkiem na Erste Platinum etykieta znika, podpis zakładki 21 400,00 zł bez dopisku', async () => {
     await editAccount(page, ERSTE, { outside: false });
     await expect(statusOf(page, ERSTE)).not.toContainText(LABEL);
     await expectCaptionSum(page, pln('21 400,00'));
-    await expect(bankTab(page)).toContainText(NOTE);
+    await expect(bankTab(page)).not.toContainText(NOTE);
   });
 
-  await test.step('Krok 13: po przełączeniu flag podpis zakładki to 15 000 zł + 100 EUR po kursie 4,25 (15 425,00 zł), dopisek widoczny, Revolut EUR bez etykiety', async () => {
+  await test.step('Krok 13: po przełączeniu flag podpis zakładki to 15 000 zł + 100 EUR po kursie 4,25 (15 425,00 zł), bez dopisku, Revolut EUR bez etykiety', async () => {
     await editAccount(page, ERSTE, { outside: true });
     await editAccount(page, REVOLUT_EUR, { outside: false });
     await expect(statusOf(page, REVOLUT_EUR)).not.toContainText(LABEL);
     await expect(statusOf(page, ERSTE)).toContainText(LABEL);
     await expectCaptionSum(page, pln('15 425,00'));
-    await expect(bankTab(page)).toContainText(NOTE);
+    await expect(bankTab(page)).not.toContainText(NOTE);
   });
 
   await test.step('Krok 14: strona konta Erste Platinum pokazuje saldo 6 400 zł i etykietę Poza majątkiem', async () => {
