@@ -57,7 +57,6 @@
   },
   "wealth": {
     "tabsLabel": "Asset types",
-    "bankOutsideNote": "excluding off-wealth accounts",
     "search": "Search",
     "groupFilter": "Group: {{ name }}",
     "groupAll": "All",

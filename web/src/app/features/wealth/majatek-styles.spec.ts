@@ -113,4 +113,33 @@ describe('Majątek stylesheets', () => {
     );
     expect(rulesFor(wealthPhone, /thead th\.wealth-all__col--status/)).toMatch(/display:\s*none/);
   });
+
+  it('empty gain line keeps the filled line font size and stays in the value cell', () => {
+    const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    const change = rulesFor(css, /__change/);
+    expect(change).toMatch(/font-size:\s*var\(--sk-text-sm\)/);
+    expect(change).not.toMatch(/display:\s*none/);
+
+    const phone = mediaBlock(css, '(width < 600px)');
+    expect(rulesFor(phone, /__change/)).not.toMatch(
+      /display:\s*none|grid-(column|row)|position:\s*absolute/,
+    );
+  });
+
+  it('wealth search label and input take typography from the group field select value', () => {
+    const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    const search = rulesFor(css, /__search/);
+    expect(search).toMatch(/container-text-font:\s*var\(--mat-select-trigger-text-font/);
+    expect(search).toMatch(/container-text-size:\s*var\(--mat-select-trigger-text-size/);
+    expect(search).toMatch(/container-text-weight:\s*var\(--mat-select-trigger-text-weight/);
+    expect(search).toMatch(
+      /outlined-input-text-color:\s*var\(--mat-select-enabled-trigger-text-color/,
+    );
+    expect(search).toMatch(/outlined-label-text-font:\s*var\(--mat-select-trigger-text-font/);
+    expect(search).toMatch(/outlined-label-text-size:\s*var\(--mat-select-trigger-text-size/);
+    expect(search).toMatch(/outlined-label-text-weight:\s*var\(--mat-select-trigger-text-weight/);
+    expect(search).toMatch(
+      /outlined-label-text-color:\s*var\(--mat-select-enabled-trigger-text-color/,
+    );
+  });
 });

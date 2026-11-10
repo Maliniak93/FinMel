@@ -23,9 +23,6 @@
           }
         } @else if (tab.type) {
           <span class="wealth__tab-caption sk-num">{{ sumCaption(tab.type) }}</span>
-          @if (tab.type === 'bank' && data.bankOutsideNetWorth()) {
-            <span class="wealth__tab-note">{{ 'wealth.bankOutsideNote' | transloco }}</span>
-          }
         }
       </span>
     </a>

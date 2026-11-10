@@ -432,19 +432,6 @@ export class WealthData {
 
   readonly total = computed(() => sumPln(this.rows()));
 
-  readonly bankOutsideNetWorth = computed(
-    () =>
-      this.accounts.hasValue() &&
-      this.accounts
-        .value()
-        .some(
-          (account) =>
-            Number(account.type) === ACCOUNT_TYPE.Bank &&
-            account.outsideNetWorth &&
-            !account.isArchived,
-        ),
-  );
-
   readonly typeSums = computed(() => {
     const sums = {} as Record<WealthType, number | null>;
     for (const section of WEALTH_SECTIONS) {

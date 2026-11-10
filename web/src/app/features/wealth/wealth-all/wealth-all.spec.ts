@@ -281,6 +281,59 @@ describe('WealthAll', () => {
     ).toBe(true);
   });
 
+  it('reserves an empty gain line in rows without a gain', async () => {
+    const data = wealthApiData();
+    const [priced] = data.securities.holdings;
+    data.securities.holdings.push({
+      ...priced,
+      assetId: 'c0000000-0000-0000-0000-000000000099',
+      name: 'Unpriced ETF',
+      ticker: 'UNP.WA',
+      costPln: 0,
+      unrealizedPlPln: 0,
+      unrealizedPlPercent: 0,
+    });
+    await setup({ data });
+    await expandAll();
+
+    for (const name of ['Santander', 'Portfel', 'Lokata Alior', 'Unpriced ETF']) {
+      const valueCell = row(name)!.querySelector<HTMLElement>('td.wealth-all__num')!;
+      const lines = valueCell.querySelectorAll<HTMLElement>('.wealth-all__change');
+      expect(lines, name).toHaveLength(1);
+      expect(lines[0].getAttribute('aria-hidden'), name).toBe('true');
+      expect(lines[0].textContent?.trim(), name).toBe('');
+      expect(valueCell.querySelector('app-gain'), name).toBeNull();
+      expect(valueCell.textContent, name).not.toContain('—');
+    }
+  });
+
+  it('reserves an empty gain line in a section header without a gain', async () => {
+    await setup();
+
+    const header = section('bank')!.querySelector<HTMLElement>(
+      'tr.wealth-all__section th.wealth-all__num',
+    )!;
+    const lines = header.querySelectorAll<HTMLElement>('.wealth-all__change');
+    expect(lines).toHaveLength(1);
+    expect(lines[0].getAttribute('aria-hidden')).toBe('true');
+    expect(lines[0].textContent?.trim()).toBe('');
+    expect(header.querySelector('app-gain')).toBeNull();
+  });
+
+  it('puts the search icon in the icon-prefix slot and keeps the Szukaj label', async () => {
+    await setup();
+
+    const field = root().querySelector<HTMLElement>('mat-form-field.wealth-all__search')!;
+    expect(field.querySelector('.mat-mdc-form-field-icon-prefix mat-icon')?.textContent).toContain(
+      'search',
+    );
+    expect(field.querySelector('mat-label')?.textContent?.trim()).toBe(en.wealth.search);
+
+    const html = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.html');
+    expect(html).toContain('<mat-icon matIconPrefix>search</mat-icon>');
+    expect(html).not.toContain('matPrefix');
+  });
+
   it('group filter', async () => {
     await setup();
     await expandAll();
