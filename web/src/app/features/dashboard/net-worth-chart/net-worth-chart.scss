@@ -48,16 +48,42 @@
   top: 0;
   bottom: 0;
   background: var(--mat-sys-secondary-container);
-  border-radius: calc(var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px);
+  border-radius: 0;
   box-shadow: inset 0 0 0 1px var(--sk-accent-stroke);
   pointer-events: none;
+}
+
+.net-worth-chart__thumb--start {
+  border-top-left-radius: calc(
+    var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px
+  );
+  border-bottom-left-radius: calc(
+    var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px
+  );
+}
+
+.net-worth-chart__thumb--end {
+  border-top-right-radius: calc(
+    var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px
+  );
+  border-bottom-right-radius: calc(
+    var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px
+  );
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .net-worth-chart__thumb--animated {
     transition:
       left var(--sk-motion-duration) var(--sk-motion-easing),
-      width var(--sk-motion-duration) var(--sk-motion-easing);
+      width var(--sk-motion-duration) var(--sk-motion-easing),
+      border-top-left-radius var(--sk-motion-duration) var(--sk-motion-easing),
+      border-top-right-radius var(--sk-motion-duration) var(--sk-motion-easing),
+      border-bottom-right-radius var(--sk-motion-duration) var(--sk-motion-easing),
+      border-bottom-left-radius var(--sk-motion-duration) var(--sk-motion-easing);
+  }
+
+  .net-worth-chart__ranges ::ng-deep .mat-button-toggle-button {
+    transition: color var(--sk-motion-duration) var(--sk-motion-easing);
   }
 }
 

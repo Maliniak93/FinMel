@@ -66,3 +66,95 @@ export function mediaBlock(css: string, condition: string): string {
   }
   throw new Error(`unclosed @media ${condition} block`);
 }
+
+export function allMediaBlocks(css: string, condition: string): string {
+  const blocks: string[] = [];
+  let from = 0;
+  for (let start = css.indexOf(`@media ${condition}`, from); start !== -1;) {
+    const open = css.indexOf('{', start);
+    let depth = 0;
+    let close = -1;
+    for (let i = open; i < css.length && close === -1; i++) {
+      if (css[i] === '{') {
+        depth++;
+      } else if (css[i] === '}' && --depth === 0) {
+        close = i;
+      }
+    }
+    if (close === -1) {
+      throw new Error(`unclosed @media ${condition} block`);
+    }
+    blocks.push(css.slice(open + 1, close));
+    from = close + 1;
+    start = css.indexOf(`@media ${condition}`, from);
+  }
+  return blocks.join('\n');
+}
+
+type Delimiter = ';' | ',' | 'space';
+
+function splitTopLevel(value: string, delimiter: Delimiter): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const char of value) {
+    if (char === '(') {
+      depth++;
+    } else if (char === ')') {
+      depth--;
+    }
+    const splits = depth === 0 && (delimiter === 'space' ? /\s/.test(char) : char === delimiter);
+    if (splits) {
+      if (current.trim()) {
+        parts.push(current.trim());
+      }
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) {
+    parts.push(current.trim());
+  }
+  return parts;
+}
+
+export function declarationList(body: string): [string, string][] {
+  return splitTopLevel(body, ';').flatMap((declaration): [string, string][] => {
+    const colon = declaration.indexOf(':');
+    return colon === -1
+      ? []
+      : [[declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim()]];
+  });
+}
+
+export function transitionsOf(body: string): { property: string; timing: string }[] {
+  return declarationList(body)
+    .filter(([name]) => name === 'transition')
+    .flatMap(([, value]) =>
+      splitTopLevel(value, ',').map((item) => {
+        const [property = '', ...timing] = splitTopLevel(item, 'space');
+        return { property, timing: timing.join(' ') };
+      }),
+    );
+}
+
+export type Corner = 'top-left' | 'top-right' | 'bottom-right' | 'bottom-left';
+
+export function cornerRadii(body: string): Partial<Record<Corner, string>> {
+  const radii: Partial<Record<Corner, string>> = {};
+  for (const [name, value] of declarationList(body)) {
+    if (name === 'border-radius') {
+      const [top = '', right = top, bottom = top, left = right] = splitTopLevel(value, 'space');
+      radii['top-left'] = top;
+      radii['top-right'] = right;
+      radii['bottom-right'] = bottom;
+      radii['bottom-left'] = left;
+    }
+    const longhand = /^border-(top|bottom)-(left|right)-radius$/.exec(name);
+    if (longhand) {
+      radii[`${longhand[1]}-${longhand[2]}` as Corner] = value;
+    }
+  }
+  return radii;
+}

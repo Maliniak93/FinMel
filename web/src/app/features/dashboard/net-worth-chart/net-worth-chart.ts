@@ -144,6 +144,7 @@ export class NetWorthChart {
 
   protected readonly thumb = signal<{ left: number; width: number } | null>(null);
   protected readonly thumbAnimated = signal(false);
+  protected readonly thumbEdge = signal<'start' | 'end' | null>(null);
 
   protected readonly ranges = RANGES;
   protected readonly customRange = CUSTOM_RANGE;
@@ -226,6 +227,7 @@ export class NetWorthChart {
     if (!toggle) {
       return;
     }
+    this.thumbEdge.set(index === 0 ? 'start' : index === RANGES.length ? 'end' : null);
     const left = toggle.offsetLeft;
     const width = toggle.offsetWidth;
     this.thumbAnimated.set(this.placedOnce);
