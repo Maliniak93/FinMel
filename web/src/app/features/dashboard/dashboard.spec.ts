@@ -26,6 +26,7 @@ import { ASSET_CLASS } from '../assets/asset-class';
 import { Dashboard } from './dashboard';
 import { customRangeLabel } from './range-label';
 import { provideI18nTesting } from '../../core/i18n/testing';
+import { PlanningState } from '../../core/planning/planning-state';
 import { rowLineSkipsLast, ruleBodies } from '../../../testing/stylesheet';
 import { stubReducedMotion } from '../../../testing/match-media';
 import { type AnimationFrames, stubAnimationFrames } from '../../../testing/animation-frame';
@@ -1693,6 +1694,283 @@ describe('Dashboard change figures', () => {
     const exposed = change().cloneNode(true) as HTMLElement;
     exposed.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
     expect(textOf(exposed)).toContain(normalised(formatSignedMoney(8900)));
+  });
+});
+
+describe('Dashboard layout flip', () => {
+  interface FakeAnimation {
+    target: Element;
+    keyframes: Keyframe[];
+    options: KeyframeAnimationOptions;
+    cancel: ReturnType<typeof vi.fn>;
+    finish(): void;
+  }
+
+  const PAIR = '.dashboard-page__todo-pair';
+  const NEIGHBOURS = ['.dashboard-page__structure', '.dashboard-page__history'];
+
+  let fixture: ComponentFixture<Dashboard>;
+  let fetchSpy: ReturnType<typeof mockApi>;
+  let rects: { mockRestore(): void };
+  let motion: { restore(): void } | undefined;
+  let animations: FakeAnimation[];
+  let rows: Record<string, unknown>[];
+
+  beforeAll(() => {
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+    reportingClient.setConfig({ baseUrl: 'https://example.test' });
+  });
+
+  beforeEach(() => {
+    animations = [];
+    document.documentElement.style.setProperty('--sk-motion-duration-long', '420ms');
+    Object.defineProperty(Element.prototype, 'animate', {
+      configurable: true,
+      writable: true,
+      value(this: Element, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
+        const listeners: (() => void)[] = [];
+        let resolveFinished!: () => void;
+        const finished = new Promise<void>((done) => (resolveFinished = done));
+        const animation = {
+          finished,
+          onfinish: null as null | (() => void),
+          oncancel: null as null | (() => void),
+          cancel: vi.fn(),
+          addEventListener: (_type: string, listener: () => void) => listeners.push(listener),
+          removeEventListener: () => undefined,
+        };
+        animations.push({
+          target: this,
+          keyframes,
+          options,
+          cancel: animation.cancel,
+          finish: () => {
+            resolveFinished();
+            animation.onfinish?.();
+            listeners.forEach((listener) => listener());
+          },
+        });
+        return animation;
+      },
+    });
+    rects = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: Element,
+    ) {
+      const overdue = document.querySelector('.dashboard-page__hero--overdue') !== null;
+      let top = 0;
+      if (this.matches(PAIR)) {
+        top = overdue ? 100 : 500;
+      } else if (this.matches('.dashboard-page__structure, .dashboard-page__history')) {
+        top = overdue ? 300 : 100;
+      }
+      return {
+        x: 0,
+        y: top,
+        left: 0,
+        top,
+        right: 400,
+        bottom: top + 100,
+        width: 400,
+        height: 100,
+        toJSON: () => ({}),
+      } as DOMRect;
+    });
+  });
+
+  afterEach(async () => {
+    fetchSpy.mockRestore();
+    rects.mockRestore();
+    motion?.restore();
+    motion = undefined;
+    delete (Element.prototype as unknown as Record<string, unknown>)['animate'];
+    vi.unstubAllGlobals();
+    document.documentElement.style.removeProperty('--sk-motion-duration-long');
+    await restoreEnglish();
+  });
+
+  const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+  async function render(): Promise<void> {
+    fetchSpy = mockApi({
+      dashboard: jsonResponse(dashboardWithClasses),
+      todo: () => todoResponse(rows),
+    });
+    await TestBed.configureTestingModule({
+      imports: [Dashboard],
+      providers: [provideRouter([]), provideI18nTesting()],
+    }).compileComponents();
+    fixture = TestBed.createComponent(Dashboard);
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  async function reloadTodo(next: Record<string, unknown>[]): Promise<void> {
+    rows = next;
+    TestBed.inject(PlanningState).reloadTodo();
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(TestBed.inject(PlanningState).todo().length).toBe(next.length);
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  async function quiet(): Promise<void> {
+    for (let turn = 0; turn < 3; turn++) {
+      await new Promise((done) => setTimeout(done, 0));
+      fixture.detectChanges();
+    }
+  }
+
+  const pairElements = (): Element[] => [
+    host().querySelector('app-todo-card')!,
+    host().querySelector('app-upcoming-card')!,
+    host().querySelector('app-month-card')!,
+  ];
+
+  const animated = (selector: string): FakeAnimation[] =>
+    animations.filter((animation) => animation.target.matches(selector));
+
+  it('settling the last overdue keeps the same todo pair elements', async () => {
+    rows = [overdueExpenseItem('Abonament', 4)];
+    await render();
+    const hero = host().querySelector('.dashboard-page__hero')!;
+    const before = pairElements();
+    expect(hero.contains(before[0])).toBe(true);
+
+    await reloadTodo([]);
+
+    const after = pairElements();
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(before[1]);
+    expect(after[2]).toBe(before[2]);
+    const { structure, todo } = sectionsOf(host());
+    expect(hero.contains(todo)).toBe(false);
+    expect(followsInDocument(structure, todo)).toBe(true);
+  });
+
+  it('a new overdue keeps the same todo pair elements', async () => {
+    rows = [];
+    await render();
+    const hero = host().querySelector('.dashboard-page__hero')!;
+    const before = pairElements();
+    expect(hero.contains(before[0])).toBe(false);
+
+    await reloadTodo([overdueExpenseItem('Abonament', 4)]);
+
+    const after = pairElements();
+    expect(after[0]).toBe(before[0]);
+    expect(after[1]).toBe(before[1]);
+    expect(after[2]).toBe(before[2]);
+    expect(hero.contains(after[0])).toBe(true);
+    expect(followsInDocument(sectionsOf(host()).kpi, sectionsOf(host()).todo)).toBe(true);
+  });
+
+  it('layout flip animates the pair and its neighbours then clears them', async () => {
+    rows = [];
+    await render();
+    await quiet();
+    animations.length = 0;
+
+    await reloadTodo([overdueExpenseItem('Abonament', 4)]);
+
+    await vi.waitFor(() => {
+      expect(animated(PAIR).length).toBeGreaterThan(0);
+    });
+    for (const selector of NEIGHBOURS) {
+      expect(animated(selector).length, selector).toBeGreaterThan(0);
+    }
+    for (const animation of animations) {
+      expect(animation.options.duration).toBe(420);
+      expect(JSON.stringify(animation.keyframes[0])).toContain('translate');
+    }
+
+    animations.forEach((animation) => animation.finish());
+    await quiet();
+
+    for (const animation of animations) {
+      expect((animation.target as HTMLElement).style.transform).toBe('');
+    }
+  });
+
+  it('initial todo load does not animate the layout', async () => {
+    rows = [overdueExpenseItem('Abonament', 4)];
+    await render();
+    await quiet();
+
+    expect(host().querySelector('.dashboard-page__hero--overdue')).not.toBeNull();
+    expect(animations).toHaveLength(0);
+
+    await reloadTodo([]);
+    await vi.waitFor(() => {
+      expect(animations.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('settling one of several overdue changes no layout', async () => {
+    rows = [overdueExpenseItem('Abonament', 4), overdueExpenseItem('Czynsz', 3)];
+    await render();
+    await quiet();
+    const before = pairElements();
+    const hero = host().querySelector('.dashboard-page__hero')!;
+
+    await reloadTodo([overdueExpenseItem('Czynsz', 3)]);
+    await quiet();
+
+    expect(pairElements()).toEqual(before);
+    expect(hero.classList).toContain('dashboard-page__hero--overdue');
+    expect(hero.contains(before[0])).toBe(true);
+    expect(animations).toHaveLength(0);
+
+    await reloadTodo([]);
+    await vi.waitFor(() => {
+      expect(animations.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('a flip during a flip restarts from the current rects', async () => {
+    rows = [];
+    await render();
+    await quiet();
+    animations.length = 0;
+
+    await reloadTodo([overdueExpenseItem('Abonament', 4)]);
+    await vi.waitFor(() => {
+      expect(animations.length).toBeGreaterThan(0);
+    });
+    const first = [...animations];
+    expect(first.every((animation) => animation.cancel.mock.calls.length === 0)).toBe(true);
+
+    await reloadTodo([]);
+    await vi.waitFor(() => {
+      expect(animations.length).toBeGreaterThan(first.length);
+    });
+
+    expect(first.every((animation) => animation.cancel.mock.calls.length > 0)).toBe(true);
+    const second = animations.slice(first.length);
+    expect(second.length).toBe(first.length);
+    expect(second.every((animation) => animation.cancel.mock.calls.length === 0)).toBe(true);
+
+    first.forEach((animation) => animation.finish());
+    await quiet();
+    expect(animations).toHaveLength(first.length + second.length);
+  });
+
+  it('layout flip is instant under reduced motion', async () => {
+    motion = stubReducedMotion(true);
+    rows = [];
+    await render();
+    await quiet();
+    const before = pairElements();
+
+    await reloadTodo([overdueExpenseItem('Abonament', 4)]);
+    await quiet();
+
+    expect(pairElements()).toEqual(before);
+    expect(pairElements()[0]).toBe(before[0]);
+    expect(host().querySelector('.dashboard-page__hero--overdue')).not.toBeNull();
+    expect(host().querySelector('.dashboard-page__hero')!.contains(pairElements()[0])).toBe(true);
+    expect(animations).toHaveLength(0);
   });
 });
 
