@@ -33,6 +33,23 @@ function splitMotion(css: string): { outside: string; inside: string } {
 }
 
 describe('Motion styles', () => {
+  it('defines the long motion token from the base token', () => {
+    expect(readStylesheet('src/skarbiec-tokens.css')).toMatch(
+      /--sk-motion-duration-long:\s*calc\(var\(--sk-motion-duration\)\s*\*\s*3\);/,
+    );
+  });
+
+  it('keeps the dashboard figure and caption motion inside no-preference', () => {
+    const { outside, inside } = splitMotion(
+      readStylesheet('src/app/features/dashboard/dashboard.scss'),
+    );
+    expect(outside).not.toMatch(/(^|[\s;{])(transition|animation)(-[a-z]+)?\s*:/);
+    expect(outside).not.toMatch(/@keyframes/);
+    expect(inside).toMatch(/@keyframes/);
+    expect(inside).toMatch(/animation\s*:/);
+    expect(inside).toContain('var(--sk-motion-duration)');
+  });
+
   it('transitions only under no-preference', () => {
     const files = [
       'src/app/layout/shell/shell.scss',

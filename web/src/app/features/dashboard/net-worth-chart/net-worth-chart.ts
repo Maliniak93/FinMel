@@ -26,6 +26,7 @@ import type { AssetClass, NetWorthHistoryPoint } from '../../../api/reporting';
 import { SectionError } from '../../../shared/section-error/section-error';
 import { fromDateOnly } from '../../../shared/date-only';
 import { assetClassColor } from '../../../shared/colors';
+import { prefersReducedMotion } from '../../../shared/motion/reduced-motion';
 import { assetClassLabel } from '../../assets/asset-class';
 import {
   formatAxisDate,
@@ -104,13 +105,6 @@ interface ChartLayer {
   readonly key: 'outgoing' | 'current';
   readonly frame: ChartFrame;
   readonly outgoing: boolean;
-}
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  );
 }
 
 @Component({

@@ -24,8 +24,11 @@ import { client as reportingClient } from '../../api/reporting/client.gen';
 import type { DashboardResponse, NetWorthHistoryResponse } from '../../api/reporting';
 import { ASSET_CLASS } from '../assets/asset-class';
 import { Dashboard } from './dashboard';
+import { customRangeLabel } from './range-label';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { rowLineSkipsLast, ruleBodies } from '../../../testing/stylesheet';
+import { stubReducedMotion } from '../../../testing/match-media';
+import { type AnimationFrames, stubAnimationFrames } from '../../../testing/animation-frame';
 import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../../shared/format';
 import {
   type ApiRoute,
@@ -93,6 +96,7 @@ describe('Dashboard', () => {
   let fixture: ComponentFixture<Dashboard>;
   let component: Dashboard;
   let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let frames: AnimationFrames | undefined;
 
   beforeAll(() => {
     portfolioClient.setConfig({ baseUrl: 'https://example.test' });
@@ -101,6 +105,8 @@ describe('Dashboard', () => {
 
   afterEach(async () => {
     fetchSpy.mockRestore();
+    frames?.restore();
+    frames = undefined;
     vi.unstubAllGlobals();
     await restoreEnglish();
   });
@@ -217,6 +223,7 @@ describe('Dashboard', () => {
   }
 
   it('shows the change for the selected range', async () => {
+    frames = stubAnimationFrames();
     await setup(jsonResponse(dashboard), (url) =>
       url.includes('range=YTD') ? historyWithChange(250, 25) : historyWithChange(40, 4),
     );
@@ -228,6 +235,8 @@ describe('Dashboard', () => {
     ) as HTMLButtonElement;
     ytdToggle.click();
     await fixture.whenStable();
+    frames.flush();
+    fixture.detectChanges();
 
     const change = element.querySelector('.dashboard-page__change') as HTMLElement;
     expect(lastHistoryParams(fetchSpy).get('range')).toBe('YTD');
@@ -533,6 +542,7 @@ describe('Dashboard', () => {
   });
 
   it('switching the range updates the change', async () => {
+    frames = stubAnimationFrames();
     await setup(jsonResponse(dashboard), (url) =>
       url.includes('range=1M') ? historyWithChange(40, 4) : historyWithChange(250, 25),
     );
@@ -544,6 +554,8 @@ describe('Dashboard', () => {
     ) as HTMLButtonElement;
     monthToggle.click();
     await fixture.whenStable();
+    frames.flush();
+    fixture.detectChanges();
 
     const historyUrls = fetchSpy.mock.calls
       .map(([input]: [unknown]) => requestUrl(input))
@@ -1316,6 +1328,371 @@ describe('Dashboard', () => {
       expect(lastHistoryParams(fetchSpy).has('groupId')).toBe(false);
       expect(textOf(element.querySelector('.net-worth-chart__filter'))).toContain('All');
     });
+  });
+});
+
+describe('Dashboard change figures', () => {
+  let fixture: ComponentFixture<Dashboard>;
+  let fetchSpy: ReturnType<typeof mockApi>;
+  let frames: AnimationFrames;
+  let motion: { restore(): void } | undefined;
+  let route: (params: URLSearchParams) => Response | Promise<Response>;
+  let dialogResult: { from: string; to: string } | undefined;
+
+  beforeAll(() => {
+    portfolioClient.setConfig({ baseUrl: 'https://example.test' });
+    reportingClient.setConfig({ baseUrl: 'https://example.test' });
+  });
+
+  beforeEach(() => {
+    document.documentElement.style.setProperty('--sk-motion-duration-long', '420ms');
+    frames = stubAnimationFrames();
+    route = defaultHistory;
+  });
+
+  afterEach(async () => {
+    fetchSpy.mockRestore();
+    motion?.restore();
+    motion = undefined;
+    frames.restore();
+    vi.unstubAllGlobals();
+    document.documentElement.style.removeProperty('--sk-motion-duration-long');
+    await restoreEnglish();
+  });
+
+  function historyOf(
+    changePln: number | null,
+    changePercent: number | null,
+    range = '1Y',
+  ): Response {
+    return jsonResponse({
+      range,
+      points: [
+        { date: '2025-07-01', netWorthPln: 1000, isIncomplete: false },
+        { date: '2026-08-01', netWorthPln: 1250, isIncomplete: false },
+      ],
+      changePln,
+      changePercent,
+      firstDate: '2025-01-10',
+      lastDate: '2026-10-19',
+    } satisfies NetWorthHistoryResponse);
+  }
+
+  function defaultHistory(params: URLSearchParams): Response {
+    return params.get('range') === '1M' ? historyOf(1250, 2.4, '1M') : historyOf(8900, 15.1, '1Y');
+  }
+
+  function deferred(): { promise: Promise<Response>; resolve: (response: Response) => void } {
+    let resolve!: (response: Response) => void;
+    const promise = new Promise<Response>((done) => {
+      resolve = done;
+    });
+    return { promise, resolve };
+  }
+
+  async function render(): Promise<void> {
+    fetchSpy = mockApi({
+      dashboard: jsonResponse(dashboardWithClasses),
+      history: (url) => route(new URL(url).searchParams),
+    });
+    await TestBed.configureTestingModule({
+      imports: [Dashboard],
+      providers: [
+        provideRouter([]),
+        provideI18nTesting(),
+        {
+          provide: MatDialog,
+          useValue: { open: () => ({ afterClosed: () => of(dialogResult) }) },
+        },
+      ],
+    }).compileComponents();
+    fixture = TestBed.createComponent(Dashboard);
+    await fixture.whenStable();
+  }
+
+  const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
+  const change = (): HTMLElement =>
+    host().querySelector('.dashboard-page__value .dashboard-page__change') as HTMLElement;
+  const amountText = (): string => textOf(change().querySelector('[data-testid="change-amount"]'));
+  const percentText = (): string =>
+    textOf(change().querySelector('[data-testid="change-percent"]'));
+  const currentCaption = (): string =>
+    textOf(host().querySelector('.dashboard-page__change-range:not([aria-hidden="true"])'));
+  const outgoingCaption = (): Element | null =>
+    host().querySelector('.dashboard-page__change-range[aria-hidden="true"]');
+  const currentClassLabel = (): string =>
+    textOf(host().querySelector('.dashboard-page__change-class:not([aria-hidden="true"])'));
+  const outgoingClassLabel = (): Element | null =>
+    host().querySelector('.dashboard-page__change-class[aria-hidden="true"]');
+
+  function rangeButton(label: string): HTMLButtonElement {
+    const button = [...host().querySelectorAll<HTMLButtonElement>('mat-button-toggle button')].find(
+      (candidate) => candidate.textContent?.trim() === label,
+    );
+    if (!button) {
+      throw new Error(`No range button "${label}".`);
+    }
+    return button;
+  }
+
+  function zakresButton(): HTMLButtonElement {
+    return host().querySelectorAll<HTMLButtonElement>('mat-button-toggle button[role="radio"]')[4];
+  }
+
+  async function loaded(): Promise<void> {
+    await fixture.whenStable();
+    fixture.detectChanges();
+  }
+
+  async function waiting(): Promise<void> {
+    await new Promise((done) => setTimeout(done, 0));
+    fixture.detectChanges();
+  }
+
+  function advance(ms: number): void {
+    frames.advance(ms);
+    fixture.detectChanges();
+  }
+
+  function flush(): void {
+    frames.flush();
+    fixture.detectChanges();
+  }
+
+  function playToEnd(): { amountTexts: string[]; percentTexts: string[] } {
+    const amountTexts = [amountText()];
+    const percentTexts = [percentText()];
+    for (let step = 0; frames.pending() > 0 && step < 1000; step++) {
+      advance(20);
+      amountTexts.push(amountText());
+      percentTexts.push(percentText());
+    }
+    return { amountTexts, percentTexts };
+  }
+
+  function signedValue(text: string, magnitude: RegExp): number {
+    const match = magnitude.exec(text);
+    if (match === null) {
+      throw new Error(`No number in "${text}".`);
+    }
+    const value = Number(match[1].replace(/,/g, ''));
+    return /[−-]/.test(text) ? -value : value;
+  }
+
+  const amountOf = (text: string): number => signedValue(text, /([\d,]+\.\d{2})/);
+  const percentOf = (text: string): number => signedValue(text, /([\d,.]+)\s?%/);
+  const decimalsOf = (text: string): number => (/\.(\d+)/.exec(text)?.[1] ?? '').length;
+
+  it('range switch counts the change figures to the new value', async () => {
+    await render();
+    expect(amountText()).toBe(normalised(formatSignedMoney(8900)));
+
+    rangeButton('1M').click();
+    await loaded();
+    flush();
+    expect(amountText()).toBe(normalised(formatSignedMoney(1250)));
+    expect(percentText()).toContain(normalised(`(+${formatPercent(2.4)})`));
+
+    rangeButton('1Y').click();
+    await loaded();
+    expect(frames.pending()).toBeGreaterThan(0);
+    advance(140);
+    const middle = amountOf(amountText());
+    expect(middle).toBeGreaterThan(1250);
+    expect(middle).toBeLessThan(8900);
+    const middlePercent = percentOf(percentText());
+    expect(middlePercent).toBeGreaterThan(2.4);
+    expect(middlePercent).toBeLessThan(15.1);
+
+    flush();
+    expect(amountText()).toBe(normalised(formatSignedMoney(8900)));
+    expect(percentText()).toContain(normalised(`(+${formatPercent(15.1)})`));
+  });
+
+  it('figures stay until the new range loads', async () => {
+    const ytd = deferred();
+    route = (params) => (params.get('range') === 'YTD' ? ytd.promise : defaultHistory(params));
+    await render();
+    const before = { amount: amountText(), percent: percentText(), caption: currentCaption() };
+
+    rangeButton('YTD').click();
+    await waiting();
+    expect(amountText()).toBe(before.amount);
+    expect(percentText()).toBe(before.percent);
+    expect(currentCaption()).toBe(before.caption);
+    expect(frames.pending()).toBe(0);
+
+    ytd.resolve(historyOf(-300, -2.1, 'YTD'));
+    await loaded();
+    expect(frames.pending()).toBeGreaterThan(0);
+  });
+
+  it('a failed load starts no tween', async () => {
+    route = (params) =>
+      params.get('range') === 'YTD'
+        ? jsonResponse({ detail: 'History is unavailable.' }, 500)
+        : defaultHistory(params);
+    await render();
+
+    rangeButton('YTD').click();
+    await loaded();
+    expect(change().classList).toContain('dashboard-page__change--neutral');
+    expect(change().textContent?.trim()).toBe('—');
+    expect(host().querySelector('[data-testid="change-amount"]')).toBeNull();
+    expect(frames.pending()).toBe(0);
+  });
+
+  it('first display and same-range refresh set the figures at once', async () => {
+    await render();
+    expect(amountText()).toBe(normalised(formatSignedMoney(8900)));
+    expect(frames.pending()).toBe(0);
+
+    route = () => historyOf(9100, 15.5, '1Y');
+    fixture.componentInstance['reloadAfterSettlement']();
+    await loaded();
+    expect(amountText()).toBe(normalised(formatSignedMoney(9100)));
+    expect(percentText()).toContain(normalised(`(+${formatPercent(15.5)})`));
+    expect(frames.pending()).toBe(0);
+  });
+
+  it('interrupted tween restarts from the displayed value', async () => {
+    route = (params) =>
+      params.get('range') === 'YTD' ? historyOf(-300, -2.1, 'YTD') : defaultHistory(params);
+    await render();
+    rangeButton('1M').click();
+    await loaded();
+    flush();
+    rangeButton('1Y').click();
+    await loaded();
+    advance(140);
+    const displayed = amountOf(amountText());
+
+    rangeButton('YTD').click();
+    await loaded();
+    expect(amountOf(amountText())).toBe(displayed);
+
+    advance(20);
+    const retargeted = amountOf(amountText());
+    expect(retargeted).toBeLessThan(displayed);
+    expect(retargeted).toBeGreaterThan(-300);
+
+    flush();
+    expect(amountText()).toBe(normalised(formatSignedMoney(-300)));
+  });
+
+  it('tween passes through zero on a sign change', async () => {
+    route = (params) =>
+      params.get('range') === 'YTD' ? historyOf(-300, -2.1, 'YTD') : defaultHistory(params);
+    await render();
+    rangeButton('1M').click();
+    await loaded();
+    flush();
+    expect(amountText()).toBe(normalised(formatSignedMoney(1250)));
+
+    rangeButton('YTD').click();
+    await loaded();
+    const amounts = playToEnd().amountTexts.map(amountOf);
+    expect(amounts.some((value) => value < 0)).toBe(true);
+    expect(amounts.every((value, index) => index === 0 || value <= amounts[index - 1])).toBe(true);
+    expect(amounts.at(-1)).toBe(-300);
+  });
+
+  it('percent without a value changes at once', async () => {
+    route = (params) =>
+      params.get('range') === 'YTD' ? historyOf(-300, null, 'YTD') : defaultHistory(params);
+    await render();
+
+    rangeButton('YTD').click();
+    await loaded();
+    expect(percentText()).toBe('');
+
+    rangeButton('1M').click();
+    await loaded();
+    expect(percentText()).toContain(normalised(`(+${formatPercent(2.4)})`));
+  });
+
+  it('tween keeps the formatter decimals', async () => {
+    const zakres = { from: '2025-03-15', to: '2026-06-30' };
+    dialogResult = zakres;
+    route = (params) =>
+      params.has('from') ? historyOf(4950.25, 49.5, 'CUSTOM') : defaultHistory(params);
+    await render();
+    rangeButton('1M').click();
+    await loaded();
+    flush();
+
+    zakresButton().click();
+    await loaded();
+    const { amountTexts, percentTexts } = playToEnd();
+    expect(amountTexts.length).toBeGreaterThan(2);
+    expect(amountTexts.every((text) => decimalsOf(text) === 2)).toBe(true);
+    expect(percentTexts.every((text) => decimalsOf(text) === 1)).toBe(true);
+    expect(currentCaption()).toContain(customRangeLabel(zakres));
+  });
+
+  it('caption and filter labels crossfade with the figures', async () => {
+    await render();
+
+    rangeButton('1M').click();
+    await loaded();
+    expect(currentCaption()).toContain('1M');
+    expect(outgoingCaption()).not.toBeNull();
+    expect(textOf(outgoingCaption())).toContain('1Y');
+    outgoingCaption()?.dispatchEvent(new Event('animationend'));
+    fixture.detectChanges();
+    expect(outgoingCaption()).toBeNull();
+
+    menuItem(await openFilterMenu(fixture), 'ETF').click();
+    await loaded();
+    expect(currentClassLabel()).toBe('ETF');
+
+    const stock = deferred();
+    route = (params) => (params.get('assetClass') === '2' ? stock.promise : defaultHistory(params));
+    menuItem(await openFilterMenu(fixture), 'Stock').click();
+    await waiting();
+    expect(currentClassLabel()).toBe('ETF');
+
+    stock.resolve(historyOf(1250, 2.4, '1M'));
+    await loaded();
+    expect(currentClassLabel()).toBe('Stock');
+    expect(textOf(outgoingClassLabel())).toBe('ETF');
+  });
+
+  it('figures and captions change at once under reduced motion', async () => {
+    motion = stubReducedMotion(true);
+    await render();
+
+    rangeButton('1M').click();
+    await loaded();
+    expect(amountText()).toBe(normalised(formatSignedMoney(1250)));
+    expect(percentText()).toContain(normalised(`(+${formatPercent(2.4)})`));
+    expect(currentCaption()).toContain('1M');
+    expect(outgoingCaption()).toBeNull();
+    expect(frames.pending()).toBe(0);
+
+    menuItem(await openFilterMenu(fixture), 'ETF').click();
+    await loaded();
+    expect(currentClassLabel()).toBe('ETF');
+    expect(outgoingClassLabel()).toBeNull();
+    expect(amountText()).toBe(normalised(formatSignedMoney(1250)));
+  });
+
+  it('exposes the final change value to assistive technology', async () => {
+    await render();
+    rangeButton('1M').click();
+    await loaded();
+    flush();
+
+    rangeButton('1Y').click();
+    await loaded();
+    advance(140);
+    const animating = change().querySelector('[data-testid="change-amount"]') as HTMLElement;
+    expect(animating.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(normalised(textOf(animating))).not.toBe(normalised(formatSignedMoney(8900)));
+
+    const exposed = change().cloneNode(true) as HTMLElement;
+    exposed.querySelectorAll('[aria-hidden="true"]').forEach((node) => node.remove());
+    expect(textOf(exposed)).toContain(normalised(formatSignedMoney(8900)));
   });
 });
 

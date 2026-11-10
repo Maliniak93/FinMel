@@ -169,6 +169,7 @@
   --sk-radius-md: 4px;
   --sk-radius-lg: 7px;
   --sk-motion-duration: 140ms;
+  --sk-motion-duration-long: calc(var(--sk-motion-duration) * 3);
   --sk-motion-easing: cubic-bezier(0.35, 0, 0.25, 1);
 }
 

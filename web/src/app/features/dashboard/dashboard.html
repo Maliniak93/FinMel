@@ -68,22 +68,81 @@
                 [class.dashboard-page__change--negative]="change.direction === 'negative'"
                 [class.dashboard-page__change--neutral]="change.direction === 'neutral'"
               >
-                {{ formatSignedMoney(change.amount) }}
-                @if (change.percent !== null) {
-                  ({{ change.sign }}{{ formatPercent(change.percent) }})
+                @let figures = displayed();
+                @if (figures !== null) {
+                  <span [attr.aria-hidden]="animating() ? 'true' : null">
+                    <span data-testid="change-amount">{{ amountLabel(figures) }}</span>
+                    @if (figures.percent !== null) {
+                      <span class="dashboard-page__change-percent" data-testid="change-percent">{{
+                        percentLabel(figures, change)
+                      }}</span>
+                    }
+                  </span>
+                  @if (animating()) {
+                    <span class="dashboard-page__visually-hidden"
+                      >{{ formatSignedMoney(change.amount) }}
+                      @if (change.percent !== null) {
+                        ({{ change.sign }}{{ formatPercent(change.percent) }})
+                      }
+                    </span>
+                  }
                 }
-                @let selectedClass = assetClass();
-                @if (selectedClass !== null) {
-                  <span class="dashboard-page__change-class">{{
-                    assetClassLabel(selectedClass) | transloco
-                  }}</span>
+                @let swap = labelSwap();
+                @if (swap.classKey !== null || change.labels.classKey !== null) {
+                  <span class="dashboard-page__swap">
+                    @if (swap.classKey; as outgoing) {
+                      <span
+                        class="dashboard-page__change-class dashboard-page__swap-out"
+                        aria-hidden="true"
+                        (animationend)="dropOutgoing('classKey')"
+                        >{{ outgoing | transloco }}</span
+                      >
+                    }
+                    @if (change.labels.classKey; as classKey) {
+                      <span
+                        class="dashboard-page__change-class"
+                        [class.dashboard-page__swap-in]="swap.classKey !== null"
+                        >{{ classKey | transloco }}</span
+                      >
+                    }
+                  </span>
                 }
-                @if (selectedGroupLabel(); as groupLabel) {
-                  <span class="dashboard-page__change-class">{{ groupLabel }}</span>
+                @if (swap.group !== null || change.labels.group !== null) {
+                  <span class="dashboard-page__swap">
+                    @if (swap.group; as outgoing) {
+                      <span
+                        class="dashboard-page__change-class dashboard-page__swap-out"
+                        aria-hidden="true"
+                        (animationend)="dropOutgoing('group')"
+                        >{{ outgoing }}</span
+                      >
+                    }
+                    @if (change.labels.group; as groupLabel) {
+                      <span
+                        class="dashboard-page__change-class"
+                        [class.dashboard-page__swap-in]="swap.group !== null"
+                        >{{ groupLabel }}</span
+                      >
+                    }
+                  </span>
                 }
-                <span class="dashboard-page__change-range">{{
-                  'dashboard.changeForRange' | transloco: { range: rangeLabel() }
-                }}</span>
+                <span class="dashboard-page__swap">
+                  @if (swap.range; as outgoing) {
+                    <span
+                      class="dashboard-page__change-range dashboard-page__swap-out"
+                      aria-hidden="true"
+                      (animationend)="dropOutgoing('range')"
+                      >{{ 'dashboard.changeForRange' | transloco: { range: outgoing } }}</span
+                    >
+                  }
+                  <span
+                    class="dashboard-page__change-range"
+                    [class.dashboard-page__swap-in]="swap.range !== null"
+                    >{{
+                      'dashboard.changeForRange' | transloco: { range: change.labels.range }
+                    }}</span
+                  >
+                </span>
               </p>
             } @else {
               <p class="dashboard-page__change dashboard-page__change--neutral">—</p>
