@@ -8,5 +8,5 @@ effort: low
 allowed-tools: Bash
 ---
 
-Run `node scripts/plan-status.mjs`, or `node scripts/plan-status.mjs --priority <arg>` when the argument is P0-P3, or `node scripts/plan-status.mjs --area <arg>` for any other argument, and print its output verbatim, minus the first two lines (title and
-generated-comment). Add nothing, change nothing.
+Run `node scripts/plan-status.mjs`, or `node scripts/plan-status.mjs --priority <arg>` when the argument is P0-P3, or `node scripts/plan-status.mjs --area <arg>` for any other argument, and print its output verbatim, minus the first line (the title).
+Add nothing, change nothing.

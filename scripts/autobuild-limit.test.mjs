@@ -189,12 +189,12 @@ test("shutdown asks first", async () => {
 });
 
 test("docs list the limit flags and no shutdown delay", () => {
-  const workflow = readFileSync(path.join(root, "skarbiec-plan", "workflow.md"), "utf8");
+  const workflow = readFileSync(path.join(root, "skarbiec-plan", "runbooks", "autobuild.md"), "utf8");
   for (const word of ["--on-limit", "--max-wait", "--sleep-test", "--hibernate-test", "limit-unknown", "limit-too-far", "wake-not-ready"]) {
     assert.ok(workflow.includes(word), word);
   }
   const stale = "/t " + "600";
-  for (const file of [["skarbiec-plan", "workflow.md"], ["CLAUDE.md"], ["scripts", "autobuild.mjs"]]) {
+  for (const file of [["skarbiec-plan", "runbooks", "autobuild.md"], ["CLAUDE.md"], ["scripts", "autobuild.mjs"]]) {
     assert.ok(!readFileSync(path.join(root, ...file), "utf8").includes(stale), file.join("/"));
   }
 });

@@ -3,10 +3,10 @@ export const meta = {
   description: 'Spec to a verified, reviewed change and the exact ship command: failing tests, implementation, verification, adversarial review',
   whenToUse: 'Invoked by /build after `gh-project.mjs prepare` cut the issue branch, and by /fix ci:#<n> on the PR branch (args.spec = its local copy, args.issue, args.branch, args.title). Not for exploratory work - the spec is the contract.',
   phases: [
-    { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test; haiku/high on tier 1, sonnet/medium on tier 2 (skippable; skipped for an Area whose profile has no test-writer: Scripts, Claude, Docs, CI/Infra, E2E - the implementer then writes the missing tests itself)' },
-    { title: 'Implement', detail: 'implementer reads the playbooks of the Area profile first, does the work and runs scripts/verify.mjs itself (scoped by the changed files, `--all` on the last non-e2e part of an epic) with up to 3 fixes; sonnet/medium on tier 1, haiku/high on a tier-1 skip-tests cleanup, sonnet/high on tier 2; a red result escalates once to opus (medium on tier 1, high on tier 2), a second red blocks the run' },
-    { title: 'E2E', detail: 'only for an epic\'s e2e part (args.e2e): replaces Tests and Implement. The e2e agent automates the epic\'s manual test plan as Playwright tests, runs verify --projects e2e and the whole e2e suite; sonnet (medium on tier 1, high on tier 2), one escalation to opus; a stable app failure or an environment problem blocks the run' },
-    { title: 'Review', detail: 'reviewer reads scripts/review-diff.mjs against the spec and applies the review-checklist sections of the Area profile; opus/medium on tier 1, opus/high on tier 2 (skippable)', model: 'claude-opus-5-5' },
+    { title: 'Tests', detail: 'test-writer turns every acceptance criterion into a failing test (skippable; skipped for an Area whose profile has no test-writer: Scripts, Claude, Docs, CI/Infra, E2E - the implementer then writes the missing tests itself)' },
+    { title: 'Implement', detail: 'implementer reads the playbooks of the Area profile first, does the work and runs scripts/verify.mjs itself (scoped by the changed files, `--all` on the last non-e2e part of an epic) with up to 3 fixes; a red result escalates once, a second red blocks the run' },
+    { title: 'E2E', detail: 'only for an epic\'s e2e part (args.e2e): replaces Tests and Implement. The e2e agent automates the epic\'s manual test plan as Playwright tests, runs verify --projects e2e and the whole e2e suite with one escalation; a stable app failure or an environment problem blocks the run' },
+    { title: 'Review', detail: 'reviewer reads scripts/review-diff.mjs against the spec and applies the review-checklist sections of the Area profile (skippable)', model: 'claude-opus-5-5' },
   ],
 }
 
@@ -142,6 +142,18 @@ const REVIEW = {
 
 // ---------------------------------------------------------------- setup
 
+const OPUS = 'claude-opus-5-5'
+// The only place the model and effort of each pipeline role are written, by tier.
+const LEVELS = {
+  testWriter: { 1: { model: 'haiku', effort: 'high' }, 2: { model: 'sonnet', effort: 'medium' } },
+  implementer: { 1: { model: 'sonnet', effort: 'medium' }, 2: { model: 'sonnet', effort: 'high' } },
+  skipTestsImplementer: { 1: { model: 'haiku', effort: 'high' }, 2: { model: 'sonnet', effort: 'high' } },
+  e2e: { 1: { model: 'sonnet', effort: 'medium' }, 2: { model: 'sonnet', effort: 'high' } },
+  escalation: { 1: { model: OPUS, effort: 'medium' }, 2: { model: OPUS, effort: 'high' } },
+  review: { 1: { model: OPUS, effort: 'medium' }, 2: { model: OPUS, effort: 'high' } },
+  reReview: { 1: { model: OPUS, effort: 'medium' }, 2: { model: OPUS, effort: 'medium' } },
+}
+
 const { spec, issue, branch, title, tier = 1, maxRounds = 2, skip = [], epic = null, e2e = false, ownPlan = false, diagnosis = null, patchApplied = false, verifyAll = false, area = null, profile = null, ciFix = null } = args || {}
 
 if (!(spec && issue && branch && title)) {
@@ -178,15 +190,16 @@ const CI_FIX_REVIEW_LINE = ciFix
   ? `This is a CI fix (\`${ciFix}\` holds the failure and the cause): blocking when the change silences the failure instead of fixing its cause - ${CI_FIX_RULE}.`
   : null
 
-const OPUS = 'claude-opus-5-5'
-const startLevel =
-  tier >= 2 ? { model: 'sonnet', effort: 'high' } : noTests ? { model: 'haiku', effort: 'high' } : { model: 'sonnet', effort: 'medium' }
-const escalatedLevel = { model: OPUS, effort: tier >= 2 ? 'high' : 'medium' }
-const e2eStartLevel = { model: 'sonnet', effort: tier >= 2 ? 'high' : 'medium' }
+const levelTier = tier >= 2 ? 2 : 1
+const startLevel = (noTests ? LEVELS.skipTestsImplementer : LEVELS.implementer)[levelTier]
+const escalatedLevel = LEVELS.escalation[levelTier]
+const e2eStartLevel = LEVELS.e2e[levelTier]
 // Escalation happens once per run; every later implementer (or e2e agent) call, review fixes included, stays escalated.
 let level = e2e ? e2eStartLevel : startLevel
-const testWriter = tier >= 2 ? { model: 'sonnet', effort: 'medium' } : { model: 'haiku', effort: 'high' }
-const reviewEffort = tier >= 2 ? 'high' : 'medium'
+const testWriter = LEVELS.testWriter[levelTier]
+const reviewLevel = LEVELS.review[levelTier]
+const reReviewLevel = LEVELS.reReview[levelTier]
+const levelText = (l) => `${l.model.replace(/^claude-([a-z]+)-.*$/, '$1')}/${l.effort}`
 
 let rounds = 0
 let tests = { tests: [], projects: [], notes: [] }
@@ -269,7 +282,7 @@ const OWN =
   'You own the design and the tests: a wrong test or a wrong design decision is yours to fix - list each change in `deviations` with why. Every acceptance criterion must still be proven by a test.'
 const epicLast = Boolean(epic && epic.last)
 const MANUAL_LINE = epicLast
-  ? `This is the last part of epic #${epic.number}: compare the spec's \`## Test manualny\` with what you built (rewrite \`skarbiec-plan/issues/${issue}.manual.md\` on a deviation) and ALWAYS write the refreshed whole-feature plan to \`skarbiec-plan/issues/${epic.number}.manual.md\`, built from the epic draft \`skarbiec-plan/issues/${epic.number}.md\`, the sibling parts' plans (\`skarbiec-plan/issues/<m>.md\`) and the code. Return both in \`manualTest\` as \`{ issue, file }\`.`
+  ? `This is the last part of epic #${epic.number}: compare the spec's \`## Test manualny\` with what you built (rewrite \`skarbiec-plan/issues/${issue}.manual.md\` on a deviation) and always write the refreshed whole-feature plan to \`skarbiec-plan/issues/${epic.number}.manual.md\`, built from the epic draft \`skarbiec-plan/issues/${epic.number}.md\`, the sibling parts' plans (\`skarbiec-plan/issues/<m>.md\`) and the code. Return both in \`manualTest\` as \`{ issue, file }\`.`
   : "Compare the spec's `## Test manualny` with what you built. On a deviation (screen, route, action, amount shown) write the full corrected section to `skarbiec-plan/issues/" +
     issue +
     '.manual.md` and return `manualTest: [{ issue, file }]`; otherwise return no `manualTest`.'
@@ -367,8 +380,8 @@ async function attempt(label, lines, runner = implement, isFailed = failed) {
 
 log(
   e2e
-    ? `Spec ${spec} on ${branch} - e2e part, tier ${tier}, e2e agent ${e2eStartLevel.model}/${e2eStartLevel.effort} escalating once to ${escalatedLevel.model}/${escalatedLevel.effort}, no test-writer and no implementer, reviewer opus/${reviewEffort} then opus/medium re-reviews, max ${maxRounds} review fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`
-    : `Spec ${spec} on ${branch} - tier ${tier}${profileLabel ? `, profile ${profileLabel}` : ', no profile (full path)'}, ${runsTestWriter ? `test-writer ${testWriter.model}/${testWriter.effort}` : 'no test-writer'}, implementer ${startLevel.model}/${startLevel.effort} escalating once to ${escalatedLevel.model}/${escalatedLevel.effort}, reviewer opus/${reviewEffort} then opus/medium re-reviews, max ${maxRounds} review fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`,
+    ? `Spec ${spec} on ${branch} - e2e part, tier ${tier}, e2e agent ${levelText(e2eStartLevel)} escalating once to ${levelText(escalatedLevel)}, no test-writer and no implementer, reviewer ${levelText(reviewLevel)} then ${levelText(reReviewLevel)} re-reviews, max ${maxRounds} review fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`
+    : `Spec ${spec} on ${branch} - tier ${tier}${profileLabel ? `, profile ${profileLabel}` : ', no profile (full path)'}, ${runsTestWriter ? `test-writer ${levelText(testWriter)}` : 'no test-writer'}, implementer ${levelText(startLevel)} escalating once to ${levelText(escalatedLevel)}, reviewer ${levelText(reviewLevel)} then ${levelText(reReviewLevel)} re-reviews, max ${maxRounds} review fix rounds${skipped.size ? `, skipping: ${[...skipped].join(', ')}` : ''}`,
 )
 
 // ---------------------------------------------------------------- tests
@@ -475,7 +488,7 @@ if (skipped.has('review')) {
             `It is uncommitted on \`${branch}\`: \`node scripts/review-diff.mjs --stat\` lists it and \`node scripts/review-diff.mjs -- <path>\` shows a file's diff, new untracked files included.`,
             e2e ? null : `tests claimed: ${JSON.stringify(tests.tests)}`,
             `${e2e ? 'e2e agent' : 'implementer'} report: ${JSON.stringify(impl)}`,
-            e2e ? 'This is an epic\'s e2e part (the `e2e` label): there is no test-writer and no implementer. Apply the "An e2e part" rules of your agent prompt; the epic body and the sibling parts are in `skarbiec-plan/issues/`, and `.git/e2e-result.json` holds the run.' : null,
+            e2e ? 'This is an epic\'s e2e part (the `e2e` label): there is no test-writer and no implementer. Apply the E2E section of the review-checklist; the epic body and the sibling parts are in `skarbiec-plan/issues/`, and `.git/e2e-result.json` holds the run.' : null,
             e2e ? DIAGNOSIS_REVIEW_LINE : null,
             CI_FIX_REVIEW_LINE,
             deviations.length ? `deviations from the spec or the tests, all rounds: ${JSON.stringify(deviations)} - judge each on its why.` : null,
@@ -486,7 +499,7 @@ if (skipped.has('review')) {
             'blocking only for wrong behaviour, an unproven acceptance criterion, a hard-rule violation or forbidden scope. Everything else is minor.',
           ],
       REVIEW,
-      { model: OPUS, effort: previous ? 'medium' : reviewEffort },
+      previous ? reReviewLevel : reviewLevel,
     )
 
     if (!review) return stop('review', { reason: 'reviewer returned no result' })

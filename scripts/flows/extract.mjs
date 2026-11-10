@@ -289,6 +289,18 @@ function extractLevels(text) {
     if (!rows.every((r) => EFFORTS.has(r.text) || /^[\w.-]+\/[a-z]+$/.test(r.text))) continue;
     levels.push({ name: m[1], rows: rows.map((r) => `${r.cond ?? "always"} → ${r.text}`) });
   }
+  const table = text.match(/^const LEVELS = (\{[\s\S]*?\n\})$/m);
+  if (table) {
+    let byRole = null;
+    try {
+      byRole = new Function(...Object.keys(constants), `"use strict"; return (${table[1]});`)(...Object.values(constants));
+    } catch {
+      byRole = null;
+    }
+    for (const [role, byTier] of Object.entries(byRole ?? {})) {
+      levels.push({ name: `LEVELS.${role}`, rows: Object.entries(byTier).map(([tier, l]) => `tier ${tier} → ${l.model}/${l.effort}`) });
+    }
+  }
   return { levels, constants: Object.fromEntries(Object.entries(constants).filter(([name]) => /^[A-Z][A-Z0-9_]*$/.test(name))) };
 }
 

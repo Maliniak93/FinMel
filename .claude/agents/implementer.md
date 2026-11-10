@@ -148,8 +148,7 @@ the delegation says `verifyAll` when this is the epic's last non-e2e part, and t
 3. Red → fix the cause in this context and start again from 1. **At most 3 fixes.** Still red after
    the 3rd → stop and return `verified: false` with the last `failures`; a stronger model takes over
    from your tree.
-4. A failure naming MSB3021 / MSB3026 / MSB3027, EBUSY / EPERM under `web/node_modules` or a port in
-   use → `node scripts/stop-stack.mjs`, then start the verify again. That does not count as a fix.
+4. A failure caused by a running local stack → see the stack bullet under "Hard constraints".
 
 After your last green verify, **edit no file**. `scripts/ship.mjs` re-checks the tree against the
 verify cache before committing, so a `verified: true` on a tree verify never saw green blocks the run.
@@ -185,7 +184,8 @@ Zero warnings and a formatted tree are part of done; your verify run checks them
 - A running local stack (Aspire AppHost, the services, `ng serve`) can block your commands: MSB3021 / MSB3026 /
   MSB3027 ("being used by another process") on a build, EBUSY / EPERM on a file under `web/node_modules`,
   a port already in use. Then run `node scripts/stop-stack.mjs` (it stops only the stack and prints what
-  it stopped), re-run the command once, and say so in `notes`. Never start the stack again afterwards.
+  it stopped), re-run the command (or start the verify again) once, and say so in `notes`. It does not
+  count as one of the 3 fixes. Never start the stack again afterwards.
 - Formatting is never yours to chase by hand — `verify.mjs --fix` does it. Fix the cause of a red
   verify; never route around it.
 - A `migrations` verify failure that names a missing `## Utrata danych` or `## Przeniesienie danych`
