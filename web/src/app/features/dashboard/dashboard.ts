@@ -4,6 +4,7 @@ import {
   DestroyRef,
   ElementRef,
   afterNextRender,
+  afterRenderEffect,
   computed,
   effect,
   inject,
@@ -32,6 +33,7 @@ import { activeLocale } from '../../core/i18n/language';
 import { PlanningState } from '../../core/planning/planning-state';
 import { assetClassColor, groupColor } from '../../shared/colors';
 import { changeDirection } from '../../shared/change-direction';
+import { createLayoutFlip } from '../../shared/motion/layout-flip';
 import { readMotionMs } from '../../shared/motion/motion-duration';
 import { createNumberTween } from '../../shared/motion/number-tween';
 import { prefersReducedMotion } from '../../shared/motion/reduced-motion';
@@ -65,6 +67,8 @@ const UNGROUPED_KEY = 'ungrouped';
 const MAX_BAR_PERCENT = 100;
 const VISIBLE_GROUPS = 5;
 const NARROW_BELOW_PX = 720;
+const FLIP_ITEMS =
+  '.dashboard-page__todo-pair, .dashboard-page__value, .dashboard-page__structure, .dashboard-page__history';
 
 interface GroupProgress {
   readonly percent: number;
@@ -172,13 +176,34 @@ function toGrosze(amount: number | string): number {
 export class Dashboard {
   private readonly planningState = inject(PlanningState);
   private readonly page = viewChild<ElementRef<HTMLElement>>('page');
+  private readonly hero = viewChild<ElementRef<HTMLElement>>('hero');
+  private readonly pair = viewChild<ElementRef<HTMLElement>>('pair');
+  private readonly layoutFlip = createLayoutFlip();
+  private settledOverdue: boolean | null = null;
+  private flipPending = false;
 
   constructor() {
     const destroyRef = inject(DestroyRef);
-    destroyRef.onDestroy(() => this.tween.cancel());
+    destroyRef.onDestroy(() => {
+      this.tween.cancel();
+      this.layoutFlip.cancel();
+    });
     effect(() => {
       const target = this.change();
       untracked(() => this.applyChange(target));
+    });
+    effect(() => {
+      const overdue = this.hasOverdue();
+      const loaded = this.planningState.todoLoaded();
+      untracked(() => this.recordLayoutFlip(overdue, loaded));
+    });
+    afterRenderEffect(() => {
+      const overdue = this.hasOverdue();
+      const hero = this.hero()?.nativeElement;
+      const pair = this.pair()?.nativeElement;
+      if (hero && pair) {
+        untracked(() => this.placePair(overdue, hero, pair));
+      }
     });
     afterNextRender(() => {
       const element = this.page()?.nativeElement;
@@ -200,6 +225,38 @@ export class Dashboard {
   protected readonly hasOverdue = computed(() =>
     this.planningState.todo().some((item) => OVERDUE_KINDS.has(item.kind)),
   );
+
+  private recordLayoutFlip(overdue: boolean, loaded: boolean): void {
+    if (!loaded) {
+      return;
+    }
+    const previous = this.settledOverdue;
+    this.settledOverdue = overdue;
+    const page = this.page()?.nativeElement;
+    if (previous === null || previous === overdue || prefersReducedMotion() || !page) {
+      return;
+    }
+    const elements = [...page.querySelectorAll<HTMLElement>(FLIP_ITEMS)];
+    if (elements.length > 0) {
+      this.layoutFlip.record(elements);
+      this.flipPending = true;
+    }
+  }
+
+  private placePair(overdue: boolean, hero: HTMLElement, pair: HTMLElement): void {
+    const inHero = pair.parentElement === hero;
+    if (inHero !== overdue) {
+      if (overdue) {
+        hero.querySelector('.dashboard-page__history')?.before(pair);
+      } else {
+        hero.after(pair);
+      }
+    }
+    if (this.flipPending) {
+      this.flipPending = false;
+      this.layoutFlip.play();
+    }
+  }
 
   protected readonly dashboardResource = resource({
     loader: async ({ abortSignal }) => {
