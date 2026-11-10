@@ -27,7 +27,6 @@ export const routes: Routes = [
       },
       {
         path: 'wealth',
-        data: { contentWidth: 'wide' },
         children: [
           {
             path: '',
@@ -101,7 +100,6 @@ export const routes: Routes = [
       },
       {
         path: 'planning',
-        data: { contentWidth: 'wide' },
         loadComponent: () => import('./features/planning/planning').then((m) => m.Planning),
       },
       {
