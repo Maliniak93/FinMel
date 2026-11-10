@@ -29,11 +29,27 @@
   }
 }
 
+.net-worth-chart__ranges.mat-button-toggle-group mat-button-toggle.mat-button-toggle-checked {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.net-worth-chart__ranges .mat-button-toggle-checked ::ng-deep .mat-button-toggle-focus-overlay {
+  opacity: 0;
+}
+
+.net-worth-chart__ranges ::ng-deep .mat-button-toggle-button:focus-visible {
+  outline: 2px solid var(--sk-accent-stroke);
+  outline-offset: -2px;
+}
+
 .net-worth-chart__thumb {
   position: absolute;
   top: 0;
   bottom: 0;
   background: var(--mat-sys-secondary-container);
+  border-radius: calc(var(--mat-button-toggle-shape, var(--mat-sys-corner-extra-large)) - 1px);
+  box-shadow: inset 0 0 0 1px var(--sk-accent-stroke);
   pointer-events: none;
 }
 

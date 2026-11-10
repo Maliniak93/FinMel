@@ -12,6 +12,7 @@ import {
   textOf,
   textsOf,
 } from '../../../../testing/i18n';
+import { rulesFor } from '../../../../testing/stylesheet';
 
 import type { NetWorthHistoryResponse } from '../../../api/reporting';
 import { provideI18nTesting } from '../../../core/i18n/testing';
@@ -240,6 +241,80 @@ describe('NetWorthChart', () => {
     expect(css.slice(0, css.indexOf('@media (prefers-reduced-motion: no-preference)'))).not.toMatch(
       /transition\s*:/,
     );
+  });
+
+  it('range thumb is a rounded pill with the accent ring', async () => {
+    await TestBed.configureTestingModule({ providers: [provideI18nTesting()] }).compileComponents();
+    const thumb = rulesFor(stylesheet(), /net-worth-chart__thumb(?![\w-])/);
+
+    expect(thumb).toMatch(
+      /border-radius:\s*calc\(\s*var\(--mat-button-toggle-shape, var\(--mat-sys-corner-extra-large\)\) - 1px\s*\)/,
+    );
+    expect(thumb).toMatch(/box-shadow:\s*inset 0 0 0 1px var\(--sk-accent-stroke\)/);
+  });
+
+  it('checked range toggle paints nothing of its own', async () => {
+    await TestBed.configureTestingModule({ providers: [provideI18nTesting()] }).compileComponents();
+    const scss = stylesheet();
+    const checked = rulesFor(scss, /net-worth-chart__ranges.*mat-button-toggle-checked(?![\w-])/);
+
+    expect(checked).toMatch(/box-shadow:\s*none\b/);
+    expect(checked).toMatch(/border-(?:[a-z-]+-)?radius:\s*0(?![.\d])/);
+    expect(checked).not.toMatch(/background(?:-color)?:\s*(?!transparent\b|none\b)/);
+    expect(scss).toMatch(/--mat-button-toggle-selected-state-background-color:\s*transparent/);
+
+    const overlay = rulesFor(
+      scss,
+      /net-worth-chart__ranges.*mat-button-toggle-checked.*mat-button-toggle-focus-overlay/,
+    );
+    expect(overlay).toMatch(/opacity:\s*0(?![.\d])|display:\s*none\b/);
+
+    const focus = rulesFor(scss, /net-worth-chart__ranges.*(focus-visible|cdk-keyboard-focused)/);
+    expect(focus).toMatch(/outline:\s*\S/);
+  });
+
+  it('range toggles have no ripple', async () => {
+    const element = await setup(yearPoints, '1Y', undefined, undefined, '2025-01-10');
+
+    const option = radios(element)[0];
+    for (const type of ['pointerdown', 'mousedown']) {
+      option.dispatchEvent(
+        new MouseEvent(type, { bubbles: true, button: 0, buttons: 1, detail: 1 }),
+      );
+    }
+    await fixture.whenStable();
+
+    expect(element.querySelectorAll('.mat-ripple-element')).toHaveLength(0);
+  });
+
+  it('range thumb moves toward the picked option', async () => {
+    const element = await setup(yearPoints, '1M', undefined, undefined, '2025-01-10');
+    element.querySelectorAll<HTMLElement>('mat-button-toggle').forEach((toggle, index) => {
+      Object.defineProperty(toggle, 'offsetLeft', { configurable: true, value: index * 50 });
+      Object.defineProperty(toggle, 'offsetWidth', { configurable: true, value: 50 + index });
+    });
+    const thumb = () =>
+      element.querySelector<HTMLElement>('mat-button-toggle-group .net-worth-chart__thumb')!;
+    const edges = () => {
+      const left = parseFloat(thumb().style.left);
+      return { left, right: left + parseFloat(thumb().style.width) };
+    };
+    const pick = async (index: number) => {
+      radios(element)[index].click();
+      await fixture.whenStable();
+    };
+
+    await pick(1);
+    const oneYear = edges();
+    await pick(0);
+    const oneMonth = edges();
+    expect(oneMonth.left).toBeLessThan(oneYear.left);
+    expect(oneMonth.right).toBeLessThan(oneYear.right);
+
+    await pick(2);
+    const ytd = edges();
+    expect(ytd.left).toBeGreaterThan(oneMonth.left);
+    expect(ytd.right).toBeGreaterThan(oneMonth.right);
   });
 
   it('range control has a Zakres option beside the presets', async () => {
