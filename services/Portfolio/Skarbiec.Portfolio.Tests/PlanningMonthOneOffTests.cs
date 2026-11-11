@@ -8,6 +8,48 @@ namespace Skarbiec.Portfolio.Tests;
 
 public sealed class PlanningMonthOneOffTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
+    private static readonly DateTimeOffset NovemberTodayUtc = new(2026, 11, 20, 10, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task UnplannedCountsOnlyInActual()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(NovemberTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var salary = await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata", 10_000m, new DateOnly(2026, 11, 1), dayOfMonth: 10);
+        await client.SettleOccurrenceAsync(salary, "2026-11", account.AccountId, 10_000m, new DateOnly(2026, 11, 10), cancellationToken);
+        var before = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).Incomes.Balance;
+        var bonus = await client.CreateOneOffIncomeAsync(
+            account.AccountId, cancellationToken, "Premia", 3_000m, new DateOnly(2026, 11, 15), planned: false);
+        await client.SettleOneOffIncomeAsync(bonus, account.AccountId, 3_000m, new DateOnly(2026, 11, 15), cancellationToken);
+
+        var after = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).Incomes.Balance;
+
+        Assert.Equal(10_000m, before.ActualPln);
+        Assert.Equal((10_000m, 13_000m, 3_000m), (after.PlanPln, after.ActualPln, after.DifferencePln));
+    }
+
+    [Fact]
+    public async Task UnplannedUnsettledCountsNowhere()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(NovemberTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata", 10_000m, new DateOnly(2026, 11, 1), dayOfMonth: 10);
+        var before = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).Incomes.Balance;
+
+        var bonus = await client.CreateOneOffIncomeAsync(
+            account.AccountId, cancellationToken, "Premia", 3_000m, new DateOnly(2026, 11, 15), planned: false);
+
+        var month = await client.GetPlanningMonthAsync("2026-11", cancellationToken);
+        Assert.Equal((before.PlanPln, before.PendingPln), (month.Incomes.Balance.PlanPln, month.Incomes.Balance.PendingPln));
+        Assert.False(month.Incomes.OneOff(bonus).Planned);
+    }
+
     [Fact]
     public async Task Income_CountsInItsMonthOnly()
     {

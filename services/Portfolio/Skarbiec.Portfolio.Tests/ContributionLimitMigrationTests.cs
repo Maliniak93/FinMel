@@ -1,10 +1,9 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Containers;
+using static Skarbiec.Portfolio.Tests.Fixtures.MigrationTestDatabase;
 
 namespace Skarbiec.Portfolio.Tests;
 
@@ -61,35 +60,8 @@ public sealed class ContributionLimitMigrationTests(SkarbiecContainersFixture co
         Assert.Equal([(userId, "Ike", 2026, 28_260m)], await ReadLimitsAsync(db, cancellationToken));
     }
 
-    private async Task<PortfolioDbContext> CreateDatabaseAtPreviousMigrationAsync(CancellationToken cancellationToken)
-    {
-        var name = $"contributionlimits_{Guid.NewGuid():N}";
-        await using (var admin = new NpgsqlConnection(_containers.PostgresConnectionString))
-        {
-            await admin.OpenAsync(cancellationToken);
-            await using var create = admin.CreateCommand();
-            create.CommandText = $"CREATE DATABASE \"{name}\"";
-            await create.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        var connectionString = new NpgsqlConnectionStringBuilder(_containers.PostgresConnectionString) { Database = name, Pooling = false }.ConnectionString;
-        var options = new DbContextOptionsBuilder<PortfolioDbContext>().UseNpgsql(connectionString).Options;
-        var db = new PortfolioDbContext(options, new StubCurrentUser(Guid.NewGuid()));
-        await db.Database.GetService<IMigrator>().MigrateAsync(MigrationBeforeGlobalLimits, cancellationToken);
-
-        return db;
-    }
-
-    private static async Task<Guid> InsertAccountAsync(
-        PortfolioDbContext db, Guid userId, string name, string wrapper, bool archived, CancellationToken cancellationToken)
-    {
-        var id = Guid.NewGuid();
-        await db.Database.ExecuteSqlAsync(
-            $"""INSERT INTO "Accounts" ("Id", "UserId", "Name", "Type", "Wrapper", "Currency", "IsArchived") VALUES ({id}, {userId}, {name}, 'Brokerage', {wrapper}, 'PLN', {archived})""",
-            cancellationToken);
-
-        return id;
-    }
+    private Task<PortfolioDbContext> CreateDatabaseAtPreviousMigrationAsync(CancellationToken cancellationToken) =>
+        CreateAtMigrationAsync(_containers, MigrationBeforeGlobalLimits, cancellationToken);
 
     private static async Task InsertLimitAsync(
         PortfolioDbContext db, Guid userId, Guid accountId, int year, decimal amount, CancellationToken cancellationToken) =>

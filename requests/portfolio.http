@@ -1466,7 +1466,7 @@ Content-Type: application/json
 DELETE {{baseUrl}}/api/portfolio/one-off-incomes/{{createOneOffIncome.response.body.id}}/settlement
 Authorization: Bearer {{authToken}}
 
-### Change a one-off income: name, amount, date and account (204; 404 NotFound.OneOffIncome; 409 Conflict.OneOffIncomeSettled while it is settled)
+### Change a one-off income: name, amount, date, account and planned (204; 404 NotFound.OneOffIncome; 409 Conflict.OneOffIncomeSettled while it is settled, unless only planned changes); planned (default true) false = counts only in Actual
 PUT {{baseUrl}}/api/portfolio/one-off-incomes/{{createOneOffIncome.response.body.id}}
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -1475,7 +1475,8 @@ Content-Type: application/json
   "name": "Premia roczna",
   "amount": 9000,
   "accountId": "{{createMbankAccount.response.body.id}}",
-  "date": "2026-12-20"
+  "date": "2026-12-20",
+  "planned": false
 }
 
 ### Delete a one-off income (204; 404 NotFound.OneOffIncome; 409 Conflict.OneOffIncomeSettled while it is settled)

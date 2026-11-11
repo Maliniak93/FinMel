@@ -101,6 +101,46 @@ public sealed class OneOffIncomeSettlementEndpointTests(SkarbiecContainersFixtur
     }
 
     [Fact]
+    public async Task PlannedFlagChangesAfterSettlement()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var id = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 2_500m, PlannedDate);
+        await client.SettleOneOffIncomeAsync(id, account.AccountId, 2_500m, new DateOnly(2026, 10, 12), cancellationToken);
+        var settled = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes;
+        Assert.Equal((2_500m, 2_500m), (settled.Balance.PlanPln, settled.Balance.ActualPln));
+
+        var response = await client.PutAsJsonAsync(
+            OneOffIncomeUri(id), NewOneOffIncomeBody(account.AccountId, "Premia", 2_500m, PlannedDate, planned: false), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var month = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes;
+        Assert.Equal((0m, 2_500m, 2_500m), (month.Balance.PlanPln, month.Balance.ActualPln, month.Balance.DifferencePln));
+        var row = month.OneOff(id);
+        Assert.Equal(("Settled", false, 2_500m), (row.Status, row.Planned, row.ActualAmount));
+    }
+
+    [Fact]
+    public async Task SettledRejectsOtherChanges()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var id = await client.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 2_500m, PlannedDate);
+        await client.SettleOneOffIncomeAsync(id, account.AccountId, 2_500m, new DateOnly(2026, 10, 12), cancellationToken);
+
+        var response = await client.PutAsJsonAsync(
+            OneOffIncomeUri(id), NewOneOffIncomeBody(account.AccountId, "Premia", 2_400m, PlannedDate, planned: false), cancellationToken);
+
+        await response.AssertProblemAsync(HttpStatusCode.Conflict, OneOffIncomeSettledErrorCode, cancellationToken);
+        var row = (await client.GetPlanningMonthAsync("2026-10", cancellationToken)).Incomes.OneOff(id);
+        Assert.Equal((2_500m, true), (row.Amount, row.Planned));
+    }
+
+    [Fact]
     public async Task Undo_ReturnsToPending()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

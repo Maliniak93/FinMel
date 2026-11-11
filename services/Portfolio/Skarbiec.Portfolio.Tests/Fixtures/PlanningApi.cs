@@ -98,7 +98,8 @@ internal static class PlanningApi
         decimal? ActualAmountPln = null,
         decimal? Difference = null,
         bool DepositCreated = false,
-        bool Overdue = false);
+        bool Overdue = false,
+        bool Planned = false);
 
     public sealed record OneOffExpenseView(
         Guid Id,
@@ -779,12 +780,13 @@ internal static class PlanningApi
     }
 
     public static object NewOneOffIncomeBody(
-        Guid accountId, string name = "Premia", decimal amount = 1_000m, DateOnly? date = null) => new
+        Guid accountId, string name = "Premia", decimal amount = 1_000m, DateOnly? date = null, bool planned = true) => new
         {
             name,
             amount,
             accountId,
-            date = date ?? new DateOnly(2026, 11, 15)
+            date = date ?? new DateOnly(2026, 11, 15),
+            planned
         };
 
     public static object NewOneOffExpenseBody(
@@ -910,10 +912,11 @@ internal static class PlanningApi
         CancellationToken cancellationToken,
         string name = "Premia",
         decimal amount = 1_000m,
-        DateOnly? date = null)
+        DateOnly? date = null,
+        bool planned = true)
     {
         var response = await client.PostAsJsonAsync(
-            OneOffIncomesUri, NewOneOffIncomeBody(accountId, name, amount, date), cancellationToken);
+            OneOffIncomesUri, NewOneOffIncomeBody(accountId, name, amount, date, planned), cancellationToken);
         response.EnsureSuccessStatusCode();
         var created = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
 

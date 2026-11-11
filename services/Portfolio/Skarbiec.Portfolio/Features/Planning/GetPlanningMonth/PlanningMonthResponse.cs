@@ -212,6 +212,7 @@ public sealed record OneOffIncomeResponse
 {
     public required Guid Id { get; init; }
     public required string Name { get; init; }
+    public required bool Planned { get; init; }
     public required DateOnly Date { get; init; }
     public required Guid AccountId { get; init; }
     public required string AccountName { get; init; }

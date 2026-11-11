@@ -5368,6 +5368,9 @@
           "date": {
             "type": "string",
             "format": "date"
+          },
+          "planned": {
+            "type": "boolean"
           }
         }
       },
@@ -6901,6 +6904,7 @@
         "required": [
           "id",
           "name",
+          "planned",
           "date",
           "accountId",
           "accountName",
@@ -6926,6 +6930,9 @@
           },
           "name": {
             "type": "string"
+          },
+          "planned": {
+            "type": "boolean"
           },
           "date": {
             "type": "string",
@@ -9121,6 +9128,9 @@
           "date": {
             "type": "string",
             "format": "date"
+          },
+          "planned": {
+            "type": "boolean"
           }
         }
       },

@@ -111,4 +111,30 @@ public sealed class PlanningMonthIncomeAccountsTests(SkarbiecContainersFixture c
         Assert.Equal(1_000m, Assert.Single(november.Expenses.GroupContributions!, g => g.GroupId == groupId).FromIncomePln);
         Assert.Equal(0m, Assert.Single(december.Expenses.GroupContributions!, g => g.GroupId == groupId).FromIncomePln);
     }
+
+    [Fact]
+    public async Task UnplannedIncomeIsNoPlanIncomeAccount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var c = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "C", balance: 5_000m);
+        var incomeId = await client.CreateOneOffIncomeAsync(
+            c.AccountId, cancellationToken, "Premia", 5_000m, new DateOnly(2026, 10, 12), planned: false);
+        var groupId = await client.CreateFundingGroupAsync(
+            cancellationToken, "Poduszka", 1_000m, contributions: [new ContributionBody(1_000m, c.AccountId)]);
+        var target = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Poduszka PLN");
+
+        var plan = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
+        var planRow = Assert.Single(plan.Expenses.GroupContributions!, g => g.GroupId == groupId);
+        Assert.Equal(0m, planRow.FromIncomePln);
+        Assert.False(Assert.Single(planRow.Contributions!, x => x.AccountId == c.AccountId).FromIncome);
+
+        await client.SettleOneOffIncomeAsync(incomeId, c.AccountId, 5_000m, new DateOnly(2026, 10, 12), cancellationToken);
+        await client.TransferMoneyAsync(c.MoneyAssetId, target.MoneyAssetId, 1_000m, FundingDay, cancellationToken);
+
+        var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
+        var deposit = Assert.Single(month.Expenses.GroupDeposits!);
+        Assert.Equal((groupId, 1_000m), (deposit.GroupId, deposit.FromIncomePln));
+    }
 }

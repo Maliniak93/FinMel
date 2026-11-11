@@ -44,6 +44,25 @@ public sealed class OneOffTenancyIsolationTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
+    public async Task CannotChangeOthersPlannedFlag()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await owner.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var income = await owner.CreateOneOffIncomeAsync(account.AccountId, cancellationToken, "Premia", 500m);
+
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangersAccount = await stranger.CreateBankAccountAsync(cancellationToken, "Moje konto");
+        var response = await stranger.PutAsJsonAsync(
+            OneOffIncomeUri(income), NewOneOffIncomeBody(strangersAccount.AccountId, "Premia", 500m, planned: false), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var month = await owner.GetPlanningMonthAsync("2026-11", cancellationToken);
+        Assert.True(month.Incomes.OneOff(income).Planned);
+    }
+
+    [Fact]
     public async Task Settlement_ByStranger_Returns404()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

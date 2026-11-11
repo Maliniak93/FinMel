@@ -14,6 +14,8 @@ public sealed record CreateOneOffIncomeRequest : IValidatableObject
 
     public required DateOnly Date { get; init; }
 
+    public bool Planned { get; init; } = true;
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext) =>
         OneOffValidation.Validate(Date);
 }
