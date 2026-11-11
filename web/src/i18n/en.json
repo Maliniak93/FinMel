@@ -1094,6 +1094,9 @@
       "recurring": "Recurring",
       "oneOff": "One-off",
       "mark": "one-off",
+      "planned": "Planned",
+      "unplanned": "Unplanned",
+      "incomeLockedHint": "Undo the settlement first to delete this entry. Only the Planned flag can be changed.",
       "lockedHint": "Undo the settlement first to edit or delete this entry.",
       "delete": {
         "title": "Delete the one-off entry?",

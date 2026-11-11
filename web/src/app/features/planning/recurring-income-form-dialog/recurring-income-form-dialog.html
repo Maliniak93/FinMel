@@ -128,6 +128,10 @@
           <mat-error>{{ form.controls.date.getError('server') }}</mat-error>
         }
       </mat-form-field>
+
+      <mat-checkbox formControlName="planned">{{
+        'planning.oneOff.planned' | transloco
+      }}</mat-checkbox>
     } @else {
       <mat-form-field
         appearance="outline"

@@ -36,6 +36,11 @@
                           <span class="day-list__mark" data-testid="one-off-mark">{{
                             'planning.oneOff.mark' | transloco
                           }}</span>
+                          @if (!income.item.planned) {
+                            <span class="day-list__mark" data-testid="unplanned-mark">{{
+                              'planning.oneOff.unplanned' | transloco
+                            }}</span>
+                          }
                         }
                       </span>
                       <span class="day-list__meta">
