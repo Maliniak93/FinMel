@@ -1,5 +1,10 @@
-import type { AssetGroupResponse, AssignableAssetResponse } from '../../../api/portfolio';
+import type {
+  AccountResponse,
+  AssetGroupResponse,
+  AssignableAssetResponse,
+} from '../../../api/portfolio';
 import type { DashboardResponse } from '../../../api/reporting';
+import { bankAccountResponse } from '../../../../testing/bank-account-fixtures';
 
 export const blueGroupId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 export const greenGroupId = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -29,6 +34,37 @@ export const greenGroup: AssetGroupResponse = {
   sharePercent: null,
   classAllocation: [],
 };
+
+export const accountAId = '66666666-6666-6666-6666-666666666666';
+export const accountBId = '77777777-7777-7777-7777-777777777777';
+export const archivedAccountId = '88888888-8888-8888-8888-888888888888';
+export const otherArchivedAccountId = '99999999-9999-9999-9999-999999999999';
+
+export const contributedGroup: AssetGroupResponse = {
+  ...greenGroup,
+  monthlyContributionPln: 2500,
+  contributions: [
+    { amountPln: 2000, accountId: accountAId },
+    { amountPln: 500, accountId: null },
+  ],
+};
+
+export const archivedContributionGroup: AssetGroupResponse = {
+  ...blueGroup,
+  monthlyContributionPln: 300,
+  contributions: [{ amountPln: 300, accountId: archivedAccountId }],
+};
+
+export const groupAccounts: AccountResponse[] = [
+  bankAccountResponse({ id: accountAId, name: 'Konto A' }),
+  bankAccountResponse({ id: accountBId, name: 'Konto B' }),
+  bankAccountResponse({ id: archivedAccountId, name: 'Stare konto', isArchived: true }),
+  bankAccountResponse({
+    id: otherArchivedAccountId,
+    name: 'Zamknięte konto',
+    isArchived: true,
+  }),
+];
 
 export const assetGroups: AssetGroupResponse[] = [blueGroup, greenGroup];
 

@@ -92,19 +92,67 @@
       }
     </mat-form-field>
 
-    <mat-form-field appearance="outline" class="group-form-dialog__field">
-      <mat-label>{{ 'groups.form.contribution' | transloco }}</mat-label>
-      <input matInput type="number" min="0" step="0.01" formControlName="monthlyContributionPln" />
-      @if (form.controls.monthlyContributionPln.hasError('server')) {
-        <mat-error data-testid="contribution-error">{{
-          form.controls.monthlyContributionPln.getError('server')
-        }}</mat-error>
-      } @else if (form.controls.monthlyContributionPln.invalid) {
-        <mat-error data-testid="contribution-error">{{
-          'groups.form.contributionInvalid' | transloco
-        }}</mat-error>
+    <fieldset class="group-form-dialog__allocation" data-testid="contributions-editor">
+      <legend>{{ 'groups.form.contribution' | transloco }}</legend>
+      <div formArrayName="contributions">
+        @for (row of form.controls.contributions.controls; track row; let index = $index) {
+          <div
+            class="group-form-dialog__allocation-row"
+            data-testid="contribution-row"
+            [formGroupName]="index"
+          >
+            <mat-form-field appearance="outline" class="group-form-dialog__allocation-percent">
+              <mat-label>{{ 'groups.form.contributionAmount' | transloco }}</mat-label>
+              <input matInput type="number" min="0" step="0.01" formControlName="amountPln" />
+              @if (row.controls.amountPln.invalid) {
+                <mat-error data-testid="contribution-error">{{
+                  'groups.form.contributionInvalid' | transloco
+                }}</mat-error>
+              }
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="group-form-dialog__allocation-class">
+              <mat-label>{{ 'groups.form.contributionAccount' | transloco }}</mat-label>
+              <mat-select formControlName="accountId">
+                <mat-option [value]="''">{{ 'groups.form.noAccount' | transloco }}</mat-option>
+                @for (account of accountOptions(row); track account.id) {
+                  <mat-option [value]="account.id">{{ account.name }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button
+              mat-icon-button
+              type="button"
+              data-testid="remove-contribution-row"
+              [attr.aria-label]="'common.delete' | transloco"
+              (click)="removeContributionRow(index)"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+      <button
+        mat-button
+        type="button"
+        data-testid="add-contribution-row"
+        (click)="addContributionRow()"
+      >
+        {{ 'groups.form.contributionAdd' | transloco }}
+      </button>
+      @if (form.controls.contributions.length > 0) {
+        <p class="group-form-dialog__allocation-sum" data-testid="contribution-total">
+          {{
+            'groups.form.contributionTotal'
+              | transloco: { amount: formatMoney(contributionTotal()) }
+          }}
+        </p>
       }
-    </mat-form-field>
+      @if (contributionsError()) {
+        <p class="group-form-dialog__error" role="alert" data-testid="contributions-error">
+          {{ contributionsError() }}
+        </p>
+      }
+    </fieldset>
 
     <fieldset class="group-form-dialog__allocation" data-testid="allocation-editor">
       <legend>{{ 'groups.form.allocation' | transloco }}</legend>

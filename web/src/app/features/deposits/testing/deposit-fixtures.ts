@@ -215,28 +215,30 @@ export function writeRequests(fetchSpy: { mock: { calls: unknown[][] } }): Reque
 async function openSelectOptions(
   fixture: ComponentFixture<unknown>,
   controlName: string,
+  index = 0,
 ): Promise<HTMLElement[]> {
-  const trigger = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+  const trigger = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
     `mat-select[formcontrolname="${controlName}"] .mat-mdc-select-trigger, [formcontrolname="${controlName}"] mat-select .mat-mdc-select-trigger`,
-  );
+  )[index];
   if (!trigger) {
-    throw new Error(`No ${controlName} select rendered.`);
+    throw new Error(`No ${controlName} select rendered at ${index}.`);
   }
   trigger.click();
   fixture.detectChanges();
   await fixture.whenStable();
-  return Array.from(
-    TestBed.inject(OverlayContainer)
-      .getContainerElement()
-      .querySelectorAll<HTMLElement>('mat-option'),
-  );
+  const container = TestBed.inject(OverlayContainer).getContainerElement();
+  const panelId = trigger.closest('mat-select')?.getAttribute('aria-controls');
+  const scope =
+    (panelId ? container.querySelector<HTMLElement>(`[id="${panelId}"]`) : null) ?? container;
+  return Array.from(scope.querySelectorAll<HTMLElement>('mat-option'));
 }
 
 export async function selectOptionLabels(
   fixture: ComponentFixture<unknown>,
   controlName: string,
+  index = 0,
 ): Promise<string[]> {
-  const options = await openSelectOptions(fixture, controlName);
+  const options = await openSelectOptions(fixture, controlName, index);
   return options.map((option) => (option.textContent ?? '').trim());
 }
 
@@ -244,8 +246,9 @@ export async function pickSelectOption(
   fixture: ComponentFixture<unknown>,
   controlName: string,
   labelSubstring: string,
+  index = 0,
 ): Promise<void> {
-  const options = await openSelectOptions(fixture, controlName);
+  const options = await openSelectOptions(fixture, controlName, index);
   const option = options.find((candidate) =>
     (candidate.textContent ?? '').includes(labelSubstring),
   );
@@ -260,12 +263,13 @@ export async function pickSelectOption(
 export function selectTriggerState(
   fixture: ComponentFixture<unknown>,
   controlName: string,
+  index = 0,
 ): { triggerText: string; empty: boolean } {
-  const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>(
+  const select = (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
     `mat-select[formcontrolname="${controlName}"], [formcontrolname="${controlName}"] mat-select`,
-  );
+  )[index];
   if (!select) {
-    throw new Error(`No ${controlName} select rendered.`);
+    throw new Error(`No ${controlName} select rendered at ${index}.`);
   }
   const trigger = select.querySelector<HTMLElement>('.mat-mdc-select-trigger');
   return {
