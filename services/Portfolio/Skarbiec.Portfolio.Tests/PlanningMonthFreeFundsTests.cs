@@ -22,7 +22,9 @@ public sealed class PlanningMonthFreeFundsTests(SkarbiecContainersFixture contai
             account.AccountId, cancellationToken, "Wypłata", 8_000m, dayOfMonth: 10);
         var rent = await client.CreateRecurringExpenseAsync(cancellationToken, "Czynsz", 3_000m, dayOfMonth: 1);
         await client.CreateRecurringExpenseAsync(cancellationToken, "Rachunki", 2_500m, dayOfMonth: 5);
-        var groupId = await client.CreateFundingGroupAsync(cancellationToken, "Emerytura", 1_000m);
+        var second = await client.CreateBankAccountAsync(cancellationToken, "PKO ROR");
+        var groupId = await client.CreateFundingGroupAsync(
+            cancellationToken, "Emerytura", 1_000m, contributionAccountIds: [account.AccountId, second.AccountId]);
         var pension = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Emerytalne");
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
 

@@ -15,6 +15,7 @@ const cushion: AssetGroupResponse = {
   assetCount: 2,
   kind: 1,
   monthlyContributionPln: 1000,
+  contributions: [{ amountPln: 1000, accountId: null }],
   sharePercent: null,
   classAllocation: [
     { assetClass: 1, percent: 70 },

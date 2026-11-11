@@ -11,11 +11,17 @@ public sealed class CreateAssetGroupHandler(PortfolioDbContext dbContext)
         var name = request.Name.Trim();
 
         var allocation = request.ClassAllocation ?? [];
+        var contributions = request.Contributions ?? [];
 
         if (AssetGroupRules.ValidateFields(
-                name, request.Color, request.TargetPln, request.Kind, request.MonthlyContributionPln, allocation) is { } invalid)
+                name, request.Color, request.TargetPln, request.Kind, contributions, allocation) is { } invalid)
         {
             return invalid;
+        }
+
+        if (await dbContext.ContributionAccountErrorAsync(contributions, [], cancellationToken) is { } accountError)
+        {
+            return accountError;
         }
 
         if (await dbContext.AssetGroups.CountAsync(cancellationToken) >= AssetGroupErrors.MaxGroups)
@@ -35,7 +41,7 @@ public sealed class CreateAssetGroupHandler(PortfolioDbContext dbContext)
             Color = request.Color,
             TargetPln = request.TargetPln,
             Kind = request.Kind,
-            MonthlyContributionPln = request.MonthlyContributionPln,
+            Contributions = contributions,
             ClassAllocation = allocation
         };
 
@@ -51,7 +57,7 @@ public sealed class CreateAssetGroupHandler(PortfolioDbContext dbContext)
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new AssetGroupResponse(
-            group.Id, group.Name, group.Color, group.TargetPln, 0, group.Kind, group.MonthlyContributionPln, group.ClassAllocation,
+            group.Id, group.Name, group.Color, group.TargetPln, 0, group.Kind, group.MonthlyContributionPln, group.Contributions, group.ClassAllocation,
             group.SharePercent);
     }
 }

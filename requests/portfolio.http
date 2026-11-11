@@ -796,7 +796,7 @@ Content-Type: application/json
   "color": "blue",
   "targetPln": 50000,
   "kind": 1,
-  "monthlyContributionPln": 0,
+  "contributions": [],
   "classAllocation": []
 }
 
@@ -814,7 +814,9 @@ Content-Type: application/json
   "color": "green",
   "targetPln": null,
   "kind": 0,
-  "monthlyContributionPln": 2000,
+  "contributions": [
+    { "amountPln": 2000, "accountId": null }
+  ],
   "classAllocation": [
     { "assetClass": 1, "percent": 50 },
     { "assetClass": 9, "percent": 50 }

@@ -98,7 +98,7 @@ describe('GroupFormDialog', () => {
       color: 'orange',
       targetPln: 30000,
       kind: 0,
-      monthlyContributionPln: 0,
+      contributions: [],
       classAllocation: [],
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
@@ -133,7 +133,7 @@ describe('GroupFormDialog', () => {
       color: 'purple',
       targetPln: 30000,
       kind: 1,
-      monthlyContributionPln: 0,
+      contributions: [],
       classAllocation: [],
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
@@ -237,7 +237,7 @@ describe('GroupFormDialog', () => {
       color: 'orange',
       targetPln: null,
       kind: 0,
-      monthlyContributionPln: 2000,
+      contributions: [{ amountPln: 2000, accountId: null }],
       classAllocation: [
         { assetClass: 1, percent: 50 },
         { assetClass: 9, percent: 50 },

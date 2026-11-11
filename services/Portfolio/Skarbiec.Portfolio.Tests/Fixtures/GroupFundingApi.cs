@@ -17,9 +17,18 @@ internal static class GroupFundingApi
     public static readonly DateOnly LaterFundingDay = new(2026, 10, 16);
 
     public static async Task<Guid> CreateFundingGroupAsync(
-        this HttpClient client, CancellationToken cancellationToken, string name, decimal planPln, int color = 1) =>
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        string name,
+        decimal planPln,
+        int color = 1,
+        Guid[]? contributionAccountIds = null) =>
         (await client.CreateAssetGroupAsync(
-            cancellationToken, name, ColorKey(color), monthlyContributionPln: planPln)).Id;
+            cancellationToken,
+            name,
+            ColorKey(color),
+            monthlyContributionPln: planPln,
+            contributions: contributionAccountIds?.Select(id => new ContributionBody(planPln / contributionAccountIds.Length, id)).ToArray())).Id;
 
     public static async Task<BankAccount> CreateBankAccountInGroupAsync(
         this HttpClient client,

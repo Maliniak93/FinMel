@@ -34,6 +34,10 @@ internal static class AssetGroupsApi
 
     public const string InvalidContributionErrorCode = "Validation.InvalidContribution";
 
+    public const string TooManyContributionsErrorCode = "Validation.TooManyContributions";
+
+    public const string AccountNotFoundErrorCode = "NotFound.Account";
+
     public const string InvalidClassAllocationErrorCode = "Validation.InvalidClassAllocation";
 
     public const string ClassAllocationSumErrorCode = "Validation.ClassAllocationSum";
@@ -50,6 +54,8 @@ internal static class AssetGroupsApi
 
     public sealed record ClassShare(AssetClass AssetClass, decimal Percent);
 
+    public sealed record ContributionBody(decimal AmountPln, Guid? AccountId = null);
+
     public sealed record AssetGroupView(
         Guid Id,
         string Name,
@@ -59,7 +65,8 @@ internal static class AssetGroupsApi
         int Kind = RegularKind,
         decimal MonthlyContributionPln = 0m,
         List<ClassShare>? ClassAllocation = null,
-        decimal? SharePercent = null);
+        decimal? SharePercent = null,
+        List<ContributionBody>? Contributions = null);
 
     public sealed record GroupShareBody(Guid GroupId, decimal SharePercent);
 
@@ -87,8 +94,17 @@ internal static class AssetGroupsApi
         decimal? targetPln = null,
         int kind = RegularKind,
         decimal monthlyContributionPln = 0m,
-        ClassShare[]? classAllocation = null) =>
-        new { name, color = color ?? ColorKey(0), targetPln, kind, monthlyContributionPln, classAllocation = classAllocation ?? [] };
+        ClassShare[]? classAllocation = null,
+        ContributionBody[]? contributions = null) =>
+        new
+        {
+            name,
+            color = color ?? ColorKey(0),
+            targetPln,
+            kind,
+            contributions = contributions ?? (monthlyContributionPln == 0m ? [] : [new ContributionBody(monthlyContributionPln)]),
+            classAllocation = classAllocation ?? []
+        };
 
     public static object NewAssignmentBody(IEnumerable<Guid> assetIds, Guid? groupId) =>
         new { assetIds = assetIds.ToArray(), groupId };
@@ -101,10 +117,11 @@ internal static class AssetGroupsApi
         decimal? targetPln = null,
         int kind = RegularKind,
         decimal monthlyContributionPln = 0m,
-        ClassShare[]? classAllocation = null)
+        ClassShare[]? classAllocation = null,
+        ContributionBody[]? contributions = null)
     {
         var response = await client.PostAsJsonAsync(
-            AssetGroupsUri, NewAssetGroupBody(name, color, targetPln, kind, monthlyContributionPln, classAllocation), cancellationToken);
+            AssetGroupsUri, NewAssetGroupBody(name, color, targetPln, kind, monthlyContributionPln, classAllocation, contributions), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<AssetGroupView>(cancellationToken))!;
@@ -154,10 +171,11 @@ internal static class AssetGroupsApi
         decimal? targetPln = null,
         int kind = RegularKind,
         decimal monthlyContributionPln = 0m,
-        ClassShare[]? classAllocation = null)
+        ClassShare[]? classAllocation = null,
+        ContributionBody[]? contributions = null)
     {
         var response = await client.PutAsJsonAsync(
-            AssetGroupUri(groupId), NewAssetGroupBody(name, color, targetPln, kind, monthlyContributionPln, classAllocation), cancellationToken);
+            AssetGroupUri(groupId), NewAssetGroupBody(name, color, targetPln, kind, monthlyContributionPln, classAllocation, contributions), cancellationToken);
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<AssetGroupView>(cancellationToken))!;
