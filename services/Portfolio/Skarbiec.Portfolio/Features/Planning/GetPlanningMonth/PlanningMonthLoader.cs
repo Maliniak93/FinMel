@@ -77,7 +77,7 @@ public sealed class PlanningMonthLoader(
 
         var settings = await dbContext.PlanningSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
 
-        var funding = await LoadFundingAsync(currentMonth, groups.Any(g => g.MonthlyContributionPln > 0m), cancellationToken);
+        var funding = await LoadFundingAsync(first, last < currentMonth ? last : currentMonth, groups.Count > 0, cancellationToken);
 
         return new PlanningMonthData(
             today,
@@ -90,26 +90,26 @@ public sealed class PlanningMonthLoader(
             settings?.PaymentLeadDays ?? PlanningSettings.DefaultPaymentLeadDays);
     }
 
-    private async Task<GroupFundingResult> LoadFundingAsync(YearMonth month, bool anyContribution, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<FundingLeg>> LoadFundingAsync(
+        YearMonth first, YearMonth last, bool anyGroup, CancellationToken cancellationToken)
     {
-        if (!anyContribution)
+        if (!anyGroup || first > last)
         {
-            return GroupFundingResult.Empty;
+            return [];
         }
 
-        var first = month.FirstDay;
-        var last = month.LastDay;
-        var legs = await dbContext.Transactions
+        var firstDay = first.FirstDay;
+        var lastDay = last.LastDay;
+
+        return await dbContext.Transactions
             .AsNoTracking()
-            .Where(t => t.Date >= first && t.Date <= last)
+            .Where(t => t.TransferId != null && t.Date >= firstDay && t.Date <= lastDay)
             .Join(
                 dbContext.Assets,
                 t => t.AssetId,
                 a => a.Id,
                 (t, a) => new FundingLeg(
-                    t.TransferId, t.Type, a.GroupId, t.Quantity, t.UnitPriceAmount, t.FxRateToPln, t.AmountPln))
+                    t.TransferId, t.Type, t.Date, a.GroupId, a.AccountId, t.Quantity, t.UnitPriceAmount, t.FxRateToPln, t.AmountPln))
             .ToListAsync(cancellationToken);
-
-        return GroupFunding.Compute(legs);
     }
 }

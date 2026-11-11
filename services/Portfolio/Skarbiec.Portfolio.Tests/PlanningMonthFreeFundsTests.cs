@@ -17,7 +17,7 @@ public sealed class PlanningMonthFreeFundsTests(SkarbiecContainersFixture contai
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(CreationDayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR", balance: 1_000m, depositedOn: EarlierMonthDay);
         var salary = await client.CreateRecurringIncomeAsync(
             account.AccountId, cancellationToken, "Wypłata", 8_000m, dayOfMonth: 10);
         var rent = await client.CreateRecurringExpenseAsync(cancellationToken, "Czynsz", 3_000m, dayOfMonth: 1);
@@ -34,7 +34,7 @@ public sealed class PlanningMonthFreeFundsTests(SkarbiecContainersFixture contai
             salary, CurrentMonth, account.AccountId, 8_000m, new DateOnly(2026, 10, 10), cancellationToken);
         await client.SettleExpensePaymentAsync(
             rent, CurrentMonth, account.AccountId, 3_000m, new DateOnly(2026, 10, 1), cancellationToken);
-        await client.DepositMoneyAsync(pension.MoneyAssetId, 600m, FundingDay, cancellationToken);
+        await client.TransferMoneyAsync(account.MoneyAssetId, pension.MoneyAssetId, 600m, FundingDay, cancellationToken);
         var json = await (await client.GetAsync(PlanningMonthUri(CurrentMonth), cancellationToken))
             .Content.ReadAsStringAsync(cancellationToken);
         var settled = (await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).FreeFunds;

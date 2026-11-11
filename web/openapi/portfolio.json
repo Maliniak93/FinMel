@@ -6322,6 +6322,49 @@
           null
         ]
       },
+      "GroupDepositResponse": {
+        "required": [
+          "groupId",
+          "name",
+          "totalPln",
+          "fromIncomePln",
+          "excessPln"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "totalPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "fromIncomePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "excessPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "GroupShareRequest": {
         "required": [
           "groupId",
@@ -7106,6 +7149,7 @@
           "payments",
           "costPln",
           "groupContributions",
+          "groupDeposits",
           "definitions",
           "oneOffs"
         ],
@@ -7129,6 +7173,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/GroupContributionResponse"
+            }
+          },
+          "groupDeposits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupDepositResponse"
             }
           },
           "definitions": {

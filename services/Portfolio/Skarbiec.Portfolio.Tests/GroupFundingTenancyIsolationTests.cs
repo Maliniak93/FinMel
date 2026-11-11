@@ -15,17 +15,23 @@ public sealed class GroupFundingTenancyIsolationTests(SkarbiecContainersFixture 
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerSource = await owner.CreateIncomeAccountAsync(cancellationToken);
         var ownerGroup = await owner.CreateFundingGroupAsync(cancellationToken, "Emerytura", 1_000m);
         var ownerAccount = await owner.CreateBankAccountInGroupAsync(cancellationToken, ownerGroup, "Główne");
-        await owner.DepositMoneyAsync(ownerAccount.MoneyAssetId, 600m, FundingDay, cancellationToken);
+        await owner.TransferMoneyAsync(ownerSource.MoneyAssetId, ownerAccount.MoneyAssetId, 600m, FundingDay, cancellationToken);
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerSource = await stranger.CreateIncomeAccountAsync(cancellationToken);
         var strangerGroup = await stranger.CreateFundingGroupAsync(cancellationToken, "Emerytura", 1_000m);
+        var strangerAccount = await stranger.CreateBankAccountInGroupAsync(cancellationToken, strangerGroup, "Główne");
+        await stranger.TransferMoneyAsync(strangerSource.MoneyAssetId, strangerAccount.MoneyAssetId, 900m, FundingDay, cancellationToken);
 
         var own = await owner.ContributionOfAsync(ownerGroup, cancellationToken);
-        var other = await stranger.ContributionOfAsync(strangerGroup, cancellationToken);
+        var ownDeposit = await owner.DepositOfAsync(ownerGroup, cancellationToken);
+        var strangerDeposits = (await owner.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).Expenses.GroupDeposits;
         Assert.Equal((600m, "Partial"), (own.FundedPln, own.Status));
-        Assert.Equal((0m, "Unsettled"), (other.FundedPln, other.Status));
+        Assert.Equal(600m, ownDeposit!.TotalPln);
+        Assert.DoesNotContain(strangerDeposits!, d => d.GroupId == strangerGroup);
     }
 
     [Fact]

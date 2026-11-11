@@ -101,6 +101,29 @@ internal static class GroupFundingApi
                 Date = date
             });
 
+    public static async Task<BankAccount> CreateIncomeAccountAsync(
+        this HttpClient client,
+        CancellationToken cancellationToken,
+        string name = "Pensja",
+        decimal balance = 10_000m,
+        string currency = "PLN")
+    {
+        var account = await client.CreateBankAccountInGroupAsync(
+            cancellationToken, null, name, balance: balance, currency: currency);
+        await client.CreateRecurringIncomeAsync(
+            account.AccountId, cancellationToken, "Wypłata", 8_000m, new DateOnly(2026, 10, 1), dayOfMonth: 10);
+
+        return account;
+    }
+
+    public static async Task<GroupDepositView?> DepositOfAsync(
+        this HttpClient client, Guid groupId, CancellationToken cancellationToken, string month = CurrentMonth)
+    {
+        var view = await client.GetPlanningMonthAsync(month, cancellationToken);
+
+        return view.Expenses.GroupDeposits?.SingleOrDefault(d => d.GroupId == groupId);
+    }
+
     public static async Task<GroupContributionView> ContributionOfAsync(
         this HttpClient client, Guid groupId, CancellationToken cancellationToken, string month = CurrentMonth)
     {
