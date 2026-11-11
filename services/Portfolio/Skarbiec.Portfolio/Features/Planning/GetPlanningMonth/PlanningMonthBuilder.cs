@@ -74,10 +74,10 @@ internal static class PlanningMonthBuilder
         var balance = PlanningForecast.BalanceOf(occurrences, oneOffIncomes);
         var fxUnavailable = forecast.ForeignIn(viewed).Any(c => !rates.ContainsKey(c));
 
-        var expenses = BuildExpenses(viewed, data);
-        var funded = expenses.GroupContributions.Sum(c => c.FundedPln ?? 0m);
-        var actualPln = balance.ActualPln - (forecast.SettledCostIn(viewed) + funded);
-        var fundingIncomplete = viewed == forecast.CurrentMonth && data.Funding.Incomplete;
+        var funding = FundingIn(viewed, data);
+        var expenses = BuildExpenses(viewed, data, funding);
+        var actualPln = balance.ActualPln - forecast.SettledCostIn(viewed) - funding.FromIncomePln;
+        var fundingIncomplete = funding.Incomplete;
         var viewedCost = forecast.CostIn(viewed);
         var viewedFigures = new MonthFigures(balance.ActualPln + balance.PendingPln - viewedCost, viewedCost);
 
@@ -191,7 +191,33 @@ internal static class PlanningMonthBuilder
 
     private static int MonthsBetween(YearMonth from, YearMonth to) => (to.Year - from.Year) * 12 + to.Month - from.Month;
 
-    private static GroupContributionResponse BuildContribution(AssetGroup group, YearMonth viewed, PlanningMonthData data)
+    private static GroupFundingResult FundingIn(YearMonth viewed, PlanningMonthData data)
+    {
+        var forecast = data.Forecast;
+        if (viewed > forecast.CurrentMonth)
+        {
+            return GroupFundingResult.Empty;
+        }
+
+        var legs = data.FundingLegs.Where(l => YearMonth.From(l.Date) == viewed).ToList();
+        if (legs.Count == 0)
+        {
+            return GroupFundingResult.Empty;
+        }
+
+        var contributions = forecast.Groups.ToDictionary(
+            g => g.Id,
+            g => (IReadOnlyList<ContributionSource>)
+            [
+                .. g.Contributions.Select(c => new ContributionSource(
+                    c.AmountPln, forecast.AccountOf(c.AccountId) is { } account ? account.Id : null))
+            ]);
+
+        return GroupFunding.Compute(legs, contributions, forecast.ActualIncomeAccountsIn(viewed));
+    }
+
+    private static GroupContributionResponse BuildContribution(
+        AssetGroup group, YearMonth viewed, PlanningMonthData data, GroupFundingResult funding)
     {
         var forecast = data.Forecast;
         var incomeAccounts = forecast.IncomeAccountsIn(viewed);
@@ -211,7 +237,7 @@ internal static class PlanningMonthBuilder
             .ToList();
         var fromIncome = lines.Where(l => l.FromIncome).Sum(l => l.AmountPln);
 
-        if (viewed != forecast.CurrentMonth)
+        if (viewed > forecast.CurrentMonth)
         {
             return new GroupContributionResponse
             {
@@ -225,7 +251,7 @@ internal static class PlanningMonthBuilder
             };
         }
 
-        var funded = data.Funding.ByGroup.GetValueOrDefault(group.Id);
+        var funded = funding.ByGroup.TryGetValue(group.Id, out var realisation) ? realisation.FundedPln : 0m;
 
         return new GroupContributionResponse
         {
@@ -241,7 +267,7 @@ internal static class PlanningMonthBuilder
         };
     }
 
-    private static PlanningExpensesResponse BuildExpenses(YearMonth viewed, PlanningMonthData data)
+    private static PlanningExpensesResponse BuildExpenses(YearMonth viewed, PlanningMonthData data, GroupFundingResult funding)
     {
         var forecast = data.Forecast;
         var plans = forecast.Plans;
@@ -302,7 +328,21 @@ internal static class PlanningMonthBuilder
             GroupContributions =
             [
                 .. forecast.ContributingGroupsIn(viewed)
-                    .Select(g => BuildContribution(g, viewed, data))
+                    .Select(g => BuildContribution(g, viewed, data, funding))
+            ],
+            GroupDeposits =
+            [
+                .. forecast.Groups
+                    .Where(g => funding.ByGroup.ContainsKey(g.Id))
+                    .OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => new GroupDepositResponse
+                    {
+                        GroupId = g.Id,
+                        Name = g.Name,
+                        TotalPln = funding.ByGroup[g.Id].TotalPln,
+                        FromIncomePln = funding.ByGroup[g.Id].FromIncomePln,
+                        ExcessPln = funding.ByGroup[g.Id].ExcessPln
+                    })
             ],
             Definitions = definitions,
             OneOffs = forecast.OneOffExpensesIn(viewed)

@@ -69,6 +69,18 @@ internal sealed class PlanningForecast
         return recurring.Concat(oneOff).ToHashSet();
     }
 
+    public IReadOnlySet<Guid> ActualIncomeAccountsIn(YearMonth month)
+    {
+        var settledRecurring = PlannedIn(month)
+            .Where(p => p.Stored is { Status: OccurrenceStatus.Settled, AccountId: not null })
+            .Select(p => p.Stored!.AccountId!.Value);
+        var settledOneOff = OneOffIncomes
+            .Where(i => i.ActualAccountId is not null && YearMonth.From(i.Date) == month)
+            .Select(i => i.ActualAccountId!.Value);
+
+        return IncomeAccountsIn(month).Concat(settledRecurring).Concat(settledOneOff).ToHashSet();
+    }
+
     // An account that is not one of the user's accounts counts as no account.
     public bool CountsInPlan(GroupContribution contribution, IReadOnlySet<Guid> incomeAccounts) =>
         contribution.AccountId is not { } accountId || !accounts.ContainsKey(accountId) || incomeAccounts.Contains(accountId);
