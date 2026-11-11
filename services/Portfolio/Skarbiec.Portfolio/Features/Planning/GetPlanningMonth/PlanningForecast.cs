@@ -63,7 +63,7 @@ internal sealed class PlanningForecast
             .Where(i => i.StartDate <= month.LastDay && (i.EndDate is null || i.EndDate >= month.FirstDay))
             .Select(i => i.InForce(month).AccountId);
         var oneOff = OneOffIncomes
-            .Where(i => YearMonth.From(i.Date) == month)
+            .Where(i => i.Planned && YearMonth.From(i.Date) == month)
             .Select(i => i.AccountId);
 
         return recurring.Concat(oneOff).ToHashSet();
@@ -125,6 +125,7 @@ internal sealed class PlanningForecast
                 {
                     Id = i.Id,
                     Name = i.Name,
+                    Planned = i.Planned,
                     Date = i.Date,
                     AccountId = account.Id,
                     AccountName = account.Name,
@@ -284,18 +285,19 @@ internal sealed class PlanningForecast
         IReadOnlyList<IncomeOccurrenceResponse> occurrences, IReadOnlyList<OneOffIncomeResponse> oneOffs)
     {
         var inMonth = oneOffs.Where(o => o.InMonth).ToList();
+        var planned = inMonth.Where(o => o.Planned).ToList();
         var settledOneOffs = inMonth.Where(o => o.Status == OccurrenceStatus.Settled).ToList();
 
         return new IncomeBalanceResponse
         {
-            PlanPln = occurrences.Sum(o => o.AmountPln ?? 0m) + inMonth.Sum(o => o.AmountPln ?? 0m),
+            PlanPln = occurrences.Sum(o => o.AmountPln ?? 0m) + planned.Sum(o => o.AmountPln ?? 0m),
             ActualPln = occurrences.Sum(o => o.ActualAmountPln ?? 0m) + settledOneOffs.Sum(o => o.ActualAmountPln ?? 0m),
             PendingPln = occurrences.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m)
-                + inMonth.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m),
+                + planned.Where(o => o.Status == OccurrenceStatus.Pending).Sum(o => o.AmountPln ?? 0m),
             DifferencePln = occurrences
                 .Where(o => o.Status != OccurrenceStatus.Pending)
                 .Sum(o => (o.ActualAmountPln ?? 0m) - (o.AmountPln ?? 0m))
-                + settledOneOffs.Sum(o => (o.ActualAmountPln ?? 0m) - (o.AmountPln ?? 0m))
+                + settledOneOffs.Sum(o => (o.ActualAmountPln ?? 0m) - (o.Planned ? o.AmountPln ?? 0m : 0m))
         };
     }
 

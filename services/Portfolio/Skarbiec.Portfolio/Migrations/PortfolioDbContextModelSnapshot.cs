@@ -724,6 +724,9 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<bool>("Planned")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid?>("TransactionId")
                         .HasColumnType("uuid");
 

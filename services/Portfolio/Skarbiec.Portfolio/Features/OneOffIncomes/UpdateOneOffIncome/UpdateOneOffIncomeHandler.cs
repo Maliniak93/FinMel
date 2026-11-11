@@ -17,7 +17,16 @@ public sealed class UpdateOneOffIncomeHandler(PortfolioDbContext dbContext)
 
         if (income.IsSettled)
         {
-            return OneOffIncomeErrors.Settled(id);
+            if (request.Name != income.Name || request.Amount != income.Amount
+                || request.AccountId != income.AccountId || request.Date != income.Date)
+            {
+                return OneOffIncomeErrors.Settled(id);
+            }
+
+            income.Planned = request.Planned;
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+            return Result.Success();
         }
 
         var account = await dbContext.Accounts
@@ -37,6 +46,7 @@ public sealed class UpdateOneOffIncomeHandler(PortfolioDbContext dbContext)
         income.Amount = request.Amount;
         income.AccountId = account.Id;
         income.Date = request.Date;
+        income.Planned = request.Planned;
 
         await dbContext.SaveChangesAsync(cancellationToken);
 

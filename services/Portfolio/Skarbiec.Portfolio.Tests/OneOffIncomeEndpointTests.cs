@@ -155,6 +155,30 @@ public sealed class OneOffIncomeEndpointTests(SkarbiecContainersFixture containe
     }
 
     [Fact]
+    public async Task CreateDefaultsToPlanned()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank ROR");
+
+        var omitted = await client.PostAsJsonAsync(
+            OneOffIncomesUri,
+            new { name = "Premia", amount = 1_000m, accountId = account.AccountId, date = new DateOnly(2026, 11, 15) },
+            cancellationToken);
+        var unplanned = await client.PostAsJsonAsync(
+            OneOffIncomesUri,
+            NewOneOffIncomeBody(account.AccountId, "Niespodzianka", 3_000m, new DateOnly(2026, 11, 15), planned: false),
+            cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Created, omitted.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, unplanned.StatusCode);
+        var incomes = (await client.GetPlanningMonthAsync("2026-11", cancellationToken)).Incomes.OneOffs!;
+        Assert.True(Assert.Single(incomes, o => o.Name == "Premia").Planned);
+        Assert.False(Assert.Single(incomes, o => o.Name == "Niespodzianka").Planned);
+    }
+
+    [Fact]
     public async Task Update_WhenSettled_Returns409()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

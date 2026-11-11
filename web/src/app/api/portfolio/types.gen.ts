@@ -399,6 +399,7 @@ export type CreateOneOffIncomeRequest = {
     amount: number | string;
     accountId: string;
     date: string;
+    planned?: boolean;
 };
 
 export type CreateOneOffIncomeResponse = {
@@ -693,6 +694,7 @@ export type OneOffExpenseResponse = {
 export type OneOffIncomeResponse = {
     id: string;
     name: string;
+    planned: boolean;
     date: string;
     accountId: string;
     accountName: string;
@@ -1115,6 +1117,7 @@ export type UpdateOneOffIncomeRequest = {
     amount: number | string;
     accountId: string;
     date: string;
+    planned?: boolean;
 };
 
 export type UpdateRecurringExpenseRequest = {

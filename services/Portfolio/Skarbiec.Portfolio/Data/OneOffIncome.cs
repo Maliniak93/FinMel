@@ -11,6 +11,9 @@ public sealed class OneOffIncome : IUserOwned
     public required Guid AccountId { get; set; }
     public required DateOnly Date { get; set; }
 
+    /// <summary>False for a surprise income: it counts only in Actual and never makes its account a Plan income account.</summary>
+    public bool Planned { get; set; } = true;
+
     /// <summary>What actually arrived; set exactly when the income is settled.</summary>
     public decimal? ActualAmount { get; set; }
 

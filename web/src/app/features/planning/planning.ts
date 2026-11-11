@@ -522,7 +522,9 @@ export class Planning {
       overdue: true,
     };
     if (isOverdueOneOff(item)) {
-      this.openSettle({ oneOffIncome: { ...common, id: item.oneOffIncomeId, inMonth: true } });
+      this.openSettle({
+        oneOffIncome: { ...common, id: item.oneOffIncomeId, inMonth: true, planned: true },
+      });
       return;
     }
 

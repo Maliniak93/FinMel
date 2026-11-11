@@ -30,7 +30,8 @@ public sealed class CreateOneOffIncomeHandler(PortfolioDbContext dbContext)
             Name = request.Name,
             Amount = request.Amount,
             AccountId = account.Id,
-            Date = request.Date
+            Date = request.Date,
+            Planned = request.Planned
         };
 
         dbContext.OneOffIncomes.Add(income);
