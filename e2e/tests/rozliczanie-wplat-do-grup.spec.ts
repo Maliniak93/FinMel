@@ -1,5 +1,6 @@
 import type { APIRequestContext, Locator, Page } from '@playwright/test';
 import { expect, logInThroughApi, logInThroughUi, openSelect, test, warsawDate } from './fixtures';
+import { addContribution, clearContributions } from './groups';
 import {
   addExpense,
   addIncome,
@@ -72,7 +73,7 @@ async function createGroup(
   await expect(dialog.getByRole('heading', { name: 'Dodaj grupę' })).toBeVisible();
   await dialog.getByLabel('Nazwa').fill(group.name);
   await dialog.getByRole('radio', { name: group.color }).click();
-  await dialog.getByLabel('Wpłata miesięczna (PLN)').fill(group.contribution);
+  await addContribution(page, dialog, { amount: group.contribution });
   await dialog.getByRole('button', { name: 'Zapisz' }).click();
   await expect(dialog).toBeHidden();
 }
@@ -166,6 +167,22 @@ async function cashTransaction(
   return created.id;
 }
 
+async function transferFromMain(
+  request: APIRequestContext,
+  token: string,
+  main: Created,
+  target: Created,
+  amount: number,
+): Promise<string> {
+  const created = await post(request, token, '/api/portfolio/transfers', {
+    sourceAssetId: main.cashAssetId,
+    targetAssetId: target.cashAssetId,
+    amount,
+    date: warsawDate(),
+  });
+  return (created as unknown as { transferId: string }).transferId;
+}
+
 async function settleExpense(page: Page, name: string, amount: string): Promise<void> {
   const row = expensePayments(page, name);
   await row.getByTestId('settle-expense').click();
@@ -199,7 +216,7 @@ test('rozliczanie wpłat do grup: group funding, status and Faktyczne free funds
   let main: Created = { id: '', cashAssetId: '' };
   let reserve: Created = { id: '', cashAssetId: '' };
   let broker: Created = { id: '', cashAssetId: '' };
-  let extraDepositId = '';
+  let extraTransferId = '';
 
   await test.step('Krok 1: groups Emerytura 1000 zł, Dom 500 zł and Wakacje 300 zł are saved', async () => {
     await page.locator('mat-sidenav').getByRole('link', { name: 'Grupy', exact: true }).click();
@@ -300,12 +317,8 @@ test('rozliczanie wpłat do grup: group funding, status and Faktyczne free funds
     await expectFigures(page, { plan: '3 700,00', actual: '6 000,00' });
   });
 
-  await test.step('Krok 7: a 600 zł deposit on Maklerskie gives Emerytura 600 / 1 000 zł Częściowa and Faktyczne 5 400 zł', async () => {
-    await cashTransaction(request, token, broker.cashAssetId, {
-      type: TYPE_DEPOSIT,
-      quantity: 600,
-      date: today,
-    });
+  await test.step('Krok 7: a 600 zł transfer from Główne to Maklerskie gives Emerytura 600 / 1 000 zł Częściowa and Faktyczne 5 400 zł', async () => {
+    await transferFromMain(request, token, main, broker, 600);
     await openMonth(page, CURRENT);
     await expectContribution(page, RETIREMENT, '600,00', '1 000,00', 'Częściowa');
     await expectFigures(page, { actual: '5 400,00' });
@@ -340,14 +353,13 @@ test('rozliczanie wpłat do grup: group funding, status and Faktyczne free funds
     await expectFigures(page, { actual: '5 400,00' });
   });
 
-  await test.step('Krok 9: another 900 zł deposit gives Emerytura 1 500 / 1 000 zł Zrealizowana and Faktyczne 4 500 zł', async () => {
-    extraDepositId = await cashTransaction(request, token, broker.cashAssetId, {
-      type: TYPE_DEPOSIT,
-      quantity: 900,
-      date: today,
-    });
+  await test.step('Krok 9: another 900 zł transfer gives Emerytura 1 000 / 1 000 zł Zrealizowana, the excess 500 zł and Faktyczne 4 500 zł', async () => {
+    extraTransferId = await transferFromMain(request, token, main, broker, 900);
     await openMonth(page, CURRENT);
-    await expectContribution(page, RETIREMENT, '1 500,00', '1 000,00', 'Zrealizowana');
+    await expectContribution(page, RETIREMENT, '1 000,00', '1 000,00', 'Zrealizowana');
+    await expect(
+      page.getByTestId('excess-row').filter({ hasText: `${RETIREMENT} — Zrealizowane` }),
+    ).toContainText(pln('500,00'));
     await expectFigures(page, { actual: '4 500,00' });
   });
 
@@ -363,32 +375,32 @@ test('rozliczanie wpłat do grup: group funding, status and Faktyczne free funds
     await expectFigures(page, { actual: '4 000,00' });
   });
 
-  await test.step('Krok 11: withdrawing 200 zł from Rezerwa gives Dom 300 / 500 zł Częściowa and Faktyczne 4 200 zł', async () => {
+  await test.step('Krok 11: withdrawing 200 zł from Rezerwa changes nothing: Dom 500 / 500 zł Zrealizowana and Faktyczne 4 000 zł', async () => {
     await cashTransaction(request, token, reserve.cashAssetId, {
       type: TYPE_WITHDRAW,
       quantity: 200,
       date: today,
     });
     await openMonth(page, CURRENT);
-    await expectContribution(page, HOME, '300,00', '500,00', 'Częściowa');
-    await expectFigures(page, { actual: '4 200,00' });
+    await expectContribution(page, HOME, '500,00', '500,00', 'Zrealizowana');
+    await expectFigures(page, { actual: '4 000,00' });
   });
 
-  await test.step('Krok 12: withdrawing another 600 zł gives Dom 0 / 500 zł Nierozliczona and Faktyczne 4 500 zł', async () => {
+  await test.step('Krok 12: withdrawing another 600 zł changes nothing: Dom 500 / 500 zł Zrealizowana and Faktyczne 4 000 zł', async () => {
     await cashTransaction(request, token, reserve.cashAssetId, {
       type: TYPE_WITHDRAW,
       quantity: 600,
       date: today,
     });
     await openMonth(page, CURRENT);
-    await expectContribution(page, HOME, '0,00', '500,00', 'Nierozliczona');
-    await expectFigures(page, { actual: '4 500,00' });
+    await expectContribution(page, HOME, '500,00', '500,00', 'Zrealizowana');
+    await expectFigures(page, { actual: '4 000,00' });
   });
 
-  await test.step('Krok 13: settling Naprawa at 450 zł lowers Faktyczne to 4 050 zł', async () => {
+  await test.step('Krok 13: settling Naprawa at 450 zł lowers Faktyczne to 3 550 zł', async () => {
     await settleExpense(page, REPAIR, '450');
     await openMonth(page, CURRENT);
-    await expectFigures(page, { actual: '4 050,00' });
+    await expectFigures(page, { actual: '3 550,00' });
     plan = await figure(page, 'free-funds-plan');
   });
 
@@ -398,7 +410,7 @@ test('rozliczanie wpłat do grup: group funding, status and Faktyczne free funds
     await page.getByTestId('edit-group').click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'Edytuj grupę' })).toBeVisible();
-    await dialog.getByLabel('Wpłata miesięczna (PLN)').fill('0');
+    await clearContributions(dialog);
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
     await openMonth(page, CURRENT);
@@ -406,24 +418,24 @@ test('rozliczanie wpłat do grup: group funding, status and Faktyczne free funds
     await expect(page.getByTestId('free-funds-plan').locator('.cascade__amount')).toHaveText(
       exactMoney(plnText(plan + 300)),
     );
-    await expectFigures(page, { actual: '4 050,00' });
+    await expectFigures(page, { actual: '3 550,00' });
   });
 
-  await test.step('Krok 15: deleting the 900 zł deposit returns Emerytura to 600 / 1 000 zł Częściowa and raises Faktyczne by 900 zł', async () => {
-    const removed = await request.delete(
-      `/api/portfolio/assets/${broker.cashAssetId}/transactions/${extraDepositId}`,
-      { headers: authorization(token) },
-    );
+  await test.step('Krok 15: deleting the 900 zł transfer returns Emerytura to 600 / 1 000 zł Częściowa and raises Faktyczne by 900 zł', async () => {
+    const removed = await request.delete(`/api/portfolio/transfers/${extraTransferId}`, {
+      headers: authorization(token),
+    });
     expect(removed.ok()).toBeTruthy();
     await openMonth(page, CURRENT);
     await expectContribution(page, RETIREMENT, '600,00', '1 000,00', 'Częściowa');
-    await expectFigures(page, { actual: '4 950,00' });
+    await expectFigures(page, { actual: '4 450,00' });
   });
 
-  await test.step('Krok 16: October has no group contributions and no statuses', async () => {
+  await test.step('Krok 16: October has the contributions of Emerytura and Dom, both Nierozliczona, and no Prognoza', async () => {
     await openMonth(page, PREVIOUS);
-    await expect(page.getByTestId('contribution-row')).toHaveCount(0);
-    await expect(page.getByTestId('contribution-status')).toHaveCount(0);
+    await expect(page.getByTestId('contribution-row')).toHaveCount(2);
+    await expectContribution(page, RETIREMENT, '0,00', '1 000,00', 'Nierozliczona');
+    await expectContribution(page, HOME, '0,00', '500,00', 'Nierozliczona');
     await expect(page.getByTestId('free-funds-forecast')).toHaveCount(0);
   });
 
@@ -444,6 +456,6 @@ test('rozliczanie wpłat do grup: group funding, status and Faktyczne free funds
     await page.goto('/dashboard');
     const card = page.getByTestId('month-card-actual');
     await expect(card).toContainText('Faktyczne wolne środki:');
-    await expect(card).toContainText(pln('4 950,00'));
+    await expect(card).toContainText(pln('4 450,00'));
   });
 });

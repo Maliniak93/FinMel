@@ -23,6 +23,7 @@ import {
   shiftMonth,
 } from './planning';
 import { expectProjected } from './projection';
+import { addContribution, clearContributions } from './groups';
 
 const ACCOUNT_TYPE_BANK = 2;
 const WRAPPER_REGULAR = 0;
@@ -94,7 +95,7 @@ async function createGroup(
     await dialog.getByLabel('Cel (PLN)').fill(group.target);
   }
   if (group.contribution) {
-    await dialog.getByLabel('Wpłata miesięczna (PLN)').fill(group.contribution);
+    await addContribution(page, dialog, { amount: group.contribution });
   }
   if (group.allocation) {
     await fillAllocation(page, dialog, group.allocation);
@@ -228,7 +229,7 @@ test('group allocation planning: groups with kind, class allocation and contribu
     const pension = await openGroupDialog(page);
     await pension.getByLabel('Nazwa').fill(PENSION);
     await pension.getByRole('radio', { name: 'Fioletowy' }).click();
-    await pension.getByLabel('Wpłata miesięczna (PLN)').fill('2000');
+    await addContribution(page, pension, { amount: '2000' });
     await fillAllocation(page, pension, [
       { assetClass: 'Lokata', percent: '50' },
       { assetClass: 'Konta bankowe', percent: '40' },
@@ -341,7 +342,7 @@ test('group allocation planning: groups with kind, class allocation and contribu
     await expect(page.getByRole('heading', { name: /alokacj/i })).toHaveCount(0);
   });
 
-  await test.step('Krok 6: Wypłata 8 000 zł and Czynsz 1 000 zł from last month leave 7 000 zł of free funds in the past month, without contributions or a split', async () => {
+  await test.step('Krok 6: Wypłata 8 000 zł and Czynsz 1 000 zł from last month leave 4 000 zł of free funds in the past month with the contributions of Emerytura and Inwestycje, without a split', async () => {
     await openMonth(page, m(0));
     await addIncome(page, {
       name: SALARY,
@@ -359,9 +360,10 @@ test('group allocation planning: groups with kind, class allocation and contribu
       day: 1,
     });
     await openMonth(page, m(-1));
-    await expectFreeFunds(page, '7 000,00');
-    await expectCost(page, '1 000,00');
-    await expect(page.getByTestId('contribution-row')).toHaveCount(0);
+    await expectFreeFunds(page, '4 000,00');
+    await expectCost(page, '4 000,00');
+    await expect(contributionOf(page, PENSION)).toContainText(pln('2 000,00'));
+    await expect(contributionOf(page, INVESTMENTS)).toContainText(pln('1 000,00'));
     await expect(page.getByTestId('split-group')).toHaveCount(0);
   });
 
@@ -438,12 +440,12 @@ test('group allocation planning: groups with kind, class allocation and contribu
     await expect(splitGroup(page, TARGETED)).toContainText(allocationOf('2 000,00'));
   });
 
-  await test.step('Krok 13: Emerytura contribution set to 0 zł raises the free funds of the current month to 6 000 zł and removes the contribution and its breakdown, the past month is unchanged', async () => {
+  await test.step('Krok 13: Emerytura contribution set to 0 zł raises the free funds of the current month to 6 000 zł and removes the contribution and its breakdown, the past month follows with the same 6 000 zł', async () => {
     await page.locator('mat-sidenav').getByRole('link', { name: 'Grupy', exact: true }).click();
     await groupRow(page, PENSION).getByTestId('group-menu').click();
     await page.getByTestId('edit-group').click();
     await expect(dialog.getByRole('heading', { name: 'Edytuj grupę' })).toBeVisible();
-    await dialog.getByLabel('Wpłata miesięczna (PLN)').fill('0');
+    await clearContributions(dialog);
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
 
@@ -454,7 +456,8 @@ test('group allocation planning: groups with kind, class allocation and contribu
     await expect(splitGroup(page, PENSION).getByTestId('split-breakdown-toggle')).toHaveCount(0);
 
     await openMonth(page, m(-1));
-    await expectFreeFunds(page, '7 000,00');
+    await expectFreeFunds(page, '6 000,00');
+    await expect(contributionOf(page, PENSION)).toHaveCount(0);
   });
 
   await test.step('Krok 14: a new regular group Wakacje has 0% in the split and the sum stays 100%', async () => {

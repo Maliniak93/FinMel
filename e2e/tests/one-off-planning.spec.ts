@@ -262,13 +262,13 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     await expect(cash(page)).toContainText(pln('2 500,00'));
   });
 
-  await test.step('Krok 9: editing and deleting the settled Zwrot podatku are blocked with the undo hint', async () => {
+  await test.step('Krok 9: deleting the settled Zwrot podatku is blocked with the undo hint and editing stays open for the Planowany flag', async () => {
     await openMonth(page, OCTOBER);
     const row = oneOffIncomeRow(page, REFUND);
-    await expect(row.getByTestId('edit-one-off-income')).toBeDisabled();
+    await expect(row.getByTestId('edit-one-off-income')).toBeEnabled();
     await expect(row.getByTestId('delete-one-off-income')).toBeDisabled();
     await expect(row.getByTestId('one-off-locked-hint')).toHaveText(
-      'Cofnij rozliczenie, aby edytować lub usunąć wpis.',
+      'Cofnij rozliczenie, aby usunąć wpis. Można zmienić tylko flagę Planowany.',
     );
   });
 

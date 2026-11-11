@@ -367,12 +367,12 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
       color: 'orange',
       kind: KIND_CUSHION,
       targetPln: 60000,
-      monthlyContributionPln: 1500,
+      contributions: [{ amountPln: 1500 }],
     });
     pensionId = await createGroup(request, token, {
       name: PENSION,
       color: 'purple',
-      monthlyContributionPln: 1000,
+      contributions: [{ amountPln: 1000 }],
     });
     await assign(request, token, [depositAssetId], cushionId);
   });
@@ -435,7 +435,7 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
   await test.step('Krok 15: a larger Emerytura contribution turns "Wolne środki" into a deficit and removes the split rows', async () => {
     const updated = await request.put(`/api/portfolio/asset-groups/${pensionId}`, {
       headers,
-      data: { name: PENSION, color: 'purple', kind: 0, monthlyContributionPln: 10000 },
+      data: { name: PENSION, color: 'purple', kind: 0, contributions: [{ amountPln: 10000 }] },
     });
     expect(updated.ok()).toBeTruthy();
     await openDashboard(page);

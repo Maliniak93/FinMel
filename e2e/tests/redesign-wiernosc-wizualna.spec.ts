@@ -374,14 +374,14 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
         color: 'orange',
         kind: KIND_CUSHION,
         targetPln: 60000,
-        monthlyContributionPln: 1000,
+        contributions: [{ amountPln: 1000 }],
         classAllocation: [{ assetClass: ASSET_CLASS_BANK_ACCOUNT, percent: 100 }],
       },
     });
     expect(cushion.ok()).toBeTruthy();
     const pension = await request.post('/api/portfolio/asset-groups', {
       headers,
-      data: { name: PENSION, color: 'purple', monthlyContributionPln: 1500 },
+      data: { name: PENSION, color: 'purple', contributions: [{ amountPln: 1500 }] },
     });
     expect(pension.ok()).toBeTruthy();
     for (const [groupResponse, assetId] of [

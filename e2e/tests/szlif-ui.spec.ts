@@ -404,7 +404,7 @@ test('szlif ui: one 140 ms motion for navigation, lists and the range switch', a
       color: COLORS[index],
       ...(name === 'Plan'
         ? {
-            monthlyContributionPln: 500,
+            contributions: [{ amountPln: 500 }],
             classAllocation: [
               { assetClass: ASSET_CLASS_DEPOSIT, percent: 50 },
               { assetClass: ASSET_CLASS_BANK, percent: 50 },

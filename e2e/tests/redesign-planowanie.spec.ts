@@ -214,12 +214,12 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
     color: 'orange',
     kind: KIND_CUSHION,
     targetPln: 60000,
-    monthlyContributionPln: 1000,
+    contributions: [{ amountPln: 1000 }],
   });
   const pensionId = await createGroup(page, token, {
     name: PENSION,
     color: 'purple',
-    monthlyContributionPln: 1500,
+    contributions: [{ amountPln: 1500 }],
   });
 
   await test.step('Krok 1: Planowanie has the header, tabs, month navigation, the Lista / Kalendarz switch, only the deposit deadline in the list and a zero balance', async () => {
@@ -425,7 +425,7 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
   await test.step('Krok 10: "Podział wolnych środków" has the info, the cushion level, shares summing to 100%, a warning with disabled save for another sum and a saved correction', async () => {
     const holiday = await request.post('/api/portfolio/asset-groups', {
       headers,
-      data: { name: HOLIDAY, color: 'blue', monthlyContributionPln: 0 },
+      data: { name: HOLIDAY, color: 'blue', contributions: [] },
     });
     expect(holiday.ok()).toBeTruthy();
     await openMonth(page, MONTH);
@@ -455,7 +455,7 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
   await test.step('Krok 11: an Emerytura contribution above the free funds shows "deficyt" with the amount in the cascade and no split', async () => {
     const raised = await request.put(`/api/portfolio/asset-groups/${pensionId}`, {
       headers,
-      data: { name: PENSION, color: 'purple', kind: 0, monthlyContributionPln: 100000 },
+      data: { name: PENSION, color: 'purple', kind: 0, contributions: [{ amountPln: 100000 }] },
     });
     expect(raised.ok()).toBeTruthy();
     await openMonth(page, MONTH);
