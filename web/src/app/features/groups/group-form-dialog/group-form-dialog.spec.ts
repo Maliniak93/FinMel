@@ -8,7 +8,20 @@ import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../../core/i18n/language';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { jsonResponse } from '../../assets/asset-form/testing/asset-form-fixtures';
-import { blueGroup, greenGroup } from '../testing/group-fixtures';
+import {
+  pickSelectOption,
+  selectOptionLabels,
+  selectTriggerState,
+} from '../../deposits/testing/deposit-fixtures';
+import {
+  accountAId,
+  accountBId,
+  archivedContributionGroup,
+  blueGroup,
+  contributedGroup,
+  greenGroup,
+  groupAccounts,
+} from '../testing/group-fixtures';
 import { GroupFormDialog, type GroupFormDialogData } from './group-form-dialog';
 
 describe('GroupFormDialog', () => {
@@ -82,8 +95,42 @@ describe('GroupFormDialog', () => {
     );
   }
 
+  function contributionRows(): HTMLElement[] {
+    return Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+        '[data-testid="contribution-row"]',
+      ),
+    );
+  }
+
+  function rowError(index: number): string {
+    const row = contributionRows()[index];
+    return row.querySelector('[data-testid="contribution-error"]')?.textContent?.trim() ?? '';
+  }
+
+  function setAmount(index: number, value: string): void {
+    const input = contributionRows()[index].querySelector<HTMLInputElement>(
+      'input[formcontrolname="amountPln"]',
+    );
+    if (!input) {
+      throw new Error(`No amount input in row ${index}.`);
+    }
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+  }
+
+  async function addContributionRow(amount: string, account: string): Promise<void> {
+    const index = contributionRows().length;
+    (fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('[data-testid="add-contribution-row"]')!
+      .click();
+    await settle();
+    setAmount(index, amount);
+    await pickSelectOption(fixture, 'accountId', account, index);
+  }
+
   it('creates a group', async () => {
-    await setup({ mode: 'create', groups: [blueGroup] });
+    await setup({ mode: 'create', groups: [blueGroup], accounts: groupAccounts });
     component['form'].controls.name.setValue('  Poduszka ');
     component['form'].controls.color.setValue('orange');
     component['form'].controls.targetPln.setValue(30000);
@@ -105,7 +152,7 @@ describe('GroupFormDialog', () => {
   });
 
   it('refuses a blank name without calling the API', async () => {
-    await setup({ mode: 'create', groups: [] });
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts });
     component['form'].controls.color.setValue('blue');
 
     await component['onSubmit']();
@@ -115,8 +162,14 @@ describe('GroupFormDialog', () => {
   });
 
   it('updates through PUT on edit', async () => {
-    await setup({ mode: 'edit', group: greenGroup, groups: [blueGroup, greenGroup] }, () =>
-      jsonResponse(greenGroup),
+    await setup(
+      {
+        mode: 'edit',
+        group: contributedGroup,
+        groups: [blueGroup, contributedGroup],
+        accounts: groupAccounts,
+      },
+      () => jsonResponse(contributedGroup),
     );
     expect(component['form'].controls.name.value).toBe('Poduszka');
     expect(component['form'].controls.color.value).toBe('green');
@@ -127,20 +180,23 @@ describe('GroupFormDialog', () => {
 
     const [request] = writes();
     expect(request.method).toBe('PUT');
-    expect(request.url).toContain(`/api/portfolio/asset-groups/${greenGroup.id}`);
+    expect(request.url).toContain(`/api/portfolio/asset-groups/${contributedGroup.id}`);
     expect(await request.json()).toEqual({
       name: 'Poduszka finansowa',
       color: 'purple',
       targetPln: 30000,
       kind: 1,
-      contributions: [],
+      contributions: [
+        { amountPln: 2000, accountId: accountAId },
+        { amountPln: 500, accountId: null },
+      ],
       classAllocation: [],
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
   it('disables used colours', async () => {
-    await setup({ mode: 'create', groups: [blueGroup, greenGroup] });
+    await setup({ mode: 'create', groups: [blueGroup, greenGroup], accounts: groupAccounts });
 
     expect(isDisabled(swatch('blue'))).toBe(true);
     expect(isDisabled(swatch('green'))).toBe(true);
@@ -153,7 +209,12 @@ describe('GroupFormDialog', () => {
   });
 
   it('keeps the own colour selectable on edit', async () => {
-    await setup({ mode: 'edit', group: greenGroup, groups: [blueGroup, greenGroup] });
+    await setup({
+      mode: 'edit',
+      group: greenGroup,
+      groups: [blueGroup, greenGroup],
+      accounts: groupAccounts,
+    });
 
     expect(isDisabled(swatch('green'))).toBe(false);
     expect(isDisabled(swatch('blue'))).toBe(true);
@@ -164,7 +225,7 @@ describe('GroupFormDialog', () => {
     ['Conflict.GroupColorTaken', 'color-error'],
     ['Validation.InvalidTarget', 'target-error'],
   ])('maps server errors: %s', async (errorCode, testId) => {
-    await setup({ mode: 'create', groups: [] }, () =>
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts }, () =>
       jsonResponse({ title: 'Conflict', status: 409, detail: 'Rejected.', errorCode }, 409),
     );
     component['form'].controls.name.setValue('Poduszka');
@@ -195,7 +256,7 @@ describe('GroupFormDialog', () => {
   }
 
   it('blocks save for a cushion without a target, an allocation off 100 or a repeated class', async () => {
-    await setup({ mode: 'create', groups: [] });
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts });
 
     component['form'].controls.kind.setValue(1);
     component['form'].controls.targetPln.setValue(null);
@@ -220,9 +281,10 @@ describe('GroupFormDialog', () => {
   });
 
   it('posts kind, contribution and allocation from a valid form', async () => {
-    await setup({ mode: 'create', groups: [] });
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts });
     component['form'].controls.kind.setValue(0);
-    component['form'].controls.monthlyContributionPln.setValue(2000);
+    await addContributionRow('2000', 'Konto A');
+    await addContributionRow('2000', 'Konto B');
     setAllocation([
       [1, 50],
       [9, 50],
@@ -237,7 +299,10 @@ describe('GroupFormDialog', () => {
       color: 'orange',
       targetPln: null,
       kind: 0,
-      contributions: [{ amountPln: 2000, accountId: null }],
+      contributions: [
+        { amountPln: 2000, accountId: accountAId },
+        { amountPln: 2000, accountId: accountBId },
+      ],
       classAllocation: [
         { assetClass: 1, percent: 50 },
         { assetClass: 9, percent: 50 },
@@ -246,8 +311,93 @@ describe('GroupFormDialog', () => {
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
 
+  it('removes a contribution row', async () => {
+    await setup(
+      {
+        mode: 'edit',
+        group: contributedGroup,
+        groups: [blueGroup, contributedGroup],
+        accounts: groupAccounts,
+      },
+      () => jsonResponse(contributedGroup),
+    );
+    await TestBed.inject(LanguageService).setLanguage('pl');
+    await settle();
+
+    expect(contributionRows()).toHaveLength(2);
+    expect(selectTriggerState(fixture, 'accountId', 0).triggerText).toContain('Konto A');
+    expect(selectTriggerState(fixture, 'accountId', 1).triggerText).toBe('Bez konta');
+
+    contributionRows()[0]
+      .querySelector<HTMLButtonElement>('[data-testid="remove-contribution-row"]')!
+      .click();
+    await settle();
+
+    expect(contributionRows()).toHaveLength(1);
+    expect(selectTriggerState(fixture, 'accountId', 0).triggerText).toBe('Bez konta');
+
+    await component['onSubmit']();
+
+    const [request] = writes();
+    expect(request.method).toBe('PUT');
+    expect((await request.json()).contributions).toEqual([{ amountPln: 500, accountId: null }]);
+  });
+
+  it('validates contribution rows', async () => {
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts }, () =>
+      jsonResponse(
+        {
+          title: 'Validation',
+          status: 400,
+          detail: 'At most 20 contributions are allowed.',
+          errorCode: 'Validation.TooManyContributions',
+        },
+        400,
+      ),
+    );
+    await addContributionRow('0', 'Konto A');
+
+    await submitNamed();
+    await settle();
+    expect(rowError(0)).not.toBe('');
+    expect(writes()).toEqual([]);
+
+    setAmount(0, '10.555');
+    await submitNamed();
+    await settle();
+    expect(rowError(0)).not.toBe('');
+    expect(writes()).toEqual([]);
+
+    setAmount(0, '2000');
+    await settle();
+    expect(rowError(0)).toBe('');
+
+    await submitNamed();
+    await settle();
+    expect(writes()).toHaveLength(1);
+    expect(errorText('contributions-error')).not.toBe('');
+    expect(dialogRef.close).not.toHaveBeenCalled();
+  });
+
+  it('keeps the archived account of an existing row', async () => {
+    await setup({
+      mode: 'edit',
+      group: archivedContributionGroup,
+      groups: [archivedContributionGroup],
+      accounts: groupAccounts,
+    });
+    await settle();
+
+    expect(contributionRows()).toHaveLength(1);
+    expect(selectTriggerState(fixture, 'accountId', 0).triggerText).toContain('Stare konto');
+
+    const labels = await selectOptionLabels(fixture, 'accountId', 0);
+    expect(labels.some((label) => label.includes('Stare konto'))).toBe(true);
+    expect(labels.some((label) => label.includes('Zamknięte konto'))).toBe(false);
+  });
+
   it('closes with false on cancel', async () => {
-    await setup({ mode: 'create', groups: [] });
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts });
 
     component['cancel']();
 
@@ -267,7 +417,7 @@ describe('GroupFormDialog', () => {
   }
 
   it('palette caption and taken colours', async () => {
-    await setup({ mode: 'create', groups: [blueGroup, greenGroup] });
+    await setup({ mode: 'create', groups: [blueGroup, greenGroup], accounts: groupAccounts });
     await TestBed.inject(LanguageService).setLanguage('pl');
     component['form'].controls.color.setValue('orange');
     await settle();
@@ -285,7 +435,7 @@ describe('GroupFormDialog', () => {
   });
 
   it('cushion requires a target', async () => {
-    await setup({ mode: 'create', groups: [] });
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts });
     await TestBed.inject(LanguageService).setLanguage('pl');
     component['form'].controls.name.setValue('Poduszka');
     component['form'].controls.color.setValue('orange');
@@ -302,7 +452,7 @@ describe('GroupFormDialog', () => {
   });
 
   it('opens with the allocation fieldset', async () => {
-    await setup({ mode: 'create', groups: [] });
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts });
     const root = fixture.nativeElement as HTMLElement;
     const fieldset = root.querySelector<HTMLFieldSetElement>('[data-testid="allocation-editor"]');
     expect(fieldset?.tagName).toBe('FIELDSET');
@@ -314,7 +464,7 @@ describe('GroupFormDialog', () => {
   });
 
   it('allocation sum and duplicates', async () => {
-    await setup({ mode: 'create', groups: [] });
+    await setup({ mode: 'create', groups: [], accounts: groupAccounts });
     await TestBed.inject(LanguageService).setLanguage('pl');
     component['form'].controls.name.setValue('Emerytura');
     component['form'].controls.color.setValue('orange');

@@ -11,6 +11,7 @@ import { firstValueFrom } from 'rxjs';
 
 import {
   deleteApiPortfolioAssetGroupsById,
+  getApiPortfolioAccounts,
   getApiPortfolioAssetGroups,
   getApiPortfolioAssetGroupsAssets,
   type AssetGroupResponse,
@@ -100,6 +101,20 @@ export class Groups {
     },
   });
 
+  private readonly accountsResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioAccounts({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(readProblemDetails(result.error).detail ?? translate('groups.loadFailed'));
+      }
+      return result.data ?? [];
+    },
+  });
+
+  private readonly accounts = computed(() =>
+    this.accountsResource.hasValue() ? this.accountsResource.value() : [],
+  );
+
   protected readonly groups = computed(() =>
     this.groupsResource.hasValue() ? this.groupsResource.value() : [],
   );
@@ -156,11 +171,16 @@ export class Groups {
   }
 
   protected openCreateDialog(): void {
-    this.openFormDialog({ mode: 'create', groups: this.groups() });
+    this.openFormDialog({ mode: 'create', groups: this.groups(), accounts: this.accounts() });
   }
 
   protected openEditDialog(group: AssetGroupResponse): void {
-    this.openFormDialog({ mode: 'edit', group, groups: this.groups() });
+    this.openFormDialog({
+      mode: 'edit',
+      group,
+      groups: this.groups(),
+      accounts: this.accounts(),
+    });
   }
 
   protected async remove(group: AssetGroupResponse): Promise<void> {

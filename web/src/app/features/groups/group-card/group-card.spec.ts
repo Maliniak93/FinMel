@@ -15,7 +15,10 @@ const cushion: AssetGroupResponse = {
   assetCount: 2,
   kind: 1,
   monthlyContributionPln: 1000,
-  contributions: [{ amountPln: 1000, accountId: null }],
+  contributions: [
+    { amountPln: 600, accountId: 'cccccccc-cccc-cccc-cccc-cccccccccccc' },
+    { amountPln: 400, accountId: null },
+  ],
   sharePercent: null,
   classAllocation: [
     { assetClass: 1, percent: 70 },
@@ -81,6 +84,15 @@ describe('GroupCard', () => {
     expect(byTestId('group-progress-caption').textContent).toContain(formatMoney(20000));
     expect(byTestId('group-contribution').textContent).toContain(formatMoney(1000));
     expect(byTestId('group-count').textContent).toContain('2');
+  });
+
+  it('shows the sum of several contributions and lists none of them', async () => {
+    await render(cushion);
+
+    const line = byTestId('group-contribution').textContent ?? '';
+    expect(line).toContain(formatMoney(1000));
+    expect(line).not.toContain(formatMoney(600));
+    expect(line).not.toContain(formatMoney(400));
   });
 
   it('renders the allocation block', async () => {

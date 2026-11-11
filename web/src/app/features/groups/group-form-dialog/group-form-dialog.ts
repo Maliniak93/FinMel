@@ -24,6 +24,7 @@ import { TranslocoPipe, translate } from '@jsverse/transloco';
 import {
   postApiPortfolioAssetGroups,
   putApiPortfolioAssetGroupsById,
+  type AccountResponse,
   type AssetGroupResponse,
 } from '../../../api/portfolio';
 import {
@@ -32,14 +33,39 @@ import {
   type ApiProblemDetails,
 } from '../../../core/auth/problem-details';
 import { GROUP_COLOR_KEYS, assetClassColor, groupColor } from '../../../shared/colors';
-import { formatPercentNumber } from '../../../shared/format';
+import { formatMoney, formatPercentNumber } from '../../../shared/format';
 import { GroupKindMarker } from '../../../shared/group-kind-marker/group-kind-marker';
 import { ASSET_CLASSES } from '../../assets/asset-class';
 import { GROUP_KINDS, GROUP_KIND } from '../group-kind';
 
 export type GroupFormDialogData =
-  | { mode: 'create'; groups: readonly AssetGroupResponse[] }
-  | { mode: 'edit'; group: AssetGroupResponse; groups: readonly AssetGroupResponse[] };
+  | {
+      mode: 'create';
+      groups: readonly AssetGroupResponse[];
+      accounts: readonly AccountResponse[];
+    }
+  | {
+      mode: 'edit';
+      group: AssetGroupResponse;
+      groups: readonly AssetGroupResponse[];
+      accounts: readonly AccountResponse[];
+    };
+
+interface ContributionRowControls {
+  amountPln: FormControl<number | null>;
+  accountId: FormControl<string>;
+}
+
+type ContributionRow = FormGroup<ContributionRowControls>;
+
+function twoDecimals(control: AbstractControl): ValidationErrors | null {
+  const value = control.value as number | null;
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const cents = Number(value) * 100;
+  return Math.abs(cents - Math.round(cents)) < 1e-6 ? null : { decimals: true };
+}
 
 interface AllocationRowControls {
   assetClass: FormControl<number | null>;
@@ -133,9 +159,12 @@ export class GroupFormDialog {
     kind: this.formBuilder.nonNullable.control<number>(
       this.data.mode === 'edit' ? Number(this.data.group.kind) : GROUP_KIND.Regular,
     ),
-    monthlyContributionPln: this.formBuilder.nonNullable.control<number | null>(
-      this.data.mode === 'edit' ? Number(this.data.group.monthlyContributionPln) : 0,
-      [Validators.min(0), Validators.max(1_000_000_000)],
+    contributions: new FormArray<ContributionRow>(
+      this.data.mode === 'edit'
+        ? this.data.group.contributions.map((contribution) =>
+            this.newContributionRow(Number(contribution.amountPln), contribution.accountId),
+          )
+        : [],
     ),
     allocation: new FormArray<AllocationRow>(
       this.data.mode === 'edit'
@@ -185,7 +214,19 @@ export class GroupFormDialog {
     });
   });
 
+  protected readonly contributionTotal = computed(() => {
+    this.formChange();
+    const grosze = this.form.controls.contributions.controls.reduce(
+      (sum, row) => sum + Math.round(Number(row.controls.amountPln.value ?? 0) * 100),
+      0,
+    );
+    return grosze / 100;
+  });
+
+  protected readonly contributionsError = signal<string | null>(null);
+
   protected readonly formatPercentNumber = formatPercentNumber;
+  protected readonly formatMoney = formatMoney;
 
   constructor() {
     this.applyKind(this.form.controls.kind.value);
@@ -197,6 +238,19 @@ export class GroupFormDialog {
   protected pickColor(key: string): void {
     this.form.controls.color.setValue(key);
     this.form.controls.color.markAsDirty();
+  }
+
+  protected addContributionRow(): void {
+    this.form.controls.contributions.push(this.newContributionRow(null, null));
+  }
+
+  protected removeContributionRow(index: number): void {
+    this.form.controls.contributions.removeAt(index);
+  }
+
+  protected accountOptions(row: ContributionRow): AccountResponse[] {
+    const current = row.controls.accountId.value;
+    return this.data.accounts.filter((account) => !account.isArchived || account.id === current);
   }
 
   protected addAllocationRow(): void {
@@ -219,6 +273,7 @@ export class GroupFormDialog {
 
     this.submitting.set(true);
     this.formError.set(null);
+    this.contributionsError.set(null);
 
     const values = this.form.getRawValue();
     const body = {
@@ -226,9 +281,11 @@ export class GroupFormDialog {
       color: values.color,
       targetPln: values.targetPln,
       kind: values.kind,
-      contributions: values.monthlyContributionPln
-        ? [{ amountPln: values.monthlyContributionPln, accountId: null }]
-        : [],
+      contributions: values.contributions.flatMap((row) =>
+        row.amountPln === null
+          ? []
+          : [{ amountPln: row.amountPln, accountId: row.accountId || null }],
+      ),
       classAllocation: values.allocation.flatMap((row) =>
         row.assetClass === null || row.percent === null
           ? []
@@ -255,6 +312,18 @@ export class GroupFormDialog {
     this.dialogRef.close(false);
   }
 
+  private newContributionRow(amount: number | null, accountId: string | null): ContributionRow {
+    return new FormGroup<ContributionRowControls>({
+      amountPln: new FormControl<number | null>(amount, [
+        Validators.required,
+        Validators.min(0.01),
+        Validators.max(1_000_000_000),
+        twoDecimals,
+      ]),
+      accountId: new FormControl<string>(accountId ?? '', { nonNullable: true }),
+    });
+  }
+
   private newRow(assetClass: number | null, percent: number | null): AllocationRow {
     return new FormGroup<AllocationRowControls>({
       assetClass: new FormControl<number | null>(assetClass, [Validators.required]),
@@ -278,18 +347,22 @@ export class GroupFormDialog {
   }
 
   private applyServerErrors(problem: ApiProblemDetails): void {
-    const mapped: Record<
-      string,
-      ['name' | 'color' | 'targetPln' | 'monthlyContributionPln', string]
-    > = {
+    const contributionErrors: Record<string, string> = {
+      'Validation.InvalidContribution': 'groups.errors.invalidContribution',
+      'Validation.TooManyContributions': 'groups.errors.tooManyContributions',
+      'Validation.ContributionAccountArchived': 'groups.errors.contributionAccountArchived',
+    };
+    const contributionKey = problem.errorCode ? contributionErrors[problem.errorCode] : undefined;
+    if (contributionKey) {
+      this.contributionsError.set(translate(contributionKey));
+      return;
+    }
+
+    const mapped: Record<string, ['name' | 'color' | 'targetPln', string]> = {
       'Conflict.DuplicateName': ['name', 'groups.errors.duplicateName'],
       'Conflict.GroupColorTaken': ['color', 'groups.errors.colorTaken'],
       'Validation.InvalidTarget': ['targetPln', 'groups.errors.invalidTarget'],
       'Validation.TargetRequiredForCushion': ['targetPln', 'groups.form.targetRequired'],
-      'Validation.InvalidContribution': [
-        'monthlyContributionPln',
-        'groups.errors.invalidContribution',
-      ],
     };
     const target = problem.errorCode ? mapped[problem.errorCode] : undefined;
     if (target) {

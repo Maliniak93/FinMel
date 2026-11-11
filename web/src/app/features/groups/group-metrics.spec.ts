@@ -1,7 +1,13 @@
 import type { AssetGroupResponse, AssignableAssetResponse } from '../../api/portfolio';
 import type { DashboardResponse } from '../../api/reporting';
 import { buildGroupMetrics, buildGroupsSummary } from './group-metrics';
-import { blueGroup, blueGroupId, greenGroupId } from './testing/group-fixtures';
+import {
+  accountAId,
+  accountBId,
+  blueGroup,
+  blueGroupId,
+  greenGroupId,
+} from './testing/group-fixtures';
 
 function dashboard(overrides: Partial<DashboardResponse> = {}): DashboardResponse {
   return {
@@ -174,8 +180,21 @@ describe('group metrics', () => {
       ],
     });
     const groups = [
-      group({ monthlyContributionPln: 500 }),
-      group({ id: greenGroupId, monthlyContributionPln: 250.5 }),
+      group({
+        monthlyContributionPln: 500,
+        contributions: [
+          { amountPln: 300, accountId: accountAId },
+          { amountPln: 200, accountId: null },
+        ],
+      }),
+      group({
+        id: greenGroupId,
+        monthlyContributionPln: 250.5,
+        contributions: [
+          { amountPln: 100.25, accountId: accountBId },
+          { amountPln: 150.25, accountId: null },
+        ],
+      }),
     ];
     const assets = [
       asset('free', { groupId: null }),
