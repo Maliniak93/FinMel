@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { expect, openSelect, test } from './fixtures';
 import { expectProjected } from './projection';
+import { addContribution } from './groups';
 
 function pln(amount: string): RegExp {
   return new RegExp(`${amount.replace(/ /g, '\\s?')}\\szł`);
@@ -227,7 +228,7 @@ test('redesign Grupy: cards, summary, assets panel, dialog and deletion', async 
     await dialog.getByLabel('Nazwa').fill('Poduszka finansowa');
     await dialog.getByRole('radio', { name: 'Niebieski' }).click();
     await kindToggle(dialog, 'Poduszka').click();
-    await dialog.getByLabel('Wpłata miesięczna (PLN)').fill('1000');
+    await addContribution(page, dialog, { amount: '1000' });
     await dialog.getByLabel('Cel (PLN)').fill('80000');
     await addAllocationRow(page, dialog, 0, 'Lokata', '70');
     await addAllocationRow(page, dialog, 1, 'Konta bankowe', '30');
@@ -273,7 +274,6 @@ test('redesign Grupy: cards, summary, assets panel, dialog and deletion', async 
     await page.getByTestId('add-group').click();
     await dialog.getByLabel('Nazwa').fill('Wakacje 2027');
     await kindToggle(dialog, 'Zwykła').click();
-    await dialog.getByLabel('Wpłata miesięczna (PLN)').fill('0');
     const first = dialog.getByRole('radio', { name: 'Niebieski' });
     await expect(first).toBeDisabled();
     await expect(first.locator('mat-icon')).toHaveText('close');

@@ -205,7 +205,7 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
       color: 'orange',
       targetPln: 30000,
       kind: CUSHION_KIND,
-      monthlyContributionPln: 0,
+      contributions: [],
       classAllocation: [],
     },
   });
