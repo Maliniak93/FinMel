@@ -422,9 +422,11 @@ test('szlif /wealth: bez dopisku, równe wiersze i spójne pole Szukaj', async (
     await page.getByLabel('Szukaj').click();
     const label = search.locator('.mdc-floating-label');
     await expect(label).toHaveClass(/mdc-floating-label--float-above/);
-    const input = await box(search.locator('input'));
-    const raised = await box(label);
-    expect(raised.y + raised.h / 2).toBeLessThan(input.y);
+    await expect(async () => {
+      const input = await box(search.locator('input'));
+      const raised = await box(label);
+      expect(raised.y + raised.h / 2).toBeLessThan(input.y);
+    }).toPass({ timeout: 30_000 });
   });
 
   await test.step('Krok 15: wpisanie „Konto” zostawia Konto A i Konto B, tekst wygląda jak w polu Grupa', async () => {

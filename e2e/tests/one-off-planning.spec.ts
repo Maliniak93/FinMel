@@ -109,7 +109,6 @@ async function addOneOffIncome(
   await fillOneOffIncome(page, dialog, income);
   await dialog.getByRole('button', { name: 'Zapisz' }).click();
   await expect(dialog).toBeHidden();
-  await expect(oneOffIncomeRow(page, income.name)).toHaveCount(1);
 }
 
 async function openOneOffExpenseDialog(page: Page): Promise<Locator> {
@@ -207,6 +206,8 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
 
   await test.step('Krok 4: Premia roczna 8 000 zł on 15.12.2026 is on the incomes list marked jednorazowy with its date instead of a rule', async () => {
     await addOneOffIncome(page, { name: BONUS, amount: '8000', date: '2026-12-15' });
+    await expect(oneOffIncomeRow(page, BONUS)).toHaveCount(0);
+    await openMonth(page, DECEMBER);
     const row = oneOffIncomeRow(page, BONUS);
     await expect(row.getByTestId('one-off-mark')).toHaveText('jednorazowy');
     await expect(row.getByTestId('one-off-date')).toHaveText(dateInText('2026-12-15'));
@@ -224,7 +225,7 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     await openMonth(page, NOVEMBER);
     await expect(occurrences(page, BONUS)).toHaveCount(0);
     await expectPlan(page, '6 000,00');
-    await expect(oneOffIncomeRow(page, BONUS)).toHaveCount(1);
+    await expect(oneOffIncomeRow(page, BONUS)).toHaveCount(0);
   });
 
   await test.step('Krok 7: Zwrot podatku 2 500 zł from 05.10.2026 gives październik Plan 8 500 zł, Pending 8 500 zł, an overdue row and a task on the dashboard card', async () => {
@@ -308,6 +309,8 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
     await dialog.getByLabel('Data', { exact: true }).fill('2026-11-10');
     await dialog.getByRole('button', { name: 'Zapisz' }).click();
     await expect(dialog).toBeHidden();
+    await expect(oneOffExpenseRow(page, SERVICE)).toHaveCount(0);
+    await openMonth(page, NOVEMBER);
     const row = oneOffExpenseRow(page, SERVICE);
     await expect(row).toHaveCount(1);
     await expect(row.getByTestId('one-off-mark')).toHaveText('jednorazowy');
@@ -344,7 +347,7 @@ test('one-off planning: one-off incomes and expenses next to the recurring ones'
   });
 
   await test.step('Krok 16: moving Przegląd auta to 12.12.2026 takes it out of listopad and puts it in grudzień', async () => {
-    await openMonth(page, OCTOBER);
+    await openMonth(page, NOVEMBER);
     await oneOffExpenseRow(page, SERVICE).getByTestId('edit-one-off-expense').click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Data', { exact: true }).fill('2026-12-12');

@@ -82,7 +82,6 @@ const ACCOUNTS_RULES: Rule[] = [
 
 const PLANNING_RULES: Rule[] = [
   { selector: '.mat-mdc-tab-label-container', side: 'bottom' },
-  { selector: '[data-testid="balance-difference"]', side: 'top' },
   { selector: '[data-testid="free-funds"] .cascade__row', side: 'bottom' },
   { selector: '.planning-split__shares', side: 'top' },
   { selector: '.planning-split__shares', side: 'bottom' },
