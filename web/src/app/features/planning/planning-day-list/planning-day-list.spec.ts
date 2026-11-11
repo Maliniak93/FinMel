@@ -39,9 +39,34 @@ function occurrence(name: string, date: string, amount: number): Record<string, 
   };
 }
 
+function oneOffIncome(name: string, date: string, planned: boolean): Record<string, unknown> {
+  return {
+    id: `one-off-${name}`,
+    name,
+    planned,
+    date,
+    accountId,
+    accountName: 'mBank ROR',
+    accountArchived: false,
+    amount: 3000,
+    currency: 'PLN',
+    amountPln: 3000,
+    estimated: false,
+    inMonth: true,
+    status: 'Pending',
+    actualAmount: null,
+    actualDate: null,
+    actualAmountPln: null,
+    difference: null,
+    depositCreated: false,
+    overdue: false,
+  };
+}
+
 function monthData(
   occurrences: Record<string, unknown>[],
   expenses: Record<string, unknown> = {},
+  oneOffs: Record<string, unknown>[] = [],
 ): Record<string, unknown> {
   return {
     incomes: {
@@ -49,7 +74,7 @@ function monthData(
       balance: { planPln: 0, actualPln: 0, pendingPln: 0, differencePln: 0 },
       fxUnavailable: false,
       definitions: [],
-      oneOffs: [],
+      oneOffs,
     },
     expenses: {
       payments: [],
@@ -448,5 +473,26 @@ describe('PlanningDayList', () => {
         item: expect.objectContaining({ status: 'Settled', actualAmount: 2350 }),
       }),
     ]);
+  });
+
+  it('marks unplanned one-off', async () => {
+    const root = await render(
+      monthData([], {}, [
+        oneOffIncome('Premia', '2026-11-15', false),
+        oneOffIncome('Pensja dodatkowa', '2026-11-15', true),
+      ]),
+      { month: '2026-11' },
+    );
+
+    const rows = all(root, 'occurrence-row');
+    const unplanned = rows.find((row) => row.textContent!.includes('Premia'))!;
+    const planned = rows.find((row) => row.textContent!.includes('Pensja dodatkowa'))!;
+
+    expect(unplanned.querySelector('[data-testid="one-off-mark"]')).not.toBeNull();
+    expect(unplanned.querySelector('[data-testid="unplanned-mark"]')!.textContent).toMatch(
+      /unplanned/i,
+    );
+    expect(planned.querySelector('[data-testid="one-off-mark"]')).not.toBeNull();
+    expect(planned.querySelector('[data-testid="unplanned-mark"]')).toBeNull();
   });
 });

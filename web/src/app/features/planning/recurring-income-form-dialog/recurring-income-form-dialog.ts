@@ -9,6 +9,7 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -56,6 +57,7 @@ export type RecurringIncomeFormDialogData =
     ReactiveFormsModule,
     MatButtonModule,
     MatButtonToggleModule,
+    MatCheckboxModule,
     MatDatepickerModule,
     MatDialogModule,
     MatFormFieldModule,
@@ -100,6 +102,7 @@ export class RecurringIncomeFormDialog {
       this.editingOneOff ? fromDateOnly(this.editingOneOff.date) : (null as Date | null),
       [Validators.required, (control: AbstractControl) => this.withinRange(control)],
     ],
+    planned: [this.editingOneOff?.planned ?? true],
     effectiveFrom: [
       currentWarsawMonth(),
       [Validators.required, Validators.pattern(/^\d{4}-\d{2}$/), monthInRange],
@@ -214,6 +217,7 @@ export class RecurringIncomeFormDialog {
       amount: Number(values.amount),
       accountId: values.accountId!,
       date: toDateOnly(values.date!),
+      planned: values.planned,
     };
     return this.editingOneOff
       ? putApiPortfolioOneOffIncomesById({ path: { id: this.editingOneOff.id }, body })
@@ -243,17 +247,25 @@ export class RecurringIncomeFormDialog {
   }
 
   private applyMode(oneOff: boolean): void {
-    const { date, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift } =
+    const { date, startDate, endDate, intervalMonths, dayKind, dayOfMonth, shift, planned } =
       this.form.controls;
     if (oneOff) {
       date.enable();
+      planned.enable();
       for (const control of [startDate, endDate, intervalMonths, dayOfMonth, shift]) {
         control.disable();
+      }
+      if (this.editingOneOff?.status === 'Settled') {
+        const { name, amount, accountId } = this.form.controls;
+        for (const control of [name, amount, accountId, date]) {
+          control.disable();
+        }
       }
       return;
     }
 
     date.disable();
+    planned.disable();
     for (const control of [startDate, endDate, intervalMonths]) {
       control.enable();
     }

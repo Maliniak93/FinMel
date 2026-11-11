@@ -1094,6 +1094,9 @@
       "recurring": "Cykliczny",
       "oneOff": "Jednorazowy",
       "mark": "jednorazowy",
+      "planned": "Planowany",
+      "unplanned": "Nieplanowany",
+      "incomeLockedHint": "Cofnij rozliczenie, aby usunąć wpis. Można zmienić tylko flagę Planowany.",
       "lockedHint": "Cofnij rozliczenie, aby edytować lub usunąć wpis.",
       "delete": {
         "title": "Usunąć wpis jednorazowy?",

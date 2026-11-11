@@ -66,6 +66,30 @@ function payment(name: string, date: string, amount: number): Record<string, unk
   };
 }
 
+function oneOffIncome(name: string, date: string, planned: boolean): Record<string, unknown> {
+  return {
+    id: `one-off-${name}`,
+    name,
+    planned,
+    date,
+    accountId,
+    accountName: 'mBank ROR',
+    accountArchived: false,
+    amount: 3000,
+    currency: 'PLN',
+    amountPln: 3000,
+    estimated: false,
+    inMonth: true,
+    status: 'Pending',
+    actualAmount: null,
+    actualDate: null,
+    actualAmountPln: null,
+    difference: null,
+    depositCreated: false,
+    overdue: false,
+  };
+}
+
 function monthData(
   occurrences: Record<string, unknown>[],
   payments: Record<string, unknown>[],
@@ -305,6 +329,22 @@ describe('PlanningCalendar', () => {
     expect(expense[0].textContent).toContain(formatMoney(1200, 'PLN'));
 
     expect(element().textContent).not.toContain('Poza miesiącem');
+  });
+
+  it('marks unplanned one-off day', async () => {
+    const data = monthData([], []);
+    data['incomes'] = {
+      ...(data['incomes'] as Record<string, unknown>),
+      oneOffs: [
+        oneOffIncome('Premia', '2027-03-15', false),
+        oneOffIncome('Pensja dodatkowa', '2027-03-18', true),
+      ],
+    };
+    await render(data);
+
+    expect(cell('2027-03-15').querySelector('[data-testid="unplanned-mark"]')).not.toBeNull();
+    expect(cell('2027-03-18').querySelector('[data-testid="unplanned-mark"]')).toBeNull();
+    expect(cell('2027-03-18').textContent).toContain('Pensja dodatkowa');
   });
 
   it('showsThreeItemsAndMoreInACellAndAllInTheDayDetails', async () => {

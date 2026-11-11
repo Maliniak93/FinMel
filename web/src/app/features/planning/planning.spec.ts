@@ -986,6 +986,7 @@ describe('Planning', () => {
       amount,
       currency: 'PLN',
       amountPln: amount,
+      planned: true,
       estimated: false,
       inMonth: true,
       status: 'Pending',
@@ -1057,6 +1058,25 @@ describe('Planning', () => {
     );
     expect(expenseRows[0].querySelector('[data-testid="edit-one-off-expense"]')).not.toBeNull();
     expect(expenseRows[0].querySelector('[data-testid="delete-one-off-expense"]')).not.toBeNull();
+  });
+
+  it('marks an unplanned one-off income row', async () => {
+    responses['2026-10'] = month({
+      oneOffs: [
+        oneOffIncome('Premia roczna', '2026-10-20', 8000, { planned: false }),
+        oneOffIncome('Zwrot podatku', '2026-10-25', 2500),
+      ],
+    });
+    await setup();
+
+    const incomeRows = rows('one-off-income-row');
+    const unplanned = incomeRows.find((row) => row.textContent!.includes('Premia roczna'))!;
+    const planned = incomeRows.find((row) => row.textContent!.includes('Zwrot podatku'))!;
+
+    expect(unplanned.querySelector('[data-testid="unplanned-mark"]')!.textContent).toMatch(
+      /unplanned/i,
+    );
+    expect(planned.querySelector('[data-testid="unplanned-mark"]')).toBeNull();
   });
 
   it('oneOffLists_entriesOfOtherMonths_areHidden', async () => {
@@ -1278,7 +1298,7 @@ describe('Planning', () => {
     expect(has(pending, 'delete-one-off-expense')).toBe(true);
   });
 
-  it('locks a settled one-off income', async () => {
+  it('keeps edit open on a settled one-off income and locks its delete', async () => {
     responses['2026-10'] = month({
       oneOffs: [
         oneOffIncome('Premia', '2026-10-28', 800, {
@@ -1298,7 +1318,7 @@ describe('Planning', () => {
     const remove = (row: HTMLElement): HTMLButtonElement =>
       row.querySelector<HTMLButtonElement>('[data-testid="delete-one-off-income"]')!;
 
-    expect(edit(settled).disabled).toBe(true);
+    expect(edit(settled).disabled).toBe(false);
     expect(remove(settled).disabled).toBe(true);
     expect(settled.querySelector('[data-testid="one-off-locked-hint"]')).not.toBeNull();
     expect(edit(pending).disabled).toBe(false);

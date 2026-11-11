@@ -38,6 +38,7 @@ interface CalendarItem {
   amount: number | string;
   currency: string;
   actualDate: string | null;
+  unplanned?: boolean;
   settleable: SettleOccurrenceDialogData | SettleExpenseDialogData | null;
 }
 
@@ -167,6 +168,7 @@ export class PlanningCalendar {
         amount: settled ? (oneOff.actualAmount ?? oneOff.amount) : oneOff.amount,
         currency: oneOff.currency,
         actualDate: settled ? (oneOff.actualDate ?? null) : null,
+        unplanned: !oneOff.planned,
         settleable: status === 'pending' || status === 'overdue' ? { oneOffIncome: oneOff } : null,
       });
     }

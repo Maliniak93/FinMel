@@ -7,6 +7,14 @@
   @if (kindIcon(item.kind); as kindGlyph) {
     <mat-icon class="planning-calendar__icon" aria-hidden="true">{{ kindGlyph }}</mat-icon>
   }
+  @if (item.unplanned) {
+    <mat-icon
+      class="planning-calendar__icon"
+      data-testid="unplanned-mark"
+      [attr.aria-label]="'planning.oneOff.unplanned' | transloco"
+      >priority_high</mat-icon
+    >
+  }
   <span class="planning-calendar__name">{{ item.name }}</span>
   <span class="planning-calendar__amount">{{ formatMoney(item.amount, item.currency) }}</span>
   @if (item.status) {

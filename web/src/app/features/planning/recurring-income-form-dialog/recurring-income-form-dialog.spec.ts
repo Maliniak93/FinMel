@@ -243,6 +243,7 @@ describe('RecurringIncomeFormDialog', () => {
       amount: 8000,
       currency: 'PLN',
       amountPln: 8000,
+      planned: true,
       estimated: false,
       inMonth: false,
       status: 'Pending',
@@ -264,6 +265,7 @@ describe('RecurringIncomeFormDialog', () => {
     expect(field('dayOfMonth')).not.toBeNull();
     expect(field('startDate')).not.toBeNull();
     expect(field('date')).toBeNull();
+    expect(field('planned')).toBeNull();
 
     await chooseOneOff();
 
@@ -276,6 +278,7 @@ describe('RecurringIncomeFormDialog', () => {
     expect(field('intervalMonths')).toBeNull();
     expect(field('dayOfMonth')).toBeNull();
     expect(field('shift')).toBeNull();
+    expect(field('planned')).not.toBeNull();
   });
 
   it('posts a one-off income', async () => {
@@ -287,6 +290,7 @@ describe('RecurringIncomeFormDialog', () => {
     component['form'].controls.accountId.setValue(plnAccountId);
     component['form'].controls.date.setValue(new Date(2026, 11, 15));
     await settle();
+    expect(component['form'].controls.planned.value).toBe(true);
     await component['onSubmit']();
 
     const [request] = posts();
@@ -296,6 +300,30 @@ describe('RecurringIncomeFormDialog', () => {
       amount: 8000,
       accountId: plnAccountId,
       date: '2026-12-15',
+      planned: true,
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('posts an unplanned one-off income when Planowany is unchecked', async () => {
+    await setup();
+    await chooseOneOff();
+
+    component['form'].controls.name.setValue('Premia roczna');
+    component['form'].controls.amount.setValue(8000);
+    component['form'].controls.accountId.setValue(plnAccountId);
+    component['form'].controls.date.setValue(new Date(2026, 11, 15));
+    component['form'].controls.planned.setValue(false);
+    await settle();
+    await component['onSubmit']();
+
+    const [request] = posts();
+    expect(await request.json()).toMatchObject({
+      name: 'Premia roczna',
+      amount: 8000,
+      accountId: plnAccountId,
+      date: '2026-12-15',
+      planned: false,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });
@@ -328,7 +356,7 @@ describe('RecurringIncomeFormDialog', () => {
   });
 
   it('edits a one-off income', async () => {
-    await setup({ oneOff: oneOff() } as never);
+    await setup({ oneOff: oneOff({ planned: false }) } as never);
 
     expect(modeToggles()).toHaveLength(0);
     expect(field('date')).not.toBeNull();
@@ -337,12 +365,14 @@ describe('RecurringIncomeFormDialog', () => {
       name: 'Premia roczna',
       amount: 8000,
       accountId: plnAccountId,
+      planned: false,
     });
     expect((component['form'].getRawValue().date as Date).toDateString()).toBe(
       new Date(2026, 11, 15).toDateString(),
     );
 
     component['form'].controls.amount.setValue(8500);
+    component['form'].controls.planned.setValue(true);
     await component['onSubmit']();
 
     expect(posts()).toHaveLength(0);
@@ -353,6 +383,32 @@ describe('RecurringIncomeFormDialog', () => {
       amount: 8500,
       accountId: plnAccountId,
       date: '2026-12-15',
+      planned: true,
+    });
+    expect(dialogRef.close).toHaveBeenCalledWith(true);
+  });
+
+  it('changes the planned flag of a settled one-off', async () => {
+    await setup({ oneOff: oneOff({ planned: false, status: 'Settled' }) } as never);
+
+    expect(component['form'].controls.name.disabled).toBe(true);
+    expect(component['form'].controls.amount.disabled).toBe(true);
+    expect(component['form'].controls.accountId.disabled).toBe(true);
+    expect(component['form'].controls.date.disabled).toBe(true);
+    expect(component['form'].controls.planned.enabled).toBe(true);
+
+    component['form'].controls.planned.setValue(true);
+    await component['onSubmit']();
+
+    expect(posts()).toHaveLength(0);
+    const [request] = puts();
+    expect(request.url).toContain('/api/portfolio/one-off-incomes/one-off-1');
+    expect(await request.json()).toMatchObject({
+      name: 'Premia roczna',
+      amount: 8000,
+      accountId: plnAccountId,
+      date: '2026-12-15',
+      planned: true,
     });
     expect(dialogRef.close).toHaveBeenCalledWith(true);
   });

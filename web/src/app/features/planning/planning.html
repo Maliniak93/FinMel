@@ -446,6 +446,11 @@
                         <mat-chip data-testid="one-off-mark">{{
                           'planning.oneOff.mark' | transloco
                         }}</mat-chip>
+                        @if (!oneOff.planned) {
+                          <mat-chip data-testid="unplanned-mark">{{
+                            'planning.oneOff.unplanned' | transloco
+                          }}</mat-chip>
+                        }
                       </mat-chip-set>
                     </div>
                     <div class="planning-definition__details">
@@ -454,7 +459,7 @@
                       <span data-testid="one-off-date">{{ formatDate(oneOff.date) }}</span>
                       @if (locked) {
                         <span class="planning-definition__change" data-testid="one-off-locked-hint">
-                          {{ 'planning.oneOff.lockedHint' | transloco }}
+                          {{ 'planning.oneOff.incomeLockedHint' | transloco }}
                         </span>
                       }
                     </div>
@@ -463,7 +468,6 @@
                         mat-button
                         type="button"
                         data-testid="edit-one-off-income"
-                        [disabled]="locked"
                         (click)="openEditOneOffIncomeDialog(oneOff)"
                       >
                         {{ 'planning.edit.action' | transloco }}
