@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 import {
+  declarationList,
   mediaBlock,
   nestedRuleBodies,
   readStylesheet,
@@ -133,7 +134,7 @@ describe('Majątek stylesheets', () => {
 
   it('wealth search label and input take typography from the group field select value', () => {
     const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
-    const search = nestedRuleBodies(css, /__search$/);
+    const search = nestedRuleBodies(css, /__search$/).replace(/\(\s+/g, '(');
     expect(search).toMatch(/container-text-font:\s*var\(--mat-select-trigger-text-font/);
     expect(search).toMatch(/container-text-size:\s*var\(--mat-select-trigger-text-size/);
     expect(search).toMatch(/container-text-weight:\s*var\(--mat-select-trigger-text-weight/);
@@ -145,6 +146,26 @@ describe('Majątek stylesheets', () => {
     expect(search).toMatch(/outlined-label-text-weight:\s*var\(--mat-select-trigger-text-weight/);
     expect(search).toMatch(
       /outlined-label-text-color:\s*var\(--mat-select-enabled-trigger-text-color/,
+    );
+  });
+
+  it('wealth search select tokens fall back to the select value defaults', () => {
+    const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
+    const search = nestedRuleBodies(css, /__search$/)
+      .replace(/\(\s+/g, '(')
+      .replace(/\s+\)/g, ')');
+    const selectTokens = declarationList(search).filter(([, value]) =>
+      value.includes('var(--mat-select-'),
+    );
+    expect(selectTokens.length, 'select tokens borrowed by the search field').toBeGreaterThan(0);
+    for (const [name, value] of selectTokens) {
+      expect(value, name).toMatch(/^var\(--mat-select-[\w-]+,\s*var\(--mat-sys-[\w-]+\)\)$/);
+    }
+    expect(search).toMatch(
+      /outlined-input-text-color:\s*var\(--mat-select-enabled-trigger-text-color,\s*var\(--mat-sys-on-surface\)\)/,
+    );
+    expect(search).toMatch(
+      /outlined-label-text-color:\s*var\(--mat-select-enabled-trigger-text-color,\s*var\(--mat-sys-on-surface\)\)/,
     );
   });
 
