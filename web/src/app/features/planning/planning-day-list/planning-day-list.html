@@ -252,7 +252,7 @@
       </li>
     }
 
-    @if (contributions().length > 0) {
+    @if (contributions().length > 0 || excesses().length > 0) {
       <li class="day-list__day day-list__day--undated" data-testid="no-date-block">
         <div class="day-list__date">
           <span class="day-list__weekday">{{ 'planning.list.noDate' | transloco }}</span>
@@ -294,6 +294,29 @@
                     formatMoney(negative(line.amountPln), 'PLN')
                   }}</span>
                 }
+                <span class="day-list__actions"></span>
+              </div>
+            </li>
+          }
+          @for (line of excesses(); track line.groupId) {
+            <li class="day-list__row" data-testid="day-row">
+              <div class="day-list__item" data-testid="excess-row">
+                <span
+                  class="day-list__dot"
+                  aria-hidden="true"
+                  [style.background-color]="colorOf(line.groupId)"
+                ></span>
+                <div class="day-list__main">
+                  <span class="day-list__name">
+                    <span data-testid="row-name">{{
+                      'planning.contribution.excess' | transloco: { name: line.name }
+                    }}</span>
+                  </span>
+                </div>
+                <span class="day-list__status"></span>
+                <span class="day-list__amount sk-num">{{
+                  formatMoney(line.excessPln, 'PLN')
+                }}</span>
                 <span class="day-list__actions"></span>
               </div>
             </li>
