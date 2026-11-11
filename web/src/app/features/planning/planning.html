@@ -138,6 +138,7 @@
         </div>
       } @else if (monthData(); as data) {
         @let plan = data.incomes;
+        @let monthOneOffIncomes = plan.oneOffs.filter((entry) => entry.inMonth);
         <app-contribution-limit-warning [warnings]="data.contributionLimitWarnings" />
         <div class="planning-layout">
           <div class="planning-layout__main">
@@ -181,7 +182,7 @@
                   <dt>{{ 'planning.balance.pending' | transloco }}</dt>
                   <dd>{{ formatMoney(plan.balance.pendingPln, 'PLN') }}</dd>
                 </div>
-                <div class="planning-balance__difference" data-testid="balance-difference">
+                <div data-testid="balance-difference">
                   <dt>{{ 'planning.balance.difference' | transloco }}</dt>
                   <dd>{{ formatMoney(plan.balance.differencePln, 'PLN') }}</dd>
                 </div>
@@ -364,7 +365,7 @@
         <div class="planning-definitions-grid">
           <section class="planning-section">
             <h2 class="sk-section-title">{{ 'planning.definitions.title' | transloco }}</h2>
-            @if (plan.definitions.length === 0 && plan.oneOffs.length === 0) {
+            @if (plan.definitions.length === 0 && monthOneOffIncomes.length === 0) {
               <p class="planning-section__empty">
                 {{ 'planning.definitions.empty' | transloco }}
               </p>
@@ -435,7 +436,7 @@
                     </div>
                   </li>
                 }
-                @for (oneOff of plan.oneOffs; track oneOff.id) {
+                @for (oneOff of monthOneOffIncomes; track oneOff.id) {
                   @let locked = oneOff.status === 'Settled';
                   <li class="planning-definition" data-testid="one-off-income-row">
                     <div class="planning-definition__main">
@@ -483,11 +484,12 @@
           </section>
 
           @let spending = data.expenses;
+          @let monthOneOffExpenses = spending.oneOffs.filter((entry) => entry.inMonth);
           <section class="planning-section" id="wydatki" data-testid="expenses-section">
             <h2 class="sk-section-title">
               {{ 'planning.expenses.definitions.title' | transloco }}
             </h2>
-            @if (spending.definitions.length === 0 && spending.oneOffs.length === 0) {
+            @if (spending.definitions.length === 0 && monthOneOffExpenses.length === 0) {
               <p class="planning-section__empty">
                 {{ 'planning.expenses.definitions.empty' | transloco }}
               </p>
@@ -571,7 +573,7 @@
                     </div>
                   </li>
                 }
-                @for (oneOff of spending.oneOffs; track oneOff.id) {
+                @for (oneOff of monthOneOffExpenses; track oneOff.id) {
                   @let oneOffSettled = oneOff.status === 'Settled';
                   @let oneOffCurrency = oneOff.currency ?? 'PLN';
                   <li class="planning-definition" data-testid="one-off-expense-row">

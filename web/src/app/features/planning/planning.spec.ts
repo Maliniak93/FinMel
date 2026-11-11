@@ -1030,8 +1030,8 @@ describe('Planning', () => {
 
   it('lists one-off entries with their date', async () => {
     responses['2026-10'] = month(
-      { oneOffs: [oneOffIncome('Premia roczna', '2026-12-15', 8000, { inMonth: false })] },
-      { oneOffs: [oneOffExpense('Przegląd auta', '2027-02-10', 1200, { inMonth: false })] },
+      { oneOffs: [oneOffIncome('Premia roczna', '2026-10-20', 8000)] },
+      { oneOffs: [oneOffExpense('Przegląd auta', '2026-10-10', 1200)] },
     );
     await setup();
 
@@ -1041,7 +1041,7 @@ describe('Planning', () => {
     expect(incomeRows[0].textContent).toContain(formatMoney(8000, 'PLN'));
     expect(incomeRows[0].querySelector('[data-testid="one-off-mark"]')).not.toBeNull();
     expect(incomeRows[0].querySelector('[data-testid="one-off-date"]')!.textContent).toContain(
-      formatDate('2026-12-15'),
+      formatDate('2026-10-20'),
     );
     expect(incomeRows[0].querySelector('[data-testid="edit-one-off-income"]')).not.toBeNull();
     expect(incomeRows[0].querySelector('[data-testid="delete-one-off-income"]')).not.toBeNull();
@@ -1051,13 +1051,67 @@ describe('Planning', () => {
     expect(expenseRows[0].textContent).toContain('Przegląd auta');
     expect(expenseRows[0].querySelector('[data-testid="one-off-mark"]')).not.toBeNull();
     expect(expenseRows[0].querySelector('[data-testid="one-off-date"]')!.textContent).toContain(
-      formatDate('2027-02-10'),
+      formatDate('2026-10-10'),
     );
     expect(expenseRows[0].querySelector('[data-testid="edit-one-off-expense"]')).not.toBeNull();
     expect(expenseRows[0].querySelector('[data-testid="delete-one-off-expense"]')).not.toBeNull();
+  });
 
-    expect(rows('occurrence-row')).toHaveLength(0);
-    expect(rows('expense-payment-row')).toHaveLength(0);
+  it('oneOffLists_entriesOfOtherMonths_areHidden', async () => {
+    responses['2026-10'] = month(
+      {
+        oneOffs: [
+          oneOffIncome('Premia październikowa', '2026-10-20', 3000),
+          oneOffIncome('Premia roczna', '2026-12-15', 8000, { inMonth: false }),
+        ],
+      },
+      {
+        oneOffs: [
+          oneOffExpense('Przegląd październikowy', '2026-10-10', 400),
+          oneOffExpense('Przegląd auta', '2027-02-10', 1200, { inMonth: false }),
+        ],
+      },
+    );
+    await setup();
+
+    const incomeRows = rows('one-off-income-row');
+    expect(incomeRows).toHaveLength(1);
+    expect(incomeRows[0].textContent).toContain('Premia październikowa');
+    expect(element().textContent).not.toContain('Premia roczna');
+
+    const expenseRows = rows('one-off-expense-row');
+    expect(expenseRows).toHaveLength(1);
+    expect(expenseRows[0].textContent).toContain('Przegląd październikowy');
+    expect(element().textContent).not.toContain('Przegląd auta');
+  });
+
+  it('definitionLists_onlyOtherMonthOneOffs_showEmptyState', async () => {
+    responses['2026-10'] = month(
+      { oneOffs: [oneOffIncome('Premia roczna', '2026-12-15', 8000, { inMonth: false })] },
+      { oneOffs: [oneOffExpense('Przegląd auta', '2027-02-10', 1200, { inMonth: false })] },
+    );
+    await setup();
+
+    expect(rows('one-off-income-row')).toHaveLength(0);
+    expect(rows('one-off-expense-row')).toHaveLength(0);
+
+    const emptyStates = Array.from(
+      element().querySelectorAll<HTMLElement>('.planning-section__empty'),
+    ).map((node) => node.textContent!.trim());
+    expect(emptyStates).toEqual(
+      expect.arrayContaining(['No recurring incomes yet.', 'No recurring expenses yet.']),
+    );
+  });
+
+  it('balanceDifference_row_matchesPendingRow', async () => {
+    await setup();
+
+    const pending = rows('balance-pending')[0];
+    const difference = rows('balance-difference')[0];
+    expect(Array.from(difference.classList)).toEqual(Array.from(pending.classList));
+    expect(readStylesheet('src/app/features/planning/planning.scss')).not.toContain(
+      'planning-balance__difference',
+    );
   });
 
   it('settles and undoes a one-off income', async () => {
