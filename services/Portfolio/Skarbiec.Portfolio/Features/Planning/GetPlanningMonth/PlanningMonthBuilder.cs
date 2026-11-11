@@ -78,7 +78,8 @@ internal static class PlanningMonthBuilder
         var funded = expenses.GroupContributions.Sum(c => c.FundedPln ?? 0m);
         var actualPln = balance.ActualPln - (forecast.SettledCostIn(viewed) + funded);
         var fundingIncomplete = viewed == forecast.CurrentMonth && data.Funding.Incomplete;
-        var viewedFigures = new MonthFigures(balance.ActualPln + balance.PendingPln - expenses.CostPln, expenses.CostPln);
+        var viewedCost = forecast.CostIn(viewed);
+        var viewedFigures = new MonthFigures(balance.ActualPln + balance.PendingPln - viewedCost, viewedCost);
 
         return new PlanningMonthResponse
         {
@@ -192,13 +193,33 @@ internal static class PlanningMonthBuilder
 
     private static GroupContributionResponse BuildContribution(AssetGroup group, YearMonth viewed, PlanningMonthData data)
     {
-        if (viewed != data.Forecast.CurrentMonth)
+        var forecast = data.Forecast;
+        var incomeAccounts = forecast.IncomeAccountsIn(viewed);
+        var lines = group.Contributions
+            .Select(c =>
+            {
+                var account = forecast.AccountOf(c.AccountId);
+
+                return new ContributionLineResponse
+                {
+                    AmountPln = c.AmountPln,
+                    AccountId = account?.Id,
+                    AccountName = account?.Name,
+                    FromIncome = forecast.CountsInPlan(c, incomeAccounts)
+                };
+            })
+            .ToList();
+        var fromIncome = lines.Where(l => l.FromIncome).Sum(l => l.AmountPln);
+
+        if (viewed != forecast.CurrentMonth)
         {
             return new GroupContributionResponse
             {
                 GroupId = group.Id,
                 Name = group.Name,
                 AmountPln = group.MonthlyContributionPln,
+                FromIncomePln = fromIncome,
+                Contributions = lines,
                 FundedPln = null,
                 Status = null
             };
@@ -211,6 +232,8 @@ internal static class PlanningMonthBuilder
             GroupId = group.Id,
             Name = group.Name,
             AmountPln = group.MonthlyContributionPln,
+            FromIncomePln = fromIncome,
+            Contributions = lines,
             FundedPln = funded,
             Status = funded >= group.MonthlyContributionPln ? GroupContributionStatus.Settled
                 : funded > 0m ? GroupContributionStatus.Partial
@@ -275,7 +298,7 @@ internal static class PlanningMonthBuilder
         return new PlanningExpensesResponse
         {
             Payments = payments,
-            CostPln = forecast.CostIn(viewed),
+            CostPln = forecast.PlanCostIn(viewed),
             GroupContributions =
             [
                 .. forecast.ContributingGroupsIn(viewed)

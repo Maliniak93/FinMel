@@ -178,7 +178,15 @@ internal static class PlanningApi
         List<GroupContributionView>? GroupContributions = null);
 
     public sealed record GroupContributionView(
-        Guid GroupId, string Name, decimal AmountPln, decimal? FundedPln = null, string? Status = null);
+        Guid GroupId,
+        string Name,
+        decimal AmountPln,
+        decimal? FundedPln = null,
+        string? Status = null,
+        decimal FromIncomePln = 0m,
+        List<ContributionLineView>? Contributions = null);
+
+    public sealed record ContributionLineView(decimal AmountPln, Guid? AccountId, string? AccountName, bool FromIncome);
 
     public sealed record ClassAmountView(AssetClass AssetClass, decimal AmountPln);
 
