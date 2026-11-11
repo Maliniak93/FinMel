@@ -350,13 +350,29 @@ public sealed record GroupContributionResponse
 {
     public required Guid GroupId { get; init; }
     public required string Name { get; init; }
+    /// <summary>The sum of all the group's contributions.</summary>
     public required decimal AmountPln { get; init; }
+
+    /// <summary>The part of the contributions the Plan counts: paid from an income account or without an account.</summary>
+    public required decimal FromIncomePln { get; init; }
+
+    public required IReadOnlyList<ContributionLineResponse> Contributions { get; init; }
 
     /// <summary>PLN that entered the group this month net of what left it, at least 0; null outside the current month.</summary>
     public required decimal? FundedPln { get; init; }
 
     /// <summary>Null outside the current month.</summary>
     public required GroupContributionStatus? Status { get; init; }
+}
+
+public sealed record ContributionLineResponse
+{
+    public required decimal AmountPln { get; init; }
+    public required Guid? AccountId { get; init; }
+    public required string? AccountName { get; init; }
+
+    /// <summary>True when the Plan counts this contribution.</summary>
+    public required bool FromIncome { get; init; }
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter<GroupContributionStatus>))]

@@ -5088,6 +5088,41 @@
           }
         }
       },
+      "ContributionLineResponse": {
+        "required": [
+          "amountPln",
+          "accountId",
+          "accountName",
+          "fromIncome"
+        ],
+        "type": "object",
+        "properties": {
+          "amountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "fromIncome": {
+            "type": "boolean"
+          }
+        }
+      },
       "ContributionResponse": {
         "required": [
           "year",
@@ -6222,6 +6257,8 @@
           "groupId",
           "name",
           "amountPln",
+          "fromIncomePln",
+          "contributions",
           "fundedPln",
           "status"
         ],
@@ -6241,6 +6278,20 @@
               "string"
             ],
             "format": "double"
+          },
+          "fromIncomePln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "contributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContributionLineResponse"
+            }
           },
           "fundedPln": {
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",

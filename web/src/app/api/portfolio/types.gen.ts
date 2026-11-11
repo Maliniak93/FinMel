@@ -343,6 +343,13 @@ export type ContributionLimitsResponse = {
     ikzeAmount?: null | number | string;
 };
 
+export type ContributionLineResponse = {
+    amountPln: number | string;
+    accountId: null | string;
+    accountName: null | string;
+    fromIncome: boolean;
+};
+
 export type ContributionResponse = {
     year: number | string;
     contributedPln: number | string;
@@ -568,6 +575,8 @@ export type GroupContributionResponse = {
     groupId: string;
     name: string;
     amountPln: number | string;
+    fromIncomePln: number | string;
+    contributions: Array<ContributionLineResponse>;
     fundedPln: null | number | string;
     status: null | GroupContributionStatus;
 };

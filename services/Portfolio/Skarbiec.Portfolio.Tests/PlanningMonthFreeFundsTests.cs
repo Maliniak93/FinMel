@@ -22,9 +22,7 @@ public sealed class PlanningMonthFreeFundsTests(SkarbiecContainersFixture contai
             account.AccountId, cancellationToken, "Wypłata", 8_000m, dayOfMonth: 10);
         var rent = await client.CreateRecurringExpenseAsync(cancellationToken, "Czynsz", 3_000m, dayOfMonth: 1);
         await client.CreateRecurringExpenseAsync(cancellationToken, "Rachunki", 2_500m, dayOfMonth: 5);
-        var second = await client.CreateBankAccountAsync(cancellationToken, "PKO ROR");
-        var groupId = await client.CreateFundingGroupAsync(
-            cancellationToken, "Emerytura", 1_000m, contributionAccountIds: [account.AccountId, second.AccountId]);
+        var groupId = await client.CreateFundingGroupAsync(cancellationToken, "Emerytura", 1_000m);
         var pension = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Emerytalne");
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
 
@@ -66,20 +64,23 @@ public sealed class PlanningMonthFreeFundsTests(SkarbiecContainersFixture contai
     }
 
     [Fact]
-    public async Task PastMonthHasNoGroupContributions()
+    public async Task PastMonthHasGroupContributions()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        await client.CreateFreeFundsOf7000Async(cancellationToken);
+        var account = await client.CreateBankAccountAsync(cancellationToken, "mBank");
+        await client.CreateRecurringIncomeAsync(account.AccountId, cancellationToken, "Wypłata", 8_000m, dayOfMonth: 10);
+        await client.CreateRecurringExpenseAsync(cancellationToken, "Czynsz", 1_000m, dayOfMonth: 1);
         var before = (await client.GetPlanningMonthAsync("2026-09", cancellationToken)).FreeFunds;
-        var groupId = await client.CreateFundingGroupAsync(cancellationToken, "Emerytura", 1_000m);
-        await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Emerytalne", balance: 600m);
+        var groupId = await client.CreateFundingGroupAsync(
+            cancellationToken, "Emerytura", 1_000m, contributions: [new AssetGroupsApi.ContributionBody(1_000m, account.AccountId)]);
 
         var september = await client.GetPlanningMonthAsync("2026-09", cancellationToken);
 
-        Assert.Equal(before, september.FreeFunds);
-        Assert.All(september.Expenses.GroupContributions ?? [], c => Assert.Null(c.FundedPln));
+        var row = Assert.Single(september.Expenses.GroupContributions!, c => c.GroupId == groupId);
+        Assert.Equal((1_000m, 1_000m), (row.AmountPln, row.FromIncomePln));
+        Assert.Equal(before.PlanPln - 1_000m, september.FreeFunds.PlanPln);
     }
 
     [Fact]

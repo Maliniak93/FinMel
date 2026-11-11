@@ -54,11 +54,31 @@ internal sealed class PlanningForecast
 
     public YearMonth CurrentMonth { get; }
 
-    // A contribution applies from the current month on, open-ended; the groups of the past months carry none.
     public IReadOnlyList<AssetGroup> ContributingGroupsIn(YearMonth month) =>
-        month < CurrentMonth
-            ? []
-            : [.. Groups.Where(g => g.MonthlyContributionPln > 0m).OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)];
+        [.. Groups.Where(g => g.MonthlyContributionPln > 0m).OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)];
+
+    public IReadOnlySet<Guid> IncomeAccountsIn(YearMonth month)
+    {
+        var recurring = incomes
+            .Where(i => i.StartDate <= month.LastDay && (i.EndDate is null || i.EndDate >= month.FirstDay))
+            .Select(i => i.InForce(month).AccountId);
+        var oneOff = OneOffIncomes
+            .Where(i => YearMonth.From(i.Date) == month)
+            .Select(i => i.AccountId);
+
+        return recurring.Concat(oneOff).ToHashSet();
+    }
+
+    // An account that is not one of the user's accounts counts as no account.
+    public bool CountsInPlan(GroupContribution contribution, IReadOnlySet<Guid> incomeAccounts) =>
+        contribution.AccountId is not { } accountId || !accounts.ContainsKey(accountId) || incomeAccounts.Contains(accountId);
+
+    public decimal PlanContributionIn(AssetGroup group, YearMonth month)
+    {
+        var incomeAccounts = IncomeAccountsIn(month);
+
+        return group.Contributions.Where(c => CountsInPlan(c, incomeAccounts)).Sum(c => c.AmountPln);
+    }
 
     public IReadOnlyList<OneOffIncome> OneOffIncomes { get; }
 
@@ -268,10 +288,15 @@ internal sealed class PlanningForecast
     }
 
     public decimal CostIn(YearMonth month) =>
+        ExpensesCostIn(month) + ContributingGroupsIn(month).Sum(g => g.MonthlyContributionPln);
+
+    public decimal PlanCostIn(YearMonth month) =>
+        ExpensesCostIn(month) + ContributingGroupsIn(month).Sum(g => PlanContributionIn(g, month));
+
+    private decimal ExpensesCostIn(YearMonth month) =>
         Plans.Sum(p => ReserveSchedule.CostIn(month, p.Plan))
         + settledPayments.Where(o => YearMonth.From(o.PlannedDate) == month).Sum(o => SettledCost(o) - o.PlannedAmount)
-        + OneOffExpenses.Where(e => YearMonth.From(e.Date) == month).Sum(e => e.IsSettled ? SettledCost(e) : e.Amount)
-        + ContributingGroupsIn(month).Sum(g => g.MonthlyContributionPln);
+        + OneOffExpenses.Where(e => YearMonth.From(e.Date) == month).Sum(e => e.IsSettled ? SettledCost(e) : e.Amount);
 
     public decimal SettledCostIn(YearMonth month) =>
         settledPayments.Where(o => YearMonth.From(o.PlannedDate) == month).Sum(SettledCost)

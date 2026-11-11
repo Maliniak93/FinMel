@@ -33,7 +33,7 @@ public sealed class PlanningMonthSplitTests(SkarbiecContainersFixture containers
     }
 
     [Fact]
-    public async Task PastMonthHasNoContributionsAndNoSplit()
+    public async Task PastMonthHasContributionsButNoSplit()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
@@ -44,10 +44,10 @@ public sealed class PlanningMonthSplitTests(SkarbiecContainersFixture containers
         var past = await client.GetPlanningMonthAsync("2026-09", cancellationToken);
         var current = await client.GetPlanningMonthAsync("2026-10", cancellationToken);
 
-        Assert.Empty(Present(past.Expenses.GroupContributions));
+        Assert.Equal(2, Present(past.Expenses.GroupContributions).Count);
         Assert.Null(past.Split);
-        Assert.Equal(1_000m, past.Expenses.CostPln);
-        Assert.Equal(7_000m, past.FreeFunds.PlanPln);
+        Assert.Equal(4_000m, past.Expenses.CostPln);
+        Assert.Equal(4_000m, past.FreeFunds.PlanPln);
         Assert.NotNull(current.Split);
     }
 

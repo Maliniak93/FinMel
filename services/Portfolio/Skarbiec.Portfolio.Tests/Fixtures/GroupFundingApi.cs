@@ -22,13 +22,15 @@ internal static class GroupFundingApi
         string name,
         decimal planPln,
         int color = 1,
-        Guid[]? contributionAccountIds = null) =>
+        Guid[]? contributionAccountIds = null,
+        ContributionBody[]? contributions = null) =>
         (await client.CreateAssetGroupAsync(
             cancellationToken,
             name,
             ColorKey(color),
             monthlyContributionPln: planPln,
-            contributions: contributionAccountIds?.Select(id => new ContributionBody(planPln / contributionAccountIds.Length, id)).ToArray())).Id;
+            contributions: contributions
+                ?? contributionAccountIds?.Select(id => new ContributionBody(planPln / contributionAccountIds.Length, id)).ToArray())).Id;
 
     public static async Task<BankAccount> CreateBankAccountInGroupAsync(
         this HttpClient client,
