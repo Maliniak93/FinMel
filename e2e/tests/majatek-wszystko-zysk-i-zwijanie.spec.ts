@@ -352,7 +352,7 @@ test('majątek → Wszystko: zysk przy aktywach, zwijane sekcje i szukanie', asy
     }
     await expect(page.locator('tr.wealth-all__row:visible')).toHaveCount(0);
     for (const name of ['Rachunki inwestycyjne', 'Konta bankowe', 'Gotówka']) {
-      await expect(sectionChange(page, name)).toHaveCount(0);
+      await expect(sectionChange(page, name)).toHaveText('');
     }
     await expect(sectionChange(page, STOCKS)).toContainText(/[-−]850,00\szł/);
   });
