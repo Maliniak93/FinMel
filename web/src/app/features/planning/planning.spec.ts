@@ -8,7 +8,6 @@ import { of } from 'rxjs';
 import { stubViewport } from '../../../testing/match-media';
 import { readStylesheet } from '../../../testing/stylesheet';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
-import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
@@ -149,7 +148,6 @@ function expenses(extra: Record<string, unknown> = {}): Record<string, unknown> 
     definitions: [],
     oneOffs: [],
     groupContributions: [],
-    groupDeposits: [],
     ...extra,
   };
 }
@@ -227,13 +225,13 @@ function splitView(extra: Record<string, unknown> = {}): Record<string, unknown>
 }
 
 const contributions = [
-  { groupId: retirementId, name: 'Emerytura', amountPln: 2000, fundedPln: 2500, status: 'Settled' },
-  { groupId: investingId, name: 'Inwestycje', amountPln: 1000, fundedPln: 600, status: 'Partial' },
+  { groupId: retirementId, name: 'Emerytura', amountPln: 2000, netPln: 2500, status: 'Settled' },
+  { groupId: investingId, name: 'Inwestycje', amountPln: 1000, netPln: 600, status: 'Partial' },
 ];
 
 const unfundedContributions = [
-  { groupId: retirementId, name: 'Emerytura', amountPln: 2000, fundedPln: null, status: null },
-  { groupId: investingId, name: 'Inwestycje', amountPln: 1000, fundedPln: null, status: null },
+  { groupId: retirementId, name: 'Emerytura', amountPln: 2000, netPln: null, status: null },
+  { groupId: investingId, name: 'Inwestycje', amountPln: 1000, netPln: null, status: null },
 ];
 
 function yearPage(year: number): Record<string, unknown> {
@@ -1391,48 +1389,39 @@ describe('Planning', () => {
     expect(rows('free-funds-incomplete')).toHaveLength(1);
   });
 
-  it('shows group deposits in actual', async () => {
+  it('sums group net in the cascade deposit row', async () => {
     responses['2026-10'] = month(
-      { balance: balance({ planPln: 10000, actualPln: 10000 }) },
+      { balance: balance({ planPln: 12482, actualPln: 12482 }) },
       {
-        costPln: 4000,
-        groupDeposits: [
+        costPln: 2000,
+        groupContributions: [
           {
             groupId: retirementId,
             name: 'Emerytura',
-            totalPln: 4000,
+            amountPln: 2000,
             fromIncomePln: 2000,
-            excessPln: 0,
+            netPln: 4000,
+            status: 'Settled',
           },
           {
             groupId: cushionId,
             name: 'Poduszka',
-            totalPln: 2000,
-            fromIncomePln: 2000,
-            excessPln: 0,
+            amountPln: 0,
+            fromIncomePln: 0,
+            netPln: 3966.86,
+            status: 'Settled',
           },
         ],
       },
-      { planPln: 7000, actualPln: 4000 },
+      { planPln: 10482, actualPln: 4515.14 },
     );
     await setup();
-    const language = TestBed.inject(LanguageService);
-    await language.setLanguage('pl');
-    try {
-      await settle();
 
-      const deposits = rows('group-deposit-row');
-      expect(deposits).toHaveLength(2);
-      expect(deposits[0].textContent).toContain('Wpłata do grupy: Emerytura');
-      expect(deposits[0].textContent).toContain(formatMoney(4000, 'PLN'));
-      expect(deposits[1].textContent).toContain('Wpłata do grupy: Poduszka');
-      expect(deposits[1].textContent).toContain(formatMoney(2000, 'PLN'));
-      expect(rows('cascade-actual-expenses')[0].textContent).toContain(formatMoney(2000, 'PLN'));
-      expect(rows('free-funds-actual')[0].textContent).toContain(formatMoney(4000, 'PLN'));
-    } finally {
-      await language.setLanguage('en');
-      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
-    }
+    expect(rows('group-deposit-row')).toHaveLength(0);
+    expect(rows('cascade-actual-contributions')[0].textContent).toContain(
+      formatMoney(7966.86, 'PLN'),
+    );
+    expect(rows('free-funds-actual')[0].textContent).toContain(formatMoney(4515.14, 'PLN'));
   });
 
   it('plan subtracts income-account contributions', async () => {
@@ -1446,7 +1435,7 @@ describe('Planning', () => {
             name: 'Emerytura',
             amountPln: 4000,
             fromIncomePln: 2000,
-            fundedPln: null,
+            netPln: null,
             status: null,
           },
         ],

@@ -3,6 +3,7 @@ using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
+using static Skarbiec.Portfolio.Tests.Fixtures.GroupFundingApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.PlanningApi;
 
 namespace Skarbiec.Portfolio.Tests;
@@ -37,6 +38,27 @@ public sealed class PlanningYearEndpointTests(SkarbiecContainersFixture containe
             Assert.Equal(month.FreeFunds.PlanPln, row.FreeFundsPlanPln);
             Assert.Equal(month.FreeFunds.ActualPln, row.FreeFundsActualPln);
         }
+    }
+
+    [Fact]
+    public async Task ActualFollowsGroupNet()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var source = await client.CreateIncomeAccountAsync(cancellationToken, "A", balance: 20_000m);
+        var emerytura = await client.CreateFundingGroupAsync(cancellationToken, "Emerytura", 2_000m, color: 1);
+        var poduszka = await client.CreateFundingGroupAsync(cancellationToken, "Poduszka", 0m, color: 2);
+        var other = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "Inne", balance: 10_000m);
+        var emeryturaAccount = await client.CreateBankAccountInGroupAsync(cancellationToken, emerytura, "E");
+        var poduszkaAccount = await client.CreateBankAccountInGroupAsync(cancellationToken, poduszka, "P");
+        var baseline = (await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).FreeFunds.ActualPln;
+        await client.TransferMoneyAsync(source.MoneyAssetId, emeryturaAccount.MoneyAssetId, 4_000m, FundingDay, cancellationToken);
+        await client.TransferMoneyAsync(other.MoneyAssetId, poduszkaAccount.MoneyAssetId, 3_966.86m, FundingDay, cancellationToken);
+
+        var year = await client.GetPlanningYearAsync(2026, cancellationToken);
+
+        Assert.Equal(baseline - 7_966.86m, year.Months.Single(m => m.Month == CurrentMonth).FreeFundsActualPln);
     }
 
     [Fact]

@@ -116,14 +116,6 @@ internal static class GroupFundingApi
         return account;
     }
 
-    public static async Task<GroupDepositView?> DepositOfAsync(
-        this HttpClient client, Guid groupId, CancellationToken cancellationToken, string month = CurrentMonth)
-    {
-        var view = await client.GetPlanningMonthAsync(month, cancellationToken);
-
-        return view.Expenses.GroupDeposits?.SingleOrDefault(d => d.GroupId == groupId);
-    }
-
     public static async Task<GroupContributionView> ContributionOfAsync(
         this HttpClient client, Guid groupId, CancellationToken cancellationToken, string month = CurrentMonth)
     {

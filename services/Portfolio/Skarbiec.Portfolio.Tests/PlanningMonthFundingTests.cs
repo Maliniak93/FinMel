@@ -30,63 +30,46 @@ public sealed class PlanningMonthFundingTests(SkarbiecContainersFixture containe
 
         var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
         var contribution = Assert.Single(month.Expenses.GroupContributions!, c => c.GroupId == groupId);
-        Assert.Equal((4_000m, "Settled"), (contribution.FundedPln, contribution.Status));
-        var deposit = Assert.Single(month.Expenses.GroupDeposits!);
-        Assert.Equal((groupId, 4_000m, 2_000m), (deposit.GroupId, deposit.TotalPln, deposit.FromIncomePln));
-        Assert.Equal(baseline - 2_000m, month.FreeFunds.ActualPln);
+        Assert.Equal((4_000m, "Settled"), (contribution.NetPln, contribution.Status));
+        Assert.Equal(baseline - 4_000m, month.FreeFunds.ActualPln);
     }
 
     [Fact]
-    public async Task TransferBeyondPlanIsExcess()
+    public async Task NetIsNotCappedByPlan()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var a = await client.CreateIncomeAccountAsync(cancellationToken, "A");
-        var groupId = await client.CreateFundingGroupAsync(cancellationToken, "Poduszka", 0m);
-        var target = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Poduszka PLN");
+        var groupId = await client.CreateFundingGroupAsync(
+            cancellationToken, "Emerytura", 2_000m, contributions: [new ContributionBody(2_000m, a.AccountId)]);
+        var target = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Emerytalne");
 
-        await client.TransferMoneyAsync(a.MoneyAssetId, target.MoneyAssetId, 2_000m, FundingDay, cancellationToken);
+        await client.TransferMoneyAsync(a.MoneyAssetId, target.MoneyAssetId, 4_000m, FundingDay, cancellationToken);
 
-        var deposit = Assert.Single((await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).Expenses.GroupDeposits!);
-        Assert.Equal((groupId, 2_000m, 2_000m), (deposit.GroupId, deposit.ExcessPln, deposit.FromIncomePln));
+        var contribution = await client.ContributionOfAsync(groupId, cancellationToken);
+        Assert.Equal((4_000m, "Settled"), (contribution.NetPln, contribution.Status));
     }
 
     [Fact]
-    public async Task LeftoverRealisesContributionWithoutAccount()
-    {
-        var cancellationToken = TestContext.Current.CancellationToken;
-        Factory.Clock.SetUtcNow(PlanningTodayUtc);
-        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var a = await client.CreateIncomeAccountAsync(cancellationToken, "A");
-        var groupId = await client.CreateFundingGroupAsync(cancellationToken, "Poduszka", 1_000m);
-        var target = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Poduszka PLN");
-
-        await client.TransferMoneyAsync(a.MoneyAssetId, target.MoneyAssetId, 2_000m, FundingDay, cancellationToken);
-
-        var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
-        Assert.Equal(1_000m, Assert.Single(month.Expenses.GroupContributions!, c => c.GroupId == groupId).FundedPln);
-        Assert.Equal(1_000m, Assert.Single(month.Expenses.GroupDeposits!).ExcessPln);
-    }
-
-    [Fact]
-    public async Task NonIncomeTransferCountsOnlyInTotal()
+    public async Task NetSubtractsOutflowsAndCountsPlainDeposits()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         await client.CreateIncomeAccountAsync(cancellationToken, "A");
-        var e1 = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "E1", balance: 1_000m);
+        var source = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "Źródło", balance: 10_000m);
+        var outside = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "Na zewnątrz");
         var groupId = await client.CreateFundingGroupAsync(cancellationToken, "Poduszka", 0m);
-        var target = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Poduszka PLN");
-        var baseline = (await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).FreeFunds.ActualPln;
+        var target = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Oszczędnościowe", balance: 5_000m);
 
-        await client.TransferMoneyAsync(e1.MoneyAssetId, target.MoneyAssetId, 500m, FundingDay, cancellationToken);
+        await client.WithdrawMoneyAsync(target.MoneyAssetId, 233.14m, FundingDay, cancellationToken);
+        await client.TransferMoneyAsync(source.MoneyAssetId, target.MoneyAssetId, 3_200m, FundingDay, cancellationToken);
+        await client.TransferMoneyAsync(target.MoneyAssetId, outside.MoneyAssetId, 2_000m, FundingDay, cancellationToken);
+        await client.TransferMoneyAsync(source.MoneyAssetId, target.MoneyAssetId, 3_000m, FundingDay, cancellationToken);
 
-        var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
-        var deposit = Assert.Single(month.Expenses.GroupDeposits!);
-        Assert.Equal((500m, 0m, 0m), (deposit.TotalPln, deposit.ExcessPln, deposit.FromIncomePln));
-        Assert.Equal(baseline, month.FreeFunds.ActualPln);
+        var contribution = await client.ContributionOfAsync(groupId, cancellationToken);
+        Assert.Equal((3_966.86m, "Settled"), (contribution.NetPln, contribution.Status));
     }
 
     [Fact]
@@ -104,13 +87,48 @@ public sealed class PlanningMonthFundingTests(SkarbiecContainersFixture containe
 
         await client.TransferMoneyAsync(first.MoneyAssetId, second.MoneyAssetId, 100m, FundingDay, cancellationToken);
         await client.TransferMoneyAsync(loose.MoneyAssetId, otherLoose.MoneyAssetId, 100m, FundingDay, cancellationToken);
-        await client.DepositMoneyAsync(first.MoneyAssetId, 300m, FundingDay, cancellationToken);
-        await client.WithdrawMoneyAsync(second.MoneyAssetId, 50m, FundingDay, cancellationToken);
+
+        var contribution = await client.ContributionOfAsync(groupId, cancellationToken);
+        Assert.Equal((0m, "Unsettled"), (contribution.NetPln, contribution.Status));
+    }
+
+    [Fact]
+    public async Task GroupWithoutPlanAndNoFlowHasNoItem()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await client.CreateIncomeAccountAsync(cancellationToken, "A");
+        var groupId = await client.CreateFundingGroupAsync(cancellationToken, "Bez planu", 0m);
+        await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Konto", balance: 1_000m);
 
         var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
-        Assert.Empty(month.Expenses.GroupDeposits ?? []);
-        var contribution = Assert.Single(month.Expenses.GroupContributions!, c => c.GroupId == groupId);
-        Assert.Equal((0m, "Unsettled"), (contribution.FundedPln, contribution.Status));
+
+        Assert.DoesNotContain(month.Expenses.GroupContributions ?? [], c => c.GroupId == groupId);
+    }
+
+    [Fact]
+    public async Task TradeCashFromOutsideCounts()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(PlanningTodayUtc);
+        using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        await client.CreateIncomeAccountAsync(cancellationToken, "A");
+        var outsideGroup = await client.CreateFundingGroupAsync(cancellationToken, "Akcje", 0m, color: 1);
+        var sameGroup = await client.CreateFundingGroupAsync(cancellationToken, "Maklerskie razem", 0m, color: 2);
+        var outsideCash = await client.CreateBrokerageInGroupAsync(
+            cancellationToken, null, outsideGroup, name: "Maklerskie 1", balance: 5_000m);
+        var insideCash = await client.CreateBrokerageInGroupAsync(
+            cancellationToken, sameGroup, sameGroup, name: "Maklerskie 2", balance: 5_000m);
+
+        await client.RecordBrokerageTradeAsync(
+            outsideCash.EtfAssetId, cancellationToken, quantity: 10m, unitPrice: 120m, date: FundingDay);
+        await client.RecordBrokerageTradeAsync(
+            insideCash.EtfAssetId, cancellationToken, quantity: 10m, unitPrice: 120m, date: FundingDay);
+
+        var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
+        Assert.Equal(1_200m, Assert.Single(month.Expenses.GroupContributions!, c => c.GroupId == outsideGroup).NetPln);
+        Assert.DoesNotContain(month.Expenses.GroupContributions!, c => c.GroupId == sameGroup);
     }
 
     [Fact]
@@ -129,31 +147,29 @@ public sealed class PlanningMonthFundingTests(SkarbiecContainersFixture containe
         var october = await client.ContributionOfAsync(groupId, cancellationToken);
         var december = (await client.GetPlanningMonthAsync("2026-12", cancellationToken)).Expenses;
 
-        Assert.Equal((1_000m, "Settled"), (october.FundedPln, october.Status));
-        Assert.All(december.GroupContributions ?? [], c => Assert.Equal((null, null), (c.FundedPln, c.Status)));
-        Assert.Empty(december.GroupDeposits ?? []);
+        Assert.Equal((1_000m, "Settled"), (october.NetPln, october.Status));
+        Assert.All(december.GroupContributions ?? [], c => Assert.Equal((null, null), (c.NetPln, c.Status)));
     }
 
     [Fact]
-    public async Task SettlementAccountIsIncomeAccountInActual()
+    public async Task ActualSubtractsNetOfAllGroups()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var a = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "A");
-        var c = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "C", balance: 5_000m);
-        var incomeId = await client.CreateOneOffIncomeAsync(a.AccountId, cancellationToken, "Premia", 5_000m, new DateOnly(2026, 10, 12));
-        await client.SettleOneOffIncomeAsync(incomeId, c.AccountId, 5_000m, new DateOnly(2026, 10, 12), cancellationToken);
-        var groupId = await client.CreateFundingGroupAsync(cancellationToken, "Poduszka", 0m);
-        var target = await client.CreateBankAccountInGroupAsync(cancellationToken, groupId, "Poduszka PLN");
+        var source = await client.CreateIncomeAccountAsync(cancellationToken, "A", balance: 20_000m);
+        var emerytura = await client.CreateFundingGroupAsync(cancellationToken, "Emerytura", 2_000m, color: 1);
+        var poduszka = await client.CreateFundingGroupAsync(cancellationToken, "Poduszka", 0m, color: 2);
+        var other = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "Inne", balance: 10_000m);
+        var emeryturaAccount = await client.CreateBankAccountInGroupAsync(cancellationToken, emerytura, "E");
+        var poduszkaAccount = await client.CreateBankAccountInGroupAsync(cancellationToken, poduszka, "P");
         var baseline = (await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).FreeFunds.ActualPln;
 
-        await client.TransferMoneyAsync(c.MoneyAssetId, target.MoneyAssetId, 2_000m, FundingDay, cancellationToken);
+        await client.TransferMoneyAsync(source.MoneyAssetId, emeryturaAccount.MoneyAssetId, 4_000m, FundingDay, cancellationToken);
+        await client.TransferMoneyAsync(other.MoneyAssetId, poduszkaAccount.MoneyAssetId, 3_966.86m, FundingDay, cancellationToken);
 
         var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
-        var deposit = Assert.Single(month.Expenses.GroupDeposits!);
-        Assert.Equal((2_000m, 2_000m), (deposit.FromIncomePln, deposit.ExcessPln));
-        Assert.Equal(baseline - 2_000m, month.FreeFunds.ActualPln);
+        Assert.Equal(baseline - 7_966.86m, month.FreeFunds.ActualPln);
     }
 
     [Fact]
@@ -170,37 +186,29 @@ public sealed class PlanningMonthFundingTests(SkarbiecContainersFixture containe
         await client.RecordBrokerageTradeAsync(
             broker.EtfAssetId, cancellationToken, TransactionType.Dividend, quantity: 50m, unitPrice: 1m, date: LaterFundingDay);
 
-        var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
-        Assert.Empty(month.Expenses.GroupDeposits ?? []);
-        Assert.Equal(0m, Assert.Single(month.Expenses.GroupContributions!).FundedPln);
+        var contribution = await client.ContributionOfAsync(groupId, cancellationToken);
+        Assert.Equal(0m, contribution.NetPln);
     }
 
     [Fact]
-    public async Task StatusFollowsFunding()
+    public async Task StatusFollowsNet()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var source = await client.CreateIncomeAccountAsync(cancellationToken, "Źródło", balance: 10_000m);
-        var partial = await client.CreateFundingGroupAsync(cancellationToken, "Emerytura", 1_000m, color: 1);
-        var settled = await client.CreateFundingGroupAsync(cancellationToken, "Dom", 1_000m, color: 2);
-        var unsettled = await client.CreateFundingGroupAsync(cancellationToken, "Wakacje", 1_000m, color: 3);
-        var noPlan = await client.CreateFundingGroupAsync(cancellationToken, "Bez planu", 0m, color: 4);
+        var partial = await client.CreateFundingGroupAsync(cancellationToken, "Emerytura", 2_000m, color: 1);
+        var negative = await client.CreateFundingGroupAsync(cancellationToken, "Dom", 2_000m, color: 2);
         var partialAccount = await client.CreateBankAccountInGroupAsync(cancellationToken, partial, "A");
-        var settledAccount = await client.CreateBankAccountInGroupAsync(cancellationToken, settled, "B");
-        await client.CreateBankAccountInGroupAsync(cancellationToken, unsettled, "C");
-        var noPlanAccount = await client.CreateBankAccountInGroupAsync(cancellationToken, noPlan, "D");
-        await client.TransferMoneyAsync(source.MoneyAssetId, partialAccount.MoneyAssetId, 600m, FundingDay, cancellationToken);
-        await client.TransferMoneyAsync(source.MoneyAssetId, settledAccount.MoneyAssetId, 1_500m, FundingDay, cancellationToken);
-        await client.TransferMoneyAsync(source.MoneyAssetId, noPlanAccount.MoneyAssetId, 200m, FundingDay, cancellationToken);
+        var negativeAccount = await client.CreateBankAccountInGroupAsync(cancellationToken, negative, "B", balance: 5_000m);
+        await client.TransferMoneyAsync(source.MoneyAssetId, partialAccount.MoneyAssetId, 1_000m, FundingDay, cancellationToken);
+        await client.DepositMoneyAsync(negativeAccount.MoneyAssetId, 1_000m, FundingDay, cancellationToken);
+        await client.WithdrawMoneyAsync(negativeAccount.MoneyAssetId, 3_000m, FundingDay, cancellationToken);
 
         var contributions = (await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).Expenses.GroupContributions!;
 
-        Assert.Equal(3, contributions.Count);
-        Assert.DoesNotContain(contributions, c => c.GroupId == noPlan);
-        Assert.Equal((600m, "Partial"), Of(contributions, partial));
-        Assert.Equal((1_000m, "Settled"), Of(contributions, settled));
-        Assert.Equal((0m, "Unsettled"), Of(contributions, unsettled));
+        Assert.Equal((1_000m, "Partial"), Of(contributions, partial));
+        Assert.Equal((-2_000m, "Unsettled"), Of(contributions, negative));
     }
 
     [Fact]
@@ -220,7 +228,7 @@ public sealed class PlanningMonthFundingTests(SkarbiecContainersFixture containe
 
         var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
 
-        Assert.Equal(425m, Assert.Single(month.Expenses.GroupDeposits!).TotalPln);
+        Assert.Equal(425m, Assert.Single(month.Expenses.GroupContributions!, c => c.GroupId == groupId).NetPln);
         Assert.False(month.FreeFunds.Incomplete);
     }
 
@@ -252,7 +260,7 @@ public sealed class PlanningMonthFundingTests(SkarbiecContainersFixture containe
 
         var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
 
-        Assert.Equal(100m, Assert.Single(month.Expenses.GroupDeposits!).TotalPln);
+        Assert.Equal(100m, Assert.Single(month.Expenses.GroupContributions!, c => c.GroupId == groupId).NetPln);
         Assert.True(month.FreeFunds.Incomplete);
     }
 
@@ -260,6 +268,6 @@ public sealed class PlanningMonthFundingTests(SkarbiecContainersFixture containe
     {
         var contribution = contributions.Single(c => c.GroupId == groupId);
 
-        return (contribution.FundedPln, contribution.Status);
+        return (contribution.NetPln, contribution.Status);
     }
 }

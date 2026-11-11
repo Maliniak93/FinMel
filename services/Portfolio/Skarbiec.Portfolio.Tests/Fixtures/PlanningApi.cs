@@ -176,17 +176,13 @@ internal static class PlanningApi
         decimal CostPln,
         List<ExpenseDefinitionView> Definitions,
         List<OneOffExpenseView>? OneOffs = null,
-        List<GroupContributionView>? GroupContributions = null,
-        List<GroupDepositView>? GroupDeposits = null);
-
-    public sealed record GroupDepositView(
-        Guid GroupId, string Name, decimal TotalPln, decimal FromIncomePln, decimal ExcessPln);
+        List<GroupContributionView>? GroupContributions = null);
 
     public sealed record GroupContributionView(
         Guid GroupId,
         string Name,
         decimal AmountPln,
-        decimal? FundedPln = null,
+        decimal? NetPln = null,
         string? Status = null,
         decimal FromIncomePln = 0m,
         List<ContributionLineView>? Contributions = null);

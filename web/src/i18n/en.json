@@ -1042,8 +1042,6 @@
       "deficit": "deficit"
     },
     "contribution": {
-      "deposit": "Group deposit: {{ name }}",
-      "excess": "{{ name }} — Realised",
       "status": {
         "unsettled": "Unsettled",
         "partial": "Partial",

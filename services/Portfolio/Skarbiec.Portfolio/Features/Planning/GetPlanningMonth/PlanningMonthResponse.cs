@@ -47,11 +47,8 @@ public sealed record PlanningExpensesResponse
     /// <summary>PLN sum of every expense's cost for the month: payments plus the reserve set aside for later ones, one-offs and the group contributions.</summary>
     public required decimal CostPln { get; init; }
 
-    /// <summary>Each group's monthly contribution.</summary>
+    /// <summary>One item per group with a planned contribution or a non-zero net in the month, ordered by name.</summary>
     public required IReadOnlyList<GroupContributionResponse> GroupContributions { get; init; }
-
-    /// <summary>The groups that received a transfer from outside them in the month, ordered by name; empty after the current month.</summary>
-    public required IReadOnlyList<GroupDepositResponse> GroupDeposits { get; init; }
 
     public required IReadOnlyList<ExpenseDefinitionResponse> Definitions { get; init; }
 
@@ -362,26 +359,11 @@ public sealed record GroupContributionResponse
 
     public required IReadOnlyList<ContributionLineResponse> Contributions { get; init; }
 
-    /// <summary>The part of the contributions transfers realised, at most AmountPln; null after the current month.</summary>
-    public required decimal? FundedPln { get; init; }
+    /// <summary>PLN that flowed into the group from outside it minus PLN that flowed out in the month; uncapped, may be negative, null after the current month.</summary>
+    public required decimal? NetPln { get; init; }
 
     /// <summary>Null after the current month.</summary>
     public required GroupContributionStatus? Status { get; init; }
-}
-
-public sealed record GroupDepositResponse
-{
-    public required Guid GroupId { get; init; }
-    public required string Name { get; init; }
-
-    /// <summary>PLN of every counted transfer into the group.</summary>
-    public required decimal TotalPln { get; init; }
-
-    /// <summary>The part of TotalPln that came from income accounts.</summary>
-    public required decimal FromIncomePln { get; init; }
-
-    /// <summary>The part of FromIncomePln beyond every contribution.</summary>
-    public required decimal ExcessPln { get; init; }
 }
 
 public sealed record ContributionLineResponse

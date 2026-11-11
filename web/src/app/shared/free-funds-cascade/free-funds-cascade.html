@@ -43,14 +43,6 @@
           </div>
         </div>
       }
-      @if (column.key === 'actual') {
-        @for (deposit of deposits(); track deposit.key) {
-          <div class="cascade__row" data-testid="group-deposit-row">
-            <span class="cascade__label">{{ deposit.label }}</span>
-            <span class="cascade__amount">{{ formatMoney(deposit.amountPln, 'PLN') }}</span>
-          </div>
-        }
-      }
     </div>
   }
 </div>

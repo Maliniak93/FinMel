@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
 using Skarbiec.Portfolio.Features.Deposits;
 using Skarbiec.Portfolio.Features.Planning.Recurrence;
@@ -103,13 +104,23 @@ public sealed class PlanningMonthLoader(
 
         return await dbContext.Transactions
             .AsNoTracking()
-            .Where(t => t.TransferId != null && t.Date >= firstDay && t.Date <= lastDay)
+            .Where(t => t.Date >= firstDay && t.Date <= lastDay)
             .Join(
                 dbContext.Assets,
                 t => t.AssetId,
                 a => a.Id,
-                (t, a) => new FundingLeg(
-                    t.TransferId, t.Type, t.Date, a.GroupId, a.AccountId, t.Quantity, t.UnitPriceAmount, t.FxRateToPln, t.AmountPln))
+                (t, a) => new { Transaction = t, Asset = a })
+            .Where(x => x.Transaction.TransferId != null
+                || (x.Asset.GroupId != null && (x.Transaction.Type == TransactionType.Deposit || x.Transaction.Type == TransactionType.Withdraw)))
+            .Select(x => new FundingLeg(
+                x.Transaction.TransferId,
+                x.Transaction.Type,
+                x.Transaction.Date,
+                x.Asset.GroupId,
+                x.Transaction.Quantity,
+                x.Transaction.UnitPriceAmount,
+                x.Transaction.FxRateToPln,
+                x.Transaction.AmountPln))
             .ToListAsync(cancellationToken);
     }
 }

@@ -27,11 +27,9 @@ public sealed class GroupFundingTenancyIsolationTests(SkarbiecContainersFixture 
         await stranger.TransferMoneyAsync(strangerSource.MoneyAssetId, strangerAccount.MoneyAssetId, 900m, FundingDay, cancellationToken);
 
         var own = await owner.ContributionOfAsync(ownerGroup, cancellationToken);
-        var ownDeposit = await owner.DepositOfAsync(ownerGroup, cancellationToken);
-        var strangerDeposits = (await owner.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).Expenses.GroupDeposits;
-        Assert.Equal((600m, "Partial"), (own.FundedPln, own.Status));
-        Assert.Equal(600m, ownDeposit!.TotalPln);
-        Assert.DoesNotContain(strangerDeposits!, d => d.GroupId == strangerGroup);
+        var contributions = (await owner.GetPlanningMonthAsync(CurrentMonth, cancellationToken)).Expenses.GroupContributions;
+        Assert.Equal((600m, "Partial"), (own.NetPln, own.Status));
+        Assert.DoesNotContain(contributions!, c => c.GroupId == strangerGroup);
     }
 
     [Fact]

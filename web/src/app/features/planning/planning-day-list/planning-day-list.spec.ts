@@ -82,7 +82,6 @@ function monthData(
       definitions: [],
       oneOffs: [],
       groupContributions: [],
-      groupDeposits: [],
       ...expenses,
     },
     freeFunds: { planPln: 0, actualPln: 0, incomplete: false },
@@ -210,14 +209,14 @@ describe('PlanningDayList', () => {
             groupId: blueGroupId,
             name: 'Poduszka finansowa',
             amountPln: 1000,
-            fundedPln: null,
+            netPln: null,
             status: null,
           },
           {
             groupId: unknownGroupId,
             name: 'Emerytura',
             amountPln: 1500,
-            fundedPln: null,
+            netPln: null,
             status: null,
           },
         ],
@@ -239,20 +238,37 @@ describe('PlanningDayList', () => {
     expect(lines[1].innerHTML).toContain('var(--sk-g-none)');
   });
 
-  it('shows undated excess per group', async () => {
+  it('shows one row per group with net and chip', async () => {
     const root = await render(
       monthData([occurrence('Wypłata', '2026-10-09', 6500)], {
-        groupDeposits: [
+        groupContributions: [
           {
             groupId: blueGroupId,
-            name: 'Poduszka',
-            totalPln: 4000,
+            name: 'Emerytura',
+            amountPln: 2000,
             fromIncomePln: 2000,
-            excessPln: 2000,
+            netPln: 4000,
+            status: 'Settled',
+          },
+          {
+            groupId: unknownGroupId,
+            name: 'Poduszka',
+            amountPln: 0,
+            fromIncomePln: 0,
+            netPln: 3966.86,
+            status: 'Settled',
+          },
+          {
+            groupId: 'c0000000-0000-0000-0000-000000000008',
+            name: 'Dom',
+            amountPln: 2000,
+            fromIncomePln: 0,
+            netPln: -2000,
+            status: 'Unsettled',
           },
         ],
       }),
-      { groups: [{ id: blueGroupId, name: 'Poduszka', color: 'blue' }] },
+      { groups: [{ id: blueGroupId, name: 'Emerytura', color: 'blue' }] },
     );
     const language = TestBed.inject(LanguageService);
     await language.setLanguage('pl');
@@ -261,35 +277,21 @@ describe('PlanningDayList', () => {
       await fixture.whenStable();
       fixture.detectChanges();
 
-      const excess = all(root, 'excess-row');
-      expect(excess).toHaveLength(1);
-      expect(excess[0].textContent).toContain('Poduszka — Zrealizowane');
-      expect(excess[0].textContent).toContain(formatMoney(2000, 'PLN'));
-      expect(excess[0].closest('[data-testid="day-group"]')).toBeNull();
-      const days = all(root, 'day-group');
-      expect(
-        days[days.length - 1].compareDocumentPosition(excess[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).not.toBe(0);
-
-      fixture.componentRef.setInput(
-        'data',
-        monthData([occurrence('Wypłata', '2026-10-09', 6500)], {
-          groupDeposits: [
-            {
-              groupId: blueGroupId,
-              name: 'Poduszka',
-              totalPln: 2000,
-              fromIncomePln: 2000,
-              excessPln: 0,
-            },
-          ],
-        }),
-      );
-      fixture.detectChanges();
-      await fixture.whenStable();
-      fixture.detectChanges();
-
+      const lines = all(root, 'contribution-row');
+      expect(lines).toHaveLength(3);
+      for (const line of lines) {
+        expect(line.textContent).toContain('Wpłata do grupy');
+        expect(line.querySelector('[data-testid="contribution-status"]')).not.toBeNull();
+      }
+      expect(lines[0].textContent).toContain(formatMoney(4000, 'PLN'));
+      expect(lines[0].textContent).toContain(formatMoney(2000, 'PLN'));
+      expect(lines[0].textContent).not.toContain('Różnica');
+      expect(lines[1].textContent).toContain(formatMoney(3966.86, 'PLN'));
+      expect(lines[1].textContent).toContain('Zrealizowana');
+      expect(lines[1].textContent).not.toContain('Nieplanowany');
+      expect(lines[2].textContent).toContain(formatMoney(-2000, 'PLN'));
       expect(all(root, 'excess-row')).toHaveLength(0);
+      expect(root.textContent).not.toContain('— Zrealizowane');
     } finally {
       await language.setLanguage('en');
       localStorage.removeItem(LANGUAGE_STORAGE_KEY);
@@ -304,7 +306,7 @@ describe('PlanningDayList', () => {
             groupId: blueGroupId,
             name: 'Emerytura',
             amountPln: 2000,
-            fundedPln: 1000,
+            netPln: 1000,
             status: 'Partial',
           },
         ],
@@ -331,7 +333,7 @@ describe('PlanningDayList', () => {
               groupId: blueGroupId,
               name: 'Emerytura',
               amountPln: 2000,
-              fundedPln: null,
+              netPln: null,
               status: null,
             },
           ],
