@@ -41,6 +41,26 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
     }
 
     [Fact]
+    public async Task ContributionAccountOfOtherUserIsNotFound()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerAccount = await owner.CreateAccountAsync(cancellationToken, "Owner");
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var group = await stranger.CreateAssetGroupAsync(cancellationToken, "Moja", ColorKey(0));
+
+        var create = await stranger.PostAsJsonAsync(
+            AssetGroupsUri, NewAssetGroupBody("Nowa", ColorKey(1), contributions: [new(100m, ownerAccount)]), cancellationToken);
+        var update = await stranger.PutAsJsonAsync(
+            AssetGroupUri(group.Id), NewAssetGroupBody("Moja", ColorKey(0), contributions: [new(100m, ownerAccount)]), cancellationToken);
+
+        await create.AssertProblemAsync(HttpStatusCode.NotFound, AccountNotFoundErrorCode, cancellationToken);
+        await update.AssertProblemAsync(HttpStatusCode.NotFound, AccountNotFoundErrorCode, cancellationToken);
+        var stored = Assert.Single(await stranger.ListAssetGroupsAsync(cancellationToken));
+        Assert.Empty(stored.Contributions ?? []);
+    }
+
+    [Fact]
     public async Task Delete_ByStranger_ReturnsNotFoundAndKeepsAssignments()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

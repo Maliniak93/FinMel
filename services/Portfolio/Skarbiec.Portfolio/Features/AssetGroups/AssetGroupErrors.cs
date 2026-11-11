@@ -12,6 +12,8 @@ internal static class AssetGroupErrors
 
     public const decimal MaxMonthlyContributionPln = 1_000_000_000m;
 
+    public const int MaxContributions = 20;
+
     public static Error NotFound(Guid id) =>
         new("NotFound.AssetGroup", $"Asset group '{id}' was not found.");
 
@@ -40,7 +42,13 @@ internal static class AssetGroupErrors
         new("Conflict.CushionGroupExists", "Only one cushion group is allowed.");
 
     public static Error InvalidContribution { get; } =
-        new("Validation.InvalidContribution", $"The monthly contribution must be 0 to {MaxMonthlyContributionPln:0} with at most 2 decimals.");
+        new("Validation.InvalidContribution", $"Each contribution must be above 0 up to {MaxMonthlyContributionPln:0} with at most 2 decimals.");
+
+    public static Error TooManyContributions { get; } =
+        new("Validation.TooManyContributions", $"At most {MaxContributions} contributions are allowed.");
+
+    public static Error ContributionAccountArchived(Guid id) =>
+        new("Validation.ContributionAccountArchived", $"Account '{id}' is archived and cannot be a contribution source.");
 
     public static Error InvalidClassAllocation { get; } =
         new("Validation.InvalidClassAllocation", "Each class must be unique, with a percent above 0 up to 100 and at most 1 decimal.");

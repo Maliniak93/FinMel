@@ -3699,6 +3699,7 @@
           "assetCount",
           "kind",
           "monthlyContributionPln",
+          "contributions",
           "classAllocation",
           "sharePercent"
         ],
@@ -3741,6 +3742,12 @@
               "string"
             ],
             "format": "double"
+          },
+          "contributions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupContribution"
+            }
           },
           "classAllocation": {
             "type": "array",
@@ -5204,13 +5211,14 @@
           "kind": {
             "$ref": "#/components/schemas/AssetGroupKind"
           },
-          "monthlyContributionPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "contributions": {
             "type": [
-              "number",
-              "string"
+              "null",
+              "array"
             ],
-            "format": "double"
+            "items": {
+              "$ref": "#/components/schemas/GroupContribution"
+            }
           },
           "classAllocation": {
             "type": [
@@ -6182,6 +6190,30 @@
           },
           "incomplete": {
             "type": "boolean"
+          }
+        }
+      },
+      "GroupContribution": {
+        "required": [
+          "amountPln",
+          "accountId"
+        ],
+        "type": "object",
+        "properties": {
+          "amountPln": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -8663,13 +8695,14 @@
           "kind": {
             "$ref": "#/components/schemas/AssetGroupKind"
           },
-          "monthlyContributionPln": {
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "contributions": {
             "type": [
-              "number",
-              "string"
+              "null",
+              "array"
             ],
-            "format": "double"
+            "items": {
+              "$ref": "#/components/schemas/GroupContribution"
+            }
           },
           "classAllocation": {
             "type": [

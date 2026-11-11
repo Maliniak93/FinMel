@@ -98,6 +98,7 @@ export type AssetGroupResponse = {
     assetCount: number | string;
     kind: AssetGroupKind;
     monthlyContributionPln: number | string;
+    contributions: Array<GroupContribution>;
     classAllocation: Array<AssetGroupClassShare>;
     sharePercent: null | number | string;
 };
@@ -365,7 +366,7 @@ export type CreateAssetGroupRequest = {
     color: string;
     targetPln?: null | number | string;
     kind?: AssetGroupKind;
-    monthlyContributionPln?: number | string;
+    contributions?: null | Array<GroupContribution>;
     classAllocation?: null | Array<AssetGroupClassShare>;
 };
 
@@ -556,6 +557,11 @@ export type FreeFundsResponse = {
     planPln: number | string;
     actualPln: number | string;
     incomplete: boolean;
+};
+
+export type GroupContribution = {
+    amountPln: number | string;
+    accountId: null | string;
 };
 
 export type GroupContributionResponse = {
@@ -1031,7 +1037,7 @@ export type UpdateAssetGroupRequest = {
     color: string;
     targetPln?: null | number | string;
     kind?: AssetGroupKind;
-    monthlyContributionPln?: number | string;
+    contributions?: null | Array<GroupContribution>;
     classAllocation?: null | Array<AssetGroupClassShare>;
 };
 

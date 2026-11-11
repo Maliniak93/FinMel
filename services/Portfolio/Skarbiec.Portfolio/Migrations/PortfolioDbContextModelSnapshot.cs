@@ -326,10 +326,6 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasColumnType("character varying(20)")
                         .HasDefaultValue("Regular");
 
-                    b.Property<decimal>("MonthlyContributionPln")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -356,6 +352,19 @@ namespace Skarbiec.Portfolio.Migrations
 
                             b1
                                 .ToJson("ClassAllocation")
+                                .HasColumnType("jsonb");
+                        });
+
+                    b.ComplexCollection(typeof(List<Dictionary<string, object>>), "Contributions", "Skarbiec.Portfolio.Data.AssetGroup.Contributions#GroupContribution", b1 =>
+                        {
+                            b1.IsRequired();
+
+                            b1.Property<Guid?>("AccountId");
+
+                            b1.Property<decimal>("AmountPln");
+
+                            b1
+                                .ToJson("Contributions")
                                 .HasColumnType("jsonb");
                         });
 

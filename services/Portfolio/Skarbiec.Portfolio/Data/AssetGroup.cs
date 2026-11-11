@@ -11,7 +11,9 @@ public sealed class AssetGroup : IUserOwned
     public required string Color { get; set; }
     public decimal? TargetPln { get; set; }
     public AssetGroupKind Kind { get; set; }
-    public decimal MonthlyContributionPln { get; set; }
+    public List<GroupContribution> Contributions { get; set; } = [];
+
+    public decimal MonthlyContributionPln => Contributions.Sum(c => c.AmountPln);
 
     // Share of the free funds the Regular groups split between them (one decimal); null for a Cushion.
     public decimal? SharePercent { get; set; }
@@ -25,3 +27,5 @@ public enum AssetGroupKind
 }
 
 public sealed record AssetGroupClassShare(AssetClass AssetClass, decimal Percent);
+
+public sealed record GroupContribution(decimal AmountPln, Guid? AccountId);

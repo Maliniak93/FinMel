@@ -226,7 +226,9 @@ export class GroupFormDialog {
       color: values.color,
       targetPln: values.targetPln,
       kind: values.kind,
-      monthlyContributionPln: values.monthlyContributionPln ?? 0,
+      contributions: values.monthlyContributionPln
+        ? [{ amountPln: values.monthlyContributionPln, accountId: null }]
+        : [],
       classAllocation: values.allocation.flatMap((row) =>
         row.assetClass === null || row.percent === null
           ? []

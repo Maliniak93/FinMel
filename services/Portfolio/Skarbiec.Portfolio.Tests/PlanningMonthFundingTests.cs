@@ -93,7 +93,10 @@ public sealed class PlanningMonthFundingTests(SkarbiecContainersFixture containe
         var cancellationToken = TestContext.Current.CancellationToken;
         Factory.Clock.SetUtcNow(PlanningTodayUtc);
         using var client = Factory.CreateAuthenticatedClient(Guid.NewGuid());
-        var partial = await client.CreateFundingGroupAsync(cancellationToken, "Emerytura", 1_000m, color: 1);
+        var sourceA = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "Źródło A");
+        var sourceB = await client.CreateBankAccountInGroupAsync(cancellationToken, null, "Źródło B");
+        var partial = await client.CreateFundingGroupAsync(
+            cancellationToken, "Emerytura", 1_000m, color: 1, contributionAccountIds: [sourceA.AccountId, sourceB.AccountId]);
         var settled = await client.CreateFundingGroupAsync(cancellationToken, "Dom", 1_000m, color: 2);
         var unsettled = await client.CreateFundingGroupAsync(cancellationToken, "Wakacje", 1_000m, color: 3);
         var noPlan = await client.CreateFundingGroupAsync(cancellationToken, "Bez planu", 0m, color: 4);

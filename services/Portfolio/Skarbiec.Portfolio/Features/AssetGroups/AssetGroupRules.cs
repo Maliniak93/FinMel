@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
 
 namespace Skarbiec.Portfolio.Features.AssetGroups;
 
@@ -11,7 +12,7 @@ internal static class AssetGroupRules
         string color,
         decimal? targetPln,
         AssetGroupKind kind,
-        decimal monthlyContributionPln,
+        List<GroupContribution> contributions,
         List<AssetGroupClassShare> classAllocation)
     {
         if (name.Length is 0 or > AssetGroupErrors.MaxNameLength)
@@ -35,13 +36,54 @@ internal static class AssetGroupRules
             return AssetGroupErrors.TargetRequiredForCushion;
         }
 
-        if (monthlyContributionPln is < 0 or > AssetGroupErrors.MaxMonthlyContributionPln
-            || decimal.Round(monthlyContributionPln, 2) != monthlyContributionPln)
+        if (contributions.Count > AssetGroupErrors.MaxContributions)
+        {
+            return AssetGroupErrors.TooManyContributions;
+        }
+
+        if (contributions.Any(c => c.AmountPln is <= 0 or > AssetGroupErrors.MaxMonthlyContributionPln
+            || decimal.Round(c.AmountPln, 2) != c.AmountPln))
         {
             return AssetGroupErrors.InvalidContribution;
         }
 
         return ValidateAllocation(classAllocation);
+    }
+
+    // An archived account is accepted only when the group already had it, so an untouched contribution survives an edit.
+    public static async Task<Error?> ContributionAccountErrorAsync(
+        this PortfolioDbContext dbContext,
+        List<GroupContribution> contributions,
+        IReadOnlyCollection<Guid?> keptAccountIds,
+        CancellationToken cancellationToken)
+    {
+        var accountIds = contributions.Where(c => c.AccountId is not null).Select(c => c.AccountId!.Value).Distinct().ToList();
+        if (accountIds.Count == 0)
+        {
+            return null;
+        }
+
+        var accounts = await dbContext.Accounts
+            .AsNoTracking()
+            .Where(a => accountIds.Contains(a.Id))
+            .Select(a => new { a.Id, a.IsArchived })
+            .ToListAsync(cancellationToken);
+
+        foreach (var accountId in accountIds)
+        {
+            var account = accounts.FirstOrDefault(a => a.Id == accountId);
+            if (account is null)
+            {
+                return AccountErrors.NotFound(accountId);
+            }
+
+            if (account.IsArchived && !keptAccountIds.Contains(accountId))
+            {
+                return AssetGroupErrors.ContributionAccountArchived(accountId);
+            }
+        }
+
+        return null;
     }
 
     private static Error? ValidateAllocation(List<AssetGroupClassShare> allocation)
