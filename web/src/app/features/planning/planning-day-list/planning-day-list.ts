@@ -108,6 +108,10 @@ export class PlanningDayList {
 
   protected readonly contributions = computed(() => this.data().expenses.groupContributions);
 
+  protected readonly excesses = computed(() =>
+    this.data().expenses.groupDeposits.filter((deposit) => Number(deposit.excessPln) > 0),
+  );
+
   protected readonly days = computed<Day[]>(() => {
     const month = this.month();
     const data = this.data();

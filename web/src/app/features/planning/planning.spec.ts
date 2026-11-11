@@ -8,6 +8,7 @@ import { of } from 'rxjs';
 import { stubViewport } from '../../../testing/match-media';
 import { readStylesheet } from '../../../testing/stylesheet';
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../core/i18n/language';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatDate, formatMoney } from '../../shared/format';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
@@ -148,6 +149,7 @@ function expenses(extra: Record<string, unknown> = {}): Record<string, unknown> 
     definitions: [],
     oneOffs: [],
     groupContributions: [],
+    groupDeposits: [],
     ...extra,
   };
 }
@@ -1367,6 +1369,76 @@ describe('Planning', () => {
     expect(deficits).toHaveLength(1);
     expect(deficits[0].textContent).toContain(formatMoney(-700, 'PLN'));
     expect(rows('free-funds-incomplete')).toHaveLength(1);
+  });
+
+  it('shows group deposits in actual', async () => {
+    responses['2026-10'] = month(
+      { balance: balance({ planPln: 10000, actualPln: 10000 }) },
+      {
+        costPln: 4000,
+        groupDeposits: [
+          {
+            groupId: retirementId,
+            name: 'Emerytura',
+            totalPln: 4000,
+            fromIncomePln: 2000,
+            excessPln: 0,
+          },
+          {
+            groupId: cushionId,
+            name: 'Poduszka',
+            totalPln: 2000,
+            fromIncomePln: 2000,
+            excessPln: 0,
+          },
+        ],
+      },
+      { planPln: 7000, actualPln: 4000 },
+    );
+    await setup();
+    const language = TestBed.inject(LanguageService);
+    await language.setLanguage('pl');
+    try {
+      await settle();
+
+      const deposits = rows('group-deposit-row');
+      expect(deposits).toHaveLength(2);
+      expect(deposits[0].textContent).toContain('Wpłata do grupy: Emerytura');
+      expect(deposits[0].textContent).toContain(formatMoney(4000, 'PLN'));
+      expect(deposits[1].textContent).toContain('Wpłata do grupy: Poduszka');
+      expect(deposits[1].textContent).toContain(formatMoney(2000, 'PLN'));
+      expect(rows('cascade-actual-expenses')[0].textContent).toContain(formatMoney(2000, 'PLN'));
+      expect(rows('free-funds-actual')[0].textContent).toContain(formatMoney(4000, 'PLN'));
+    } finally {
+      await language.setLanguage('en');
+      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+    }
+  });
+
+  it('plan subtracts income-account contributions', async () => {
+    responses['2026-10'] = month(
+      { balance: balance({ planPln: 10000, actualPln: 10000 }) },
+      {
+        costPln: 5000,
+        groupContributions: [
+          {
+            groupId: retirementId,
+            name: 'Emerytura',
+            amountPln: 4000,
+            fromIncomePln: 2000,
+            fundedPln: null,
+            status: null,
+          },
+        ],
+      },
+      { planPln: 7000, actualPln: 7000 },
+    );
+    await setup();
+
+    expect(rows('cascade-plan-incomes')[0].textContent).toContain(formatMoney(10000, 'PLN'));
+    expect(rows('cascade-plan-expenses')[0].textContent).toContain(formatMoney(1000, 'PLN'));
+    expect(rows('cascade-plan-contributions')[0].textContent).toContain(formatMoney(4000, 'PLN'));
+    expect(rows('free-funds-plan')[0].textContent).toContain(formatMoney(7000, 'PLN'));
   });
 
   it('keeps the cascade when the groups request fails', async () => {

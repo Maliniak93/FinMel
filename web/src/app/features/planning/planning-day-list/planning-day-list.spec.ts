@@ -3,6 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
 
+import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../../core/i18n/language';
 import { provideI18nTesting } from '../../../core/i18n/testing';
 import { formatMoney } from '../../../shared/format';
 import { bondResponse } from '../../../../testing/bond-fixtures';
@@ -56,6 +57,7 @@ function monthData(
       definitions: [],
       oneOffs: [],
       groupContributions: [],
+      groupDeposits: [],
       ...expenses,
     },
     freeFunds: { planPln: 0, actualPln: 0, incomplete: false },
@@ -78,7 +80,7 @@ describe('PlanningDayList', () => {
 
   async function render(
     data: Record<string, unknown>,
-    extra: { deposits?: unknown[]; bonds?: unknown[]; groups?: unknown[] } = {},
+    extra: { deposits?: unknown[]; bonds?: unknown[]; groups?: unknown[]; month?: string } = {},
   ): Promise<HTMLElement> {
     await TestBed.configureTestingModule({
       providers: [
@@ -89,7 +91,7 @@ describe('PlanningDayList', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(PlanningDayList);
-    fixture.componentRef.setInput('month', '2026-10');
+    fixture.componentRef.setInput('month', extra.month ?? '2026-10');
     fixture.componentRef.setInput('data', data);
     fixture.componentRef.setInput('deposits', extra.deposits ?? []);
     fixture.componentRef.setInput('bonds', extra.bonds ?? []);
@@ -210,6 +212,116 @@ describe('PlanningDayList', () => {
     expect(lines[0].innerHTML).toContain('var(--sk-g-blue)');
     expect(lines[1].textContent).toContain(formatMoney(-1500, 'PLN'));
     expect(lines[1].innerHTML).toContain('var(--sk-g-none)');
+  });
+
+  it('shows undated excess per group', async () => {
+    const root = await render(
+      monthData([occurrence('Wypłata', '2026-10-09', 6500)], {
+        groupDeposits: [
+          {
+            groupId: blueGroupId,
+            name: 'Poduszka',
+            totalPln: 4000,
+            fromIncomePln: 2000,
+            excessPln: 2000,
+          },
+        ],
+      }),
+      { groups: [{ id: blueGroupId, name: 'Poduszka', color: 'blue' }] },
+    );
+    const language = TestBed.inject(LanguageService);
+    await language.setLanguage('pl');
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const excess = all(root, 'excess-row');
+      expect(excess).toHaveLength(1);
+      expect(excess[0].textContent).toContain('Poduszka — Zrealizowane');
+      expect(excess[0].textContent).toContain(formatMoney(2000, 'PLN'));
+      expect(excess[0].closest('[data-testid="day-group"]')).toBeNull();
+      const days = all(root, 'day-group');
+      expect(
+        days[days.length - 1].compareDocumentPosition(excess[0]) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).not.toBe(0);
+
+      fixture.componentRef.setInput(
+        'data',
+        monthData([occurrence('Wypłata', '2026-10-09', 6500)], {
+          groupDeposits: [
+            {
+              groupId: blueGroupId,
+              name: 'Poduszka',
+              totalPln: 2000,
+              fromIncomePln: 2000,
+              excessPln: 0,
+            },
+          ],
+        }),
+      );
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(all(root, 'excess-row')).toHaveLength(0);
+    } finally {
+      await language.setLanguage('en');
+      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+    }
+  });
+
+  it('shows status in past months', async () => {
+    const root = await render(
+      monthData([], {
+        groupContributions: [
+          {
+            groupId: blueGroupId,
+            name: 'Emerytura',
+            amountPln: 2000,
+            fundedPln: 1000,
+            status: 'Partial',
+          },
+        ],
+      }),
+      { month: '2026-09', groups: [{ id: blueGroupId, name: 'Emerytura', color: 'blue' }] },
+    );
+    const language = TestBed.inject(LanguageService);
+    await language.setLanguage('pl');
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const chips = all(root, 'contribution-status');
+      expect(chips).toHaveLength(1);
+      expect(chips[0].textContent).toContain('Częściowa');
+
+      fixture.componentRef.setInput('month', '2026-12');
+      fixture.componentRef.setInput(
+        'data',
+        monthData([], {
+          groupContributions: [
+            {
+              groupId: blueGroupId,
+              name: 'Emerytura',
+              amountPln: 2000,
+              fundedPln: null,
+              status: null,
+            },
+          ],
+        }),
+      );
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(all(root, 'contribution-row')).toHaveLength(1);
+      expect(all(root, 'contribution-status')).toHaveLength(0);
+    } finally {
+      await language.setLanguage('en');
+      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+    }
   });
 
   function expensePayment(extra: Record<string, unknown> = {}): Record<string, unknown> {

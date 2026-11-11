@@ -63,6 +63,7 @@ import { fromDateOnly } from '../../shared/date-only';
 import { activeLocale } from '../../core/i18n/language';
 import {
   type CascadeLabels,
+  type CascadeSplitRow,
   FreeFundsCascade,
 } from '../../shared/free-funds-cascade/free-funds-cascade';
 import { groupColor } from '../../shared/colors';
@@ -294,6 +295,15 @@ export class Planning {
     'actual-free-deficit': 'free-funds-deficit',
   };
 
+  protected readonly cascadeDeposits = computed<CascadeSplitRow[]>(() => {
+    activeLocale();
+    return (this.monthData()?.expenses.groupDeposits ?? []).map((deposit) => ({
+      key: deposit.groupId,
+      label: translate('planning.contribution.deposit', { name: deposit.name }),
+      amountPln: Number(deposit.totalPln),
+    }));
+  });
+
   protected readonly cascade = computed(() => {
     const data = this.monthData();
     if (!data) {
@@ -306,8 +316,8 @@ export class Planning {
     const expenses = (toGrosze(data.expenses.costPln) - contributionsGrosze) / 100;
     const contributions = contributionsGrosze / 100;
     const balance = data.incomes.balance;
-    const fundedGrosze = data.expenses.groupContributions.reduce(
-      (sum, contribution) => sum + toGrosze(contribution.fundedPln ?? 0),
+    const fundedGrosze = data.expenses.groupDeposits.reduce(
+      (sum, deposit) => sum + toGrosze(deposit.fromIncomePln),
       0,
     );
     const actualIncomesGrosze = toGrosze(balance.actualPln);
