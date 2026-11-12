@@ -48,4 +48,42 @@ public sealed class QuartzSchemaProvisioningTests(SkarbiecContainersFixture cont
             await second.StopAsync(cancellationToken);
         }
     }
+
+    [Fact]
+    public async Task Quartz46Schema_SchedulerStarts_AddsFixedDelayColumn()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var connectionString = await FreshQuartzHost.CreateMigratedDatabaseAsync(_containers, cancellationToken);
+
+        var provisioner = FreshQuartzHost.BuildSchedulerHost(_containers, connectionString);
+        await provisioner.StartAsync(cancellationToken);
+        try
+        {
+            await FreshQuartzHost.WaitForRunningSchedulerAsync(provisioner, cancellationToken);
+        }
+        finally
+        {
+            await provisioner.StopAsync(cancellationToken);
+        }
+
+        // The app's own price-sync trigger is the row a restart must keep.
+        await FreshQuartzHost.DropTriggerFixedDelayColumnAsync(connectionString, cancellationToken);
+        var triggersBefore = await FreshQuartzHost.TriggerNamesAsync(connectionString, cancellationToken);
+        Assert.Contains("price-sync-trigger", triggersBefore);
+        Assert.False(await FreshQuartzHost.HasTriggerFixedDelayColumnAsync(connectionString, cancellationToken));
+
+        var upgraded = FreshQuartzHost.BuildSchedulerHost(_containers, connectionString);
+        await upgraded.StartAsync(cancellationToken);
+        try
+        {
+            var scheduler = await FreshQuartzHost.WaitForRunningSchedulerAsync(upgraded, cancellationToken);
+            Assert.Equal(SchedulerStatus.Running, scheduler.Status);
+            Assert.True(await FreshQuartzHost.HasTriggerFixedDelayColumnAsync(connectionString, cancellationToken));
+            Assert.Equal(triggersBefore, await FreshQuartzHost.TriggerNamesAsync(connectionString, cancellationToken));
+        }
+        finally
+        {
+            await upgraded.StopAsync(cancellationToken);
+        }
+    }
 }
