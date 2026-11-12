@@ -572,7 +572,7 @@ describe('Planning', () => {
     expect(skipped.classList.contains('day-list__item--skipped')).toBe(true);
     expect(pending.classList.contains('day-list__item--skipped')).toBe(false);
     expect(overdue.classList.contains('day-list__item--overdue')).toBe(true);
-    expect(settled.querySelector('[data-testid="occurrence-actual"]')!.textContent).toContain(
+    expect(settled.querySelector('[data-testid="occurrence-settled-on"]')!.textContent).toContain(
       `Settled on ${formatDate('2026-10-29')}`,
     );
     expect(pending.querySelector('[data-testid="occurrence-actual"]')).toBeNull();
@@ -592,7 +592,9 @@ describe('Planning', () => {
     expect(has(skipped, 'skip-occurrence')).toBe(false);
     expect(has(skipped, 'edit-settlement')).toBe(false);
 
-    expect(settled.textContent).toContain(formatMoney(9200, 'PLN'));
+    expect(settled.querySelector('[data-testid="occurrence-plan"]')!.textContent).toContain(
+      formatMoney(9200, 'PLN'),
+    );
     expect(settled.querySelector('[data-testid="occurrence-actual"]')!.textContent).toContain(
       formatMoney(9143.27, 'PLN'),
     );
@@ -603,9 +605,7 @@ describe('Planning', () => {
       formatMoney(-800, 'PLN'),
     );
 
-    expect(rows('deposit-created')).toHaveLength(1);
-    expect(has(settled, 'deposit-created')).toBe(true);
-    expect(has(outOfRule, 'deposit-created')).toBe(false);
+    expect(rows('deposit-created')).toHaveLength(0);
 
     expect(rows('out-of-rule')).toHaveLength(1);
     expect(has(outOfRule, 'out-of-rule')).toBe(true);
