@@ -40,6 +40,17 @@ public sealed class SkarbiecContainers : IAsyncLifetime
         return new NpgsqlConnectionStringBuilder(_postgres.GetConnectionString()) { Database = name }.ConnectionString;
     }
 
+    // FORCE ends the idle pooled backends a finished class leaves behind; without it they exhaust max_connections.
+    public async Task DropDatabaseAsync(string connectionString)
+    {
+        var name = new NpgsqlConnectionStringBuilder(connectionString).Database;
+        await using var admin = new NpgsqlConnection(_postgres.GetConnectionString());
+        await admin.OpenAsync();
+        await using var drop = admin.CreateCommand();
+        drop.CommandText = $"DROP DATABASE IF EXISTS \"{name}\" WITH (FORCE)";
+        await drop.ExecuteNonQueryAsync();
+    }
+
     public async Task<string> CreateVirtualHostAsync()
     {
         var name = $"t_{Guid.NewGuid():N}";

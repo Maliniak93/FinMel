@@ -18,7 +18,14 @@ public sealed class SkarbiecContainersFixture : IAsyncLifetime
         RabbitMqConnectionString = await containers.CreateVirtualHostAsync();
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public async ValueTask DisposeAsync()
+    {
+        if (PostgresConnectionString is not null)
+        {
+            NpgsqlConnection.ClearPool(new NpgsqlConnection(PostgresConnectionString));
+            await SkarbiecContainers.Current.DropDatabaseAsync(PostgresConnectionString);
+        }
+    }
 
     public async Task ResetDatabaseAsync()
     {

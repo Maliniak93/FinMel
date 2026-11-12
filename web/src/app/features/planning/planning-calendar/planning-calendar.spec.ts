@@ -2,6 +2,7 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { of } from 'rxjs';
 
+import { readStylesheet, ruleBodies } from '../../../../testing/stylesheet';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { PlanningState } from '../../../core/planning/planning-state';
 import { provideI18nTesting } from '../../../core/i18n/testing';
@@ -138,7 +139,7 @@ describe('PlanningCalendar', () => {
     fetchSpy.mockRestore();
   });
 
-  async function render(data: Record<string, unknown>): Promise<void> {
+  async function render(data: Record<string, unknown>, month = '2027-03'): Promise<void> {
     fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async () => jsonResponse({ detail: 'Not found.' }, 404));
@@ -154,7 +155,7 @@ describe('PlanningCalendar', () => {
     }).compileComponents();
 
     fixture = TestBed.createComponent(PlanningCalendar);
-    fixture.componentRef.setInput('month', '2027-03');
+    fixture.componentRef.setInput('month', month);
     fixture.componentRef.setInput('data', data);
     fixture.componentRef.setInput('deposits', [
       DEPOSIT,
@@ -242,6 +243,50 @@ describe('PlanningCalendar', () => {
     expect(
       element().querySelectorAll('.planning-calendar__grid [data-testid="calendar-cell"]'),
     ).toHaveLength(cells().length);
+  });
+
+  it('renders out-of-month days as blank cells', async () => {
+    await render(monthData([occurrence('Czynsz', '2026-12-01', 500)], []), '2026-11');
+    await vi.waitFor(async () => {
+      await settle();
+      expect(cells().length).toBeGreaterThan(0);
+    });
+
+    const blank = cells().filter((candidate) => !candidate.dataset['date']);
+    expect(blank).toHaveLength(12);
+    for (const candidate of blank) {
+      expect(candidate.classList.contains('planning-calendar__cell--empty')).toBe(true);
+      expect(candidate.textContent?.trim()).toBe('');
+      expect(candidate.querySelector('[data-testid="calendar-item"]')).toBeNull();
+    }
+
+    const scss = readStylesheet(
+      'src/app/features/planning/planning-calendar/planning-calendar.scss',
+    );
+    const emptyRule = ruleBodies(scss, '.planning-calendar__cell--empty');
+    expect(emptyRule).toMatch(/border(?:-right|-bottom|-style)?:\s*(?:0|none)\b/);
+    expect(emptyRule).not.toMatch(/dashed|solid|background/);
+  });
+
+  it('dims settled items', async () => {
+    await render(monthData([PENDING, SETTLED], []));
+    await vi.waitFor(async () => {
+      await settle();
+      expect(itemsOf('2027-03-26')).toHaveLength(1);
+    });
+
+    expect(itemsOf('2027-03-26')[0].dataset['status']).toBe('settled');
+    expect(itemsOf('2027-03-10')[0].dataset['status']).toBe('pending');
+
+    const scss = readStylesheet(
+      'src/app/features/planning/planning-calendar/planning-calendar.scss',
+    );
+    expect(ruleBodies(scss, ".planning-calendar__item[data-status='settled']")).toMatch(
+      /opacity:\s*0?\.\d+|color:\s*var\(--mat-sys-on-surface-variant\)/,
+    );
+    expect(ruleBodies(scss, ".planning-calendar__item[data-status='pending']")).not.toMatch(
+      /opacity|on-surface-variant/,
+    );
   });
 
   it('gives the day details heading the sub section title classes', async () => {

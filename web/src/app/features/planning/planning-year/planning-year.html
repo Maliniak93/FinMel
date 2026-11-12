@@ -35,8 +35,6 @@
     @if (!hasDefinitions()) {
       <app-empty-state icon="event_note" [message]="'planning.year.empty' | transloco" />
     } @else {
-      <app-planning-year-chart [months]="months()" [year]="selectedYear()" />
-
       <ng-template #amount let-cell>
         @if (cell.actual) {
           <span data-testid="year-result-actual">{{ cell.text }}</span>
