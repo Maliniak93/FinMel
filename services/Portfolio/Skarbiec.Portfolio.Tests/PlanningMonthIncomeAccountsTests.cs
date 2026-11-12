@@ -134,7 +134,7 @@ public sealed class PlanningMonthIncomeAccountsTests(SkarbiecContainersFixture c
         await client.TransferMoneyAsync(c.MoneyAssetId, target.MoneyAssetId, 1_000m, FundingDay, cancellationToken);
 
         var month = await client.GetPlanningMonthAsync(CurrentMonth, cancellationToken);
-        var deposit = Assert.Single(month.Expenses.GroupDeposits!);
-        Assert.Equal((groupId, 1_000m), (deposit.GroupId, deposit.FromIncomePln));
+        var row = Assert.Single(month.Expenses.GroupContributions!, g => g.GroupId == groupId);
+        Assert.Equal(1_000m, row.NetPln);
     }
 }

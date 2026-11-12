@@ -578,19 +578,11 @@ export type GroupContributionResponse = {
     amountPln: number | string;
     fromIncomePln: number | string;
     contributions: Array<ContributionLineResponse>;
-    fundedPln: null | number | string;
+    netPln: null | number | string;
     status: null | GroupContributionStatus;
 };
 
 export type GroupContributionStatus = 'Unsettled' | 'Partial' | 'Settled';
-
-export type GroupDepositResponse = {
-    groupId: string;
-    name: string;
-    totalPln: number | string;
-    fromIncomePln: number | string;
-    excessPln: number | string;
-};
 
 export type GroupShareRequest = {
     groupId: string;
@@ -745,7 +737,6 @@ export type PlanningExpensesResponse = {
     payments: Array<ExpensePaymentResponse>;
     costPln: number | string;
     groupContributions: Array<GroupContributionResponse>;
-    groupDeposits: Array<GroupDepositResponse>;
     definitions: Array<ExpenseDefinitionResponse>;
     oneOffs: Array<OneOffExpenseResponse>;
 };

@@ -77,7 +77,6 @@ export class FreeFundsCascade {
   readonly contributions = input<readonly CascadeContribution[]>([]);
   readonly groups = input<readonly CascadeGroup[]>([]);
   readonly split = input<readonly CascadeSplitRow[]>([]);
-  readonly deposits = input<readonly CascadeSplitRow[]>([]);
   readonly planDeficit = input<boolean | null>(null);
   readonly testIds = input<Readonly<Record<string, string>>>({});
 

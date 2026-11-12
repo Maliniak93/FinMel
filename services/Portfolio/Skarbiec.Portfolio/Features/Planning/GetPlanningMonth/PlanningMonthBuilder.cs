@@ -76,7 +76,7 @@ internal static class PlanningMonthBuilder
 
         var funding = FundingIn(viewed, data);
         var expenses = BuildExpenses(viewed, data, funding);
-        var actualPln = balance.ActualPln - forecast.SettledCostIn(viewed) - funding.FromIncomePln;
+        var actualPln = balance.ActualPln - forecast.SettledCostIn(viewed) - funding.TotalNetPln;
         var fundingIncomplete = funding.Incomplete;
         var viewedCost = forecast.CostIn(viewed);
         var viewedFigures = new MonthFigures(balance.ActualPln + balance.PendingPln - viewedCost, viewedCost);
@@ -205,15 +205,7 @@ internal static class PlanningMonthBuilder
             return GroupFundingResult.Empty;
         }
 
-        var contributions = forecast.Groups.ToDictionary(
-            g => g.Id,
-            g => (IReadOnlyList<ContributionSource>)
-            [
-                .. g.Contributions.Select(c => new ContributionSource(
-                    c.AmountPln, forecast.AccountOf(c.AccountId) is { } account ? account.Id : null))
-            ]);
-
-        return GroupFunding.Compute(legs, contributions, forecast.ActualIncomeAccountsIn(viewed));
+        return GroupFunding.Compute(legs);
     }
 
     private static GroupContributionResponse BuildContribution(
@@ -246,12 +238,12 @@ internal static class PlanningMonthBuilder
                 AmountPln = group.MonthlyContributionPln,
                 FromIncomePln = fromIncome,
                 Contributions = lines,
-                FundedPln = null,
+                NetPln = null,
                 Status = null
             };
         }
 
-        var funded = funding.ByGroup.TryGetValue(group.Id, out var realisation) ? realisation.FundedPln : 0m;
+        var net = funding.NetOf(group.Id);
 
         return new GroupContributionResponse
         {
@@ -260,9 +252,9 @@ internal static class PlanningMonthBuilder
             AmountPln = group.MonthlyContributionPln,
             FromIncomePln = fromIncome,
             Contributions = lines,
-            FundedPln = funded,
-            Status = funded >= group.MonthlyContributionPln ? GroupContributionStatus.Settled
-                : funded > 0m ? GroupContributionStatus.Partial
+            NetPln = net,
+            Status = net > 0m && net >= group.MonthlyContributionPln ? GroupContributionStatus.Settled
+                : net > 0m ? GroupContributionStatus.Partial
                 : GroupContributionStatus.Unsettled
         };
     }
@@ -272,6 +264,7 @@ internal static class PlanningMonthBuilder
         var forecast = data.Forecast;
         var plans = forecast.Plans;
         var payments = forecast.ExpensePaymentsIn(viewed);
+        var contributing = forecast.ContributingGroupsIn(viewed);
 
         var definitions = plans
             .OrderBy(p => p.Expense.Name, StringComparer.OrdinalIgnoreCase)
@@ -327,22 +320,10 @@ internal static class PlanningMonthBuilder
             CostPln = forecast.PlanCostIn(viewed),
             GroupContributions =
             [
-                .. forecast.ContributingGroupsIn(viewed)
-                    .Select(g => BuildContribution(g, viewed, data, funding))
-            ],
-            GroupDeposits =
-            [
-                .. forecast.Groups
-                    .Where(g => funding.ByGroup.ContainsKey(g.Id))
+                .. contributing
+                    .Concat(forecast.Groups.Where(g => !contributing.Contains(g) && funding.NetOf(g.Id) != 0m))
                     .OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase)
-                    .Select(g => new GroupDepositResponse
-                    {
-                        GroupId = g.Id,
-                        Name = g.Name,
-                        TotalPln = funding.ByGroup[g.Id].TotalPln,
-                        FromIncomePln = funding.ByGroup[g.Id].FromIncomePln,
-                        ExcessPln = funding.ByGroup[g.Id].ExcessPln
-                    })
+                    .Select(g => BuildContribution(g, viewed, data, funding))
             ],
             Definitions = definitions,
             OneOffs = forecast.OneOffExpensesIn(viewed)

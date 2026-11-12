@@ -1042,8 +1042,6 @@
       "deficit": "deficyt"
     },
     "contribution": {
-      "deposit": "Wpłata do grupy: {{ name }}",
-      "excess": "{{ name }} — Zrealizowane",
       "status": {
         "unsettled": "Nierozliczona",
         "partial": "Częściowa",
