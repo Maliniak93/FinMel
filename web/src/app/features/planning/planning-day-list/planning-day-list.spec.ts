@@ -5,16 +5,23 @@ import { of } from 'rxjs';
 
 import { LANGUAGE_STORAGE_KEY, LanguageService } from '../../../core/i18n/language';
 import { provideI18nTesting } from '../../../core/i18n/testing';
-import { formatMoney } from '../../../shared/format';
+import { formatDate, formatMoney } from '../../../shared/format';
 import { bondResponse } from '../../../../testing/bond-fixtures';
 import { depositResponse } from '../../deposits/testing/deposit-fixtures';
+import en from '../../../../i18n/en.json';
+import pl from '../../../../i18n/pl.json';
 import { PlanningDayList } from './planning-day-list';
 
 const accountId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const blueGroupId = 'c0000000-0000-0000-0000-000000000001';
 const unknownGroupId = 'c0000000-0000-0000-0000-000000000009';
 
-function occurrence(name: string, date: string, amount: number): Record<string, unknown> {
+function occurrence(
+  name: string,
+  date: string,
+  amount: number,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
   return {
     recurringIncomeId: `id-${name}`,
     nominalMonth: date.slice(0, 7),
@@ -36,6 +43,7 @@ function occurrence(name: string, date: string, amount: number): Record<string, 
     actualAmountPln: null,
     depositCreated: false,
     overdue: false,
+    ...extra,
   };
 }
 
@@ -432,19 +440,63 @@ describe('PlanningDayList', () => {
   });
 
   it('shows settled expense', async () => {
-    const root = await render(monthData([], { payments: [expensePayment(settledPayment)] }));
+    const root = await render(
+      monthData([], {
+        payments: [
+          expensePayment({
+            ...settledPayment,
+            amount: 500,
+            actualAmount: 520,
+            actualAmountPln: 520,
+            difference: 20,
+          }),
+        ],
+      }),
+    );
 
     const [row] = all(root, 'expense-payment-row');
     expect(row.querySelector('[data-testid="expense-status"]')!.textContent).toMatch(/settled/i);
-    expect(row.querySelector('[data-testid="expense-actual"]')!.textContent).toContain(
-      formatMoney(2350, 'PLN'),
+    expect(row.querySelector('[data-testid="expense-settled-on"]')!.textContent).toContain(
+      formatDate('2026-10-06'),
     );
+    const plan = row.querySelector('[data-testid="expense-plan"]')!;
+    expect(plan.closest('.day-list__meta')).not.toBeNull();
+    expect(plan.textContent).toContain(formatMoney(500, 'PLN'));
     expect(row.querySelector('[data-testid="expense-difference"]')!.textContent).toContain(
-      formatMoney(-50, 'PLN'),
+      formatMoney(20, 'PLN'),
     );
+    const actual = row.querySelector('[data-testid="expense-actual"]')!;
+    expect(actual.closest('.day-list__amount')).not.toBeNull();
+    expect(actual.textContent).toContain(formatMoney(520, 'PLN'));
     expect(row.querySelector('[data-testid="settle-expense"]')).toBeNull();
     expect(row.querySelector('[data-testid="edit-expense-settlement"]')).not.toBeNull();
     expect(row.querySelector('[data-testid="undo-expense"]')).not.toBeNull();
+  });
+
+  it('shows settled expense without difference', async () => {
+    const root = await render(
+      monthData([], {
+        payments: [
+          expensePayment({
+            ...settledPayment,
+            amount: 500,
+            actualAmount: 500,
+            actualAmountPln: 500,
+            difference: 0,
+          }),
+        ],
+      }),
+    );
+
+    const [row] = all(root, 'expense-payment-row');
+    expect(row.querySelector('[data-testid="expense-settled-on"]')!.textContent).toContain(
+      formatDate('2026-10-06'),
+    );
+    expect(row.querySelector('[data-testid="expense-plan"]')).toBeNull();
+    expect(row.querySelector('[data-testid="expense-difference"]')).toBeNull();
+    expect(row.querySelector('[data-testid="expense-actual"]')!.textContent).toContain(
+      formatMoney(500, 'PLN'),
+    );
   });
 
   it('undo calls the endpoint', async () => {
@@ -496,5 +548,134 @@ describe('PlanningDayList', () => {
     );
     expect(planned.querySelector('[data-testid="one-off-mark"]')).not.toBeNull();
     expect(planned.querySelector('[data-testid="unplanned-mark"]')).toBeNull();
+  });
+
+  it('shows plan in meta and actual in amount for a settled income', async () => {
+    const root = await render(
+      monthData([
+        occurrence('Wypłata', '2026-11-04', 10000, {
+          status: 'Settled',
+          actualAmount: 10882,
+          actualDate: '2026-11-04',
+          difference: 882,
+          actualAmountPln: 10882,
+        }),
+      ]),
+      { month: '2026-11' },
+    );
+    const language = TestBed.inject(LanguageService);
+    await language.setLanguage('pl');
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const [row] = all(root, 'occurrence-row');
+      expect(row.querySelector('[data-testid="occurrence-settled-on"]')!.textContent).toContain(
+        `Rozliczono ${formatDate('2026-11-04')}`,
+      );
+      const plan = row.querySelector('[data-testid="occurrence-plan"]')!;
+      expect(plan.closest('.day-list__meta')).not.toBeNull();
+      expect(plan.textContent).toContain(formatMoney(10000, 'PLN'));
+      const difference = row.querySelector('[data-testid="occurrence-difference"]')!;
+      expect(difference.closest('.day-list__meta')).not.toBeNull();
+      expect(difference.textContent).toContain('Różnica');
+      expect(difference.textContent).toContain(formatMoney(882, 'PLN'));
+      const actual = row.querySelector('[data-testid="occurrence-actual"]')!;
+      expect(actual.closest('.day-list__amount')).not.toBeNull();
+      expect(actual.textContent).toContain(formatMoney(10882, 'PLN'));
+    } finally {
+      await language.setLanguage('en');
+      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+    }
+  });
+
+  it('hides plan and difference when settled without difference', async () => {
+    const root = await render(
+      monthData([
+        occurrence('800+', '2026-11-08', 1600, {
+          status: 'Settled',
+          actualAmount: 1600,
+          actualDate: '2026-11-08',
+          difference: 0,
+          actualAmountPln: 1600,
+        }),
+      ]),
+      { month: '2026-11' },
+    );
+    const language = TestBed.inject(LanguageService);
+    await language.setLanguage('pl');
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      const [row] = all(root, 'occurrence-row');
+      const meta = row.querySelector<HTMLElement>('.day-list__meta')!;
+      expect(meta.textContent).toContain(`Rozliczono ${formatDate('2026-11-08')}`);
+      expect(meta.textContent).not.toContain('Różnica');
+      expect(meta.textContent).not.toContain(formatMoney(1600, 'PLN'));
+      expect(row.querySelector('[data-testid="occurrence-plan"]')).toBeNull();
+      expect(row.querySelector('[data-testid="occurrence-difference"]')).toBeNull();
+      expect(row.querySelector('[data-testid="occurrence-status"]')!.textContent).toMatch(
+        /rozliczone/i,
+      );
+      expect(row.querySelector('[data-testid="occurrence-actual"]')!.textContent).toContain(
+        formatMoney(1600, 'PLN'),
+      );
+    } finally {
+      await language.setLanguage('en');
+      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+    }
+  });
+
+  it('shows no created-transaction labels', async () => {
+    const root = await render(
+      monthData(
+        [
+          occurrence('Wypłata', '2026-10-04', 10000, {
+            status: 'Settled',
+            actualAmount: 10882,
+            actualDate: '2026-10-04',
+            difference: 882,
+            actualAmountPln: 10882,
+            depositCreated: true,
+          }),
+        ],
+        { payments: [expensePayment({ ...settledPayment, withdrawalCreated: true })] },
+        [
+          {
+            ...oneOffIncome('Premia', '2026-10-15', true),
+            status: 'Settled',
+            actualAmount: 3000,
+            actualDate: '2026-10-15',
+            actualAmountPln: 3000,
+            depositCreated: true,
+          },
+        ],
+      ),
+    );
+    const language = TestBed.inject(LanguageService);
+    await language.setLanguage('pl');
+    try {
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+
+      expect(all(root, 'occurrence-row')).toHaveLength(2);
+      expect(all(root, 'expense-payment-row')).toHaveLength(1);
+      expect(all(root, 'deposit-created')).toHaveLength(0);
+      expect(all(root, 'withdrawal-created')).toHaveLength(0);
+      expect(root.textContent).not.toContain('wpłata utworzona');
+      expect(root.textContent).not.toContain('wypłata zapisana');
+    } finally {
+      await language.setLanguage('en');
+      localStorage.removeItem(LANGUAGE_STORAGE_KEY);
+    }
+    for (const translations of [pl, en]) {
+      const json = JSON.stringify(translations);
+      expect(json).not.toContain('"depositCreated"');
+      expect(json).not.toContain('"withdrawalCreated"');
+    }
   });
 });

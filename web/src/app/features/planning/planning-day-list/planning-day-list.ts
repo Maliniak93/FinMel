@@ -207,6 +207,10 @@ export class PlanningDayList {
     return value !== null && value !== undefined;
   }
 
+  protected differs(value: number | string | null | undefined): boolean {
+    return this.hasValue(value) && Math.round(Number(value) * 100) !== 0;
+  }
+
   protected negative(amount: number | string): number {
     return -Number(amount);
   }

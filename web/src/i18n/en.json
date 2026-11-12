@@ -968,8 +968,6 @@
     "occurrence": {
       "difference": "Difference",
       "outOfRule": "out of rule",
-      "depositCreated": "deposit created",
-      "withdrawalCreated": "withdrawal recorded",
       "settle": "Settle",
       "skip": "Skip",
       "edit": "Edit",

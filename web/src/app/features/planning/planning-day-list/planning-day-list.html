@@ -22,6 +22,8 @@
                   @let income = entry.row;
                   @let occurrence = income.item;
                   @let status = statusOf(occurrence);
+                  @let settledIncome =
+                    occurrence.status === 'Settled' && hasValue(occurrence.actualAmount);
                   <div
                     class="day-list__item"
                     data-testid="occurrence-row"
@@ -51,26 +53,25 @@
                             {{ 'planning.archivedAccount' | transloco }}
                           </span>
                         }
-                        @if (hasValue(occurrence.actualAmount)) {
-                          <span data-testid="occurrence-actual">
-                            @if (occurrence.actualDate) {
+                        @if (settledIncome) {
+                          @if (occurrence.actualDate) {
+                            <span data-testid="occurrence-settled-on">
                               {{
                                 'planning.calendar.settledOn'
                                   | transloco: { date: formatDate(occurrence.actualDate) }
                               }}
-                            }
-                            {{ formatMoney(occurrence.actualAmount, occurrence.currency) }}
-                          </span>
+                            </span>
+                          }
+                          @if (differs(occurrence.difference)) {
+                            <span data-testid="occurrence-plan">
+                              {{ formatMoney(occurrence.amount, occurrence.currency) }}
+                            </span>
+                          }
                         }
-                        @if (hasValue(occurrence.difference)) {
+                        @if (differs(occurrence.difference)) {
                           <span data-testid="occurrence-difference">
                             {{ 'planning.occurrence.difference' | transloco }}:
-                            {{ formatMoney(occurrence.difference, occurrence.currency) }}
-                          </span>
-                        }
-                        @if (occurrence.depositCreated) {
-                          <span data-testid="deposit-created">
-                            {{ 'planning.occurrence.depositCreated' | transloco }}
+                            {{ formatMoney(occurrence.difference ?? 0, occurrence.currency) }}
                           </span>
                         }
                         @if (!income.oneOff && income.item.outOfRule) {
@@ -88,7 +89,16 @@
                       />
                     </span>
                     <span class="day-list__amount sk-num">
-                      <span>{{ formatMoney(occurrence.amount, occurrence.currency) }}</span>
+                      @if (settledIncome) {
+                        <span data-testid="occurrence-actual">{{
+                          formatMoney(
+                            occurrence.actualAmount ?? occurrence.amount,
+                            occurrence.currency
+                          )
+                        }}</span>
+                      } @else {
+                        <span>{{ formatMoney(occurrence.amount, occurrence.currency) }}</span>
+                      }
                       @if (occurrence.estimated) {
                         <span class="day-list__estimate">
                           @if (hasValue(occurrence.amountPln)) {
@@ -151,6 +161,8 @@
                   @let payment = expense.item;
                   @let paymentStatus = expenseStatusOf(payment);
                   @let paymentCurrency = payment.currency ?? 'PLN';
+                  @let settledPayment =
+                    payment.status === 'Settled' && hasValue(payment.actualAmount);
                   <div class="day-list__item" data-testid="expense-payment-row">
                     <mat-icon class="day-list__icon" aria-hidden="true">arrow_upward</mat-icon>
                     <div class="day-list__main">
@@ -166,26 +178,25 @@
                         @if (payment.accountName) {
                           <span>{{ payment.accountName }}</span>
                         }
-                        @if (hasValue(payment.actualAmount)) {
-                          <span data-testid="expense-actual">
-                            @if (payment.actualDate) {
+                        @if (settledPayment) {
+                          @if (payment.actualDate) {
+                            <span data-testid="expense-settled-on">
                               {{
                                 'planning.calendar.settledOn'
                                   | transloco: { date: formatDate(payment.actualDate) }
                               }}
-                            }
-                            {{ formatMoney(payment.actualAmount, paymentCurrency) }}
-                          </span>
+                            </span>
+                          }
+                          @if (differs(payment.difference)) {
+                            <span data-testid="expense-plan">
+                              {{ formatMoney(payment.amount, paymentCurrency) }}
+                            </span>
+                          }
                         }
-                        @if (hasValue(payment.difference)) {
+                        @if (differs(payment.difference)) {
                           <span data-testid="expense-difference">
                             {{ 'planning.occurrence.difference' | transloco }}:
-                            {{ formatMoney(payment.difference, paymentCurrency) }}
-                          </span>
-                        }
-                        @if (payment.withdrawalCreated) {
-                          <span data-testid="withdrawal-created">
-                            {{ 'planning.occurrence.withdrawalCreated' | transloco }}
+                            {{ formatMoney(payment.difference ?? 0, paymentCurrency) }}
                           </span>
                         }
                       </span>
@@ -197,9 +208,15 @@
                         [tone]="paymentStatus.tone"
                       />
                     </span>
-                    <span class="day-list__amount sk-num">{{
-                      formatMoney(payment.amount, paymentCurrency)
-                    }}</span>
+                    <span class="day-list__amount sk-num">
+                      @if (settledPayment) {
+                        <span data-testid="expense-actual">{{
+                          formatMoney(payment.actualAmount ?? payment.amount, paymentCurrency)
+                        }}</span>
+                      } @else {
+                        {{ formatMoney(payment.amount, paymentCurrency) }}
+                      }
+                    </span>
                     <span class="day-list__actions">
                       @if (payment.status === 'Settled') {
                         <button
