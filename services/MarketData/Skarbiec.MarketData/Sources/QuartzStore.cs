@@ -38,6 +38,10 @@ public static class QuartzStore
         await using var command = connection.CreateCommand();
         command.CommandText = $"CREATE SCHEMA IF NOT EXISTS {SchemaName}";
         await command.ExecuteNonQueryAsync(cancellationToken);
+
+        // Quartz 4.7 validates qrtz_triggers.fixed_delay, which a 4.6 schema lacks and ProvisionSchema does not add.
+        command.CommandText = $"ALTER TABLE IF EXISTS {SchemaName}.qrtz_triggers ADD COLUMN IF NOT EXISTS fixed_delay BOOLEAN NULL";
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public static IServiceCollection AddMarketDataScheduler(

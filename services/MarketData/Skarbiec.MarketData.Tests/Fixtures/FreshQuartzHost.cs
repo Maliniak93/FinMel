@@ -47,6 +47,41 @@ internal static class FreshQuartzHost
         return tables;
     }
 
+    // Quartz 4.6 has no fixed_delay column on qrtz_triggers; dropping it turns a 4.7 schema into a 4.6 one.
+    public static async Task DropTriggerFixedDelayColumnAsync(string connectionString, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "ALTER TABLE quartz.qrtz_triggers DROP COLUMN fixed_delay";
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public static async Task<bool> HasTriggerFixedDelayColumnAsync(string connectionString, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'quartz' AND table_name = 'qrtz_triggers' AND column_name = 'fixed_delay')";
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    public static async Task<List<string>> TriggerNamesAsync(string connectionString, CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT trigger_name FROM quartz.qrtz_triggers ORDER BY 1";
+        var names = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            names.Add(reader.GetString(0));
+        }
+
+        return names;
+    }
+
     // Quartz 4 starts the scheduler only after the application has started, so the status has to be awaited.
     public static async Task<IScheduler> WaitForRunningSchedulerAsync(IHost host, CancellationToken cancellationToken)
     {
