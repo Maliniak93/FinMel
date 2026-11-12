@@ -39,7 +39,7 @@
 }
 
 .planning-calendar__cell--empty {
-  border-style: dashed;
+  border: 0;
   cursor: default;
 }
 
@@ -96,6 +96,7 @@
 
 .planning-calendar__item[data-status='settled'] {
   border-left-color: var(--mat-sys-tertiary);
+  opacity: 0.6;
 }
 
 .planning-calendar__item[data-status='skipped'] {

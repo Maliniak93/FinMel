@@ -213,10 +213,7 @@ describe('PlanningYear', () => {
   it('marks the overdue month and highlights the current month', async () => {
     await setup();
 
-    expect(
-      element().querySelector('app-planning-year-chart [data-current="true"]')?.textContent,
-    ).toContain('Oct');
-
+    expect(element().querySelector('app-planning-year-chart')).toBeNull();
     expect(rows()[9].querySelector('[data-testid="year-overdue"]')).not.toBeNull();
     expect(rows()[9].getAttribute('aria-current')).toBe('date');
     expect(rows().filter((row) => row.getAttribute('aria-current') !== null)).toHaveLength(1);
@@ -292,7 +289,6 @@ describe('PlanningYear', () => {
 
     expect(element().querySelectorAll('app-empty-state')).toHaveLength(1);
     expect(rows()).toHaveLength(0);
-    expect(element().querySelector('app-planning-year-chart')).toBeNull();
     expect(element().querySelector('table')).toBeNull();
   });
 
@@ -321,7 +317,7 @@ describe('PlanningYear', () => {
     phoneViewport();
     await setup();
 
-    expect(element().querySelector('app-planning-year-chart')).not.toBeNull();
+    expect(element().querySelector('app-planning-year-chart')).toBeNull();
     const headers = Array.from(element().querySelectorAll('thead th'), (th) =>
       th.textContent?.trim(),
     );

@@ -899,9 +899,6 @@
       "incomplete": "niekompletny",
       "expand": "Pokaż szczegóły miesiąca",
       "collapse": "Ukryj szczegóły miesiąca",
-      "chart": {
-        "label": "Wolne środki, plan i faktyczne w {{ year }}"
-      },
       "columns": {
         "month": "Miesiąc",
         "incomePlan": "Wpływy plan",

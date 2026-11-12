@@ -22,7 +22,6 @@ import { EmptyState } from '../../../shared/empty-state/empty-state';
 import { formatMoney, formatMonth } from '../../../shared/format';
 import { SectionError } from '../../../shared/section-error/section-error';
 import { currentWarsawMonth } from '../recurrence';
-import { PlanningYearChart } from './planning-year-chart';
 
 const YEAR_PATTERN = /^\d{4}$/;
 
@@ -72,7 +71,6 @@ interface YearRow {
     MatIconModule,
     MatProgressSpinnerModule,
     NgTemplateOutlet,
-    PlanningYearChart,
     SectionError,
     TranslocoPipe,
   ],
