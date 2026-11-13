@@ -363,7 +363,7 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
     await openMonth(page, PREMIA_MONTH);
     const row = occurrences(page, PREMIA);
     await expect(status(row)).toHaveText('rozliczone');
-    await expect(row.getByTestId('occurrence-actual')).toContainText('Rozliczono');
+    await expect(row.getByTestId('occurrence-settled-on')).toContainText('Rozliczono');
     await expect(row.getByTestId('occurrence-actual')).toContainText(pln('1 700,00'));
     await expect(row.getByTestId('occurrence-difference')).toContainText(pln('-100,00'));
     await row.getByTestId('undo-occurrence').click();
@@ -495,14 +495,11 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
     await expect(page).not.toHaveURL(/layout=calendar/);
   });
 
-  await test.step('Krok 13: Rok shows twelve bars with the current month marked, a deficit mark, the table with Razem, actual values for past months and a row opening that month', async () => {
+  await test.step('Krok 13: Rok shows no chart, the table with the current month marked with Razem, actual values for past months and a row opening that month', async () => {
     await page.getByRole('tab', { name: 'Rok', exact: true }).click();
     await expect(page).toHaveURL(/tab=year/);
-    await expect(page.getByTestId('year-chart-column')).toHaveCount(12);
-    await expect(
-      page.locator('[data-testid="year-chart-column"][data-current="true"]'),
-    ).toHaveCount(1);
-    await expect(page.getByTestId('year-chart-deficit-mark').first()).toContainText('deficyt');
+    await expect(page.getByTestId('year-chart-column')).toHaveCount(0);
+    await expect(page.locator('[data-testid="year-row"][aria-current="date"]')).toHaveCount(1);
     for (const column of [
       'Miesiąc',
       'Wpływy plan',
@@ -645,7 +642,7 @@ test('redesign planowanie: header, day list, cascade, split, calendar, year, dia
   await test.step('Krok 18: the year on a phone shows Miesiąc, Wydatki and Wolne środki prognoza and the other columns after expanding a row', async () => {
     await page.goto(`/planning?tab=year&year=${YEAR}`);
     await expect(page.getByTestId('year-row')).toHaveCount(12);
-    await expect(page.getByTestId('year-chart-column')).toHaveCount(12);
+    await expect(page.getByTestId('year-chart-column')).toHaveCount(0);
     await expect(page.getByRole('columnheader', { name: 'Miesiąc', exact: true })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Wydatki', exact: true })).toBeVisible();
     await expect(

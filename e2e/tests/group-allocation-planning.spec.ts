@@ -457,7 +457,10 @@ test('group allocation planning: groups with kind, class allocation and contribu
 
     await openMonth(page, m(-1));
     await expectFreeFunds(page, '6 000,00');
-    await expect(contributionOf(page, PENSION)).toHaveCount(0);
+    await expect(contributionOf(page, PENSION)).toHaveCount(1);
+    await expect(contributionOf(page, PENSION).locator('.day-list__amount')).toHaveText(
+      new RegExp(`^\\s*${pln('10 000,00').source}\\s*$`),
+    );
   });
 
   await test.step('Krok 14: a new regular group Wakacje has 0% in the split and the sum stays 100%', async () => {

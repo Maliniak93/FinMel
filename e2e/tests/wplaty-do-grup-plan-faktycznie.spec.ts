@@ -151,18 +151,14 @@ async function expectStatus(page: Page, group: string, status: string): Promise<
   await expect(row.getByTestId('contribution-status')).toContainText(status);
 }
 
-function depositRow(page: Page, group: string): Locator {
-  return page.getByTestId('group-deposit-row').filter({ hasText: `Wpłata do grupy: ${group}` });
-}
-
-async function expectDeposit(page: Page, group: string, amount: string): Promise<void> {
-  const row = depositRow(page, group);
+async function expectNet(page: Page, group: string, amount: RegExp): Promise<void> {
+  const row = contributionRow(page, group);
   await expect(row).toHaveCount(1);
-  await expect(row.locator('.cascade__amount')).toHaveText(exactMoney(amount));
+  await expect(row.locator('.day-list__amount')).toHaveText(amount);
 }
 
-function excessRow(page: Page, group: string): Locator {
-  return page.getByTestId('excess-row').filter({ hasText: `${group} — Zrealizowane` });
+function progress(net: string, plan: string): RegExp {
+  return new RegExp(`^\\s*${pln(net).source}\\s/\\s${pln(plan).source}\\s*$`);
 }
 
 async function expectFree(page: Page, figures: { plan?: string; actual?: string }): Promise<void> {
@@ -299,50 +295,49 @@ test('wpłaty do grup: contributions from income accounts, transfers realising t
     await transfer(request, token, account(A), account(E1), 2000, TODAY);
   });
 
-  await test.step('Krok 8: Emerytura is Częściowa, the Faktycznie row is 2 000 zł and free funds 8 000 zł', async () => {
+  await test.step('Krok 8: Emerytura is Częściowa with the net 2 000 / 4 000 zł and free funds 8 000 zł', async () => {
     await openMonth(page, NOVEMBER);
     await expectStatus(page, RETIREMENT, 'Częściowa');
-    await expectDeposit(page, RETIREMENT, '2 000,00');
+    await expectNet(page, RETIREMENT, progress('2 000,00', '4 000,00'));
     await expectFree(page, { actual: '8 000,00' });
   });
 
-  await test.step('Krok 9: a transfer of 2 000 zł from B to E1 makes Emerytura Zrealizowana, row 4 000 zł, free funds still 8 000 zł', async () => {
+  await test.step('Krok 9: a transfer of 2 000 zł from B to E1 makes Emerytura Zrealizowana with the net 4 000 / 4 000 zł and free funds 6 000 zł', async () => {
     await transfer(request, token, account(B), account(E1), 2000, TODAY);
     await openMonth(page, NOVEMBER);
     await expectStatus(page, RETIREMENT, 'Zrealizowana');
-    await expectDeposit(page, RETIREMENT, '4 000,00');
-    await expectFree(page, { actual: '8 000,00' });
+    await expectNet(page, RETIREMENT, progress('4 000,00', '4 000,00'));
+    await expectFree(page, { actual: '6 000,00' });
   });
 
-  await test.step('Krok 10: a transfer of 2 000 zł from A to P1 gives the undated Poduszka — Zrealizowane 2 000 zł, row 2 000 zł, free funds 6 000 zł', async () => {
+  await test.step('Krok 10: a transfer of 2 000 zł from A to P1 gives one undated Poduszka row of 2 000 zł Zrealizowana and free funds 4 000 zł', async () => {
     await transfer(request, token, account(A), account(P1), 2000, TODAY);
     await openMonth(page, NOVEMBER);
-    await expect(excessRow(page, CUSHION)).toHaveCount(1);
-    await expect(excessRow(page, CUSHION).locator('.day-list__amount')).toHaveText(
-      exactMoney('2 000,00'),
-    );
     await expect(
-      page.getByTestId('no-date-block').getByTestId('excess-row').filter({ hasText: CUSHION }),
+      page
+        .getByTestId('no-date-block')
+        .getByTestId('contribution-row')
+        .filter({ hasText: CUSHION }),
     ).toHaveCount(1);
-    await expectDeposit(page, CUSHION, '2 000,00');
-    await expectFree(page, { actual: '6 000,00' });
+    await expectNet(page, CUSHION, exactMoney('2 000,00'));
+    await expectStatus(page, CUSHION, 'Zrealizowana');
+    await expect(page.getByTestId('excess-row')).toHaveCount(0);
+    await expectFree(page, { actual: '4 000,00' });
   });
 
-  await test.step('Krok 11: a transfer of 500 zł from E1 to P1 leaves Zrealizowane at 2 000 zł, row 2 500 zł, free funds 6 000 zł', async () => {
+  await test.step('Krok 11: a transfer of 500 zł from E1 to P1 gives Emerytura 3 500 / 4 000 zł, Poduszka 2 500 zł and free funds 4 000 zł', async () => {
     await transfer(request, token, account(E1), account(P1), 500, TODAY);
     await openMonth(page, NOVEMBER);
-    await expect(excessRow(page, CUSHION).locator('.day-list__amount')).toHaveText(
-      exactMoney('2 000,00'),
-    );
-    await expectDeposit(page, CUSHION, '2 500,00');
-    await expectFree(page, { actual: '6 000,00' });
+    await expectNet(page, RETIREMENT, progress('3 500,00', '4 000,00'));
+    await expectNet(page, CUSHION, exactMoney('2 500,00'));
+    await expectFree(page, { actual: '4 000,00' });
   });
 
-  await test.step('Krok 12: in the previous month a transfer of 2 000 zł from A to E1 makes the contribution Częściowa with a 2 000 zł row', async () => {
+  await test.step('Krok 12: in the previous month a transfer of 2 000 zł from A to E1 makes the contribution Częściowa with the net 2 000 / 4 000 zł', async () => {
     await transfer(request, token, account(A), account(E1), 2000, day(OCTOBER, 15));
     await openMonth(page, OCTOBER);
     await expectStatus(page, RETIREMENT, 'Częściowa');
-    await expectDeposit(page, RETIREMENT, '2 000,00');
+    await expectNet(page, RETIREMENT, progress('2 000,00', '4 000,00'));
   });
 
   await test.step('Krok 13: an unplanned one-off Premia 3 000 zł on A, 15th, keeps Plan 10 000 zł and has the chip and the calendar mark', async () => {
@@ -405,7 +400,7 @@ test('wpłaty do grup: contributions from income accounts, transfers realising t
     await expectFree(page, { plan: '8 000,00' });
   });
 
-  await test.step('Krok 18: a 1 000 zł contribution without an account in Poduszka lowers Plan by 1 000 zł, Zrealizowane shows 1 000 zł and Poduszka is Zrealizowana', async () => {
+  await test.step('Krok 18: a 1 000 zł contribution without an account in Poduszka lowers Plan by 1 000 zł, Poduszka shows its net 2 500 / 1 000 zł Zrealizowana', async () => {
     await openGroups(page);
     const dialog = await editGroup(page, CUSHION);
     await addContribution(page, dialog, { amount: '1000' });
@@ -413,9 +408,7 @@ test('wpłaty do grup: contributions from income accounts, transfers realising t
     await expect(dialog).toBeHidden();
     await openMonth(page, NOVEMBER);
     await expectFree(page, { plan: '7 000,00' });
-    await expect(excessRow(page, CUSHION).locator('.day-list__amount')).toHaveText(
-      exactMoney('1 000,00'),
-    );
+    await expectNet(page, CUSHION, progress('2 500,00', '1 000,00'));
     await expectStatus(page, CUSHION, 'Zrealizowana');
   });
 });
