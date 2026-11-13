@@ -18,8 +18,10 @@ using Skarbiec.Portfolio.Features.AssetGroups.AssignAssetsToGroup;
 using Skarbiec.Portfolio.Features.AssetGroups.CreateAssetGroup;
 using Skarbiec.Portfolio.Features.AssetGroups.DeleteAssetGroup;
 using Skarbiec.Portfolio.Features.AssetGroups.ListAssetGroups;
+using Skarbiec.Portfolio.Features.AssetGroups.GetAssetGroupTree;
 using Skarbiec.Portfolio.Features.AssetGroups.ListAssignableAssets;
 using Skarbiec.Portfolio.Features.AssetGroups.SaveGroupShares;
+using Skarbiec.Portfolio.Features.AssetGroups.SetAssetGroupMembers;
 using Skarbiec.Portfolio.Features.AssetGroups.UpdateAssetGroup;
 using Skarbiec.Portfolio.Features.Bonds.AddBond;
 using Skarbiec.Portfolio.Features.Bonds.GetBond;
@@ -160,6 +162,7 @@ builder.Services.AddScoped<PositionEventPublisher>();
 if (!OpenApiBuildTime.IsActive && !builder.Configuration.GetValue<bool>("Testing:DisableBackgroundJobs"))
 {
     builder.Services.AddHostedService<BondTermsRepublishService>();
+    builder.Services.AddHostedService<AssetGroupRepublishService>();
 }
 
 builder.Services.AddScoped<CreateAccountHandler>();
@@ -212,6 +215,8 @@ builder.Services.AddScoped<ListAssetGroupsHandler>();
 builder.Services.AddScoped<UpdateAssetGroupHandler>();
 builder.Services.AddScoped<DeleteAssetGroupHandler>();
 builder.Services.AddScoped<AssignAssetsToGroupHandler>();
+builder.Services.AddScoped<GetAssetGroupTreeHandler>();
+builder.Services.AddScoped<SetAssetGroupMembersHandler>();
 builder.Services.AddScoped<SaveGroupSharesHandler>();
 builder.Services.AddScoped<ListAssignableAssetsHandler>();
 builder.Services.AddScoped<CreateCashPlaceHandler>();
@@ -323,6 +328,8 @@ app.MapListAssetGroupsEndpoint();
 app.MapUpdateAssetGroupEndpoint();
 app.MapDeleteAssetGroupEndpoint();
 app.MapAssignAssetsToGroupEndpoint();
+app.MapGetAssetGroupTreeEndpoint();
+app.MapSetAssetGroupMembersEndpoint();
 app.MapSaveGroupSharesEndpoint();
 app.MapListAssignableAssetsEndpoint();
 app.MapCreateCashPlaceEndpoint();

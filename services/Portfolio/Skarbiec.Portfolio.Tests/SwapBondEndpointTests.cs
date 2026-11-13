@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Json;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts.UpdateAccount;
 using Skarbiec.Portfolio.Features.Bonds;
 using Skarbiec.Portfolio.Features.Transfers;
 using Skarbiec.Portfolio.Tests.Fixtures;
@@ -30,6 +32,33 @@ public sealed class SwapBondEndpointTests(SkarbiecContainersFixture containers) 
         Assert.True(response.IsSuccessStatusCode, $"Swap answered {(int)response.StatusCode}.");
         var edo = await client.FindSwappedBondAsync(tosId, cancellationToken);
         Assert.Equal(group.Id, (await ReadAssetGroupStatesAsync(userId, cancellationToken, edo.AssetId))[edo.AssetId].GroupId);
+    }
+
+    [Fact]
+    public async Task NewBondCopiesGroupException()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Factory.Clock.SetUtcNow(AfterTosMaturityUtc);
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var groupA = await client.CreateAssetGroupAsync(cancellationToken, "A", ColorKey(0));
+        var groupB = await client.CreateAssetGroupAsync(cancellationToken, "B", ColorKey(1));
+        var funded = await client.CreateSettledTosAsync(cancellationToken, groupId: groupA.Id);
+        var tosId = funded.Bond.AssetId;
+        var accountUpdate = await client.PutAsJsonAsync(
+            AccountsApi.AccountUri(funded.BondAccountId),
+            new UpdateAccountRequest { Name = "Bonds", GroupId = groupB.Id },
+            cancellationToken);
+        Assert.True(accountUpdate.IsSuccessStatusCode);
+        var old = (await ReadAssetInheritanceAsync(userId, cancellationToken, tosId))[tosId];
+        Assert.Equal((groupA.Id, true), (old.GroupId, old.IsException));
+
+        var response = await client.SwapBondRawAsync(tosId, NewSwapBody(10), cancellationToken);
+
+        Assert.True(response.IsSuccessStatusCode, $"Swap answered {(int)response.StatusCode}.");
+        var edo = await client.FindSwappedBondAsync(tosId, cancellationToken);
+        var created = (await ReadAssetInheritanceAsync(userId, cancellationToken, edo.AssetId))[edo.AssetId];
+        Assert.Equal((groupA.Id, true), (created.GroupId, created.IsException));
     }
 
     [Fact]

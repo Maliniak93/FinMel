@@ -45,6 +45,7 @@ public sealed class SwapBondHandler(
             Id = Guid.NewGuid(),
             AccountId = bond.AccountId,
             GroupId = bond.GroupId,
+            GroupIsException = bond.GroupIsException,
             AssetClass = AssetClass.Bond,
             Name = newBond.Name,
             Currency = Currency,

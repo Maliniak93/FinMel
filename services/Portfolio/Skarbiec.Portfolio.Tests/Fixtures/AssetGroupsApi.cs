@@ -1,5 +1,11 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Data;
+using Skarbiec.Portfolio.Features.Accounts;
+using Skarbiec.Portfolio.Features.Accounts.CreateAccount;
+using Skarbiec.Testing.Auth;
+using static Skarbiec.Portfolio.Tests.Fixtures.PortfolioApi;
 
 namespace Skarbiec.Portfolio.Tests.Fixtures;
 
@@ -179,6 +185,89 @@ internal static class AssetGroupsApi
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<AssetGroupView>(cancellationToken))!;
+    }
+
+    public const string TreeUri = AssetGroupsUri + "/tree";
+
+    public const string AccountCashManagedErrorCode = "Validation.AccountCashManaged";
+
+    public static string MembersUri(Guid groupId) => $"{AssetGroupUri(groupId)}/members";
+
+    public static object NewMembersBody(IEnumerable<Guid>? accountIds = null, IEnumerable<Guid>? assetIds = null) =>
+        new { accountIds = (accountIds ?? []).ToArray(), assetIds = (assetIds ?? []).ToArray() };
+
+    public static async Task SetAssetGroupMembersAsync(
+        this HttpClient client,
+        Guid groupId,
+        CancellationToken cancellationToken,
+        IEnumerable<Guid>? accountIds = null,
+        IEnumerable<Guid>? assetIds = null)
+    {
+        var response = await client.PutAsJsonAsync(MembersUri(groupId), NewMembersBody(accountIds, assetIds), cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public static async Task<List<JsonElement>> GetAssetGroupTreeAsync(
+        this HttpClient client, CancellationToken cancellationToken)
+    {
+        var response = await client.GetAsync(TreeUri, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var body = await response.ReadJsonAsync(cancellationToken);
+
+        return TreeItems(body);
+    }
+
+    public static List<JsonElement> TreeItems(JsonElement body) =>
+        (body.ValueKind == JsonValueKind.Array ? body : body.GetProperty("items")).EnumerateArray().ToList();
+
+    public static List<JsonElement> TreeChildren(JsonElement item) =>
+        item.TryGetProperty("children", out var children) && children.ValueKind == JsonValueKind.Array
+            ? children.EnumerateArray().ToList()
+            : [];
+
+    public static Guid? OptionalGuid(this JsonElement element, string property) =>
+        element.TryGetProperty(property, out var value) && value.ValueKind != JsonValueKind.Null ? value.GetGuid() : null;
+
+    public sealed record GroupedAccount(Guid AccountId, Guid CashAssetId);
+
+    public static async Task<GroupedAccount> CreateGroupedAccountAsync(
+        this HttpClient client,
+        Guid? groupId,
+        CancellationToken cancellationToken,
+        string name = "XTB",
+        AccountType type = AccountType.Brokerage)
+    {
+        var response = await client.PostAsJsonAsync(
+            AccountsApi.AccountsUri,
+            new CreateAccountRequest { Name = name, Type = type, Wrapper = TaxWrapper.Regular, GroupId = groupId },
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var created = (await response.Content.ReadFromJsonAsync<AccountResponse>(cancellationToken))!;
+
+        return new GroupedAccount(created.Id, created.CashAssetId);
+    }
+
+    public sealed record GroupedBonds(Guid AccountId, Guid CashAssetId, Guid FirstBond, Guid SecondBond, Guid? ExceptionBond);
+
+    // Two bonds inheriting the account's group and, when exceptionGroupId is set, a third bond that is an exception to it.
+    public static async Task<GroupedBonds> CreateGroupedBondsAccountAsync(
+        this HttpClient client,
+        Guid groupId,
+        CancellationToken cancellationToken,
+        Guid? exceptionGroupId = null,
+        string name = "Bonds")
+    {
+        var account = await client.CreateGroupedAccountAsync(groupId, cancellationToken, name, AccountType.Bonds);
+        var first = await client.AddBondAsync(account.AccountId, cancellationToken, PortfolioApi.NewBondRequest(name: "Bond 1"));
+        var second = await client.AddBondAsync(account.AccountId, cancellationToken, PortfolioApi.NewBondRequest(name: "Bond 2"));
+        Guid? exception = null;
+        if (exceptionGroupId is not null)
+        {
+            exception = (await client.AddBondAsync(
+                account.AccountId, cancellationToken, PortfolioApi.NewBondRequest(name: "Bond 3") with { GroupId = exceptionGroupId })).AssetId;
+        }
+
+        return new GroupedBonds(account.AccountId, account.CashAssetId, first.AssetId, second.AssetId, exception);
     }
 
     public static async Task<Dictionary<Guid, decimal?>> ReadSharesAsync(

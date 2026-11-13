@@ -1687,6 +1687,61 @@
         }
       }
     },
+    "/api/portfolio/asset-groups/tree": {
+      "get": {
+        "tags": [
+          "GetAssetGroupTreeEndpoint"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssetGroupTreeItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/asset-groups/{groupId}/members": {
+      "put": {
+        "tags": [
+          "SetAssetGroupMembersEndpoint"
+        ],
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAssetGroupMembersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/portfolio/asset-groups/shares": {
       "put": {
         "tags": [
@@ -3765,6 +3820,128 @@
             "format": "double"
           }
         }
+      },
+      "AssetGroupTreeChild": {
+        "required": [
+          "assetId",
+          "name",
+          "assetClass",
+          "groupId",
+          "isException",
+          "isArchived"
+        ],
+        "type": "object",
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "assetClass": {
+            "$ref": "#/components/schemas/AssetClass"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "isException": {
+            "type": "boolean"
+          },
+          "isArchived": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AssetGroupTreeItem": {
+        "required": [
+          "kind",
+          "accountId",
+          "assetId",
+          "name",
+          "accountType",
+          "assetClass",
+          "groupId",
+          "cashAssetId",
+          "isArchived",
+          "children"
+        ],
+        "type": "object",
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/AssetGroupTreeItemKind"
+          },
+          "accountId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "assetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "accountType": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AccountType"
+              }
+            ]
+          },
+          "assetClass": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AssetClass"
+              }
+            ]
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "cashAssetId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "isArchived": {
+            "type": "boolean"
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetGroupTreeChild"
+            }
+          }
+        }
+      },
+      "AssetGroupTreeItemKind": {
+        "enum": [
+          "Account",
+          "Asset"
+        ]
       },
       "AssetResponse": {
         "required": [
@@ -7932,6 +8109,29 @@
       "SecurityPriceUnavailableReason": {
         "type": "integer"
       },
+      "SetAssetGroupMembersRequest": {
+        "required": [
+          "accountIds",
+          "assetIds"
+        ],
+        "type": "object",
+        "properties": {
+          "accountIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "assetIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "SetContributionLimitsRequest": {
         "type": "object",
         "properties": {
@@ -9673,6 +9873,12 @@
     },
     {
       "name": "AssignAssetsToGroupEndpoint"
+    },
+    {
+      "name": "GetAssetGroupTreeEndpoint"
+    },
+    {
+      "name": "SetAssetGroupMembersEndpoint"
     },
     {
       "name": "SaveGroupSharesEndpoint"

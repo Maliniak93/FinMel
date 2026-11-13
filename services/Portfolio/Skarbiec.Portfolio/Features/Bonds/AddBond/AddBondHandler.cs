@@ -36,12 +36,12 @@ public sealed class AddBondHandler(
         {
             Id = Guid.NewGuid(),
             AccountId = account.Id,
-            GroupId = request.GroupId,
             AssetClass = AssetClass.Bond,
             Name = request.Name,
             Currency = Currency,
             ValuationMode = AssetValuationMode.CurrencyValued,
         };
+        AccountGroupInheritance.ForNewComponent(asset, account, request.GroupId);
 
         var cost = request.BondCount * request.PurchasePricePerBond;
 

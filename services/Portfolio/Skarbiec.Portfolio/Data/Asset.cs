@@ -24,4 +24,8 @@ public sealed class Asset : IUserOwned
     public bool IsArchived { get; set; }
 
     public Guid? GroupId { get; set; }
+
+    public bool GroupIsException { get; set; }
+
+    public bool GroupRepublishPending { get; set; }
 }

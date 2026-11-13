@@ -51,7 +51,7 @@ public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) 
         var ungrouped = (await withoutGroup.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
         var states = await ReadAssetGroupStatesAsync(userId, cancellationToken, grouped, ungrouped);
         Assert.Equal(group.Id, states[grouped].GroupId);
-        Assert.Null(states[ungrouped].GroupId);
+        Assert.Equal(defaultGroup.Id, states[ungrouped].GroupId);
     }
 
     [Fact]

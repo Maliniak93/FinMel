@@ -17,17 +17,29 @@ public sealed class DeleteAssetGroupHandler(
         }
 
         var assets = await dbContext.Assets.Where(a => a.GroupId == id).ToListAsync(cancellationToken);
+        var accounts = await dbContext.Accounts.Where(a => a.GroupId == id).ToListAsync(cancellationToken);
+        var accountIds = accounts.Select(a => a.Id).ToList();
+        var components = await dbContext.Assets
+            .Where(a => a.AccountId != null && accountIds.Contains(a.AccountId.Value))
+            .ToListAsync(cancellationToken);
 
-        // The group, the cleared assets and their position events commit together.
-        foreach (var asset in assets)
+        // The account's group goes first so its inheritors follow; what still shows the group is an exception or a flat asset.
+        var changed = new List<Asset>();
+        foreach (var account in accounts)
         {
-            asset.GroupId = null;
-            await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
+            changed.AddRange(AccountGroupInheritance.ApplyAccountGroup(account, null, components.Where(a => a.AccountId == account.Id)));
         }
 
-        foreach (var account in await dbContext.Accounts.Where(a => a.DefaultGroupId == id).ToListAsync(cancellationToken))
+        foreach (var asset in assets.Where(a => a.GroupId == id))
         {
-            account.DefaultGroupId = null;
+            asset.GroupId = null;
+            changed.Add(asset);
+        }
+
+        // The group, the cleared assets and their position events commit together.
+        foreach (var asset in changed)
+        {
+            await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
         }
 
         foreach (var place in await dbContext.CashPlaces.Where(p => p.DefaultGroupId == id).ToListAsync(cancellationToken))

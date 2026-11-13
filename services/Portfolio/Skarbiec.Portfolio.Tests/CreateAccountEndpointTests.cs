@@ -37,7 +37,7 @@ public sealed class CreateAccountEndpointTests(SkarbiecContainersFixture contain
         var cashId = body.GetProperty("cashAssetId").GetGuid();
         Assert.Equal(group.Id, (await ReadAssetGroupStatesAsync(userId, cancellationToken, cashId))[cashId].GroupId);
         await using var dbContext = CreateDbContext(userId);
-        Assert.Equal(group.Id, (await dbContext.Set<Account>().SingleAsync(a => a.Id == body.GetProperty("id").GetGuid(), cancellationToken)).DefaultGroupId);
+        Assert.Equal(group.Id, (await dbContext.Set<Account>().SingleAsync(a => a.Id == body.GetProperty("id").GetGuid(), cancellationToken)).GroupId);
     }
 
     [Fact]
@@ -57,7 +57,7 @@ public sealed class CreateAccountEndpointTests(SkarbiecContainersFixture contain
         var cashId = body.GetProperty("cashAssetId").GetGuid();
         Assert.Null((await ReadAssetGroupStatesAsync(userId, cancellationToken, cashId))[cashId].GroupId);
         await using var dbContext = CreateDbContext(userId);
-        Assert.Null((await dbContext.Set<Account>().SingleAsync(a => a.Id == body.GetProperty("id").GetGuid(), cancellationToken)).DefaultGroupId);
+        Assert.Null((await dbContext.Set<Account>().SingleAsync(a => a.Id == body.GetProperty("id").GetGuid(), cancellationToken)).GroupId);
     }
 
     [Fact]

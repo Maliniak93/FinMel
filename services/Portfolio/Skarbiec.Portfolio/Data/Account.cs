@@ -11,6 +11,6 @@ public sealed class Account : IUserOwned
     public required TaxWrapper Wrapper { get; init; }
     public required string Currency { get; init; }
     public bool IsArchived { get; set; }
-    public Guid? DefaultGroupId { get; set; }
+    public Guid? GroupId { get; set; }
     public bool OutsideNetWorth { get; set; }
 }

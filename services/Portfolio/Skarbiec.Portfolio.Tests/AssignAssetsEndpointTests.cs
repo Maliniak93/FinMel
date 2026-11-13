@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Tests.Fixtures;
 using Skarbiec.Testing.Auth;
 using Skarbiec.Testing.Containers;
@@ -107,19 +108,48 @@ public sealed class AssignAssetsEndpointTests(SkarbiecContainersFixture containe
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var accountId = await client.CreateAccountAsync(cancellationToken);
-        var accountCash = await client.GetAccountCashAssetIdAsync(accountId, cancellationToken);
-        var bankBalance = (await client.CreateBankAccountAsync(cancellationToken)).MoneyAssetId;
         var placeBalance = await client.AddCashAssetAsync(cancellationToken);
         var archived = await client.AddAssetAsync(accountId, cancellationToken, "Archived");
         await client.ArchiveAssetAsync(archived, cancellationToken);
         var group = await client.CreateAssetGroupAsync(cancellationToken);
 
         var response = await client.PutAsJsonAsync(
-            AssignmentUri, NewAssignmentBody([accountCash, bankBalance, placeBalance, archived], group.Id), cancellationToken);
+            AssignmentUri, NewAssignmentBody([placeBalance, archived], group.Id), cancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
-        var states = await ReadAssetGroupStatesAsync(userId, cancellationToken, accountCash, bankBalance, placeBalance, archived);
-        Assert.Equal(4, states.Count);
+        var states = await ReadAssetGroupStatesAsync(userId, cancellationToken, placeBalance, archived);
+        Assert.Equal(2, states.Count);
         Assert.All(states.Values, state => Assert.Equal(group.Id, state.GroupId));
+    }
+
+    [Fact]
+    public async Task ComponentsFollowCheckRule()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var groupA = await client.CreateAssetGroupAsync(cancellationToken, "A", ColorKey(0));
+        var groupB = await client.CreateAssetGroupAsync(cancellationToken, "B", ColorKey(1));
+        var account = await client.CreateGroupedAccountAsync(groupB.Id, cancellationToken);
+        var etf = await client.AddAssetAsync(account.AccountId, cancellationToken, "Etf", AssetClass.Etf);
+        var inherited = await ReadAssetInheritanceAsync(userId, cancellationToken, etf);
+        Assert.Equal((groupB.Id, false), (inherited[etf].GroupId, inherited[etf].IsException));
+
+        var sameGroup = await client.PutAsJsonAsync(AssignmentUri, NewAssignmentBody([etf], groupB.Id), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, sameGroup.StatusCode);
+        Assert.Equal(inherited[etf], (await ReadAssetInheritanceAsync(userId, cancellationToken, etf))[etf]);
+
+        var other = await client.PutAsJsonAsync(AssignmentUri, NewAssignmentBody([etf], groupA.Id), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, other.StatusCode);
+        var exception = (await ReadAssetInheritanceAsync(userId, cancellationToken, etf))[etf];
+        Assert.Equal((groupA.Id, true, inherited[etf].Version + 1), exception);
+
+        var cleared = await client.PutAsJsonAsync(AssignmentUri, NewAssignmentBody([etf], null), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, cleared.StatusCode);
+        var none = (await ReadAssetInheritanceAsync(userId, cancellationToken, etf))[etf];
+        Assert.Equal((null, true, exception.Version + 1), none);
     }
 }

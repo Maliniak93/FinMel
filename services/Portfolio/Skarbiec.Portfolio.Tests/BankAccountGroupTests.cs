@@ -41,6 +41,6 @@ public sealed class BankAccountGroupTests(SkarbiecContainersFixture containers) 
         Assert.Equal(second.Id, after.GroupId);
         Assert.Equal(before.Version + 1, after.Version);
         await using var dbContext = CreateDbContext(userId);
-        Assert.Null((await dbContext.Set<Account>().SingleAsync(a => a.Id == accountId, cancellationToken)).DefaultGroupId);
+        Assert.Equal(second.Id, (await dbContext.Set<Account>().SingleAsync(a => a.Id == accountId, cancellationToken)).GroupId);
     }
 }

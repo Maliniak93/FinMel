@@ -65,6 +65,9 @@ internal static class AssetGroupErrors
     public static Error SharesGroupMismatch { get; } =
         new("Validation.SharesGroupMismatch", "The shares must list each regular group exactly once and nothing else.");
 
+    public static Error AccountCashManaged(Guid assetId) =>
+        new("Validation.AccountCashManaged", $"Asset '{assetId}' is an account's cash — its group is the account's group.");
+
     public static Error AssetIdsRequired { get; } =
         new("Validation.AssetIdsRequired", "Pick at least one asset.");
 }

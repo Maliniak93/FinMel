@@ -103,6 +103,30 @@ export type AssetGroupResponse = {
     sharePercent: null | number | string;
 };
 
+export type AssetGroupTreeChild = {
+    assetId: string;
+    name: string;
+    assetClass: AssetClass;
+    groupId: null | string;
+    isException: boolean;
+    isArchived: boolean;
+};
+
+export type AssetGroupTreeItem = {
+    kind: AssetGroupTreeItemKind;
+    accountId: null | string;
+    assetId: null | string;
+    name: string;
+    accountType: null | AccountType;
+    assetClass: null | AssetClass;
+    groupId: null | string;
+    cashAssetId: null | string;
+    isArchived: boolean;
+    children: Array<AssetGroupTreeChild>;
+};
+
+export type AssetGroupTreeItemKind = 'Account' | 'Asset';
+
 export type AssetResponse = {
     id: string;
     accountId?: null | string;
@@ -882,6 +906,11 @@ export type SecurityHoldingResponse = {
 };
 
 export type SecurityPriceUnavailableReason = number;
+
+export type SetAssetGroupMembersRequest = {
+    accountIds: Array<string>;
+    assetIds: Array<string>;
+};
 
 export type SetContributionLimitsRequest = {
     ikeAmount?: null | number | string;
@@ -2092,6 +2121,40 @@ export type PutApiPortfolioAssetGroupsAssignmentResponses = {
 };
 
 export type PutApiPortfolioAssetGroupsAssignmentResponse = PutApiPortfolioAssetGroupsAssignmentResponses[keyof PutApiPortfolioAssetGroupsAssignmentResponses];
+
+export type GetApiPortfolioAssetGroupsTreeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/portfolio/asset-groups/tree';
+};
+
+export type GetApiPortfolioAssetGroupsTreeResponses = {
+    /**
+     * OK
+     */
+    200: Array<AssetGroupTreeItem>;
+};
+
+export type GetApiPortfolioAssetGroupsTreeResponse = GetApiPortfolioAssetGroupsTreeResponses[keyof GetApiPortfolioAssetGroupsTreeResponses];
+
+export type PutApiPortfolioAssetGroupsByGroupIdMembersData = {
+    body: SetAssetGroupMembersRequest;
+    path: {
+        groupId: string;
+    };
+    query?: never;
+    url: '/api/portfolio/asset-groups/{groupId}/members';
+};
+
+export type PutApiPortfolioAssetGroupsByGroupIdMembersResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type PutApiPortfolioAssetGroupsByGroupIdMembersResponse = PutApiPortfolioAssetGroupsByGroupIdMembersResponses[keyof PutApiPortfolioAssetGroupsByGroupIdMembersResponses];
 
 export type PutApiPortfolioAssetGroupsSharesData = {
     body: SaveGroupSharesRequest;
