@@ -71,6 +71,25 @@
   font-size: var(--sk-text-xs);
 }
 
+.assets-panel__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sk-space-1);
+}
+
+.assets-panel__name--child {
+  padding-inline-start: var(--sk-space-8);
+}
+
+.assets-panel__toggle-spacer {
+  display: inline-block;
+  width: var(--sk-space-10);
+}
+
+.assets-panel__row--greyed {
+  color: var(--mat-sys-on-surface-variant);
+}
+
 .assets-panel__chip {
   display: inline-block;
   padding: 0 var(--sk-space-2);

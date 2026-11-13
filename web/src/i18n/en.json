@@ -841,6 +841,9 @@
       "classFilter": "Class",
       "allClasses": "All classes",
       "selectAllShown": "Select all shown",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "chipTooltip": "In group \"{{ name }}\" — checking moves it here",
       "class": "Class",
       "location": "Account or place",
       "group": "Group"
