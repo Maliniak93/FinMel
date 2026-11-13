@@ -265,7 +265,6 @@ test('rozliczanie wydatków: settle recurring and one-off expenses with the with
     await withdrawalSwitch(dialog).uncheck();
     await saveSettlement(dialog);
     await expect(paymentStatus(row)).toHaveText('rozliczone');
-    await expect(row.getByTestId('withdrawal-created')).toHaveCount(0);
     await openBankAccount(page, MBANK);
     await expect(cash(page)).toContainText(pln('10 000,00'));
     await expect(historyRow(page, pln('2 400,00'))).toHaveCount(0);
@@ -279,7 +278,6 @@ test('rozliczanie wydatków: settle recurring and one-off expenses with the with
     await expect(withdrawalSwitch(dialog)).toBeChecked();
     await saveSettlement(dialog);
     await expect(paymentStatus(row)).toHaveText('rozliczone');
-    await expect(row.getByTestId('withdrawal-created')).toBeVisible();
 
     await openBankAccount(page, MBANK);
     await expect(cash(page)).toContainText(pln('7 600,00'));

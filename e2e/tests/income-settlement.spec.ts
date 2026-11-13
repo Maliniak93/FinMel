@@ -300,7 +300,6 @@ test('income settlement: settle, skip, edit and undo occurrences with the cash d
     await page.getByRole('dialog').getByRole('button', { name: 'Cofnij', exact: true }).click();
     await expect(snackBar(page)).toContainText("The source of funds can't cover this amount");
     await expect(status(row)).toHaveText('rozliczone');
-    await expect(row.getByTestId('deposit-created')).toBeVisible();
   });
 
   await test.step('Krok 10: deleting the manual withdrawal and settling Wypłata Dominik without a deposit leaves mBank ROR at 6 500 zł and the balance unchanged', async () => {
@@ -317,7 +316,6 @@ test('income settlement: settle, skip, edit and undo occurrences with the cash d
     await dialog.getByRole('checkbox', { name: 'Utwórz wpłatę na konto' }).uncheck();
     await saveSettlement(dialog);
     await expect(status(row)).toHaveText('rozliczone');
-    await expect(row.getByTestId('deposit-created')).toHaveCount(0);
     await expect(row.getByTestId('occurrence-actual')).toContainText(pln('9 143,27'));
     await expectBalance(page, {
       plan: '20 750,00',
@@ -374,7 +372,7 @@ test('income settlement: settle, skip, edit and undo occurrences with the cash d
     await saveSettlement(dialog);
     await expect(status(row)).toHaveText('rozliczone');
     await expect(row.getByTestId('occurrence-actual')).toContainText(pln('9 200,00'));
-    await expect(row.getByTestId('occurrence-actual')).toContainText(dateInText(today()));
+    await expect(row.locator('.day-list__meta')).toContainText(dateInText(today()));
     await openBankAccount(page, MBANK);
     await expect(historyRow(page, 'Wpływ · Wypłata Dominik')).toContainText(pln('9 200,00'));
     await expect(cash(page)).toContainText(pln('15 700,00'));

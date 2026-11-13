@@ -216,9 +216,9 @@ test('tokeny projektowe: typography scale, spacing grid and the three breakpoint
     await expectNoSmallText(page);
   });
 
-  await test.step('Krok 4: Planowanie → Rok has chart labels of at least 12 px', async () => {
+  await test.step('Krok 4: Planowanie → Rok has a table with text of at least 12 px', async () => {
     await openPlanningYear();
-    await expect(page.locator('.year-chart__label').first()).toBeVisible();
+    await expect(page.getByTestId('year-row').first()).toBeVisible();
     await expectNoSmallText(page);
   });
 
