@@ -2,7 +2,7 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { of } from 'rxjs';
 
-import { readStylesheet, ruleBodies } from '../../../../testing/stylesheet';
+import { declarationList, readStylesheet, ruleBodies } from '../../../../testing/stylesheet';
 import { client as portfolioClient } from '../../../api/portfolio/client.gen';
 import { PlanningState } from '../../../core/planning/planning-state';
 import { provideI18nTesting } from '../../../core/i18n/testing';
@@ -266,6 +266,46 @@ describe('PlanningCalendar', () => {
     const emptyRule = ruleBodies(scss, '.planning-calendar__cell--empty');
     expect(emptyRule).toMatch(/border(?:-right|-bottom|-style)?:\s*(?:0|none)\b/);
     expect(emptyRule).not.toMatch(/dashed|solid|background/);
+  });
+
+  it('draws all four edges of in-month days next to blank cells', async () => {
+    await render(monthData([], []), '2026-11');
+    await vi.waitFor(async () => {
+      await settle();
+      expect(cells().length).toBeGreaterThan(0);
+    });
+
+    expect(cell('2026-11-01').classList.contains('planning-calendar__cell--empty')).toBe(false);
+
+    const scss = readStylesheet(
+      'src/app/features/planning/planning-calendar/planning-calendar.scss',
+    );
+    const edges = Object.fromEntries(declarationList(ruleBodies(scss, '.planning-calendar__cell')));
+    for (const side of ['top', 'right', 'bottom', 'left']) {
+      expect(edges[`border-${side}`]).toBe('1px solid var(--mat-sys-outline-variant)');
+    }
+    expect(edges['margin']).toBe('-1px 0 0 -1px');
+  });
+
+  it('keeps the today highlight border', async () => {
+    await render(monthData([], []));
+    await vi.waitFor(async () => {
+      await settle();
+      expect(cells().length).toBeGreaterThan(0);
+    });
+
+    expect(cell('2027-03-05').classList.contains('planning-calendar__cell--today')).toBe(true);
+
+    const scss = readStylesheet(
+      'src/app/features/planning/planning-calendar/planning-calendar.scss',
+    );
+    const today = Object.fromEntries(
+      declarationList(ruleBodies(scss, '.planning-calendar__cell--today')),
+    );
+    expect(today['border-color']).toBe('var(--mat-sys-primary)');
+    expect(today['border-width']).toBe('2px');
+    expect(today['position']).toBe('relative');
+    expect(today['z-index']).toBe('1');
   });
 
   it('dims settled items', async () => {

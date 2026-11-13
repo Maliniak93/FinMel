@@ -32,13 +32,17 @@
   gap: 2px;
   min-height: 96px;
   padding: var(--sk-space-1);
+  margin: -1px 0 0 -1px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
   border-right: 1px solid var(--mat-sys-outline-variant);
   border-bottom: 1px solid var(--mat-sys-outline-variant);
+  border-left: 1px solid var(--mat-sys-outline-variant);
   cursor: pointer;
   overflow: hidden;
 }
 
 .planning-calendar__cell--empty {
+  margin: 0;
   border: 0;
   cursor: default;
 }
@@ -51,6 +55,8 @@
 .planning-calendar__cell--today {
   border-color: var(--mat-sys-primary);
   border-width: 2px;
+  position: relative;
+  z-index: 1;
 }
 
 .planning-calendar__cell--selected {
