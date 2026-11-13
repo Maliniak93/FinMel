@@ -3,12 +3,15 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { _getAnimationsState, MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
-import type { AssetGroupResponse, AssignableAssetResponse } from '../../api/portfolio';
+import type {
+  AssetGroupResponse,
+  AssetGroupTreeItem,
+  AssignableAssetResponse,
+} from '../../api/portfolio';
 import type { DashboardResponse } from '../../api/reporting';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import { stubViewport } from '../../../testing/match-media';
@@ -17,7 +20,6 @@ import { provideI18nTesting } from '../../core/i18n/testing';
 import { ConfirmDialog } from '../../shared/confirm-dialog/confirm-dialog';
 import { formatMoney } from '../../shared/format';
 import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-form-fixtures';
-import { GroupAssetsPanel } from './group-assets-panel/group-assets-panel';
 import { Groups } from './groups';
 import { GroupFormDialog } from './group-form-dialog/group-form-dialog';
 import {
@@ -26,14 +28,24 @@ import {
   blueGroupId,
   freeAssetId,
   greenGroup,
+  greenGroupId,
   groupsDashboard,
-  memberAssetId,
-  otherGroupAssetId,
+  groupTree,
+  skarbonki,
+  treeAccountId,
+  treeAccountWithThreeChildren,
+  treeAccount,
+  treeAsset,
+  treeChild,
+  treeChildOneId,
+  treeChildThreeId,
+  treeChildTwoId,
 } from './testing/group-fixtures';
 
 interface SetupOptions {
   groups?: AssetGroupResponse[];
   assets?: AssignableAssetResponse[];
+  tree?: AssetGroupTreeItem[];
   dashboard?: DashboardResponse | 'fail';
   groupList?: 'ok' | 'fail' | 'pending';
   afterAssignment?: {
@@ -112,7 +124,10 @@ describe('Groups', () => {
       if (url.includes('/api/portfolio/asset-groups/assets')) {
         return jsonResponse(assets);
       }
-      if (url.includes('/api/portfolio/asset-groups/assignment')) {
+      if (url.includes('/api/portfolio/asset-groups/tree')) {
+        return jsonResponse(options.tree ?? groupTree);
+      }
+      if (/\/api\/portfolio\/asset-groups\/[^/]+\/members$/.test(url)) {
         if (options.afterAssignment) {
           groups = options.afterAssignment.groups;
           assets = options.afterAssignment.assets;
@@ -208,20 +223,6 @@ describe('Groups', () => {
       .length;
   }
 
-  function assetRow(name: string): HTMLElement {
-    const row = Array.from(
-      element().querySelectorAll<HTMLElement>('[data-testid="asset-row"]'),
-    ).find((r) => (r.textContent ?? '').includes(name));
-    if (!row) {
-      throw new Error(`No asset row for '${name}'.`);
-    }
-    return row;
-  }
-
-  function checkbox(name: string): HTMLInputElement {
-    return assetRow(name).querySelector<HTMLInputElement>('input[type=checkbox]')!;
-  }
-
   function visibleAssetNames(): string[] {
     return Array.from(element().querySelectorAll<HTMLElement>('[data-testid="asset-row"]')).map(
       (r) => (r.textContent ?? '').trim(),
@@ -234,7 +235,7 @@ describe('Groups', () => {
   }
 
   async function toggle(name: string): Promise<void> {
-    checkbox(name).click();
+    rowCheckbox(name).click();
     await settle();
   }
 
@@ -244,20 +245,6 @@ describe('Groups', () => {
         (call[0] as Request).method === 'GET' &&
         /\/api\/portfolio\/asset-groups$/.test(requestUrl(call[0])),
     ).length;
-  }
-
-  function assetLists(): number {
-    return fetchSpy.mock.calls.filter(
-      (call: unknown[]) =>
-        (call[0] as Request).method === 'GET' &&
-        requestUrl(call[0]).includes('/api/portfolio/asset-groups/assets'),
-    ).length;
-  }
-
-  function assignmentWrites(): Request[] {
-    return fetchSpy.mock.calls
-      .map((call: unknown[]) => call[0] as Request)
-      .filter((r: Request) => r.method === 'PUT' && r.url.includes('/asset-groups/assignment'));
   }
 
   it('puts the title, the add button and the counter line in the page header', async () => {
@@ -524,10 +511,6 @@ describe('Groups', () => {
     return byTestId(element(), 'assets-panel');
   }
 
-  function panelComponent(): GroupAssetsPanel {
-    return fixture.debugElement.query(By.directive(GroupAssetsPanel)).componentInstance;
-  }
-
   function panelOpen(): boolean {
     return panel().classList.contains('mat-drawer-opened');
   }
@@ -549,19 +532,20 @@ describe('Groups', () => {
 
   it('assets button opens the panel', async () => {
     setViewport(1280);
-    await setup();
+    await setup({ tree: [treeAccountWithThreeChildren(blueGroupId), ...skarbonki(1)] });
     expect(panelOpen()).toBe(false);
 
     await selectGroup('Emerytura');
 
     expect(panelOpen()).toBe(true);
     expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('Emerytura');
-    expect(checkbox('Member Bond').checked).toBe(true);
+    expect(rowCheckbox('IKE Obligacje').checked).toBe(true);
+    expect(rowCheckbox('Skarbonka 1').checked).toBe(false);
     expect(byTestId(panel(), 'asset-filter')).toBeTruthy();
     expect(byTestId(panel(), 'select-all-shown')).toBeTruthy();
     expect(panel().querySelector('mat-select')).toBeTruthy();
     const list = element().querySelector('.groups-page__list')!;
-    expect(list.querySelector('[data-testid="asset-row"]')).toBeNull();
+    expect(list.querySelector('[data-testid="tree-row"]')).toBeNull();
     expect(element().querySelectorAll('[data-testid="save-assignment"]')).toHaveLength(1);
     expect(panel().contains(byTestId(element(), 'save-assignment'))).toBe(true);
   });
@@ -584,7 +568,7 @@ describe('Groups', () => {
     });
     await selectGroup('Emerytura');
 
-    await toggle('Free Stock');
+    await toggle('Skarbonka 1');
     byTestId(element(), 'save-assignment').click();
     await settle();
 
@@ -619,7 +603,13 @@ describe('Groups', () => {
 
   it('panel closes and restores focus', async () => {
     setViewport(1280);
-    await setup();
+    await setup({
+      tree: [
+        treeAccountWithThreeChildren(),
+        treeAsset('cushion-cash', 'Cushion Cash', { groupId: greenGroupId }),
+        ...skarbonki(1),
+      ],
+    });
     const opener = byTestId(groupCard('Emerytura'), 'select-group');
     opener.focus();
 
@@ -629,14 +619,14 @@ describe('Groups', () => {
       timeout: 5000,
     });
 
-    await toggle('Free Stock');
+    await toggle('Skarbonka 1');
     byTestId(panel(), 'close-assets-panel').click();
     await settle();
     expect(panelOpen()).toBe(false);
     await vi.waitFor(() => expect(document.activeElement).toBe(opener), { timeout: 5000 });
 
     await selectGroup('Emerytura');
-    expect(checkbox('Free Stock').checked).toBe(false);
+    expect(rowCheckbox('Skarbonka 1').checked).toBe(false);
     await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true), {
       timeout: 5000,
     });
@@ -649,12 +639,12 @@ describe('Groups', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(opener), { timeout: 5000 });
 
     await selectGroup('Emerytura');
-    await toggle('Free Stock');
+    await toggle('Skarbonka 1');
     await selectGroup('Poduszka');
     expect(panelOpen()).toBe(true);
     expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('Poduszka');
-    expect(checkbox('Free Stock').checked).toBe(false);
-    expect(checkbox('Cushion Cash').checked).toBe(true);
+    expect(rowCheckbox('Skarbonka 1').checked).toBe(false);
+    expect(rowCheckbox('Cushion Cash').checked).toBe(true);
   });
 
   it('GroupsPanel_ReopenAfterTransitionsEnabled_TakesFocus', async () => {
@@ -714,102 +704,172 @@ describe('Groups', () => {
     expect(panel().classList.contains('mat-drawer-over')).toBe(false);
   });
 
-  it('lists assignable assets', async () => {
-    await setup();
+  function treeRows(): HTMLElement[] {
+    return Array.from(element().querySelectorAll<HTMLElement>('[data-testid="tree-row"]'));
+  }
 
-    await selectGroup('Emerytura');
+  function treeRow(name: string): HTMLElement {
+    const row = treeRows().find((r) => (byTestId(r, 'row-name').textContent ?? '').trim() === name);
+    if (!row) {
+      throw new Error(`No tree row for '${name}'.`);
+    }
+    return row;
+  }
 
-    expect(element().querySelectorAll('[data-testid="asset-row"]')).toHaveLength(4);
-    expect(checkbox('Member Bond').checked).toBe(true);
-    expect(checkbox('Free Stock').checked).toBe(false);
-    expect(checkbox('Cushion Cash').checked).toBe(false);
-    expect(assetRow('Member Bond').textContent).toContain('Obligacje');
-    expect(assetRow('Cushion Cash').textContent).toContain('Safe');
-    expect(byTestId(assetRow('Cushion Cash'), 'asset-group-chip').textContent).toContain(
-      'Poduszka',
-    );
-    expect(assetRow('Member Bond').querySelector('[data-testid="asset-group-chip"]')).toBeNull();
-    expect(assetRow('Free Stock').querySelector('[data-testid="asset-group-chip"]')).toBeNull();
-    expect(byTestId(assetRow('Old Bond'), 'asset-archived')).toBeTruthy();
-    expect(assetRow('Free Stock').querySelector('[data-testid="asset-archived"]')).toBeNull();
-  });
+  function rowCheckbox(name: string): HTMLInputElement {
+    return treeRow(name).querySelector<HTMLInputElement>('input[type=checkbox]')!;
+  }
 
-  it('filters and selects all', async () => {
-    await setup();
-    await selectGroup('Poduszka');
+  function paginator(): HTMLElement {
+    return panel().querySelector<HTMLElement>('mat-paginator')!;
+  }
 
+  async function nextPage(): Promise<void> {
+    paginator().querySelector<HTMLElement>('.mat-mdc-paginator-navigation-next')!.click();
+    await settle();
+  }
+
+  async function previousPage(): Promise<void> {
+    paginator().querySelector<HTMLElement>('.mat-mdc-paginator-navigation-previous')!.click();
+    await settle();
+  }
+
+  async function toggleExpand(name: string): Promise<void> {
+    byTestId(treeRow(name), 'expand-toggle').click();
+    await settle();
+  }
+
+  async function typeFilter(value: string): Promise<void> {
     const filter = byTestId(element(), 'asset-filter') as HTMLInputElement;
-    filter.value = 'bond';
+    filter.value = value;
     filter.dispatchEvent(new Event('input'));
     await settle();
-    expect(visibleAssetNames().some((n) => n.includes('Free Stock'))).toBe(false);
-    expect(visibleAssetNames()).toHaveLength(2);
+  }
 
-    filter.value = '';
-    filter.dispatchEvent(new Event('input'));
-    await settle();
-    expect(visibleAssetNames()).toHaveLength(4);
+  function memberWrites(): Request[] {
+    return fetchSpy.mock.calls
+      .map((call: unknown[]) => call[0] as Request)
+      .filter((r: Request) => r.method === 'PUT' && /\/asset-groups\/[^/]+\/members$/.test(r.url));
+  }
 
-    panelComponent()['classFilter'].set(4);
-    await settle();
-    expect(visibleAssetNames()).toHaveLength(2);
+  function treeLists(): number {
+    return fetchSpy.mock.calls.filter(
+      (call: unknown[]) =>
+        (call[0] as Request).method === 'GET' &&
+        requestUrl(call[0]).includes('/api/portfolio/asset-groups/tree'),
+    ).length;
+  }
 
-    byTestId(element(), 'select-all-shown').click();
-    await settle();
-    expect(checkbox('Member Bond').checked).toBe(true);
-    expect(checkbox('Old Bond').checked).toBe(true);
+  it('edit tree paginates with expanded rows', async () => {
+    await setup({ tree: [treeAccountWithThreeChildren(), ...skarbonki(20)] });
+    await selectGroup('Emerytura');
 
-    panelComponent()['classFilter'].set(null);
-    await settle();
-    expect(checkbox('Free Stock').checked).toBe(false);
-    expect(checkbox('Cushion Cash').checked).toBe(true);
+    expect(treeRows()).toHaveLength(20);
+    expect(paginator().querySelector('mat-select')).toBeNull();
+    await nextPage();
+    expect(treeRows()).toHaveLength(1);
+    await previousPage();
+
+    await toggleExpand('IKE Obligacje');
+
+    expect(treeRows()).toHaveLength(20);
+    expect(treeRow('OTS0126')).toBeTruthy();
+    await nextPage();
+    expect(treeRows()).toHaveLength(4);
+    expect(paginator().textContent).toContain('24');
   });
 
-  it('saves the assignment diff', async () => {
-    await setup();
+  it('keeps expansion across page and filter', async () => {
+    await setup({ tree: [treeAccountWithThreeChildren(), ...skarbonki(20)] });
     await selectGroup('Emerytura');
-    const assetListsBefore = assetLists();
+    await toggleExpand('IKE Obligacje');
 
-    await toggle('Member Bond');
-    await toggle('Free Stock');
-    await toggle('Cushion Cash');
-    byTestId(element(), 'save-assignment').click();
-    await settle();
+    await nextPage();
+    await previousPage();
+    expect(treeRow('OTS0126')).toBeTruthy();
 
-    await vi.waitFor(() => expect(assignmentWrites()).toHaveLength(2));
-    const bodies = await Promise.all(assignmentWrites().map((r) => r.clone().json()));
-    expect(bodies).toContainEqual({
-      assetIds: expect.arrayContaining([freeAssetId, otherGroupAssetId]),
-      groupId: blueGroupId,
+    await typeFilter('Skarbonka 3');
+    await typeFilter('');
+    expect(treeRow('OTS0126')).toBeTruthy();
+  });
+
+  it('greyed row with chip can be checked', async () => {
+    await setup({
+      tree: [treeAccountWithThreeChildren(greenGroupId), ...skarbonki(1)],
     });
-    expect(bodies).toContainEqual({ assetIds: [memberAssetId], groupId: null });
-    const added = bodies.find((b) => b.groupId === blueGroupId);
-    expect(added.assetIds).toHaveLength(2);
-    await vi.waitFor(() => expect(assetLists()).toBeGreaterThan(assetListsBefore));
-  });
-
-  it('skips an empty side of the assignment diff', async () => {
-    await setup();
     await selectGroup('Emerytura');
 
-    await toggle('Free Stock');
+    const account = treeRow('IKE Obligacje');
+    expect(account.dataset['greyed']).toBe('true');
+    expect(byTestId(account, 'asset-group-chip').textContent).toContain('Poduszka');
+    expect(rowCheckbox('IKE Obligacje').checked).toBe(false);
+
+    await toggleExpand('IKE Obligacje');
+    const child = treeRow('OTS0126');
+    expect(child.dataset['greyed']).toBe('true');
+    expect(byTestId(child, 'asset-group-chip').textContent).toContain('Poduszka');
+    expect(rowCheckbox('OTS0126').checked).toBe(false);
+    expect(rowCheckbox('OTS0126').disabled).toBe(false);
+
+    await settle();
+    rowCheckbox('OTS0126').click();
+    await settle();
+    expect(rowCheckbox('OTS0126').checked).toBe(true);
+  });
+
+  it('saves desired state through members', async () => {
+    await setup({ tree: [treeAccountWithThreeChildren(blueGroupId), ...skarbonki(1)] });
+    await selectGroup('Emerytura');
+    await toggleExpand('IKE Obligacje');
+    expect(rowCheckbox('IKE Obligacje').checked).toBe(true);
+    expect(rowCheckbox('ROR0126').checked).toBe(true);
+    const treeListsBefore = treeLists();
+    const groupListsBefore = groupLists();
+
+    rowCheckbox('ROR0126').click();
+    await settle();
     byTestId(element(), 'save-assignment').click();
     await settle();
 
-    await vi.waitFor(() => expect(assignmentWrites()).toHaveLength(1));
-    expect(await assignmentWrites()[0].clone().json()).toEqual({
-      assetIds: [freeAssetId],
-      groupId: blueGroupId,
+    await vi.waitFor(() => expect(memberWrites()).toHaveLength(1));
+    const [write] = memberWrites();
+    expect(write.url).toContain(`/asset-groups/${blueGroupId}/members`);
+    const body = await write.clone().json();
+    expect(body.accountIds).toContain(treeAccountId);
+    expect(body.assetIds).not.toContain(treeChildTwoId);
+    expect(body.assetIds).toContain(treeChildOneId);
+    expect(body.assetIds).toContain(treeChildThreeId);
+    await vi.waitFor(() => {
+      expect(treeLists()).toBeGreaterThan(treeListsBefore);
+      expect(groupLists()).toBeGreaterThan(groupListsBefore);
     });
   });
 
-  it('sends nothing when the selection did not change', async () => {
-    await setup();
+  it('checking an account leaves an exception child alone', async () => {
+    const account = treeAccount(treeAccountId, 'IKE Obligacje', [
+      treeChild(treeChildOneId, 'OTS0126', { assetClass: 4 }),
+      treeChild(treeChildTwoId, 'ROR0126', {
+        assetClass: 4,
+        groupId: greenGroupId,
+        isException: true,
+      }),
+    ]);
+    await setup({ tree: [account] });
     await selectGroup('Emerytura');
+    await toggleExpand('IKE Obligacje');
+
+    rowCheckbox('IKE Obligacje').click();
+    await settle();
+    expect(rowCheckbox('OTS0126').checked).toBe(true);
+    expect(rowCheckbox('ROR0126').checked).toBe(false);
 
     byTestId(element(), 'save-assignment').click();
     await settle();
 
-    expect(assignmentWrites()).toHaveLength(0);
+    await vi.waitFor(() => expect(memberWrites()).toHaveLength(1));
+    const body = await memberWrites()[0].clone().json();
+    expect(body.accountIds).toContain(treeAccountId);
+    expect(body.assetIds).toContain(treeChildOneId);
+    expect(body.assetIds).not.toContain(treeChildTwoId);
   });
 });

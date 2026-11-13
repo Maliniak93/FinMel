@@ -14,6 +14,7 @@ import {
   getApiPortfolioAccounts,
   getApiPortfolioAssetGroups,
   getApiPortfolioAssetGroupsAssets,
+  getApiPortfolioAssetGroupsTree,
   type AssetGroupResponse,
 } from '../../api/portfolio';
 import { getApiReportingDashboard } from '../../api/reporting';
@@ -101,6 +102,18 @@ export class Groups {
     },
   });
 
+  protected readonly treeResource = resource({
+    loader: async ({ abortSignal }) => {
+      const result = await getApiPortfolioAssetGroupsTree({ signal: abortSignal });
+      if (result.error) {
+        throw new Error(
+          readProblemDetails(result.error).detail ?? translate('groups.assets.loadFailed'),
+        );
+      }
+      return result.data;
+    },
+  });
+
   private readonly accountsResource = resource({
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioAccounts({ signal: abortSignal });
@@ -167,6 +180,7 @@ export class Groups {
       this.closePanel();
     }
     this.assetsResource.reload();
+    this.treeResource.reload();
     this.reloadGroups();
   }
 
@@ -213,6 +227,7 @@ export class Groups {
       this.closePanel();
     }
     this.assetsResource.reload();
+    this.treeResource.reload();
     this.reloadGroups();
   }
 

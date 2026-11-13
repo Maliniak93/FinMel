@@ -1,6 +1,8 @@
 import type {
   AccountResponse,
   AssetGroupResponse,
+  AssetGroupTreeChild,
+  AssetGroupTreeItem,
   AssignableAssetResponse,
 } from '../../../api/portfolio';
 import type { DashboardResponse } from '../../../api/reporting';
@@ -126,6 +128,95 @@ export const assignableAssets: AssignableAssetResponse[] = [
     isArchived: true,
   },
 ];
+
+export function treeChild(
+  assetId: string,
+  name: string,
+  overrides: Partial<AssetGroupTreeChild> = {},
+): AssetGroupTreeChild {
+  return {
+    assetId,
+    name,
+    assetClass: 2,
+    groupId: null,
+    isException: false,
+    isArchived: false,
+    ...overrides,
+  };
+}
+
+export function treeAccount(
+  accountId: string,
+  name: string,
+  children: AssetGroupTreeChild[],
+  overrides: Partial<AssetGroupTreeItem> = {},
+): AssetGroupTreeItem {
+  return {
+    kind: 'Account',
+    accountId,
+    assetId: null,
+    name,
+    accountType: 0,
+    assetClass: null,
+    groupId: null,
+    cashAssetId: null,
+    isArchived: false,
+    children,
+    ...overrides,
+  };
+}
+
+export function treeAsset(
+  assetId: string,
+  name: string,
+  overrides: Partial<AssetGroupTreeItem> = {},
+): AssetGroupTreeItem {
+  return {
+    kind: 'Asset',
+    accountId: null,
+    assetId,
+    name,
+    accountType: null,
+    assetClass: 0,
+    groupId: null,
+    cashAssetId: null,
+    isArchived: false,
+    children: [],
+    ...overrides,
+  };
+}
+
+export const treeAccountId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+export const treeChildOneId = 'f1f1f1f1-f1f1-f1f1-f1f1-f1f1f1f1f1f1';
+export const treeChildTwoId = 'f2f2f2f2-f2f2-f2f2-f2f2-f2f2f2f2f2f2';
+export const treeChildThreeId = 'f3f3f3f3-f3f3-f3f3-f3f3-f3f3f3f3f3f3';
+
+export function treeAccountWithThreeChildren(
+  groupId: string | null = null,
+  childGroupId: string | null = groupId,
+): AssetGroupTreeItem {
+  return treeAccount(
+    treeAccountId,
+    'IKE Obligacje',
+    [
+      treeChild(treeChildOneId, 'OTS0126', { assetClass: 4, groupId: childGroupId }),
+      treeChild(treeChildTwoId, 'ROR0126', { assetClass: 4, groupId: childGroupId }),
+      treeChild(treeChildThreeId, 'COI0126', { assetClass: 4, groupId: childGroupId }),
+    ],
+    { groupId },
+  );
+}
+
+export function skarbonki(count: number): AssetGroupTreeItem[] {
+  return Array.from({ length: count }, (_, index) =>
+    treeAsset(
+      `00000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`,
+      `Skarbonka ${index + 1}`,
+    ),
+  );
+}
+
+export const groupTree: AssetGroupTreeItem[] = [treeAccountWithThreeChildren(), ...skarbonki(2)];
 
 export const groupsDashboard: DashboardResponse = {
   netWorthPln: 6300,

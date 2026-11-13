@@ -841,6 +841,9 @@
       "classFilter": "Klasa",
       "allClasses": "Wszystkie klasy",
       "selectAllShown": "Zaznacz wszystkie widoczne",
+      "expand": "Rozwiń",
+      "collapse": "Zwiń",
+      "chipTooltip": "W grupie „{{ name }}” — zaznaczenie przeniesie tu",
       "class": "Klasa",
       "location": "Rachunek lub miejsce",
       "group": "Grupa"
