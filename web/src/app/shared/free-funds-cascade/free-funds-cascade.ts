@@ -28,6 +28,7 @@ export interface CascadeContribution {
   readonly groupId: string;
   readonly name: string;
   readonly amountPln: number | string;
+  readonly netPln?: number | string | null;
 }
 
 export interface CascadeGroup {
@@ -59,6 +60,7 @@ interface CascadeColumn {
   readonly key: ColumnKey;
   readonly title: string | null;
   readonly rows: readonly CascadeRow[];
+  readonly segments: SplitBarSegment[];
 }
 
 const ROW_KEYS: readonly RowKey[] = ['incomes', 'expenses', 'contributions', 'free'];
@@ -82,15 +84,17 @@ export class FreeFundsCascade {
 
   protected readonly formatMoney = formatMoney;
 
-  protected readonly segments = computed<SplitBarSegment[]>(() => {
+  private segmentsFor(column: ColumnKey): SplitBarSegment[] {
     const groups = this.groups();
-    return this.contributions().map((contribution) => ({
-      key: contribution.groupId,
-      label: contribution.name,
-      value: Number(contribution.amountPln),
-      color: groupColor(groups.find((group) => group.id === contribution.groupId)?.color),
-    }));
-  });
+    return this.contributions()
+      .map((contribution) => ({
+        key: contribution.groupId,
+        label: contribution.name,
+        value: Number(column === 'plan' ? contribution.amountPln : (contribution.netPln ?? 0)),
+        color: groupColor(groups.find((group) => group.id === contribution.groupId)?.color),
+      }))
+      .filter((segment) => segment.value > 0);
+  }
 
   protected readonly columns = computed<CascadeColumn[]>(() => {
     const labels = this.labels();
@@ -111,6 +115,7 @@ export class FreeFundsCascade {
     ): CascadeColumn => ({
       key,
       title,
+      segments: this.segmentsFor(key),
       rows: ROW_KEYS.map((rowKey) => ({
         key: rowKey,
         label: labels[rowKey],
