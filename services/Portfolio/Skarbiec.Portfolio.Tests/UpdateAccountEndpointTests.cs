@@ -17,7 +17,7 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class UpdateAccountEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task DefaultGroupChange_LeavesAssets()
+    public async Task GroupChange_MovesInheritingAssets()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
@@ -40,8 +40,8 @@ public sealed class UpdateAccountEndpointTests(SkarbiecContainersFixture contain
         Assert.Equal(second.Id, (await response.ReadJsonAsync(cancellationToken)).GetProperty("groupId").GetGuid());
         var after = await ReadAssetGroupStatesAsync(userId, cancellationToken, cashId, stockId);
         Assert.Equal(first.Id, before[cashId].GroupId);
-        Assert.Equal(before[cashId], after[cashId]);
-        Assert.Equal(before[stockId], after[stockId]);
+        Assert.Equal((second.Id, before[cashId].Version + 1), after[cashId]);
+        Assert.Equal((second.Id, before[stockId].Version + 1), after[stockId]);
     }
 
     [Fact]

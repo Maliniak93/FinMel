@@ -59,19 +59,22 @@ public sealed class UpdateAccountHandler(
         account.Name = request.Name;
         cash.Name = request.Name;
 
-        if (account.Type != AccountType.Bank)
+        var components = await dbContext.Assets.Where(a => a.AccountId == id && a.Id != cash.Id).ToListAsync(cancellationToken);
+        var changed = AccountGroupInheritance.ApplyAccountGroup(
+            account, request.OutsideNetWorth ? null : request.GroupId, [cash, .. components]);
+
+        if (account.OutsideNetWorth != request.OutsideNetWorth)
         {
-            account.DefaultGroupId = request.GroupId;
-        }
-        else
-        {
-            var groupId = request.OutsideNetWorth ? null : request.GroupId;
-            if (cash.GroupId != groupId || account.OutsideNetWorth != request.OutsideNetWorth)
+            account.OutsideNetWorth = request.OutsideNetWorth;
+            if (!changed.Contains(cash))
             {
-                cash.GroupId = groupId;
-                account.OutsideNetWorth = request.OutsideNetWorth;
-                await positionEventPublisher.PublishChangedAsync(cash, cancellationToken);
+                changed.Add(cash);
             }
+        }
+
+        foreach (var asset in changed)
+        {
+            await positionEventPublisher.PublishChangedAsync(asset, cancellationToken);
         }
 
         if (terms is not null)

@@ -59,7 +59,7 @@ public sealed class AccountCashOutboxTests(SkarbiecContainersFixture containers)
     }
 
     [Fact]
-    public async Task UpdateDefaultGroup_PublishesNothing()
+    public async Task UpdateGroup_PublishesCashAndInheritingAssets()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var scope = Provider.CreateAsyncScope();
@@ -74,7 +74,7 @@ public sealed class AccountCashOutboxTests(SkarbiecContainersFixture containers)
             accountId, new UpdateAccountRequest { Name = "XTB IKE", GroupId = secondId }, cancellationToken);
 
         Assert.True(updated.IsSuccess);
-        Assert.Equal(outboxRowsBefore, await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken));
+        Assert.Equal(outboxRowsBefore + 2, await dbContext.Set<OutboxMessage>().CountAsync(cancellationToken));
     }
 
     [Fact]

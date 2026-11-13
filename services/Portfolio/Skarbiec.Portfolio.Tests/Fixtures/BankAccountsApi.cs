@@ -104,11 +104,12 @@ internal static class BankAccountsApi
         decimal annualInterestRatePercent = 0m,
         decimal balance = 0m,
         DateOnly? depositedOn = null,
-        bool outsideNetWorth = false)
+        bool outsideNetWorth = false,
+        Guid? groupId = null)
     {
         var response = await client.PostAsJsonAsync(
             AccountsUri,
-            NewBankAccountBody(name, variant, currency, name, annualInterestRatePercent, outsideNetWorth: outsideNetWorth),
+            NewBankAccountBody(name, variant, currency, name, annualInterestRatePercent, groupId: groupId, outsideNetWorth: outsideNetWorth),
             cancellationToken);
         response.EnsureSuccessStatusCode();
         var created = await response.ReadJsonAsync(cancellationToken);

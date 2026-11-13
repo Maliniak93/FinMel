@@ -1,4 +1,6 @@
+using System.Net.Http.Json;
 using Skarbiec.Contracts;
+using Skarbiec.Portfolio.Features.Accounts.UpdateAccount;
 using Skarbiec.Portfolio.Features.Transfers.CreateTransfer;
 using static Skarbiec.Portfolio.Tests.Fixtures.AssetGroupsApi;
 using static Skarbiec.Portfolio.Tests.Fixtures.BankAccountsApi;
@@ -41,14 +43,8 @@ internal static class GroupFundingApi
         string currency = "PLN",
         DateOnly? depositedOn = null)
     {
-        var account = await client.CreateBankAccountAsync(
-            cancellationToken, name, currency: currency, balance: balance, depositedOn: depositedOn ?? EarlierMonthDay);
-        if (groupId is not null)
-        {
-            await client.AssignAssetsAsync(groupId, cancellationToken, account.MoneyAssetId);
-        }
-
-        return account;
+        return await client.CreateBankAccountAsync(
+            cancellationToken, name, currency: currency, balance: balance, depositedOn: depositedOn ?? EarlierMonthDay, groupId: groupId);
     }
 
     public sealed record BrokerageInGroup(Guid AccountId, Guid CashAssetId, Guid EtfAssetId);
@@ -65,7 +61,11 @@ internal static class GroupFundingApi
             cancellationToken, cashBalance: balance, accountName: name, depositedOn: EarlierMonthDay);
         if (cashGroupId is not null)
         {
-            await client.AssignAssetsAsync(cashGroupId, cancellationToken, holding.CashAssetId);
+            var response = await client.PutAsJsonAsync(
+                AccountsApi.AccountUri(holding.AccountId),
+                new UpdateAccountRequest { Name = name, GroupId = cashGroupId },
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
         }
 
         if (etfGroupId is not null)

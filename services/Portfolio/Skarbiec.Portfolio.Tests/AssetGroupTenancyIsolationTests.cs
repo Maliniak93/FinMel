@@ -126,6 +126,56 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
     }
 
     [Fact]
+    public async Task MembersOfAnotherUserAre404()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var ownerId = Guid.NewGuid();
+        var strangerId = Guid.NewGuid();
+        using var owner = Factory.CreateAuthenticatedClient(ownerId);
+        var ownerGroup = await owner.CreateAssetGroupAsync(cancellationToken, "Owner", ColorKey(0));
+        var ownerAccount = await owner.CreateGroupedAccountAsync(ownerGroup.Id, cancellationToken, "Owner account");
+        var ownerAsset = await owner.AddAssetAsync(ownerAccount.AccountId, cancellationToken, "Owner asset");
+        using var stranger = Factory.CreateAuthenticatedClient(strangerId);
+        var strangerGroup = await stranger.CreateAssetGroupAsync(cancellationToken, "Stranger", ColorKey(0));
+        var strangerAccount = await stranger.CreateGroupedAccountAsync(null, cancellationToken, "Stranger account");
+        var ownerBefore = await ReadAssetInheritanceAsync(ownerId, cancellationToken, ownerAccount.CashAssetId, ownerAsset);
+
+        var foreignAccount = await stranger.PutAsJsonAsync(
+            MembersUri(strangerGroup.Id), NewMembersBody([ownerAccount.AccountId]), cancellationToken);
+        var foreignAsset = await stranger.PutAsJsonAsync(
+            MembersUri(strangerGroup.Id), NewMembersBody([strangerAccount.AccountId], [ownerAsset]), cancellationToken);
+        var foreignGroup = await stranger.PutAsJsonAsync(
+            MembersUri(ownerGroup.Id), NewMembersBody([strangerAccount.AccountId]), cancellationToken);
+
+        await foreignAccount.AssertProblemAsync(HttpStatusCode.NotFound, AccountNotFoundErrorCode, cancellationToken);
+        await foreignAsset.AssertProblemAsync(HttpStatusCode.NotFound, AssetNotFoundErrorCode, cancellationToken);
+        await foreignGroup.AssertProblemAsync(HttpStatusCode.NotFound, AssetGroupNotFoundErrorCode, cancellationToken);
+        Assert.Equal(ownerGroup.Id, await ReadAccountGroupAsync(ownerId, ownerAccount.AccountId, cancellationToken));
+        Assert.Null(await ReadAccountGroupAsync(strangerId, strangerAccount.AccountId, cancellationToken));
+        Assert.Equal(ownerBefore, await ReadAssetInheritanceAsync(ownerId, cancellationToken, ownerAccount.CashAssetId, ownerAsset));
+    }
+
+    [Fact]
+    public async Task TreeShowsOnlyOwnItems()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var ownerAccount = await owner.CreateGroupedAccountAsync(null, cancellationToken, "Owner account");
+        var ownerAsset = await owner.AddAssetAsync(ownerAccount.AccountId, cancellationToken, "Owner asset");
+        await owner.AddCashAssetAsync(cancellationToken, name: "Owner place");
+        using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
+        var strangerAccount = await stranger.CreateGroupedAccountAsync(null, cancellationToken, "Stranger account");
+
+        var items = await stranger.GetAssetGroupTreeAsync(cancellationToken);
+
+        var only = Assert.Single(items);
+        Assert.Equal(strangerAccount.AccountId, only.GetProperty("accountId").GetGuid());
+        Assert.Empty(TreeChildren(only));
+        Assert.NotEqual(ownerAsset, only.OptionalGuid("assetId"));
+        Assert.Single(await owner.GetAssetGroupTreeAsync(cancellationToken), i => i.OptionalGuid("accountId") == ownerAccount.AccountId);
+    }
+
+    [Fact]
     public async Task ForeignGroupOnCreateRequests()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -178,7 +228,7 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
         await using var dbContext = CreateDbContext(strangerId);
         Assert.Equal(3, await dbContext.Set<Account>().CountAsync(cancellationToken));
         Assert.Equal(1, await dbContext.Set<CashPlace>().CountAsync(cancellationToken));
-        Assert.All(await dbContext.Set<Account>().ToListAsync(cancellationToken), a => Assert.Null(a.DefaultGroupId));
+        Assert.All(await dbContext.Set<Account>().ToListAsync(cancellationToken), a => Assert.Null(a.GroupId));
         Assert.DoesNotContain(await dbContext.Assets.ToListAsync(cancellationToken), a => a.GroupId == foreignGroupId);
     }
 

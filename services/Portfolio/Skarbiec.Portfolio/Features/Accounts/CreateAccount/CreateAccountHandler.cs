@@ -58,7 +58,7 @@ public sealed class CreateAccountHandler(PortfolioDbContext dbContext, PositionE
             Type = request.Type,
             Wrapper = request.Wrapper,
             Currency = currency,
-            DefaultGroupId = request.Type == AccountType.Bank ? null : request.GroupId,
+            GroupId = request.OutsideNetWorth ? null : request.GroupId,
             OutsideNetWorth = request.OutsideNetWorth
         };
 
@@ -66,7 +66,7 @@ public sealed class CreateAccountHandler(PortfolioDbContext dbContext, PositionE
         {
             Id = Guid.NewGuid(),
             AccountId = account.Id,
-            GroupId = request.OutsideNetWorth ? null : request.GroupId,
+            GroupId = account.GroupId,
             AssetClass = AccountCash.MoneyClassOf(request.Type),
             Name = account.Name,
             Currency = currency,

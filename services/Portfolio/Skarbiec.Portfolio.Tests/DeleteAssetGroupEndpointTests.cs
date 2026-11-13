@@ -51,6 +51,34 @@ public sealed class DeleteAssetGroupEndpointTests(SkarbiecContainersFixture cont
     }
 
     [Fact]
+    public async Task DeletingAccountGroupAndExceptions()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        using var client = Factory.CreateAuthenticatedClient(userId);
+        var groupA = await client.CreateAssetGroupAsync(cancellationToken, "A", ColorKey(0));
+        var groupB = await client.CreateAssetGroupAsync(cancellationToken, "B", ColorKey(1));
+        var inAGroup = await client.CreateGroupedAccountAsync(groupA.Id, cancellationToken, "In A");
+        var inheritor = await client.AddAssetAsync(inAGroup.AccountId, cancellationToken, "Inheritor", AssetClass.Etf);
+        var inBGroup = await client.CreateGroupedAccountAsync(groupB.Id, cancellationToken, "In B");
+        var exception = await client.AddAssetAsync(inBGroup.AccountId, cancellationToken, "Exception", groupId: groupA.Id);
+        var before = await ReadAssetInheritanceAsync(
+            userId, cancellationToken, inAGroup.CashAssetId, inheritor, inBGroup.CashAssetId, exception);
+
+        var response = await client.DeleteAsync(AssetGroupUri(groupA.Id), cancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Null(await ReadAccountGroupAsync(userId, inAGroup.AccountId, cancellationToken));
+        Assert.Equal(groupB.Id, await ReadAccountGroupAsync(userId, inBGroup.AccountId, cancellationToken));
+        var after = await ReadAssetInheritanceAsync(
+            userId, cancellationToken, inAGroup.CashAssetId, inheritor, inBGroup.CashAssetId, exception);
+        Assert.Equal((null, false, before[inAGroup.CashAssetId].Version + 1), after[inAGroup.CashAssetId]);
+        Assert.Equal((null, false, before[inheritor].Version + 1), after[inheritor]);
+        Assert.Equal((null, true, before[exception].Version + 1), after[exception]);
+        Assert.Equal(before[inBGroup.CashAssetId], after[inBGroup.CashAssetId]);
+    }
+
+    [Fact]
     public async Task Delete_ClearsAssetsAndPublishes()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

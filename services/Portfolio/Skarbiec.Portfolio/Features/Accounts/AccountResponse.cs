@@ -13,7 +13,7 @@ public sealed record AccountResponse
     public required bool IsArchived { get; init; }
     public required Guid CashAssetId { get; init; }
 
-    /// <summary>The default group of new assets; for a Bank account, the group of its balance.</summary>
+    /// <summary>The account's group, inherited by its money asset and every component without an exception.</summary>
     public Guid? GroupId { get; init; }
 
     /// <summary>The account's money in its currency, the quantity of its cash asset.</summary>
@@ -49,7 +49,7 @@ public static class AccountMappingExtensions
         Currency = account.Currency,
         IsArchived = account.IsArchived,
         CashAssetId = cash.Id,
-        GroupId = account.Type == AccountType.Bank ? cash.GroupId : account.DefaultGroupId,
+        GroupId = account.GroupId,
         CashBalance = cash.Quantity,
         OutsideNetWorth = account.OutsideNetWorth
     };

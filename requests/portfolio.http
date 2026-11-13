@@ -838,6 +838,21 @@ Content-Type: application/json
   "groupId": "{{createAssetGroup.response.body.id}}"
 }
 
+### The panel tree: accounts with their Stock/Etf/Bond children, deposits, metals and cash-place balances (no money asset rows)
+# @name assetGroupTree
+GET {{baseUrl}}/api/portfolio/asset-groups/tree
+Authorization: Bearer {{authToken}}
+
+### Set the checked accounts and assets of a group (an account moves with its inheriting components; 404 NotFound.AssetGroup, NotFound.Account, NotFound.Asset; 400 Validation.AccountCashManaged for a money asset id)
+PUT {{baseUrl}}/api/portfolio/asset-groups/{{createAssetGroup.response.body.id}}/members
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "accountIds": ["{{assetGroupTree.response.body.$[0].accountId}}"],
+  "assetIds": []
+}
+
 ### Save the free-funds shares of the regular groups (exactly those groups, each 0 to 100 with one decimal, summing to 100: 400 Validation.SharesGroupMismatch, Validation.SharesSum, Validation.InvalidShare; a new regular group starts at 0, the first takes 100)
 PUT {{baseUrl}}/api/portfolio/asset-groups/shares
 Authorization: Bearer {{authToken}}

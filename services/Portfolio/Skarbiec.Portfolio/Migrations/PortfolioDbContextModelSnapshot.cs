@@ -18,7 +18,7 @@ namespace Skarbiec.Portfolio.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.13")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -204,7 +204,7 @@ namespace Skarbiec.Portfolio.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
-                    b.Property<Guid?>("DefaultGroupId")
+                    b.Property<Guid?>("GroupId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("IsArchived")
@@ -263,6 +263,12 @@ namespace Skarbiec.Portfolio.Migrations
 
                     b.Property<Guid?>("GroupId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("GroupIsException")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("GroupRepublishPending")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid?>("InstrumentId")
                         .HasColumnType("uuid");

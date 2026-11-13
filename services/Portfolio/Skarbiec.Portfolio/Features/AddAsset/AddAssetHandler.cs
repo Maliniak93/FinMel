@@ -95,13 +95,21 @@ public sealed class AddAssetHandler(
         {
             Id = Guid.NewGuid(),
             AccountId = account.Value?.Id,
-            GroupId = request.GroupId,
             AssetClass = request.AssetClass,
             Name = request.Name,
             Currency = request.Currency,
             // Currency-valued is the fallthrough: AddAssetRequest.Validate already allowed it for this class.
             ValuationMode = AssetValuationMode.CurrencyValued,
         };
+
+        if (account.Value is { } owner)
+        {
+            AccountGroupInheritance.ForNewComponent(asset, owner, request.GroupId);
+        }
+        else
+        {
+            asset.GroupId = request.GroupId;
+        }
 
         if (request.InstrumentId is { } instrumentId)
         {

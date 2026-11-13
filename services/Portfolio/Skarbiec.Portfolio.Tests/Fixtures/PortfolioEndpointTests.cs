@@ -53,6 +53,30 @@ public abstract class PortfolioEndpointTests(SkarbiecContainersFixture container
         return rows.ToDictionary(r => r.Id, r => (r.GroupId, r.Version));
     }
 
+    protected async Task<Dictionary<Guid, (Guid? GroupId, bool IsException, long Version)>> ReadAssetInheritanceAsync(
+        Guid userId, CancellationToken cancellationToken, params Guid[] assetIds)
+    {
+        await using var dbContext = CreateDbContext(userId);
+        var rows = await dbContext.Assets
+            .AsNoTracking()
+            .Where(a => assetIds.Contains(a.Id))
+            .Select(a => new { a.Id, a.GroupId, a.GroupIsException, a.Version })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(r => r.Id, r => (r.GroupId, r.GroupIsException, r.Version));
+    }
+
+    protected async Task<Guid?> ReadAccountGroupAsync(Guid userId, Guid accountId, CancellationToken cancellationToken)
+    {
+        await using var dbContext = CreateDbContext(userId);
+
+        return await dbContext.Set<Account>()
+            .AsNoTracking()
+            .Where(a => a.Id == accountId)
+            .Select(a => a.GroupId)
+            .SingleAsync(cancellationToken);
+    }
+
     protected async Task<Guid> AddQuotedHoldingAsync(
         HttpClient client,
         Guid accountId,
