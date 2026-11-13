@@ -2,8 +2,8 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
 import { provideI18nTesting } from '../../core/i18n/testing';
-import { formatMoney } from '../format';
-import { FreeFundsCascade } from './free-funds-cascade';
+import { formatMoney, formatPercent } from '../format';
+import { type CascadeContribution, FreeFundsCascade } from './free-funds-cascade';
 
 const labels = {
   incomes: 'Incomes label',
@@ -18,6 +18,7 @@ const labels = {
 const groups = [
   { id: 'g-1', color: 'blue' },
   { id: 'g-2', color: 'green' },
+  { id: 'g-3', color: 'amber' },
 ];
 
 @Component({
@@ -34,7 +35,7 @@ class Host {
   labels = labels;
   plan = { incomes: 13600, expenses: 5679.99, contributions: 3000, free: 4920.01 };
   actual: { incomes: number; expenses: number; contributions: number; free: number } | null = null;
-  contributions = [
+  contributions: CascadeContribution[] = [
     { groupId: 'g-1', name: 'Emerytura', amountPln: 2000 },
     { groupId: 'g-2', name: 'Inwestycje', amountPln: 1000 },
   ];
@@ -53,6 +54,18 @@ describe('FreeFundsCascade', () => {
 
   function byId(element: HTMLElement, testId: string): HTMLElement | null {
     return element.querySelector<HTMLElement>(`[data-testid="${testId}"]`);
+  }
+
+  function splitBar(element: HTMLElement, barTestId: string): HTMLElement {
+    return byId(element, barTestId)!.querySelector<HTMLElement>('app-split-bar [role="img"]')!;
+  }
+
+  function segmentsOf(bar: HTMLElement): HTMLElement[] {
+    return [...bar.querySelectorAll<HTMLElement>('.split-bar__segment')];
+  }
+
+  function flexGrow(segment: HTMLElement): number {
+    return parseFloat(segment.style.getPropertyValue('flex-grow'));
   }
 
   it('renders the four rows on one axis', async () => {
@@ -129,5 +142,55 @@ describe('FreeFundsCascade', () => {
     const segments = [...bar.querySelectorAll<HTMLElement>('.split-bar__segment')];
     expect(segments[0].style.backgroundColor).toContain('--sk-g-blue');
     expect(segments[1].style.backgroundColor).toContain('--sk-g-none');
+  });
+
+  it('segments_PerColumn_UsePlanAndNetAmounts', async () => {
+    const element = await render((host) => {
+      host.actual = { incomes: 13600, expenses: 5633.14, contributions: 7966.86, free: 0 };
+      host.contributions = [
+        { groupId: 'g-1', name: 'Emerytura', amountPln: 2000, netPln: 4000 },
+        { groupId: 'g-3', name: 'Poduszka', amountPln: 0, netPln: 3966.86 },
+      ];
+    });
+
+    const planBar = splitBar(element, 'cascade-bar-plan-contributions');
+    const planSegments = segmentsOf(planBar);
+    expect(planSegments).toHaveLength(1);
+    expect(planSegments[0].style.backgroundColor).toContain('--sk-g-blue');
+    expect(flexGrow(planSegments[0])).toBeCloseTo(2000, 2);
+    expect(planBar.getAttribute('aria-label')).toBe(`Emerytura ${formatPercent(100)}`);
+
+    const actualBar = splitBar(element, 'cascade-bar-actual-contributions');
+    const actualSegments = segmentsOf(actualBar);
+    expect(actualSegments).toHaveLength(2);
+    expect(actualSegments[0].style.backgroundColor).toContain('--sk-g-blue');
+    expect(flexGrow(actualSegments[0])).toBeCloseTo(4000, 2);
+    expect(actualSegments[1].style.backgroundColor).toContain('--sk-g-amber');
+    expect(flexGrow(actualSegments[1])).toBeCloseTo(3966.86, 2);
+    expect(actualBar.getAttribute('aria-label')).toContain('Emerytura');
+    expect(actualBar.getAttribute('aria-label')).toContain('Poduszka');
+  });
+
+  it('segments_NonPositiveAmount_AreNotDrawn', async () => {
+    const element = await render((host) => {
+      host.actual = { incomes: 13600, expenses: 5633.14, contributions: 1000, free: 6966.86 };
+      host.contributions = [
+        { groupId: 'g-1', name: 'Emerytura', amountPln: 2000, netPln: -500 },
+        { groupId: 'g-2', name: 'Inwestycje', amountPln: 1000, netPln: null },
+        { groupId: 'g-3', name: 'Poduszka', amountPln: 0, netPln: 3966.86 },
+      ];
+    });
+
+    const planBar = splitBar(element, 'cascade-bar-plan-contributions');
+    expect(segmentsOf(planBar)).toHaveLength(2);
+    expect(planBar.getAttribute('aria-label')).toContain('Emerytura');
+    expect(planBar.getAttribute('aria-label')).toContain('Inwestycje');
+    expect(planBar.getAttribute('aria-label')).not.toContain('Poduszka');
+
+    const actualBar = splitBar(element, 'cascade-bar-actual-contributions');
+    const actualSegments = segmentsOf(actualBar);
+    expect(actualSegments).toHaveLength(1);
+    expect(actualSegments[0].style.backgroundColor).toContain('--sk-g-amber');
+    expect(actualBar.getAttribute('aria-label')).toBe(`Poduszka ${formatPercent(100)}`);
   });
 });

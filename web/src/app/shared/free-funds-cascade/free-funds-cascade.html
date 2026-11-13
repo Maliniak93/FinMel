@@ -27,7 +27,7 @@
                 [style.width.%]="row.percent"
                 [attr.data-testid]="row.barTestId"
               >
-                <app-split-bar [segments]="segments()" />
+                <app-split-bar [segments]="column.segments" />
               </div>
             } @else {
               <div
