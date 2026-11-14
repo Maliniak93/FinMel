@@ -76,7 +76,28 @@ function assignmentPanel(page: Page): Locator {
 }
 
 function assetRow(page: Page, name: string): Locator {
-  return assignmentPanel(page).getByTestId('asset-row').filter({ hasText: name });
+  return assignmentPanel(page).getByTestId('tree-row').filter({ hasText: name });
+}
+
+async function expandAccount(page: Page, account: string): Promise<void> {
+  const toggle = assetRow(page, account).first().getByTestId('expand-toggle');
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+  }
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
+async function assignRow(
+  page: Page,
+  group: string,
+  target: { row: string; account?: string },
+): Promise<void> {
+  await openAssignment(page, group);
+  if (target.account) {
+    await expandAccount(page, target.account);
+  }
+  await assetRow(page, target.row).getByRole('checkbox').check();
+  await saveAssignment(page);
 }
 
 function groupLegend(page: Page): Locator {
@@ -174,12 +195,7 @@ async function pickInstrument(page: Page, dialog: Locator, query: string, ticker
   await expect(dialog.getByText(`Zweryfikowano: ${ticker}`)).toBeVisible();
 }
 
-async function openBuyStockDialog(
-  page: Page,
-  account: string,
-  expectedGroup: string,
-  tab?: string,
-): Promise<Locator> {
+async function openBuyStockDialog(page: Page, account: string, tab?: string): Promise<Locator> {
   await openPage(page, 'Akcje i ETF');
   if (tab) {
     await page.getByRole('tab', { name: tab, exact: true }).click();
@@ -187,11 +203,11 @@ async function openBuyStockDialog(
   await page.getByRole('button', { name: 'Dodaj', exact: true }).first().click();
   const dialog = page.getByRole('dialog');
   await selectOption(page, dialog.getByRole('combobox', { name: 'Rachunek' }), account);
-  await expect(groupCombobox(dialog)).toContainText(expectedGroup);
+  await expect(groupCombobox(dialog)).toHaveCount(0);
   return dialog;
 }
 
-async function openBondDialog(page: Page, account: string, expectedGroup: string) {
+async function openBondDialog(page: Page, account: string) {
   await openPage(page, 'Obligacje');
   await page
     .getByRole('button', { name: /^(Kup obligacje|Zapisz pierwszy zakup obligacji)$/ })
@@ -199,7 +215,7 @@ async function openBondDialog(page: Page, account: string, expectedGroup: string
     .click();
   const dialog = page.getByRole('dialog');
   await selectOption(page, dialog.getByRole('combobox', { name: 'Rachunek' }), account);
-  await expect(groupCombobox(dialog)).toContainText(expectedGroup);
+  await expect(groupCombobox(dialog)).toHaveCount(0);
   return dialog;
 }
 
@@ -298,13 +314,15 @@ async function expectFilteredChart(
 async function saveAssignment(page: Page): Promise<void> {
   const save = assignmentPanel(page).getByTestId('save-assignment');
   await save.click();
-  await expect(assignmentPanel(page).getByTestId('assets-panel-title')).toHaveCount(0);
+  await expect(assignmentPanel(page).getByTestId('edit-view')).toHaveCount(0);
 }
 
 async function openAssignment(page: Page, group: string): Promise<void> {
   await openPage(page, 'Grupy');
   await groupRow(page, group).getByTestId('select-group').click();
   await expect(assignmentPanel(page)).toBeVisible();
+  await assignmentPanel(page).getByTestId('edit-assignment').click();
+  await expect(assignmentPanel(page).getByTestId('edit-view')).toBeVisible();
 }
 
 test('asset groups: the dashboard invites to create groups once there is any wealth', async ({
@@ -398,15 +416,15 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
       .click();
     await dialog.getByLabel('Nazwa').fill('Broker');
     await selectOption(page, dialog.getByRole('combobox', { name: 'Typ' }), 'Maklerski');
-    await expect(groupCombobox(dialog, 'Domyślna grupa')).toBeVisible();
-    await selectOption(page, groupCombobox(dialog, 'Domyślna grupa'), 'Inwestycje');
+    await expect(groupCombobox(dialog, 'Grupa konta')).toBeVisible();
+    await selectOption(page, groupCombobox(dialog, 'Grupa konta'), 'Inwestycje');
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
 
     await page.getByRole('button', { name: 'Nowy rachunek' }).first().click();
     await dialog.getByLabel('Nazwa').fill('Obligacje');
     await selectOption(page, dialog.getByRole('combobox', { name: 'Typ' }), 'Obligacji');
-    await selectOption(page, groupCombobox(dialog, 'Domyślna grupa'), 'Emerytura');
+    await selectOption(page, groupCombobox(dialog, 'Grupa konta'), 'Emerytura');
     await dialog.getByRole('button', { name: 'Utwórz' }).click();
     await expect(dialog).toBeHidden();
     await expect(
@@ -479,7 +497,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
   });
 
   await test.step('Krok 7: 20 CDR.WA bought on Broker is offered the group Inwestycje and stays there', async () => {
-    const buy = await openBuyStockDialog(page, 'Broker', 'Inwestycje');
+    const buy = await openBuyStockDialog(page, 'Broker');
     await pickInstrument(page, buy, 'CDR', 'CDR.WA');
     await buy.getByRole('checkbox', { name: 'Dodaj pierwszą transakcję' }).check();
     await buy.getByLabel(/^Ilość/).fill('20');
@@ -498,9 +516,8 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     });
   });
 
-  await test.step('Krok 8: VWCE.DE bought with the group changed to Emerytura lands in Emerytura', async () => {
-    const buy = await openBuyStockDialog(page, 'Broker', 'Inwestycje', 'ETF');
-    await selectOption(page, groupCombobox(buy), 'Emerytura');
+  await test.step('Krok 8: VWCE.DE bought on Broker and assigned to Emerytura as an exception lands in Emerytura', async () => {
+    const buy = await openBuyStockDialog(page, 'Broker', 'ETF');
     await pickInstrument(page, buy, 'VWCE', 'VWCE.DE');
     await buy.getByRole('checkbox', { name: 'Dodaj pierwszą transakcję' }).check();
     await buy.getByLabel(/^Ilość/).fill('10');
@@ -511,6 +528,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await buy.getByRole('button', { name: 'Utwórz' }).click();
     await expect(buy).toBeHidden();
     await syncNow(page);
+    await assignRow(page, 'Emerytura', { account: 'Broker', row: 'Vanguard FTSE All-World' });
     await expectDashboard(page, {
       netWorth: '103 000,00',
       groups: [
@@ -521,8 +539,8 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     });
   });
 
-  await test.step('Krok 9: EDO0136 stays in Emerytura, COI0136 moved to Inwestycje', async () => {
-    const edo = await openBondDialog(page, 'Obligacje', 'Emerytura');
+  await test.step('Krok 9: EDO0136 stays in Emerytura, COI0136 moved to Inwestycje as an exception', async () => {
+    const edo = await openBondDialog(page, 'Obligacje');
     await fillBond(page, edo, {
       code: 'EDO0136',
       type: 'Dziesięcioletnie indeksowane inflacją',
@@ -531,8 +549,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await edo.getByRole('button', { name: 'Utwórz' }).click();
     await expect(edo).toBeHidden();
 
-    const coi = await openBondDialog(page, 'Obligacje', 'Emerytura');
-    await selectOption(page, groupCombobox(coi), 'Inwestycje');
+    const coi = await openBondDialog(page, 'Obligacje');
     await fillBond(page, coi, {
       code: 'COI0136',
       type: 'Czteroletnie indeksowane inflacją',
@@ -540,6 +557,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     });
     await coi.getByRole('button', { name: 'Utwórz' }).click();
     await expect(coi).toBeHidden();
+    await assignRow(page, 'Inwestycje', { account: 'Obligacje', row: 'COI0136' });
 
     await expectDashboard(page, {
       netWorth: '103 000,00',
@@ -595,12 +613,8 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
   });
 
   await test.step('Krok 11: the gold bar assigned to Emerytura and the deposit to Poduszka empty Bez grupy', async () => {
-    await openAssignment(page, 'Emerytura');
-    await assetRow(page, 'Sztabka 1 g').getByRole('checkbox').check();
-    await saveAssignment(page);
-    await openAssignment(page, 'Poduszka');
-    await assetRow(page, 'Lokata 5000').getByRole('checkbox').check();
-    await saveAssignment(page);
+    await assignRow(page, 'Emerytura', { row: 'Sztabka 1 g' });
+    await assignRow(page, 'Poduszka', { row: 'Lokata 5000' });
     await expectDashboard(page, {
       netWorth: '103 000,00',
       groups: [
@@ -612,14 +626,15 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     });
   });
 
-  await test.step('Krok 12: all bond lots selected in one move go to Inwestycje', async () => {
+  await test.step('Krok 12: both bond lots shown by the class filter belong to Inwestycje', async () => {
     await openAssignment(page, 'Inwestycje');
     await selectOption(
       page,
       assignmentPanel(page).getByRole('combobox', { name: 'Klasa' }),
       'Obligacje',
     );
-    await assignmentPanel(page).getByTestId('select-all-shown').click();
+    await assetRow(page, 'EDO0136').getByRole('checkbox').check();
+    await expect(assetRow(page, 'COI0136').getByRole('checkbox')).toBeChecked();
     await saveAssignment(page);
     await expectDashboard(page, {
       netWorth: '103 000,00',
@@ -672,9 +687,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
   });
 
   await test.step('Krok 17: moving VWCE.DE from Emerytura to Inwestycje redraws both groups', async () => {
-    await openAssignment(page, 'Inwestycje');
-    await assetRow(page, 'Vanguard FTSE All-World').getByRole('checkbox').check();
-    await saveAssignment(page);
+    await assignRow(page, 'Inwestycje', { account: 'Broker', row: 'Vanguard FTSE All-World' });
     await expectFilteredChart(page, { group: 'Emerytura' }, /do\s29\s?200,00\szł/);
     await expectFilteredChart(page, { group: 'Inwestycje' }, /do\s52\s?000,00\szł/);
   });
@@ -730,7 +743,7 @@ test('asset groups: groups split the wealth on the dashboard, filter the history
     await openPage(page, 'Rachunki inwestycyjne');
     await page.getByRole('button', { name: 'Akcje dla: Broker', exact: true }).click();
     await page.getByRole('menuitem', { name: 'Edytuj', exact: true }).click();
-    await expect(groupCombobox(dialog, 'Domyślna grupa')).toContainText('Bez grupy');
+    await expect(groupCombobox(dialog, 'Grupa konta')).toContainText('Bez grupy');
     await dialog.getByRole('button', { name: 'Anuluj' }).click();
     await expect(dialog).toBeHidden();
   });

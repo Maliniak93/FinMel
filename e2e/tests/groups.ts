@@ -1,5 +1,18 @@
-import type { Locator, Page } from '@playwright/test';
+import type { APIRequestContext, Locator, Page } from '@playwright/test';
 import { expect, openSelect } from './fixtures';
+
+export async function assignAccountToGroup(
+  request: APIRequestContext,
+  headers: { Authorization: string },
+  groupId: string,
+  accountId: string,
+): Promise<void> {
+  const assigned = await request.put(`/api/portfolio/asset-groups/${groupId}/members`, {
+    headers,
+    data: { accountIds: [accountId], assetIds: [] },
+  });
+  expect(assigned.ok(), await assigned.text()).toBeTruthy();
+}
 
 export async function addContribution(
   page: Page,

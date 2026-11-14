@@ -9,6 +9,7 @@ import {
   warsawDate,
 } from './fixtures';
 import { addExpense, addIncome, choose, openAddDialog, openMonth } from './planning';
+import { assignAccountToGroup } from './groups';
 import { expectProjected } from './projection';
 
 const ACCOUNT_TYPE_BROKERAGE = 0;
@@ -330,7 +331,8 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
       },
     });
     expect(mbank.ok()).toBeTruthy();
-    const mbankCashAssetId = ((await mbank.json()) as { cashAssetId: string }).cashAssetId;
+    const mbankBody = (await mbank.json()) as { id: string; cashAssetId: string };
+    const mbankCashAssetId = mbankBody.cashAssetId;
     await depositCashThroughApi(request, token, mbankCashAssetId, {
       quantity: 10000,
       date: warsawDate(100),
@@ -384,18 +386,16 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
       data: { name: PENSION, color: 'purple', contributions: [{ amountPln: 1500 }] },
     });
     expect(pension.ok()).toBeTruthy();
-    for (const [groupResponse, assetId] of [
-      [cushion, mbankCashAssetId],
-      [pension, xtb.cashAssetId],
+    for (const [groupResponse, accountId] of [
+      [cushion, mbankBody.id],
+      [pension, xtb.id],
     ] as const) {
-      const assigned = await request.put('/api/portfolio/asset-groups/assignment', {
+      await assignAccountToGroup(
+        request,
         headers,
-        data: {
-          assetIds: [assetId],
-          groupId: ((await groupResponse.json()) as { id: string }).id,
-        },
-      });
-      expect(assigned.ok()).toBeTruthy();
+        ((await groupResponse.json()) as { id: string }).id,
+        accountId,
+      );
     }
 
     await openMonth(page, MONTH);
@@ -681,8 +681,8 @@ test('redesign wierność wizualna: shell, login, Pulpit, Majątek, Planowanie a
       selector: '[data-testid="calendar-cell"][data-date]',
       side: 'bottom',
     });
-    await expectNoBorder(cell, 'top');
-    await expectNoBorder(cell, 'left');
+    await expectRule(page, { selector: '[data-testid="calendar-cell"][data-date]', side: 'top' });
+    await expectRule(page, { selector: '[data-testid="calendar-cell"][data-date]', side: 'left' });
     await expectPx(cell, 'border-top-left-radius', 0);
 
     await page.locator(`[data-testid="calendar-cell"][data-date="${TODAY}"]`).click();

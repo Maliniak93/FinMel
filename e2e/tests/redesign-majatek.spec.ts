@@ -451,14 +451,15 @@ test('redesign Majątek: navigation, Wszystko view, tabs, filters, archive, asse
       .click();
     const panel = page.getByTestId('assets-panel');
     await expect(panel.getByTestId('assets-panel-title')).toBeVisible();
+    await panel.getByTestId('edit-assignment').click();
     await panel
-      .getByTestId('asset-row')
+      .getByTestId('tree-row')
       .filter({ hasText: 'Lokata Santander' })
       .getByRole('checkbox')
       .check();
     const save = panel.getByTestId('save-assignment');
     await save.click();
-    await expect(panel.getByTestId('assets-panel-title')).toHaveCount(0);
+    await expect(panel.getByTestId('members-view')).toBeVisible();
 
     await openWealth(page);
     await expandWealthSections(page);

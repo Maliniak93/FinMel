@@ -7,6 +7,7 @@ import {
   warsawDate,
 } from './fixtures';
 import { addExpense, addIncome, choose, openAddDialog, openMonth, pln, settle } from './planning';
+import { assignAccountToGroup } from './groups';
 import { expectProjected } from './projection';
 
 const ACCOUNT_TYPE_BANK = 2;
@@ -154,6 +155,7 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
   const headers = authorization(token);
   const netWorth = page.getByTestId('net-worth');
   let savingsCashAssetId = '';
+  let savingsAccountId = '';
   let depositAssetId = '';
   let cushionId = '';
   let pensionId = '';
@@ -180,6 +182,7 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
       annualInterestRatePercent: 0,
     } as Parameters<typeof createAccountThroughApi>[2]);
     savingsCashAssetId = account.cashAssetId;
+    savingsAccountId = account.id;
     await depositCashThroughApi(request, token, savingsCashAssetId, {
       quantity: 60000,
       date: warsawDate(40),
@@ -479,7 +482,7 @@ test('redesign pulpit: value, history, structure, work sections, groups, phone, 
         { assetClass: ASSET_CLASS_BANK_ACCOUNT, percent: 50 },
       ],
     });
-    await assign(request, token, [savingsCashAssetId], classesId);
+    await assignAccountToGroup(request, authorization(token), classesId, savingsAccountId);
     await expectProjected(
       () => openDashboard(page),
       async () => {
