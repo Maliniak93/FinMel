@@ -1,4 +1,4 @@
-import type { AssetGroupResponse, AssignableAssetResponse } from '../../api/portfolio';
+import type { AssetGroupResponse } from '../../api/portfolio';
 import type { DashboardResponse } from '../../api/reporting';
 import { buildGroupMetrics, buildGroupsSummary } from './group-metrics';
 import {
@@ -7,6 +7,8 @@ import {
   blueGroup,
   blueGroupId,
   greenGroupId,
+  treeAccount,
+  treeChild,
 } from './testing/group-fixtures';
 
 function dashboard(overrides: Partial<DashboardResponse> = {}): DashboardResponse {
@@ -24,24 +26,6 @@ function dashboard(overrides: Partial<DashboardResponse> = {}): DashboardRespons
 
 function group(overrides: Partial<AssetGroupResponse> = {}): AssetGroupResponse {
   return { ...blueGroup, ...overrides };
-}
-
-function asset(
-  id: string,
-  overrides: Partial<AssignableAssetResponse> = {},
-): AssignableAssetResponse {
-  return {
-    assetId: id,
-    name: id,
-    assetClass: 2,
-    currency: 'PLN',
-    accountId: null,
-    accountName: null,
-    cashPlaceName: null,
-    groupId: blueGroupId,
-    isArchived: false,
-    ...overrides,
-  };
 }
 
 function valued(groupValue: number, byAssetClass: { assetClass: number; valuePln: number }[] = []) {
@@ -146,12 +130,19 @@ describe('group metrics', () => {
   });
 
   it('incomplete value', () => {
-    const assets = [
-      asset('no-row'),
-      asset('stale'),
-      asset('archived', { isArchived: true }),
-      asset('valued'),
-      asset('other-group', { groupId: greenGroupId }),
+    const tree = [
+      treeAccount(
+        'acc-1',
+        'Konto',
+        [
+          treeChild('no-row', 'No row', { groupId: blueGroupId }),
+          treeChild('stale', 'Stale', { groupId: blueGroupId }),
+          treeChild('archived', 'Archived', { groupId: blueGroupId, isArchived: true }),
+          treeChild('valued', 'Valued', { groupId: blueGroupId }),
+          treeChild('other-group', 'Other group', { groupId: greenGroupId }),
+        ],
+        { groupId: blueGroupId, cashAssetId: 'cash' },
+      ),
     ];
     const board = dashboard({
       byGroup: [{ groupId: blueGroupId, valuePln: 100, percentage: 100, byAssetClass: [] }],
@@ -161,11 +152,11 @@ describe('group metrics', () => {
       ],
     });
 
-    expect(buildGroupMetrics(group(), board, assets).unvaluedCount).toBe(2);
+    expect(buildGroupMetrics(group(), board, tree).unvaluedCount).toBe(3);
   });
 
   it('is unavailable without a dashboard', () => {
-    const metrics = buildGroupMetrics(group({ targetPln: 1000 }), null, [asset('a')]);
+    const metrics = buildGroupMetrics(group({ targetPln: 1000 }), null, []);
 
     expect(metrics.value).toBeNull();
   });
@@ -196,20 +187,34 @@ describe('group metrics', () => {
         ],
       }),
     ];
-    const assets = [
-      asset('free', { groupId: null }),
-      asset('free-archived', { groupId: null, isArchived: true }),
-      asset('member'),
+    const tree = [
+      treeAccount(
+        'acc-free',
+        'Free account',
+        [
+          treeChild('free', 'Free', { groupId: null }),
+          treeChild('free-archived', 'Free archived', { groupId: null, isArchived: true }),
+        ],
+        { cashAssetId: 'free-cash' },
+      ),
+      treeAccount(
+        'acc-member',
+        'Member account',
+        [treeChild('member', 'Member', { groupId: blueGroupId })],
+        {
+          groupId: blueGroupId,
+        },
+      ),
     ];
 
-    const summary = buildGroupsSummary(groups, board, assets);
+    const summary = buildGroupsSummary(groups, board, tree);
 
     expect(summary.grouped).toBe(700);
     expect(summary.ungrouped).toBe(300);
-    expect(summary.ungroupedCount).toBe(1);
+    expect(summary.ungroupedCount).toBe(2);
     expect(summary.contributionTotal).toBe(750.5);
 
-    const absent = buildGroupsSummary(groups, valued(600), assets);
+    const absent = buildGroupsSummary(groups, valued(600), tree);
     expect(absent.ungrouped).toBe(0);
   });
 });

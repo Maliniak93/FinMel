@@ -18,16 +18,17 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class BondOutboxTests(SkarbiecContainersFixture containers) : PortfolioOutboxTestBase(containers)
 {
     [Fact]
-    public async Task AddBondWithGroup_FirstPositionCarriesGroup()
+    public async Task AddBondInGroupedAccount_FirstPositionCarriesGroup()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var scope = Provider.CreateAsyncScope();
-        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Bond outbox account", cancellationToken, AccountType.Bonds);
-        await FundAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken, 10_000m);
         var groupId = await CreateGroupAsync(scope.ServiceProvider, "Poduszka", cancellationToken);
+        var accountId = await CreateAccountAsync(
+            scope.ServiceProvider, "Bond outbox account", cancellationToken, AccountType.Bonds, groupId: groupId);
+        await FundAccountCashAsync(scope.ServiceProvider, accountId, cancellationToken, 10_000m);
 
         var result = await scope.ServiceProvider.GetRequiredService<AddBondHandler>()
-            .HandleAsync(PortfolioApi.NewBondRequest() with { AccountId = accountId, GroupId = groupId }, cancellationToken);
+            .HandleAsync(PortfolioApi.NewBondRequest() with { AccountId = accountId }, cancellationToken);
 
         Assert.True(result.IsSuccess);
         var first = (await scope.ServiceProvider.GetRequiredService<PortfolioDbContext>()

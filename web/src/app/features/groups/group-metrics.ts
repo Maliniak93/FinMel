@@ -1,6 +1,7 @@
-import type { AssetGroupResponse, AssignableAssetResponse } from '../../api/portfolio';
+import type { AssetGroupResponse, AssetGroupTreeItem } from '../../api/portfolio';
 import type { DashboardResponse } from '../../api/reporting';
 import { ALLOCATION_DEVIATION_PP } from '../../shared/allocation-bar/allocation-bar';
+import { componentsOf } from './group-tree/group-tree';
 
 export type GoalProgressState = 'none' | 'below' | 'reached';
 
@@ -91,10 +92,10 @@ function classRowsOf(
 function unvaluedCountOf(
   group: AssetGroupResponse,
   dashboard: DashboardResponse,
-  assets: readonly AssignableAssetResponse[],
+  tree: readonly AssetGroupTreeItem[],
 ): number {
   const lines = new Map(dashboard.byAsset.map((line) => [line.assetId, line]));
-  return assets.filter((asset) => {
+  return componentsOf(tree).filter((asset) => {
     if (asset.groupId !== group.id || asset.isArchived) {
       return false;
     }
@@ -106,7 +107,7 @@ function unvaluedCountOf(
 export function buildGroupMetrics(
   group: AssetGroupResponse,
   dashboard: DashboardResponse | null,
-  assets: readonly AssignableAssetResponse[],
+  tree: readonly AssetGroupTreeItem[],
 ): GroupMetrics {
   const targetPln =
     group.targetPln === null || group.targetPln === undefined ? null : Number(group.targetPln);
@@ -128,19 +129,19 @@ export function buildGroupMetrics(
     progress: progressOf(targetPln, value),
     classRows,
     maxDeviation: classRows.reduce((max, row) => Math.max(max, Math.abs(row.deviation)), 0),
-    unvaluedCount: unvaluedCountOf(group, dashboard, assets),
+    unvaluedCount: unvaluedCountOf(group, dashboard, tree),
   };
 }
 
 export function buildGroupsSummary(
   groups: readonly AssetGroupResponse[],
   dashboard: DashboardResponse | null,
-  assets: readonly AssignableAssetResponse[],
+  tree: readonly AssetGroupTreeItem[],
 ): GroupsSummary {
   const known = new Set(groups.map((group) => group.id));
   const contributionTotal =
     groups.reduce((sum, group) => sum + toGrosze(group.monthlyContributionPln), 0) / 100;
-  const ungroupedCount = assets.filter(
+  const ungroupedCount = componentsOf(tree).filter(
     (asset) => !asset.isArchived && (!asset.groupId || !known.has(asset.groupId)),
   ).length;
 

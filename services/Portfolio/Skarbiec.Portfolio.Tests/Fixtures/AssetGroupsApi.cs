@@ -16,8 +16,6 @@ internal static class AssetGroupsApi
 
     public const string AssignmentUri = AssetGroupsUri + "/assignment";
 
-    public const string AssignableAssetsUri = AssetGroupsUri + "/assets";
-
     public const string GroupLimitReachedErrorCode = "Conflict.GroupLimitReached";
 
     public const string GroupColorTakenErrorCode = "Conflict.GroupColorTaken";
@@ -76,17 +74,6 @@ internal static class AssetGroupsApi
 
     public sealed record GroupShareBody(Guid GroupId, decimal SharePercent);
 
-    public sealed record AssignableAssetView(
-        Guid AssetId,
-        string Name,
-        AssetClass AssetClass,
-        string Currency,
-        Guid? AccountId,
-        string? AccountName,
-        string? CashPlaceName,
-        Guid? GroupId,
-        bool IsArchived);
-
     public static string AssetGroupUri(Guid groupId) => $"{AssetGroupsUri}/{groupId}";
 
     public static string ColorKey(int index) => AssetGroupColors.Keys[index];
@@ -140,15 +127,6 @@ internal static class AssetGroupsApi
         response.EnsureSuccessStatusCode();
 
         return (await response.Content.ReadFromJsonAsync<List<AssetGroupView>>(cancellationToken))!;
-    }
-
-    public static async Task<List<AssignableAssetView>> ListAssignableAssetsAsync(
-        this HttpClient client, CancellationToken cancellationToken)
-    {
-        var response = await client.GetAsync(AssignableAssetsUri, cancellationToken);
-        response.EnsureSuccessStatusCode();
-
-        return (await response.Content.ReadFromJsonAsync<List<AssignableAssetView>>(cancellationToken))!;
     }
 
     public static async Task AssignAssetsAsync(
@@ -263,8 +241,9 @@ internal static class AssetGroupsApi
         Guid? exception = null;
         if (exceptionGroupId is not null)
         {
-            exception = (await client.AddBondAsync(
-                account.AccountId, cancellationToken, PortfolioApi.NewBondRequest(name: "Bond 3") with { GroupId = exceptionGroupId })).AssetId;
+            var third = await client.AddBondAsync(account.AccountId, cancellationToken, PortfolioApi.NewBondRequest(name: "Bond 3"));
+            await client.AssignAssetsAsync(exceptionGroupId, cancellationToken, third.AssetId);
+            exception = third.AssetId;
         }
 
         return new GroupedBonds(account.AccountId, account.CashAssetId, first.AssetId, second.AssetId, exception);

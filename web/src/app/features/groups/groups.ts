@@ -13,7 +13,6 @@ import {
   deleteApiPortfolioAssetGroupsById,
   getApiPortfolioAccounts,
   getApiPortfolioAssetGroups,
-  getApiPortfolioAssetGroupsAssets,
   getApiPortfolioAssetGroupsTree,
   type AssetGroupResponse,
 } from '../../api/portfolio';
@@ -90,18 +89,6 @@ export class Groups {
     },
   });
 
-  protected readonly assetsResource = resource({
-    loader: async ({ abortSignal }) => {
-      const result = await getApiPortfolioAssetGroupsAssets({ signal: abortSignal });
-      if (result.error) {
-        throw new Error(
-          readProblemDetails(result.error).detail ?? translate('groups.assets.loadFailed'),
-        );
-      }
-      return result.data;
-    },
-  });
-
   protected readonly treeResource = resource({
     loader: async ({ abortSignal }) => {
       const result = await getApiPortfolioAssetGroupsTree({ signal: abortSignal });
@@ -134,23 +121,23 @@ export class Groups {
   protected readonly maxGroups = MAX_GROUPS;
   protected readonly atLimit = computed(() => this.groups().length >= MAX_GROUPS);
 
-  protected readonly assets = computed(() =>
-    this.assetsResource.hasValue() ? this.assetsResource.value() : [],
+  private readonly tree = computed(() =>
+    this.treeResource.hasValue() ? (this.treeResource.value() ?? []) : [],
   );
 
-  private readonly dashboard = computed(() =>
+  protected readonly dashboard = computed(() =>
     this.dashboardResource.hasValue() ? this.dashboardResource.value() : null,
   );
 
   protected readonly cards = computed(() =>
     this.groups().map((group) => ({
       group,
-      metrics: buildGroupMetrics(group, this.dashboard(), this.assets()),
+      metrics: buildGroupMetrics(group, this.dashboard(), this.tree()),
     })),
   );
 
   protected readonly summary = computed(() =>
-    buildGroupsSummary(this.groups(), this.dashboard(), this.assets()),
+    buildGroupsSummary(this.groups(), this.dashboard(), this.tree()),
   );
 
   protected readonly summaryItems = computed<SummaryItem[]>(() => {
@@ -175,11 +162,7 @@ export class Groups {
     this.panel.set(null);
   }
 
-  protected onAssignmentSaved(complete: boolean): void {
-    if (complete) {
-      this.closePanel();
-    }
-    this.assetsResource.reload();
+  protected onAssignmentSaved(): void {
     this.treeResource.reload();
     this.reloadGroups();
   }
@@ -226,7 +209,6 @@ export class Groups {
     if (this.panel()?.groupId === group.id) {
       this.closePanel();
     }
-    this.assetsResource.reload();
     this.treeResource.reload();
     this.reloadGroups();
   }

@@ -6,6 +6,17 @@
       {{ 'groups.field.none' | transloco }}
     }
   </h2>
+  @if (!readOnly()) {
+    @if (editing()) {
+      <button mat-button type="button" data-testid="members-assignment" (click)="backToMembers()">
+        {{ 'groups.assets.backToMembers' | transloco }}
+      </button>
+    } @else {
+      <button mat-button type="button" data-testid="edit-assignment" (click)="startEditing()">
+        {{ 'groups.assets.edit' | transloco }}
+      </button>
+    }
+  }
   <button
     mat-icon-button
     type="button"
@@ -35,7 +46,14 @@
     <app-skeleton [rows]="3" />
   } @else if (source().hasValue() && !hasAssets()) {
     <p>
-      {{ (readOnly() ? 'groups.assets.ungroupedEmpty' : 'groups.assets.empty') | transloco }}
+      {{
+        (readOnly()
+          ? 'groups.assets.ungroupedEmpty'
+          : editing()
+            ? 'groups.assets.empty'
+            : 'groups.assets.membersEmpty'
+        ) | transloco
+      }}
     </p>
   } @else if (source().hasValue()) {
     <div class="assets-panel__filters">
@@ -59,56 +77,35 @@
           }
         </mat-select>
       </mat-form-field>
-      @if (!readOnly()) {
+      @if (editing()) {
         <button mat-button type="button" data-testid="select-all-shown" (click)="selectAllShown()">
           {{ 'groups.assets.selectAllShown' | transloco }}
         </button>
       }
     </div>
 
-    @if (readOnly()) {
-      <table class="assets-panel__table">
-        <thead>
-          <tr>
-            <th>{{ 'common.name' | transloco }}</th>
-            <th>{{ 'groups.assets.class' | transloco }}</th>
-            <th>{{ 'groups.assets.location' | transloco }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (asset of shownAssets(); track asset.assetId) {
-            <tr data-testid="asset-row">
-              <td>
-                {{ asset.name }}
-                @if (asset.isArchived) {
-                  <span class="assets-panel__badge" data-testid="asset-archived">{{
-                    'common.archived' | transloco
-                  }}</span>
-                }
-              </td>
-              <td>{{ assetClassLabel(asset.assetClass) | transloco }}</td>
-              <td>{{ asset.accountName ?? asset.cashPlaceName }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    } @else {
-      <table class="assets-panel__table">
-        <thead>
-          <tr>
+    <table
+      class="assets-panel__table"
+      [attr.data-testid]="editing() ? 'edit-view' : 'members-view'"
+    >
+      <thead>
+        <tr>
+          @if (editing()) {
             <th></th>
-            <th>{{ 'common.name' | transloco }}</th>
-            <th>{{ 'groups.assets.class' | transloco }}</th>
-            <th>{{ 'groups.assets.group' | transloco }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (row of pageRows(); track row.key) {
-            <tr
-              data-testid="tree-row"
-              [class.assets-panel__row--greyed]="isGreyed(row)"
-              [attr.data-greyed]="isGreyed(row) ? 'true' : null"
-            >
+          }
+          <th>{{ 'common.name' | transloco }}</th>
+          <th>{{ 'groups.assets.class' | transloco }}</th>
+          <th>{{ (editing() ? 'groups.assets.group' : 'groups.assets.value') | transloco }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of pageRows(); track row.key) {
+          <tr
+            data-testid="tree-row"
+            [class.assets-panel__row--greyed]="editing() && isGreyed(row)"
+            [attr.data-greyed]="editing() && isGreyed(row) ? 'true' : null"
+          >
+            @if (editing()) {
               <td>
                 <mat-checkbox
                   [checked]="isChecked(row)"
@@ -116,41 +113,43 @@
                   (change)="toggle(row, $event.checked)"
                 />
               </td>
-              <td>
-                <span
-                  class="assets-panel__name"
-                  [class.assets-panel__name--child]="row.kind === 'child'"
-                >
-                  @if (row.expandable) {
-                    <button
-                      mat-icon-button
-                      type="button"
-                      data-testid="expand-toggle"
-                      [attr.aria-expanded]="row.expanded"
-                      [attr.aria-label]="toggleLabel(row) | transloco"
-                      (click)="toggleExpanded(row.key)"
-                    >
-                      <mat-icon>{{
-                        row.expanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'
-                      }}</mat-icon>
-                    </button>
-                  } @else if (row.kind === 'account') {
-                    <span class="assets-panel__toggle-spacer"></span>
-                  }
-                  <span data-testid="row-name">{{ row.name }}</span>
-                  @if (row.isArchived) {
-                    <span class="assets-panel__badge" data-testid="asset-archived">{{
-                      'common.archived' | transloco
-                    }}</span>
-                  }
-                </span>
-              </td>
-              <td>
-                @if (row.assetClass !== null) {
-                  {{ assetClassLabel(row.assetClass) | transloco }}
+            }
+            <td>
+              <span
+                class="assets-panel__name"
+                [class.assets-panel__name--child]="row.kind === 'child'"
+              >
+                @if (row.expandable) {
+                  <button
+                    mat-icon-button
+                    type="button"
+                    data-testid="expand-toggle"
+                    [attr.aria-expanded]="row.expanded"
+                    [attr.aria-label]="toggleLabel(row) | transloco"
+                    (click)="toggleExpanded(row.key)"
+                  >
+                    <mat-icon>{{
+                      row.expanded ? 'keyboard_arrow_down' : 'keyboard_arrow_right'
+                    }}</mat-icon>
+                  </button>
+                } @else if (row.kind === 'account') {
+                  <span class="assets-panel__toggle-spacer"></span>
                 }
-              </td>
-              <td>
+                <span data-testid="row-name">{{ row.name }}</span>
+                @if (row.isArchived) {
+                  <span class="assets-panel__badge" data-testid="asset-archived">{{
+                    'common.archived' | transloco
+                  }}</span>
+                }
+              </span>
+            </td>
+            <td>
+              @if (row.assetClass !== null) {
+                {{ assetClassLabel(row.assetClass) | transloco }}
+              }
+            </td>
+            <td>
+              @if (editing()) {
                 @if (chipOf(row); as chip) {
                   <span
                     class="assets-panel__chip"
@@ -162,23 +161,28 @@
                     >{{ groupName(chip) }}</span
                   >
                 }
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-      <mat-paginator
-        [length]="rows().length"
-        [pageIndex]="pageIndex()"
-        [pageSize]="pageSize"
-        [hidePageSize]="true"
-        (page)="onPage($event)"
-      ></mat-paginator>
-    }
+              } @else {
+                @let value = values().get(row.key);
+                <span data-testid="row-value">
+                  <app-money [amount]="value?.amount" [stale]="value?.stale ?? false" />
+                </span>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <mat-paginator
+      [length]="rows().length"
+      [pageIndex]="pageIndex()"
+      [pageSize]="pageSize"
+      [hidePageSize]="true"
+      (page)="onPage($event)"
+    ></mat-paginator>
   }
 </div>
 
-@if (!readOnly()) {
+@if (editing()) {
   <footer class="assets-panel__actions">
     <button
       mat-flat-button

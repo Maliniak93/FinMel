@@ -372,11 +372,11 @@ describe('AccountFormDialog', () => {
         return labelsOf(fixture.nativeElement as HTMLElement, 'mat-label');
       };
 
-      expect(await labelsFor(0)).toContain('Default group');
-      expect(await labelsFor(1)).toContain('Default group');
+      expect(await labelsFor(0)).toContain('Account group');
+      expect(await labelsFor(1)).toContain('Account group');
       const bankLabels = await labelsFor(2);
       expect(bankLabels).toContain('Group');
-      expect(bankLabels).not.toContain('Default group');
+      expect(bankLabels).not.toContain('Account group');
     });
 
     it('sends groupId', async () => {

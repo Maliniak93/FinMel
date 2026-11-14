@@ -429,7 +429,12 @@ internal static class PortfolioApi
         this HttpClient client, CancellationToken cancellationToken, TaxWrapper wrapper = TaxWrapper.Regular, Guid? groupId = null)
     {
         var funded = await client.CreateFundedBondAsync(
-            cancellationToken, request: NewTosBondRequest() with { GroupId = groupId }, wrapper: wrapper);
+            cancellationToken, request: NewTosBondRequest(), wrapper: wrapper);
+        if (groupId is not null)
+        {
+            await AssetGroupsApi.AssignAssetsAsync(client, groupId, cancellationToken, funded.Bond.AssetId);
+        }
+
         await client.SettleBondInterestAsync(
             funded.Bond.AssetId, [(1, null), (2, null), (3, null)], cancellationToken);
 
@@ -742,13 +747,18 @@ internal static class PortfolioApi
             Name = name,
             Currency = currency,
             InstrumentId = AssetValuationModes.SupportsCurrencyValued(assetClass) ? null : FakeInstrumentLookupClient.IdFor(assetClass, currency),
-            GroupId = groupId
         };
 
         var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+        var assetId = (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+        if (groupId is not null)
+        {
+            await AssetGroupsApi.AssignAssetsAsync(client, groupId, cancellationToken, assetId);
+        }
+
+        return assetId;
     }
 
     // A cash place named after the balance, holding it alone; returns the balance's asset id.
@@ -782,13 +792,18 @@ internal static class PortfolioApi
             Name = name,
             Currency = currency,
             InstrumentId = instrumentId ?? Guid.NewGuid(),
-            GroupId = groupId
         };
 
         var response = await client.PostAsJsonAsync(AllAssetsUri, request, cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        return (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+        var assetId = (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+        if (groupId is not null)
+        {
+            await AssetGroupsApi.AssignAssetsAsync(client, groupId, cancellationToken, assetId);
+        }
+
+        return assetId;
     }
 
     // The account's cash is funded because every stock trade settles in it.

@@ -8,7 +8,7 @@ import {
   treeAsset,
   treeChild,
 } from '../testing/group-fixtures';
-import { flattenVisible, page, rowState } from './group-tree';
+import { flattenVisible, membersOf, page, rowState } from './group-tree';
 
 const noFilter = { text: '', assetClass: null };
 const names = (rows: { name: string }[]): string[] => rows.map((row) => row.name);
@@ -92,5 +92,37 @@ describe('GroupTree', () => {
     expect(stateOf('In green')).toEqual({ checked: false, greyed: true, chip: greenGroupId });
     expect(stateOf('Free')).toEqual({ checked: false, greyed: false, chip: null });
     expect(stateOf('Green account')).toEqual({ checked: false, greyed: true, chip: greenGroupId });
+  });
+
+  it('membersOf', () => {
+    const items = [
+      treeAccount(
+        'acc-x',
+        'IKE eMakler',
+        [
+          treeChild('x-1', 'VWCE.DE', { assetClass: 3, groupId: blueGroupId }),
+          treeChild('x-2', 'CDR.WA', { assetClass: 3, groupId: blueGroupId }),
+          treeChild('x-3', 'PKO.WA', { assetClass: 2 }),
+        ],
+        { groupId: blueGroupId, cashAssetId: 'x-cash' },
+      ),
+      treeAccount('acc-y', 'IKE Obligacje', [
+        treeChild('y-1', 'OTS0126', { assetClass: 4, groupId: blueGroupId, isException: true }),
+        treeChild('y-2', 'ROR0126', { assetClass: 4 }),
+      ]),
+      treeAccount('acc-w', 'Bank', [], { groupId: blueGroupId }),
+      treeAccount('acc-z', 'Other', [treeChild('z-1', 'Elsewhere', { groupId: greenGroupId })]),
+      treeAsset('a-1', 'Direct', { groupId: blueGroupId }),
+      treeAsset('a-2', 'Free asset'),
+    ];
+
+    const members = membersOf(items, blueGroupId);
+
+    expect(members.map((item) => [item.name, item.children.map((child) => child.name)])).toEqual([
+      ['IKE eMakler', ['VWCE.DE', 'CDR.WA']],
+      ['IKE Obligacje', ['OTS0126']],
+      ['Bank', []],
+      ['Direct', []],
+    ]);
   });
 });

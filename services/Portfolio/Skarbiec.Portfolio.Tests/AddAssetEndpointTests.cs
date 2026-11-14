@@ -21,37 +21,32 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class AddAssetEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task GroupId_IsStored()
+    public async Task NewEtfInheritsAccountGroup()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
-        var defaultGroup = await client.CreateAssetGroupAsync(cancellationToken, "Poduszka");
         var group = await client.CreateAssetGroupAsync(cancellationToken, "Akcje", ColorKey(3));
-        var account = await client.PostAsJsonAsync(
-            AccountsUri,
-            new CreateAccountRequest { Name = "XTB", Type = AccountType.Brokerage, Wrapper = TaxWrapper.Regular, GroupId = defaultGroup.Id },
+        var otherGroup = await client.CreateAssetGroupAsync(cancellationToken, "Obligacje", ColorKey(4));
+        var accountId = (await client.CreateGroupedAccountAsync(group.Id, cancellationToken)).AccountId;
+
+        // A stray groupId in the body is ignored: the component takes its account's group.
+        var response = await client.PostAsJsonAsync(
+            AllAssetsUri,
+            new
+            {
+                accountId,
+                assetClass = AssetClass.Etf,
+                name = "World ETF",
+                currency = "PLN",
+                instrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Etf, "PLN"),
+                groupId = otherGroup.Id
+            },
             cancellationToken);
-        var accountId = (await account.ReadJsonAsync(cancellationToken)).GetProperty("id").GetGuid();
-        var stock = new AddAssetRequest
-        {
-            AccountId = accountId,
-            AssetClass = AssetClass.Stock,
-            Name = "Stock",
-            Currency = "PLN",
-            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN")
-        };
 
-        var withGroup = await client.PostAsJsonAsync(AllAssetsUri, stock with { GroupId = group.Id }, cancellationToken);
-        var withoutGroup = await client.PostAsJsonAsync(AllAssetsUri, stock with { Name = "Without group" }, cancellationToken);
-
-        Assert.Equal(HttpStatusCode.Created, withGroup.StatusCode);
-        Assert.Equal(HttpStatusCode.Created, withoutGroup.StatusCode);
-        var grouped = (await withGroup.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
-        var ungrouped = (await withoutGroup.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
-        var states = await ReadAssetGroupStatesAsync(userId, cancellationToken, grouped, ungrouped);
-        Assert.Equal(group.Id, states[grouped].GroupId);
-        Assert.Equal(defaultGroup.Id, states[ungrouped].GroupId);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var assetId = (await response.Content.ReadFromJsonAsync<AssetResponse>(cancellationToken))!.Id;
+        Assert.Equal(group.Id, (await ReadAssetGroupStatesAsync(userId, cancellationToken, assetId))[assetId].GroupId);
     }
 
     [Fact]

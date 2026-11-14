@@ -63,7 +63,6 @@ describe('SecurityAssetForm', () => {
       name: 'Vanguard FTSE All-World',
       currency: 'EUR',
       instrumentId,
-      groupId: null,
       initialTransaction: null,
     });
   });

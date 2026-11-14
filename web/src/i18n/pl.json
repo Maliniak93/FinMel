@@ -760,6 +760,7 @@
     "field": {
       "group": "Grupa",
       "defaultGroup": "Domyślna grupa",
+      "accountGroup": "Grupa konta",
       "none": "Bez grupy"
     },
     "assetCount": "Aktywa: {{ count }}",
@@ -834,6 +835,10 @@
       "closePanel": "Zamknij panel aktywów",
       "ungroupedHint": "Te aktywa nie należą do żadnej grupy. Aby je przypisać, otwórz panel Aktywa na karcie grupy.",
       "ungroupedEmpty": "Każde aktywo jest w jakiejś grupie.",
+      "membersEmpty": "W tej grupie nic jeszcze nie ma.",
+      "edit": "Edytuj skład",
+      "backToMembers": "Wróć do składu",
+      "value": "Wartość",
       "loadFailed": "Nie udało się wczytać aktywów.",
       "saveFailed": "Nie udało się zapisać przypisania.",
       "empty": "Nie masz jeszcze aktywów do przypisania.",
@@ -845,7 +850,6 @@
       "collapse": "Zwiń",
       "chipTooltip": "W grupie „{{ name }}” — zaznaczenie przeniesie tu",
       "class": "Klasa",
-      "location": "Rachunek lub miejsce",
       "group": "Grupa"
     }
   },

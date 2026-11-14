@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Skarbiec.Contracts;
 using Skarbiec.Portfolio.Data;
@@ -16,17 +17,20 @@ namespace Skarbiec.Portfolio.Tests;
 public sealed class AddBondEndpointTests(SkarbiecContainersFixture containers) : PortfolioEndpointTests(containers)
 {
     [Fact]
-    public async Task GroupId_IsStored()
+    public async Task NewBondInheritsAccountGroup()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         using var client = Factory.CreateAuthenticatedClient(userId);
         var group = await client.CreateAssetGroupAsync(cancellationToken);
-        var accountId = await client.CreateAccountAsync(cancellationToken, "Bonds", AccountType.Bonds);
+        var otherGroup = await client.CreateAssetGroupAsync(cancellationToken, "Obligacje", ColorKey(4));
+        var accountId = (await client.CreateGroupedAccountAsync(group.Id, cancellationToken, "Bonds", AccountType.Bonds)).AccountId;
         await client.FundAccountAsync(accountId, cancellationToken);
 
-        var response = await client.PostAsJsonAsync(
-            AllBondsUri, NewBondRequest() with { AccountId = accountId, GroupId = group.Id }, cancellationToken);
+        // A stray groupId in the body is ignored: the component takes its account's group.
+        var rawBody = JsonSerializer.SerializeToNode(NewBondRequest() with { AccountId = accountId }, JsonSerializerOptions.Web)!.AsObject();
+        rawBody["groupId"] = otherGroup.Id.ToString();
+        var response = await client.PostAsJsonAsync(AllBondsUri, rawBody, cancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<BondResponse>(cancellationToken);

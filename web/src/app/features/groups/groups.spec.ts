@@ -7,11 +7,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 
 import { client as portfolioClient } from '../../api/portfolio/client.gen';
-import type {
-  AssetGroupResponse,
-  AssetGroupTreeItem,
-  AssignableAssetResponse,
-} from '../../api/portfolio';
+import type { AssetGroupResponse, AssetGroupTreeItem } from '../../api/portfolio';
 import type { DashboardResponse } from '../../api/reporting';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import { stubViewport } from '../../../testing/match-media';
@@ -23,14 +19,15 @@ import { jsonResponse, requestUrl } from '../assets/asset-form/testing/asset-for
 import { Groups } from './groups';
 import { GroupFormDialog } from './group-form-dialog/group-form-dialog';
 import {
-  assignableAssets,
+  archivedAssetId,
   blueGroup,
   blueGroupId,
   freeAssetId,
   greenGroup,
   greenGroupId,
   groupsDashboard,
-  groupTree,
+  memberAssetId,
+  otherGroupAssetId,
   skarbonki,
   treeAccountId,
   treeAccountWithThreeChildren,
@@ -42,15 +39,32 @@ import {
   treeChildTwoId,
 } from './testing/group-fixtures';
 
+// The members view and the edit tree both read this tree: a member bond in B, a free stock and an archived bond without a group.
+const defaultTree: AssetGroupTreeItem[] = [
+  treeAccount(
+    treeAccountId,
+    'Obligacje',
+    [treeChild(memberAssetId, 'Member Bond', { assetClass: 4, groupId: blueGroupId })],
+    { groupId: blueGroupId },
+  ),
+  treeAsset(freeAssetId, 'Free Stock', { assetClass: 2 }),
+  treeAsset(otherGroupAssetId, 'Cushion Cash', { assetClass: 0, groupId: greenGroupId }),
+  treeAsset(archivedAssetId, 'Old Bond', { assetClass: 4, isArchived: true }),
+];
+
+const cashXId = 'c0c0c0c0-0000-0000-0000-000000000001';
+const cashYId = 'c0c0c0c0-0000-0000-0000-000000000002';
+const etfOneId = 'e0e0e0e0-0000-0000-0000-000000000001';
+const etfTwoId = 'e0e0e0e0-0000-0000-0000-000000000002';
+
 interface SetupOptions {
   groups?: AssetGroupResponse[];
-  assets?: AssignableAssetResponse[];
   tree?: AssetGroupTreeItem[];
   dashboard?: DashboardResponse | 'fail';
   groupList?: 'ok' | 'fail' | 'pending';
   afterAssignment?: {
     groups: AssetGroupResponse[];
-    assets: AssignableAssetResponse[];
+    tree: AssetGroupTreeItem[];
     dashboard: DashboardResponse;
   };
 }
@@ -104,7 +118,7 @@ describe('Groups', () => {
 
   async function setup(options: SetupOptions = {}): Promise<void> {
     let groups = options.groups ?? [blueGroup, greenGroup];
-    let assets = options.assets ?? assignableAssets;
+    let tree = options.tree ?? defaultTree;
     let dashboard = options.dashboard ?? groupsDashboard;
     const gate =
       options.groupList === 'pending'
@@ -121,16 +135,13 @@ describe('Groups', () => {
           ? jsonResponse({ detail: 'Reporting down.' }, 500)
           : jsonResponse(dashboard);
       }
-      if (url.includes('/api/portfolio/asset-groups/assets')) {
-        return jsonResponse(assets);
-      }
       if (url.includes('/api/portfolio/asset-groups/tree')) {
-        return jsonResponse(options.tree ?? groupTree);
+        return jsonResponse(tree);
       }
       if (/\/api\/portfolio\/asset-groups\/[^/]+\/members$/.test(url)) {
         if (options.afterAssignment) {
           groups = options.afterAssignment.groups;
-          assets = options.afterAssignment.assets;
+          tree = options.afterAssignment.tree;
           dashboard = options.afterAssignment.dashboard;
         }
         return new Response(null, { status: 204 });
@@ -223,14 +234,13 @@ describe('Groups', () => {
       .length;
   }
 
-  function visibleAssetNames(): string[] {
-    return Array.from(element().querySelectorAll<HTMLElement>('[data-testid="asset-row"]')).map(
-      (r) => (r.textContent ?? '').trim(),
-    );
-  }
-
   async function selectGroup(name: string): Promise<void> {
     byTestId(groupCard(name), 'select-group').click();
+    await settle();
+  }
+
+  async function openEdit(): Promise<void> {
+    byTestId(panel(), 'edit-assignment').click();
     await settle();
   }
 
@@ -329,7 +339,7 @@ describe('Groups', () => {
 
   it('hides the ungrouped row when there are no ungrouped assets', async () => {
     await setup({
-      assets: assignableAssets.filter((asset) => asset.assetId !== freeAssetId),
+      tree: defaultTree.filter((item) => item.assetId !== freeAssetId),
       dashboard: {
         ...groupsDashboard,
         byGroup: groupsDashboard.byGroup.filter((entry) => entry.groupId),
@@ -519,6 +529,7 @@ describe('Groups', () => {
     setViewport(1280);
     await setup();
     await selectGroup('Emerytura');
+    await openEdit();
     expect(panelOpen()).toBe(true);
     expect(element().querySelector('[data-testid="save-assignment"]')).toBeTruthy();
 
@@ -530,7 +541,7 @@ describe('Groups', () => {
     expect(panelOpen()).toBe(false);
   });
 
-  it('assets button opens the panel', async () => {
+  it('assets button opens the panel in members mode', async () => {
     setViewport(1280);
     await setup({ tree: [treeAccountWithThreeChildren(blueGroupId), ...skarbonki(1)] });
     expect(panelOpen()).toBe(false);
@@ -539,25 +550,104 @@ describe('Groups', () => {
 
     expect(panelOpen()).toBe(true);
     expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('Emerytura');
-    expect(rowCheckbox('IKE Obligacje').checked).toBe(true);
-    expect(rowCheckbox('Skarbonka 1').checked).toBe(false);
+    expect(byTestId(panel(), 'members-view')).toBeTruthy();
+    expect(treeRow('IKE Obligacje').querySelector('input[type=checkbox]')).toBeNull();
     expect(byTestId(panel(), 'asset-filter')).toBeTruthy();
-    expect(byTestId(panel(), 'select-all-shown')).toBeTruthy();
-    expect(panel().querySelector('mat-select')).toBeTruthy();
-    const list = element().querySelector('.groups-page__list')!;
-    expect(list.querySelector('[data-testid="tree-row"]')).toBeNull();
-    expect(element().querySelectorAll('[data-testid="save-assignment"]')).toHaveLength(1);
-    expect(panel().contains(byTestId(element(), 'save-assignment'))).toBe(true);
+    expect(panel().querySelector('[data-testid="save-assignment"]')).toBeNull();
+    expect(byTestId(panel(), 'edit-assignment')).toBeTruthy();
+  });
+
+  it('members view sums account rows', async () => {
+    setViewport(1280);
+    await setup({
+      tree: [
+        treeAccount(
+          'acc-x',
+          'IKE eMakler',
+          [
+            treeChild(etfOneId, 'VWCE.DE', { assetClass: 3, groupId: blueGroupId }),
+            treeChild(etfTwoId, 'CDR.WA', { assetClass: 3, groupId: blueGroupId }),
+          ],
+          { groupId: blueGroupId, cashAssetId: cashXId },
+        ),
+        treeAccount(
+          'acc-y',
+          'IKE Obligacje',
+          [
+            treeChild(treeChildOneId, 'OTS0126', {
+              assetClass: 4,
+              groupId: blueGroupId,
+              isException: true,
+            }),
+          ],
+          { cashAssetId: cashYId },
+        ),
+      ],
+      dashboard: {
+        ...groupsDashboard,
+        byAsset: [
+          { assetId: cashXId, valuePln: 1200, priceDate: '2026-10-24', isStale: false },
+          { assetId: etfOneId, valuePln: 500, priceDate: '2026-10-24', isStale: false },
+          { assetId: etfTwoId, valuePln: 300, priceDate: '2026-10-24', isStale: false },
+          { assetId: treeChildOneId, valuePln: 250, priceDate: '2026-10-24', isStale: false },
+          { assetId: cashYId, valuePln: 900, priceDate: '2026-10-24', isStale: false },
+        ],
+      },
+    });
+
+    await selectGroup('Emerytura');
+
+    expect(treeRows().map((row) => byTestId(row, 'row-name').textContent?.trim())).toEqual([
+      'IKE eMakler',
+      'VWCE.DE',
+      'CDR.WA',
+      'IKE Obligacje',
+      'OTS0126',
+    ]);
+    expect(byTestId(treeRow('IKE eMakler'), 'row-value').textContent).toContain(formatMoney(2000));
+    expect(byTestId(treeRow('VWCE.DE'), 'row-value').textContent).toContain(formatMoney(500));
+    expect(byTestId(treeRow('CDR.WA'), 'row-value').textContent).toContain(formatMoney(300));
+    expect(byTestId(treeRow('IKE Obligacje'), 'row-value').textContent).toContain(formatMoney(250));
+    expect(byTestId(treeRow('OTS0126'), 'row-value').textContent).toContain(formatMoney(250));
+  });
+
+  it('switches between members and edit', async () => {
+    setViewport(1280);
+    const tree = [treeAccountWithThreeChildren(blueGroupId), ...skarbonki(1)];
+    await setup({
+      tree,
+      afterAssignment: { groups: [blueGroup, greenGroup], tree, dashboard: groupsDashboard },
+    });
+    await selectGroup('Emerytura');
+    expect(byTestId(panel(), 'members-view')).toBeTruthy();
+    expect(element().querySelector('[data-testid="save-assignment"]')).toBeNull();
+
+    await openEdit();
+    expect(byTestId(element(), 'save-assignment')).toBeTruthy();
+    expect(rowCheckbox('Skarbonka 1')).toBeTruthy();
+    await toggle('Skarbonka 1');
+    byTestId(element(), 'save-assignment').click();
+    await settle();
+
+    await vi.waitFor(() => {
+      fixture.detectChanges();
+      expect(element().querySelector('[data-testid="save-assignment"]')).toBeNull();
+      expect(byTestId(panel(), 'members-view')).toBeTruthy();
+    });
+    expect(panelOpen()).toBe(true);
   });
 
   it('save refreshes the cards', async () => {
     setViewport(1280);
+    const tree = [treeAccountWithThreeChildren(blueGroupId), ...skarbonki(1)];
     await setup({
+      tree,
       afterAssignment: {
         groups: [{ ...blueGroup, assetCount: 4 }, greenGroup],
-        assets: assignableAssets.map((asset) =>
-          asset.assetId === freeAssetId ? { ...asset, groupId: blueGroupId } : asset,
-        ),
+        tree: [
+          treeAccountWithThreeChildren(blueGroupId),
+          ...skarbonki(1).map((item) => ({ ...item, groupId: blueGroupId })),
+        ],
         dashboard: {
           ...groupsDashboard,
           byGroup: groupsDashboard.byGroup.map((entry) =>
@@ -567,6 +657,7 @@ describe('Groups', () => {
       },
     });
     await selectGroup('Emerytura');
+    await openEdit();
 
     await toggle('Skarbonka 1');
     byTestId(element(), 'save-assignment').click();
@@ -574,7 +665,7 @@ describe('Groups', () => {
 
     await vi.waitFor(() => {
       fixture.detectChanges();
-      expect(panelOpen()).toBe(false);
+      expect(element().querySelector('[data-testid="save-assignment"]')).toBeNull();
       expect(byTestId(groupCard('Emerytura'), 'group-count').textContent).toContain('4');
       expect(byTestId(groupCard('Emerytura'), 'group-value').textContent).toContain(
         formatMoney(4800),
@@ -582,7 +673,7 @@ describe('Groups', () => {
     });
   });
 
-  it('ungrouped is read only', async () => {
+  it('ungrouped panel is members only', async () => {
     setViewport(1280);
     await setup();
 
@@ -591,14 +682,31 @@ describe('Groups', () => {
 
     expect(panelOpen()).toBe(true);
     expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('No group');
-    expect(visibleAssetNames()).toHaveLength(2);
-    expect(visibleAssetNames().some((name) => name.includes('Free Stock'))).toBe(true);
-    expect(visibleAssetNames().some((name) => name.includes('Old Bond'))).toBe(true);
-    expect(visibleAssetNames().some((name) => name.includes('Member Bond'))).toBe(false);
+    expect(byTestId(panel(), 'members-view')).toBeTruthy();
+    expect(treeRows().map((row) => byTestId(row, 'row-name').textContent?.trim())).toEqual([
+      'Free Stock',
+      'Old Bond',
+    ]);
     expect(panel().querySelector('input[type=checkbox]')).toBeNull();
+    expect(panel().querySelector('[data-testid="edit-assignment"]')).toBeNull();
     expect(panel().querySelector('[data-testid="save-assignment"]')).toBeNull();
     expect(byTestId(panel(), 'asset-filter')).toBeTruthy();
     expect(byTestId(panel(), 'ungrouped-hint')).toBeTruthy();
+  });
+
+  it('members view paginates', async () => {
+    setViewport(1280);
+    await setup({
+      tree: skarbonki(21).map((item) => ({ ...item, groupId: blueGroupId })),
+    });
+    await selectGroup('Emerytura');
+
+    expect(byTestId(panel(), 'members-view')).toBeTruthy();
+    expect(treeRows()).toHaveLength(20);
+    await nextPage();
+    expect(treeRows()).toHaveLength(1);
+    await previousPage();
+    expect(treeRows()).toHaveLength(20);
   });
 
   it('panel closes and restores focus', async () => {
@@ -619,6 +727,7 @@ describe('Groups', () => {
       timeout: 5000,
     });
 
+    await openEdit();
     await toggle('Skarbonka 1');
     byTestId(panel(), 'close-assets-panel').click();
     await settle();
@@ -626,6 +735,7 @@ describe('Groups', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(opener), { timeout: 5000 });
 
     await selectGroup('Emerytura');
+    await openEdit();
     expect(rowCheckbox('Skarbonka 1').checked).toBe(false);
     await vi.waitFor(() => expect(panel().contains(document.activeElement)).toBe(true), {
       timeout: 5000,
@@ -639,8 +749,10 @@ describe('Groups', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(opener), { timeout: 5000 });
 
     await selectGroup('Emerytura');
+    await openEdit();
     await toggle('Skarbonka 1');
     await selectGroup('Poduszka');
+    await openEdit();
     expect(panelOpen()).toBe(true);
     expect(byTestId(panel(), 'assets-panel-title').textContent).toContain('Poduszka');
     expect(rowCheckbox('Skarbonka 1').checked).toBe(false);
@@ -763,6 +875,7 @@ describe('Groups', () => {
   it('edit tree paginates with expanded rows', async () => {
     await setup({ tree: [treeAccountWithThreeChildren(), ...skarbonki(20)] });
     await selectGroup('Emerytura');
+    await openEdit();
 
     expect(treeRows()).toHaveLength(20);
     expect(paginator().querySelector('mat-select')).toBeNull();
@@ -782,6 +895,7 @@ describe('Groups', () => {
   it('keeps expansion across page and filter', async () => {
     await setup({ tree: [treeAccountWithThreeChildren(), ...skarbonki(20)] });
     await selectGroup('Emerytura');
+    await openEdit();
     await toggleExpand('IKE Obligacje');
 
     await nextPage();
@@ -798,6 +912,7 @@ describe('Groups', () => {
       tree: [treeAccountWithThreeChildren(greenGroupId), ...skarbonki(1)],
     });
     await selectGroup('Emerytura');
+    await openEdit();
 
     const account = treeRow('IKE Obligacje');
     expect(account.dataset['greyed']).toBe('true');
@@ -820,6 +935,7 @@ describe('Groups', () => {
   it('saves desired state through members', async () => {
     await setup({ tree: [treeAccountWithThreeChildren(blueGroupId), ...skarbonki(1)] });
     await selectGroup('Emerytura');
+    await openEdit();
     await toggleExpand('IKE Obligacje');
     expect(rowCheckbox('IKE Obligacje').checked).toBe(true);
     expect(rowCheckbox('ROR0126').checked).toBe(true);
@@ -856,6 +972,7 @@ describe('Groups', () => {
     ]);
     await setup({ tree: [account] });
     await selectGroup('Emerytura');
+    await openEdit();
     await toggleExpand('IKE Obligacje');
 
     rowCheckbox('IKE Obligacje').click();

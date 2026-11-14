@@ -276,7 +276,7 @@ Content-Type: application/json
   "currency": "PLN"
 }
 
-### Add a market-valuation asset (groupId is optional and never defaulted from the account; 404 NotFound.AssetGroup; AddBond, AddMetal and AddDeposit take it too)
+### Add a market-valuation asset (it inherits its account's group; AddMetal and AddDeposit take a groupId)
 # @name addAsset
 POST {{baseUrl}}/api/portfolio/assets
 Authorization: Bearer {{authToken}}
@@ -287,8 +287,7 @@ Content-Type: application/json
   "assetClass": "Stock",
   "name": "Example stock",
   "currency": "USD",
-  "instrumentId": "{{addCustomInstrument.response.body.id}}",
-  "groupId": "{{createAssetGroup.response.body.id}}"
+  "instrumentId": "{{addCustomInstrument.response.body.id}}"
 }
 
 ### List assets
@@ -823,18 +822,13 @@ Content-Type: application/json
   ]
 }
 
-### Every asset the user can assign, archived ones and managed cash included
-# @name listAssignableAssets
-GET {{baseUrl}}/api/portfolio/asset-groups/assets
-Authorization: Bearer {{authToken}}
-
 ### Assign assets to a group, or clear them with groupId null (publishes AssetPositionChanged per changed asset; 404 NotFound.AssetGroup, NotFound.Asset; 400 Validation.AssetIdsRequired)
 PUT {{baseUrl}}/api/portfolio/asset-groups/assignment
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "assetIds": ["{{listAssignableAssets.response.body.$[0].assetId}}"],
+  "assetIds": ["{{addAsset.response.body.id}}"],
   "groupId": "{{createAssetGroup.response.body.id}}"
 }
 

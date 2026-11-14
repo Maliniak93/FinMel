@@ -28,8 +28,6 @@ import {
 import { fromDateOnly, toDateOnly } from '../../../shared/date-only';
 import { formatMoney } from '../../../shared/format';
 import { ACCOUNT_TYPE } from '../../accounts/account-type';
-import { assignGroup } from '../../../shared/group-select/assign-group';
-import { GroupSelect } from '../../../shared/group-select/group-select';
 import { BOND_TYPES, bondTypeInfo } from '../bond-types';
 
 export interface BondPurchaseDialogData {
@@ -58,7 +56,6 @@ function emptyToNull(value: unknown): number | null {
     MatInputModule,
     MatProgressSpinnerModule,
     MatSelectModule,
-    GroupSelect,
     TranslocoPipe,
   ],
   templateUrl: './bond-purchase-dialog.html',
@@ -90,7 +87,6 @@ export class BondPurchaseDialog {
       { value: this.data.accountId ?? this.bond?.accountId ?? '', disabled: this.isEdit },
       [Validators.required],
     ),
-    groupId: [this.bond?.groupId ?? (null as string | null)],
     name: this.formBuilder.nonNullable.control(this.bond?.name ?? '', [
       Validators.required,
       Validators.maxLength(200),
@@ -189,27 +185,8 @@ export class BondPurchaseDialog {
       : null;
   });
 
-  private readonly accountDefaultGroup = computed(() => {
-    if (!this.accountsResource.hasValue()) {
-      return null;
-    }
-    const accountId = this.formValue().accountId;
-    return (
-      this.accountsResource.value().find((candidate) => candidate.id === accountId)?.groupId ?? null
-    );
-  });
-
   constructor() {
     const controls = this.form.controls;
-
-    effect(() => {
-      const groupId = this.accountDefaultGroup();
-      untracked(() => {
-        if (!this.isEdit && !controls.groupId.dirty) {
-          controls.groupId.setValue(groupId);
-        }
-      });
-    });
 
     controls.series.valueChanges
       .pipe(takeUntilDestroyed())
@@ -311,17 +288,8 @@ export class BondPurchaseDialog {
           body: terms,
         })
       : await postApiPortfolioBonds({
-          body: { ...terms, accountId: values.accountId, groupId: values.groupId },
+          body: { ...terms, accountId: values.accountId },
         });
-
-    if (!result.error && this.bond && values.groupId !== (this.bond.groupId ?? null)) {
-      const assignmentError = await assignGroup(this.bond.assetId, values.groupId);
-      if (assignmentError) {
-        this.submitting.set(false);
-        this.formError.set(assignmentError);
-        return;
-      }
-    }
 
     this.submitting.set(false);
 

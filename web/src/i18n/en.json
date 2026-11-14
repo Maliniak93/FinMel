@@ -760,6 +760,7 @@
     "field": {
       "group": "Group",
       "defaultGroup": "Default group",
+      "accountGroup": "Account group",
       "none": "No group"
     },
     "assetCount": "Assets: {{ count }}",
@@ -834,6 +835,10 @@
       "closePanel": "Close assets panel",
       "ungroupedHint": "These assets are in no group. To assign them, open the Assets panel of a group card.",
       "ungroupedEmpty": "Every asset is in a group.",
+      "membersEmpty": "Nothing is in this group yet.",
+      "edit": "Edit members",
+      "backToMembers": "Back to members",
+      "value": "Value",
       "loadFailed": "Failed to load the assets.",
       "saveFailed": "Failed to save the assignment.",
       "empty": "You have no assets to assign yet.",
@@ -845,7 +850,6 @@
       "collapse": "Collapse",
       "chipTooltip": "In group \"{{ name }}\" — checking moves it here",
       "class": "Class",
-      "location": "Account or place",
       "group": "Group"
     }
   },

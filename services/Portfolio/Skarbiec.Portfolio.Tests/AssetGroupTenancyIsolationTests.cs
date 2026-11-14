@@ -81,7 +81,7 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
     }
 
     [Fact]
-    public async Task List_ForStranger_DoesNotIncludeGroupsOrAssets()
+    public async Task List_ForStranger_DoesNotIncludeGroups()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var owner = Factory.CreateAuthenticatedClient(Guid.NewGuid());
@@ -91,12 +91,9 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
 
         using var stranger = Factory.CreateAuthenticatedClient(Guid.NewGuid());
         var groups = await stranger.GetAsync(AssetGroupsUri, cancellationToken);
-        var assets = await stranger.GetAsync(AssignableAssetsUri, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, groups.StatusCode);
         Assert.Empty((await groups.ReadJsonAsync(cancellationToken)).EnumerateArray());
-        Assert.Equal(HttpStatusCode.OK, assets.StatusCode);
-        Assert.Empty((await assets.ReadJsonAsync(cancellationToken)).EnumerateArray());
     }
 
     [Fact]
@@ -184,20 +181,9 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
         var strangerId = Guid.NewGuid();
         using var stranger = Factory.CreateAuthenticatedClient(strangerId);
         var strangerAccount = await stranger.CreateAccountAsync(cancellationToken, "Stranger", AccountType.Brokerage);
-        var strangerBonds = await stranger.CreateAccountAsync(cancellationToken, "Stranger bonds", AccountType.Bonds);
-        await stranger.FundAccountAsync(strangerBonds, cancellationToken);
         var strangerBank = await stranger.CreateBankAccountAsync(cancellationToken, "Stranger bank", balance: 10_000m);
         var strangerPlace = await stranger.CreateCashPlaceAsync(cancellationToken, "Sejf");
         var before = await SnapshotUserRowsAsync(strangerId, cancellationToken);
-        var stock = new AddAssetRequest
-        {
-            AccountId = strangerAccount,
-            AssetClass = AssetClass.Stock,
-            Name = "Foreign asset",
-            Currency = "PLN",
-            InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN"),
-            GroupId = foreignGroupId
-        };
 
         var responses = new[]
         {
@@ -207,8 +193,6 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
                 cancellationToken),
             await stranger.PostAsJsonAsync(
                 CashPlacesUri, new { name = "Foreign place", currencies = new[] { "PLN" }, groupId = foreignGroupId }, cancellationToken),
-            await stranger.PostAsJsonAsync(AllAssetsUri, stock, cancellationToken),
-            await stranger.PostAsJsonAsync(AllBondsUri, NewBondRequest() with { AccountId = strangerBonds, GroupId = foreignGroupId }, cancellationToken),
             await stranger.PostAsJsonAsync(AllMetalsUri, NewMetalRequest() with { GroupId = foreignGroupId }, cancellationToken),
             await stranger.PostAsJsonAsync(
                 AllDepositsUri, NewDepositRequest() with { SourceAccountId = strangerBank.AccountId, GroupId = foreignGroupId }, cancellationToken),
@@ -226,7 +210,7 @@ public sealed class AssetGroupTenancyIsolationTests(SkarbiecContainersFixture co
 
         Assert.Equal(before, await SnapshotUserRowsAsync(strangerId, cancellationToken));
         await using var dbContext = CreateDbContext(strangerId);
-        Assert.Equal(3, await dbContext.Set<Account>().CountAsync(cancellationToken));
+        Assert.Equal(2, await dbContext.Set<Account>().CountAsync(cancellationToken));
         Assert.Equal(1, await dbContext.Set<CashPlace>().CountAsync(cancellationToken));
         Assert.All(await dbContext.Set<Account>().ToListAsync(cancellationToken), a => Assert.Null(a.GroupId));
         Assert.DoesNotContain(await dbContext.Assets.ToListAsync(cancellationToken), a => a.GroupId == foreignGroupId);

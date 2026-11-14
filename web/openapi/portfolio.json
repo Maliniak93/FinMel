@@ -1764,28 +1764,6 @@
         }
       }
     },
-    "/api/portfolio/asset-groups/assets": {
-      "get": {
-        "tags": [
-          "ListAssignableAssetsEndpoint"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AssignableAssetResponse"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/portfolio/cash-places": {
       "post": {
         "tags": [
@@ -3432,13 +3410,6 @@
             ],
             "format": "uuid"
           },
-          "groupId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
           "initialTransaction": {
             "oneOf": [
               {
@@ -3465,13 +3436,6 @@
         "type": "object",
         "properties": {
           "accountId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "groupId": {
             "type": [
               "null",
               "string"
@@ -4094,64 +4058,6 @@
               "string"
             ],
             "format": "uuid"
-          }
-        }
-      },
-      "AssignableAssetResponse": {
-        "required": [
-          "assetId",
-          "name",
-          "assetClass",
-          "currency",
-          "accountId",
-          "accountName",
-          "cashPlaceName",
-          "groupId",
-          "isArchived"
-        ],
-        "type": "object",
-        "properties": {
-          "assetId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "assetClass": {
-            "$ref": "#/components/schemas/AssetClass"
-          },
-          "currency": {
-            "type": "string"
-          },
-          "accountId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "accountName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "cashPlaceName": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "groupId": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "uuid"
-          },
-          "isArchived": {
-            "type": "boolean"
           }
         }
       },
@@ -9882,9 +9788,6 @@
     },
     {
       "name": "SaveGroupSharesEndpoint"
-    },
-    {
-      "name": "ListAssignableAssetsEndpoint"
     },
     {
       "name": "CreateCashPlaceEndpoint"

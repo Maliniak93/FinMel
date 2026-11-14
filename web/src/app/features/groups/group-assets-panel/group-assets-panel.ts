@@ -24,10 +24,11 @@ import {
   putApiPortfolioAssetGroupsByGroupIdMembers,
   type AssetGroupResponse,
   type AssetGroupTreeItem,
-  type AssignableAssetResponse,
 } from '../../../api/portfolio';
+import type { DashboardResponse } from '../../../api/reporting';
 import { readProblemDetails } from '../../../core/auth/problem-details';
 import { groupColor } from '../../../shared/colors';
+import { Money } from '../../../shared/money/money';
 import { Skeleton } from '../../../shared/skeleton/skeleton';
 import { ASSET_CLASSES, assetClassLabel } from '../../assets/asset-class';
 import {
@@ -35,6 +36,7 @@ import {
   assetRow,
   childRow,
   flattenVisible,
+  membersOf,
   page,
   rowState,
   type TreeRow,
@@ -60,6 +62,7 @@ interface LoadState {
     MatPaginatorModule,
     MatSelectModule,
     MatTooltipModule,
+    Money,
     Skeleton,
     TranslocoPipe,
   ],
@@ -72,15 +75,20 @@ export class GroupAssetsPanel {
 
   readonly groupId = input.required<string | null>();
   readonly groups = input.required<AssetGroupResponse[]>();
-  readonly assetsResource = input.required<ResourceRef<AssignableAssetResponse[] | undefined>>();
+  readonly dashboard = input.required<DashboardResponse | null>();
   readonly treeResource = input.required<ResourceRef<AssetGroupTreeItem[] | undefined>>();
 
   readonly closed = output<void>();
-  readonly saved = output<boolean>();
+  readonly saved = output<void>();
 
   protected readonly pageSize = PAGE_SIZE;
   protected readonly saving = signal(false);
-  protected readonly expanded = signal<ReadonlySet<string>>(new Set());
+  private readonly openAccounts = signal<ReadonlySet<string>>(new Set());
+  private readonly collapsedMembers = signal<ReadonlySet<string>>(new Set());
+  private readonly mode = linkedSignal<string | null, 'members' | 'edit'>({
+    source: this.groupId,
+    computation: () => 'members',
+  });
   protected readonly pageIndex = linkedSignal<string | null, number>({
     source: this.groupId,
     computation: () => 0,
@@ -93,17 +101,9 @@ export class GroupAssetsPanel {
   });
 
   protected readonly readOnly = computed(() => this.groupId() === null);
+  protected readonly editing = computed(() => !this.readOnly() && this.mode() === 'edit');
   protected readonly group = computed(
     () => this.groups().find((group) => group.id === this.groupId()) ?? null,
-  );
-
-  private readonly allAssets = computed(() => {
-    const resource = this.assetsResource();
-    return resource.hasValue() ? (resource.value() ?? []) : [];
-  });
-
-  private readonly listedAssets = computed(() =>
-    this.allAssets().filter((asset) => asset.groupId === null),
   );
 
   private readonly tree = computed(() => {
@@ -111,9 +111,25 @@ export class GroupAssetsPanel {
     return resource.hasValue() ? (resource.value() ?? []) : [];
   });
 
+  private readonly members = computed(() => membersOf(this.tree(), this.groupId()));
+
+  private readonly shownTree = computed(() => (this.editing() ? this.tree() : this.members()));
+
+  private readonly expanded = computed<ReadonlySet<string>>(() => {
+    if (this.editing()) {
+      return this.openAccounts();
+    }
+    const collapsed = this.collapsedMembers();
+    return new Set(
+      this.members()
+        .filter((item) => item.kind === 'Account' && !collapsed.has(item.accountId!))
+        .map((item) => item.accountId!),
+    );
+  });
+
   private readonly treeClasses = computed(() => {
     const present = new Set<number>();
-    for (const item of this.tree()) {
+    for (const item of this.shownTree()) {
       if (item.assetClass !== null) {
         present.add(Number(item.assetClass));
       }
@@ -123,23 +139,8 @@ export class GroupAssetsPanel {
   });
 
   protected readonly presentClasses = computed(() => {
-    const present = this.readOnly()
-      ? new Set(this.listedAssets().map((asset) => Number(asset.assetClass)))
-      : this.treeClasses();
+    const present = this.treeClasses();
     return ASSET_CLASSES.filter((assetClass) => present.has(Number(assetClass.value)));
-  });
-
-  protected readonly shownAssets = computed(() => {
-    const text = this.textFilter().trim().toLowerCase();
-    const assetClass = this.classFilter();
-    return this.listedAssets().filter(
-      (asset) =>
-        (assetClass === null || Number(asset.assetClass) === assetClass) &&
-        (text === '' ||
-          [asset.name, asset.accountName, asset.cashPlaceName].some((value) =>
-            (value ?? '').toLowerCase().includes(text),
-          )),
-    );
   });
 
   private readonly overrides = linkedSignal<
@@ -150,12 +151,10 @@ export class GroupAssetsPanel {
     computation: () => new Map(),
   });
 
-  protected readonly source = computed<LoadState>(() =>
-    this.readOnly() ? this.assetsResource() : this.treeResource(),
-  );
+  protected readonly source = computed<LoadState>(() => this.treeResource());
 
   protected readonly rows = computed(() =>
-    flattenVisible(this.tree(), this.expanded(), {
+    flattenVisible(this.shownTree(), this.expanded(), {
       text: this.textFilter(),
       assetClass: this.classFilter(),
     }),
@@ -173,9 +172,39 @@ export class GroupAssetsPanel {
       .length;
   });
 
-  protected readonly hasAssets = computed(() =>
-    this.readOnly() ? this.listedAssets().length > 0 : this.tree().length > 0,
-  );
+  protected readonly hasAssets = computed(() => this.shownTree().length > 0);
+
+  protected readonly values = computed(() => {
+    const lines = new Map((this.dashboard()?.byAsset ?? []).map((line) => [line.assetId, line]));
+    const groupId = this.groupId();
+    const values = new Map<string, { amount: number | null; stale: boolean }>();
+    const sumOf = (assetIds: string[]) => {
+      let grosze = 0;
+      let found = false;
+      let stale = false;
+      for (const assetId of assetIds) {
+        const line = lines.get(assetId);
+        if (line === undefined) {
+          stale = true;
+          continue;
+        }
+        found = true;
+        stale = stale || line.isStale;
+        grosze += Math.round(Number(line.valuePln) * 100);
+      }
+      return { amount: found ? grosze / 100 : null, stale };
+    };
+    for (const item of this.members()) {
+      if (item.kind !== 'Account') {
+        values.set(item.assetId!, sumOf([item.assetId!]));
+        continue;
+      }
+      item.children.forEach((child) => values.set(child.assetId, sumOf([child.assetId])));
+      const cash = item.groupId === groupId && item.cashAssetId !== null ? [item.cashAssetId] : [];
+      values.set(item.accountId!, sumOf([...cash, ...item.children.map((child) => child.assetId)]));
+    }
+    return values;
+  });
 
   protected readonly assetClassLabel = assetClassLabel;
 
@@ -198,6 +227,14 @@ export class GroupAssetsPanel {
     return groupColor(this.groups().find((group) => group.id === groupId)?.color);
   }
 
+  protected startEditing(): void {
+    this.mode.set('edit');
+  }
+
+  protected backToMembers(): void {
+    this.mode.set('members');
+  }
+
   protected onFilterInput(event: Event): void {
     this.textFilter.set((event.target as HTMLInputElement).value);
     this.pageIndex.set(0);
@@ -217,7 +254,8 @@ export class GroupAssetsPanel {
   }
 
   protected toggleExpanded(key: string): void {
-    this.expanded.update((current) => {
+    const target = this.editing() ? this.openAccounts : this.collapsedMembers;
+    target.update((current) => {
       const next = new Set(current);
       if (!next.delete(key)) {
         next.add(key);
@@ -295,6 +333,9 @@ export class GroupAssetsPanel {
       this.saving.set(false);
     }
 
-    this.saved.emit(complete);
+    if (complete) {
+      this.mode.set('members');
+    }
+    this.saved.emit();
   }
 }

@@ -131,3 +131,51 @@ export function rowState(row: TreeRow, groupId: string | null): TreeRowState {
     chip: greyed ? row.groupId : null,
   };
 }
+
+export function membersOf(
+  items: readonly AssetGroupTreeItem[],
+  groupId: string | null,
+): AssetGroupTreeItem[] {
+  const members: AssetGroupTreeItem[] = [];
+  for (const item of items) {
+    if (item.kind !== 'Account') {
+      if (item.groupId === groupId) {
+        members.push(item);
+      }
+      continue;
+    }
+
+    const children = item.children.filter((child) => child.groupId === groupId);
+    if (item.groupId === groupId || children.length > 0) {
+      members.push({ ...item, children });
+    }
+  }
+  return members;
+}
+
+export interface TreeComponent {
+  assetId: string;
+  groupId: string | null;
+  isArchived: boolean;
+}
+
+// Every valued asset of the tree: direct assets, account components and each account's cash (in the account's group).
+export function componentsOf(items: readonly AssetGroupTreeItem[]): TreeComponent[] {
+  return items.flatMap((item): TreeComponent[] => {
+    if (item.kind !== 'Account') {
+      return [{ assetId: item.assetId!, groupId: item.groupId, isArchived: item.isArchived }];
+    }
+    const cash: TreeComponent[] =
+      item.cashAssetId === null
+        ? []
+        : [{ assetId: item.cashAssetId, groupId: item.groupId, isArchived: item.isArchived }];
+    return [
+      ...cash,
+      ...item.children.map((child) => ({
+        assetId: child.assetId,
+        groupId: child.groupId,
+        isArchived: child.isArchived,
+      })),
+    ];
+  });
+}
