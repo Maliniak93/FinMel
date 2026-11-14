@@ -80,11 +80,6 @@ public sealed class AddAssetHandler(
             }
         }
 
-        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
-        {
-            return groupError;
-        }
-
         var account = await dbContext.ResolveAsync(request.AssetClass, request.AccountId, cancellationToken);
         if (account.IsFailure)
         {
@@ -104,11 +99,7 @@ public sealed class AddAssetHandler(
 
         if (account.Value is { } owner)
         {
-            AccountGroupInheritance.ForNewComponent(asset, owner, request.GroupId);
-        }
-        else
-        {
-            asset.GroupId = request.GroupId;
+            AccountGroupInheritance.Inherit(asset, owner);
         }
 
         if (request.InstrumentId is { } instrumentId)

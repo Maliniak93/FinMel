@@ -54,12 +54,12 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
     }
 
     [Fact]
-    public async Task AddAssetWithGroup_FirstPositionCarriesGroup()
+    public async Task AddAssetInGroupedAccount_FirstPositionCarriesGroup()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var scope = Provider.CreateAsyncScope();
-        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken);
         var groupId = await CreateGroupAsync(scope.ServiceProvider, "Poduszka", cancellationToken);
+        var accountId = await CreateAccountAsync(scope.ServiceProvider, "Outbox test account", cancellationToken, groupId: groupId);
 
         var added = await scope.ServiceProvider.GetRequiredService<AddAssetHandler>().HandleAsync(
             new AddAssetRequest
@@ -69,7 +69,6 @@ public sealed class AssetOutboxTests(SkarbiecContainersFixture containers) : Por
                 Name = "Grouped",
                 Currency = "PLN",
                 InstrumentId = FakeInstrumentLookupClient.IdFor(AssetClass.Stock, "PLN"),
-                GroupId = groupId
             },
             cancellationToken);
 

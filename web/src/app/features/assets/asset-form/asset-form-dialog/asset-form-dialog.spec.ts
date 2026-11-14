@@ -31,11 +31,7 @@ import {
   stockInstrumentDetails,
   toggleFirstTransaction,
 } from '../testing/asset-form-fixtures';
-import {
-  pickSelectOption,
-  selectOptionLabels,
-  selectTriggerState,
-} from '../../../deposits/testing/deposit-fixtures';
+import { pickSelectOption, selectOptionLabels } from '../../../deposits/testing/deposit-fixtures';
 import {
   assetGroups,
   blueGroupId,
@@ -355,104 +351,27 @@ describe('AssetFormDialog', () => {
         ? jsonResponse(stockAsset, 201)
         : jsonResponse(accounts);
 
-    it('prefills the account default', async () => {
+    it('has no group field for stock and etf', async () => {
+      await setup({ assetClass: ASSET_CLASS.Stock }, chooseAccountFetch);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-group-select')).toBeNull();
+      expect(Object.keys(activeForm().form.controls)).not.toContain('groupId');
+
+      vi.restoreAllMocks();
+      TestBed.resetTestingModule();
       await setup({ assetClass: ASSET_CLASS.Etf }, chooseAccountFetch);
       await pickSelectOption(fixture, 'accountId', 'XTB IKE');
-      await vi.waitFor(() => {
-        fixture.detectChanges();
-        expect(selectTriggerState(fixture, 'groupId').triggerText).toContain('Emerytura');
-      });
       findControl(activeForm().form, 'name').setValue('World ETF');
       await pickInstrument(fixture, etfSearchResult);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-group-select')).toBeNull();
 
       await component['onSubmit']();
 
-      const [post] = writeRequests();
-      expect(await post.json()).toEqual(
-        expect.objectContaining({ accountId: xtbIkeId, groupId: blueGroupId }),
-      );
-    });
-
-    it('prefills the default of a preset account', async () => {
-      await setup({ assetClass: ASSET_CLASS.Etf, accountId: xtbIkeId }, chooseAccountFetch);
-      await vi.waitFor(() => {
-        fixture.detectChanges();
-        expect(selectTriggerState(fixture, 'groupId').triggerText).toContain('Emerytura');
-      });
-      findControl(activeForm().form, 'name').setValue('World ETF');
-      await pickInstrument(fixture, etfSearchResult);
-
-      await component['onSubmit']();
-
-      const [post] = writeRequests();
-      expect(await post.json()).toEqual(
-        expect.objectContaining({ accountId: xtbIkeId, groupId: blueGroupId }),
-      );
-    });
-
-    it('keeps a manual choice', async () => {
-      await setup({ assetClass: ASSET_CLASS.Etf }, chooseAccountFetch);
-      await pickSelectOption(fixture, 'accountId', 'XTB IKE');
-      await pickSelectOption(fixture, 'groupId', 'No group');
-      await pickSelectOption(fixture, 'accountId', 'XTB zwykly');
-      await vi.waitFor(() => {
-        fixture.detectChanges();
-        expect(selectTriggerState(fixture, 'groupId').triggerText).toContain('No group');
-      });
-      findControl(activeForm().form, 'name').setValue('World ETF');
-      await pickInstrument(fixture, etfSearchResult);
-
-      await component['onSubmit']();
-
-      const [post] = writeRequests();
-      expect(await post.json()).toEqual(
-        expect.objectContaining({ accountId: xtbRegularId, groupId: null }),
-      );
-    });
-
-    describe('on edit', () => {
-      const groupedStock = { ...stockAsset, groupId: blueGroupId };
-      const editFetch = async (input: unknown): Promise<Response> =>
-        requestUrl(input).includes('/instruments/')
-          ? jsonResponse(stockInstrumentDetails)
-          : jsonResponse(stockAsset);
-
-      it('assigns after a changed group', async () => {
-        await setup({ assetClass: groupedStock.assetClass, asset: groupedStock }, editFetch);
-        await vi.waitFor(() => {
-          fixture.detectChanges();
-          expect(selectTriggerState(fixture, 'groupId').triggerText).toContain('Emerytura');
-        });
-        await pickSelectOption(fixture, 'groupId', 'Poduszka');
-
-        await component['onSubmit']();
-
-        const [update, assignment] = writeRequests();
-        expect(update.method).toBe('PUT');
-        expect(update.url).toContain(`/api/portfolio/assets/${stockAsset.id}`);
-        expect(assignment.method).toBe('PUT');
-        expect(assignment.url).toContain('/api/portfolio/asset-groups/assignment');
-        expect(await assignment.json()).toEqual({
-          assetIds: [stockAsset.id],
-          groupId: greenGroupId,
-        });
-        expect(dialogRef.close).toHaveBeenCalledWith(true);
-      });
-
-      it('skips assignment when unchanged', async () => {
-        await setup({ assetClass: groupedStock.assetClass, asset: groupedStock }, editFetch);
-        await vi.waitFor(() => {
-          fixture.detectChanges();
-          expect(selectTriggerState(fixture, 'groupId').triggerText).toContain('Emerytura');
-        });
-
-        await component['onSubmit']();
-
-        const writes = writeRequests();
-        expect(writes).toHaveLength(1);
-        expect(writes[0].method).toBe('PUT');
-        expect(writes[0].url).toContain(`/api/portfolio/assets/${stockAsset.id}`);
-      });
+      const writes = writeRequests();
+      expect(writes).toHaveLength(1);
+      expect(writes[0].url).not.toContain('/asset-groups/');
+      expect(await writes[0].json()).not.toHaveProperty('groupId');
     });
   });
 

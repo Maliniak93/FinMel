@@ -18,8 +18,6 @@ public sealed record AddAssetRequest : IValidatableObject
 
     public Guid? InstrumentId { get; init; }
 
-    public Guid? GroupId { get; init; }
-
     /// <summary>Optional opening transaction; omitted, the asset starts with no transactions.</summary>
     public RecordTransactionRequest? InitialTransaction { get; init; }
 

@@ -50,10 +50,10 @@
           <app-group-assets-panel
             [groupId]="target.groupId"
             [groups]="groups()"
-            [assetsResource]="assetsResource"
+            [dashboard]="dashboard()"
             [treeResource]="treeResource"
             (closed)="closePanel()"
-            (saved)="onAssignmentSaved($event)"
+            (saved)="onAssignmentSaved()"
           />
         }
       </mat-drawer>

@@ -38,18 +38,6 @@ internal static class AccountGroupInheritance
         return changed;
     }
 
-    public static void ForNewComponent(Asset asset, Account account, Guid? requestedGroupId)
-    {
-        if (requestedGroupId is null || requestedGroupId == account.GroupId)
-        {
-            Inherit(asset, account);
-        }
-        else
-        {
-            Set(asset, requestedGroupId, true);
-        }
-    }
-
     public static bool Inherit(Asset asset, Account account) => Set(asset, account.GroupId, false);
 
     private static bool Set(Asset asset, Guid? groupId, bool isException)

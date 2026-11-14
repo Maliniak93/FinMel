@@ -169,10 +169,11 @@ public abstract class PortfolioOutboxTestBase(SkarbiecContainersFixture containe
         string name,
         CancellationToken cancellationToken,
         AccountType type = AccountType.Brokerage,
-        TaxWrapper wrapper = TaxWrapper.Regular)
+        TaxWrapper wrapper = TaxWrapper.Regular,
+        Guid? groupId = null)
     {
         var result = await services.GetRequiredService<CreateAccountHandler>()
-            .HandleAsync(new CreateAccountRequest { Name = name, Type = type, Wrapper = wrapper }, cancellationToken);
+            .HandleAsync(new CreateAccountRequest { Name = name, Type = type, Wrapper = wrapper, GroupId = groupId }, cancellationToken);
         Assert.True(result.IsSuccess);
 
         return result.Value.Id;

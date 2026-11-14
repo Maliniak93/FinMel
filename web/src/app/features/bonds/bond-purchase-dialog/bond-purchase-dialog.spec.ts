@@ -20,11 +20,7 @@ import {
   renderedText,
   requestUrl,
 } from '../../assets/asset-form/testing/asset-form-fixtures';
-import {
-  pickSelectOption,
-  selectOptionLabels,
-  selectTriggerState,
-} from '../../deposits/testing/deposit-fixtures';
+import { pickSelectOption, selectOptionLabels } from '../../deposits/testing/deposit-fixtures';
 import { assetGroups, blueGroupId, isGroupListRequest } from '../../groups/testing/group-fixtures';
 import { BondPurchaseDialog, type BondPurchaseDialogData } from './bond-purchase-dialog';
 
@@ -365,21 +361,20 @@ describe('BondPurchaseDialog', () => {
     });
   });
 
-  describe('group', () => {
-    it('prefills the account default', async () => {
-      await setup({});
-      await fill({ ...manualPurchase, accountId: bondsAccountId });
+  it('has no group field', async () => {
+    await setup({});
+    await fill({ ...manualPurchase, accountId: bondsAccountId });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-group-select')).toBeNull();
+    expect(form().get('groupId')).toBeNull();
 
-      await vi.waitFor(() => {
-        fixture.detectChanges();
-        expect(selectTriggerState(fixture, 'groupId').triggerText).toContain('Emerytura');
-      });
-      await component['onSubmit']();
+    await component['onSubmit']();
 
-      const [request] = writeRequests();
-      expect(request.url).toContain(`/api/portfolio/bonds`);
-      expect((await request.json()).groupId).toBe(blueGroupId);
-    });
+    const writes = writeRequests();
+    expect(writes).toHaveLength(1);
+    expect(writes[0].url).toContain('/api/portfolio/bonds');
+    expect(await writes[0].json()).not.toHaveProperty('groupId');
+    expect(writes.some((request) => request.url.includes('/asset-groups/'))).toBe(false);
   });
 
   describe('edit', () => {

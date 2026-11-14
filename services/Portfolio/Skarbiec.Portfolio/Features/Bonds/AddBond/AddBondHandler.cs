@@ -19,11 +19,6 @@ public sealed class AddBondHandler(
     public async Task<Result<BondResponse>> HandleAsync(
         AddBondRequest request, CancellationToken cancellationToken)
     {
-        if (await dbContext.CheckAsync(request.GroupId, cancellationToken) is { } groupError)
-        {
-            return groupError;
-        }
-
         var resolved = await dbContext.ResolveAsync(AssetClass.Bond, request.AccountId, cancellationToken);
         if (resolved.IsFailure)
         {
@@ -41,7 +36,7 @@ public sealed class AddBondHandler(
             Currency = Currency,
             ValuationMode = AssetValuationMode.CurrencyValued,
         };
-        AccountGroupInheritance.ForNewComponent(asset, account, request.GroupId);
+        AccountGroupInheritance.Inherit(asset, account);
 
         var cost = request.BondCount * request.PurchasePricePerBond;
 

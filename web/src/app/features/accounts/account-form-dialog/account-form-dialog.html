@@ -89,7 +89,7 @@
     @if (!(isBank() && outsideNetWorth())) {
       <app-group-select
         formControlName="groupId"
-        [labelKey]="isBank() ? 'groups.field.group' : 'groups.field.defaultGroup'"
+        [labelKey]="isBank() ? 'groups.field.group' : 'groups.field.accountGroup'"
       />
     }
 

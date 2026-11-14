@@ -30,13 +30,11 @@ export type AddAssetRequest = {
     name: string;
     currency?: string;
     instrumentId?: null | string;
-    groupId?: null | string;
     initialTransaction?: null | RecordTransactionRequest;
 };
 
 export type AddBondRequest = {
     accountId?: null | string;
-    groupId?: null | string;
     name: string;
     seriesCode: string;
     type: TreasuryBondType;
@@ -153,18 +151,6 @@ export type AssetValuationMode = number;
 export type AssignAssetsToGroupRequest = {
     assetIds: Array<string>;
     groupId?: null | string;
-};
-
-export type AssignableAssetResponse = {
-    assetId: string;
-    name: string;
-    assetClass: AssetClass;
-    currency: string;
-    accountId: null | string;
-    accountName: null | string;
-    cashPlaceName: null | string;
-    groupId: null | string;
-    isArchived: boolean;
 };
 
 export type BankInterestPreviewResponse = {
@@ -2171,22 +2157,6 @@ export type PutApiPortfolioAssetGroupsSharesResponses = {
 };
 
 export type PutApiPortfolioAssetGroupsSharesResponse = PutApiPortfolioAssetGroupsSharesResponses[keyof PutApiPortfolioAssetGroupsSharesResponses];
-
-export type GetApiPortfolioAssetGroupsAssetsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/portfolio/asset-groups/assets';
-};
-
-export type GetApiPortfolioAssetGroupsAssetsResponses = {
-    /**
-     * OK
-     */
-    200: Array<AssignableAssetResponse>;
-};
-
-export type GetApiPortfolioAssetGroupsAssetsResponse = GetApiPortfolioAssetGroupsAssetsResponses[keyof GetApiPortfolioAssetGroupsAssetsResponses];
 
 export type GetApiPortfolioCashPlacesData = {
     body?: never;
