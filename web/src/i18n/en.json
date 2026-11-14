@@ -61,7 +61,6 @@
     "groupFilter": "Group: {{ name }}",
     "groupAll": "All",
     "groupNone": "No group",
-    "open": "open →",
     "section": {
       "expand": "Expand section",
       "collapse": "Collapse section"

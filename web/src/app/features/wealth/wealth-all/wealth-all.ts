@@ -1,5 +1,5 @@
 import type { ComponentType } from '@angular/cdk/portal';
-import { Component, computed, inject, linkedSignal, signal, untracked } from '@angular/core';
+import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -94,16 +94,23 @@ export class WealthAll {
   protected readonly search = signal('');
   protected readonly groupFilter = signal('all');
 
-  protected readonly expanded = linkedSignal<string, ReadonlySet<WealthType>>({
-    source: () => this.search().trim().toLowerCase(),
-    computation: (term) =>
-      term === ''
-        ? new Set<WealthType>()
-        : new Set(
-            untracked(() => this.data.rows())
-              .filter((row) => row.name.toLowerCase().includes(term))
-              .map((row) => row.type),
-          ),
+  private readonly searchExpanded = computed<ReadonlySet<WealthType>>(() => {
+    const term = this.search().trim().toLowerCase();
+    return term === ''
+      ? new Set<WealthType>()
+      : new Set(
+          this.data
+            .rows()
+            .filter((row) => row.name.toLowerCase().includes(term))
+            .map((row) => row.type),
+        );
+  });
+
+  private readonly searchEmpty = computed(() => this.search().trim() === '');
+
+  private readonly overrides = linkedSignal<boolean, ReadonlyMap<WealthType, boolean>>({
+    source: this.searchEmpty,
+    computation: () => new Map<WealthType, boolean>(),
   });
 
   protected readonly groups = this.groupList.groups;
@@ -174,17 +181,12 @@ export class WealthAll {
   ];
 
   protected isExpanded(type: WealthType): boolean {
-    return this.expanded().has(type);
+    return this.overrides().get(type) ?? this.searchExpanded().has(type);
   }
 
   protected toggle(type: WealthType): void {
-    this.expanded.update((current) => {
-      const next = new Set(current);
-      if (!next.delete(type)) {
-        next.add(type);
-      }
-      return next;
-    });
+    const open = !this.isExpanded(type);
+    this.overrides.update((current) => new Map(current).set(type, open));
   }
 
   protected onSearch(event: Event): void {

@@ -7,7 +7,7 @@ import { filter } from 'rxjs';
 
 import { activeLocale } from '../../core/i18n/language';
 import { formatMoney } from '../../shared/format';
-import { WealthData, type WealthType } from './wealth-data';
+import { WEALTH_SECTIONS, WealthData, type WealthType } from './wealth-data';
 
 interface WealthTab {
   path: string;
@@ -17,13 +17,11 @@ interface WealthTab {
 
 const WEALTH_TABS: readonly WealthTab[] = [
   { path: '', label: 'netWorthChart.allClasses', type: null },
-  { path: 'accounts', label: 'shell.nav.accounts', type: 'accounts' },
-  { path: 'bank', label: 'shell.nav.bankAccounts', type: 'bank' },
-  { path: 'cash', label: 'shell.nav.cash', type: 'cash' },
-  { path: 'deposits', label: 'shell.nav.deposits', type: 'deposits' },
-  { path: 'bonds', label: 'shell.nav.bonds', type: 'bonds' },
-  { path: 'securities', label: 'shell.nav.securities', type: 'securities' },
-  { path: 'metals', label: 'shell.nav.metals', type: 'metals' },
+  ...WEALTH_SECTIONS.map((section) => ({
+    path: section.path,
+    label: section.labelKey,
+    type: section.type,
+  })),
 ];
 
 @Component({

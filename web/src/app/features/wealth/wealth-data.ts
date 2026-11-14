@@ -58,51 +58,51 @@ export interface WealthSection {
   type: WealthType;
   labelKey: string;
   color: string;
-  link: string[];
+  path: string;
 }
 
 export const WEALTH_SECTIONS: readonly WealthSection[] = [
   {
-    type: 'securities',
-    labelKey: 'shell.nav.securities',
-    color: assetClassColor(ASSET_CLASS.Stock),
-    link: ['/wealth/securities'],
-  },
-  {
-    type: 'bonds',
-    labelKey: 'shell.nav.bonds',
-    color: assetClassColor(ASSET_CLASS.Bond),
-    link: ['/wealth/bonds'],
-  },
-  {
-    type: 'deposits',
-    labelKey: 'shell.nav.deposits',
-    color: assetClassColor(ASSET_CLASS.Deposit),
-    link: ['/wealth/deposits'],
+    type: 'accounts',
+    labelKey: 'shell.nav.accounts',
+    color: assetClassColor(ASSET_CLASS.Cash),
+    path: 'accounts',
   },
   {
     type: 'bank',
     labelKey: 'shell.nav.bankAccounts',
     color: assetClassColor(ASSET_CLASS.BankAccount),
-    link: ['/wealth/bank'],
-  },
-  {
-    type: 'accounts',
-    labelKey: 'shell.nav.accounts',
-    color: assetClassColor(ASSET_CLASS.Cash),
-    link: ['/wealth/accounts'],
-  },
-  {
-    type: 'metals',
-    labelKey: 'shell.nav.metals',
-    color: assetClassColor(ASSET_CLASS.PreciousMetal),
-    link: ['/wealth/metals'],
+    path: 'bank',
   },
   {
     type: 'cash',
     labelKey: 'shell.nav.cash',
     color: assetClassColor(ASSET_CLASS.Cash),
-    link: ['/wealth/cash'],
+    path: 'cash',
+  },
+  {
+    type: 'deposits',
+    labelKey: 'shell.nav.deposits',
+    color: assetClassColor(ASSET_CLASS.Deposit),
+    path: 'deposits',
+  },
+  {
+    type: 'bonds',
+    labelKey: 'shell.nav.bonds',
+    color: assetClassColor(ASSET_CLASS.Bond),
+    path: 'bonds',
+  },
+  {
+    type: 'securities',
+    labelKey: 'shell.nav.securities',
+    color: assetClassColor(ASSET_CLASS.Stock),
+    path: 'securities',
+  },
+  {
+    type: 'metals',
+    labelKey: 'shell.nav.metals',
+    color: assetClassColor(ASSET_CLASS.PreciousMetal),
+    path: 'metals',
   },
 ];
 

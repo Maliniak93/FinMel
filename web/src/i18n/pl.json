@@ -61,7 +61,6 @@
     "groupFilter": "Grupa: {{ name }}",
     "groupAll": "Wszystkie",
     "groupNone": "Bez grupy",
-    "open": "otwórz →",
     "section": {
       "expand": "Rozwiń sekcję",
       "collapse": "Zwiń sekcję"
