@@ -6,6 +6,7 @@ import {
   test,
   warsawDate,
 } from './fixtures';
+import { assignAccountToGroup } from './groups';
 import { pln } from './planning';
 import { expectProjected } from './projection';
 
@@ -151,7 +152,11 @@ async function seedEightGroups(
             `Portfel ${letter}`,
             GROUP_AMOUNTS[index] as number,
           );
-    await assign(request, seeded.headers, assetId, groupId);
+    if (index === 0) {
+      await assignAccountToGroup(request, seeded.headers, groupId, seeded.accountId);
+    } else {
+      await assign(request, seeded.headers, assetId, groupId);
+    }
   }
 }
 
@@ -413,7 +418,7 @@ test('szlif ui: one 140 ms motion for navigation, lists and the range switch', a
         : {}),
     });
     if (name === 'Plan') {
-      await assign(request, seeded.headers, seeded.cashAssetId, id);
+      await assignAccountToGroup(request, seeded.headers, id, seeded.accountId);
     }
   }
   const bondAccount = await createAccountThroughApi(request, token, {

@@ -113,9 +113,15 @@ async function openCardPanel(page: Page, name: string): Promise<void> {
   await expect(panelOf(page).getByTestId('assets-panel-title')).toContainText(name);
 }
 
+async function openCardEdit(page: Page, name: string): Promise<void> {
+  await openCardPanel(page, name);
+  await panelOf(page).getByTestId('edit-assignment').click();
+  await expect(panelOf(page).getByTestId('edit-view')).toBeVisible();
+}
+
 async function savePanel(page: Page): Promise<void> {
   await panelOf(page).getByTestId('save-assignment').click();
-  await expect(panelOf(page).getByTestId('assets-panel-title')).toHaveCount(0);
+  await expect(panelOf(page).getByTestId('edit-view')).toHaveCount(0);
 }
 
 async function openCardMenu(page: Page, name: string, item: 'edit-group' | 'delete-group') {
@@ -261,7 +267,11 @@ test('redesign Grupy: cards, summary, assets panel, dialog and deletion', async 
     await expect(dialog.getByTestId('allocation-sum')).toContainText('brakuje 20 pp');
     await expect(dialog.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
 
-    await selectOption(page, dialog.getByRole('combobox', { name: 'Klasa' }).nth(1), 'Lokata');
+    const secondClass = dialog.getByRole('combobox', { name: 'Klasa' }).nth(1);
+    await expect(async () => {
+      await openSelect(secondClass);
+      await page.getByRole('option', { name: 'Lokata', exact: true }).click({ timeout: 3_000 });
+    }).toPass({ timeout: 30_000 });
     await expect(dialog.getByTestId('allocation-error')).toContainText(
       'Każda klasa może wystąpić tylko raz.',
     );
@@ -311,7 +321,7 @@ test('redesign Grupy: cards, summary, assets panel, dialog and deletion', async 
   });
 
   await test.step('Krok 8: the "Aktywa" side panel of "Poduszka finansowa" assigns the deposit by class filter and the account by text filter; the card shows "Aktywa: 2"', async () => {
-    await openCardPanel(page, 'Poduszka finansowa');
+    await openCardEdit(page, 'Poduszka finansowa');
     const panel = panelOf(page);
     await selectOption(page, panel.getByRole('combobox', { name: 'Klasa' }), 'Lokata');
     await panel.getByTestId('select-all-shown').click();
@@ -382,7 +392,7 @@ test('redesign Grupy: cards, summary, assets panel, dialog and deletion', async 
     await ungrouped.getByTestId('ungrouped-assets').click();
     const panel = panelOf(page);
     await expect(panel.getByTestId('assets-panel-title')).toHaveText('Bez grupy');
-    await expect(panel.getByTestId('asset-row').filter({ hasText: 'Portfel' })).toBeVisible();
+    await expect(panel.getByTestId('tree-row').filter({ hasText: 'Portfel' })).toBeVisible();
     await expect(panel.getByRole('checkbox')).toHaveCount(0);
     await expect(panel.getByTestId('save-assignment')).toHaveCount(0);
     await expect(panel.getByTestId('ungrouped-hint')).toContainText(
@@ -426,7 +436,7 @@ test('redesign Grupy: cards, summary, assets panel, dialog and deletion', async 
   await test.step('Krok 13: a new cash place assigned to the group is valued after "Synchronizuj teraz": no "wartość niepełna" message and the value 60 100,00 zł (the pre-sync incomplete state is tylko manualnie: the e2e stack syncs every 15 s)', async () => {
     await createCashPlace(page, 'Skarbonka', '100');
     await openGroups(page);
-    await openCardPanel(page, 'Poduszka finansowa');
+    await openCardEdit(page, 'Poduszka finansowa');
     await panelOf(page).getByTestId('asset-filter').fill('Skarbonka');
     await panelOf(page).getByTestId('select-all-shown').click();
     await savePanel(page);

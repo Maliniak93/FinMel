@@ -122,13 +122,14 @@ async function assignAccount(page: Page, group: string, account: string): Promis
   await groupCard(page, group).getByTestId('select-group').click();
   const panel = page.getByTestId('assets-panel');
   await expect(panel).toBeVisible();
+  await panel.getByTestId('edit-assignment').click();
   await panel
-    .getByRole('row')
-    .filter({ has: page.getByRole('cell', { name: account, exact: true }) })
+    .getByTestId('tree-row')
+    .filter({ has: page.getByTestId('row-name').getByText(account, { exact: true }) })
     .getByRole('checkbox')
     .check();
   await panel.getByTestId('save-assignment').click();
-  await expect(panel.getByTestId('assets-panel-title')).toHaveCount(0);
+  await expect(panel.getByTestId('members-view')).toBeVisible();
 }
 
 async function editGroup(page: Page, name: string): Promise<Locator> {

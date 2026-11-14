@@ -6,6 +6,7 @@ import {
   test,
   warsawDate,
 } from './fixtures';
+import { assignAccountToGroup } from './groups';
 import { expectProjected } from './projection';
 
 const ACCOUNT_TYPE_BANK = 2;
@@ -194,11 +195,7 @@ test('pulpit: three rows split evenly with two separator lines', async ({
   });
   expect(cushion.ok()).toBeTruthy();
   const cushionId = ((await cushion.json()) as { id: string }).id;
-  const assigned = await request.put('/api/portfolio/asset-groups/assignment', {
-    headers,
-    data: { assetIds: [account.cashAssetId], groupId: cushionId },
-  });
-  expect(assigned.ok()).toBeTruthy();
+  await assignAccountToGroup(request, headers, cushionId, account.id);
   const pension = await request.post('/api/portfolio/asset-groups', {
     headers,
     data: { name: 'Emerytura', color: 'purple' },

@@ -338,8 +338,11 @@ test('rachunek poza majątkiem: konto bieżące zostaje poza majątkiem, a przel
     );
     await card.getByTestId('select-group').click();
     const panel = page.getByTestId('assets-panel');
+    await panel.getByTestId('edit-assignment').click();
     const assetRow = (name: string): Locator =>
-      panel.getByRole('row').filter({ has: page.getByRole('cell', { name, exact: true }) });
+      panel
+        .getByTestId('tree-row')
+        .filter({ has: page.getByTestId('row-name').getByText(name, { exact: true }) });
     await expect(assetRow(SAVINGS).getByRole('checkbox')).toBeChecked();
     await expect(assetRow(MBANK).getByRole('checkbox')).not.toBeChecked();
     await expect(page.getByTestId('ungrouped-card').getByTestId('ungrouped-count')).toContainText(

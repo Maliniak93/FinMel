@@ -6,6 +6,7 @@ import {
   test,
   warsawDate,
 } from './fixtures';
+import { assignAccountToGroup } from './groups';
 import { expectProjected } from './projection';
 
 const ACCOUNT_TYPE_BANK = 2;
@@ -201,11 +202,7 @@ test('pulpit: layout and change colours', async ({ signedInPage: page, request, 
   });
   expect(created.ok()).toBeTruthy();
   const groupId = ((await created.json()) as { id: string }).id;
-  const assigned = await request.put('/api/portfolio/asset-groups/assignment', {
-    headers,
-    data: { assetIds: [account.cashAssetId], groupId },
-  });
-  expect(assigned.ok()).toBeTruthy();
+  await assignAccountToGroup(request, headers, groupId, account.id);
   const emptyGroup = await request.post('/api/portfolio/asset-groups', {
     headers,
     data: { name: EMPTY_GROUP, color: 'purple' },
