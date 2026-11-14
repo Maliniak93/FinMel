@@ -10,6 +10,7 @@ import { client as portfolioClient } from '../../api/portfolio/client.gen';
 import { client as reportingClient } from '../../api/reporting/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { formatMoney } from '../../shared/format';
+import { WEALTH_SECTIONS } from './wealth-data';
 import { WealthLayout } from './wealth-layout';
 
 const TABS = [
@@ -72,6 +73,18 @@ describe('WealthLayout', () => {
     const selected = links.filter((a) => a.getAttribute('aria-selected') === 'true');
     expect(selected).toHaveLength(1);
     expect(selected[0].textContent).toContain(label);
+  });
+
+  it('tabs follow WEALTH_SECTIONS', async () => {
+    await harness.navigateByUrl('/wealth', WealthLayout);
+    harness.detectChanges();
+    const nav = (harness.routeNativeElement as HTMLElement).querySelector('nav[mat-tab-nav-bar]')!;
+    const hrefs = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a')).map((a) =>
+      a.getAttribute('href'),
+    );
+
+    expect(hrefs[0]).toBe('/wealth');
+    expect(hrefs.slice(1)).toEqual(WEALTH_SECTIONS.map((section) => `/wealth/${section.type}`));
   });
 
   it('renders the tab bar', async () => {

@@ -127,11 +127,10 @@
                   (click)="toggle(section.type)"
                 >
                   <mat-icon aria-hidden="true">chevron_right</mat-icon>
-                  <span class="wealth-all__swatch" [style.background-color]="section.color"></span>
-                  <span class="wealth-all__section-name">{{ section.labelKey | transloco }}</span>
                 </button>
-                <a class="wealth-all__section-link" [routerLink]="section.link">{{
-                  'wealth.open' | transloco
+                <span class="wealth-all__swatch" [style.background-color]="section.color"></span>
+                <a class="wealth-all__section-name" [routerLink]="['/wealth', section.path]">{{
+                  section.labelKey | transloco
                 }}</a>
               </span>
             </th>

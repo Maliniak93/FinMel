@@ -5,7 +5,7 @@ import { client as reportingClient } from '../../api/reporting/client.gen';
 import { provideI18nTesting } from '../../core/i18n/testing';
 import { ASOF, IDS, account, mockWealthApi, wealthApiData } from '../../../testing/wealth-fixtures';
 import { BOND_STATUS } from '../bonds/bond-interest';
-import { WealthData } from './wealth-data';
+import { WEALTH_SECTIONS, WealthData } from './wealth-data';
 
 describe('WealthData', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
@@ -162,5 +162,17 @@ describe('WealthData', () => {
       expect(data.sectionGain(type), type).toBeNull();
     }
     expect(data.totalGain()).toEqual({ amount: 115000, percent: 6.8 });
+  });
+
+  it('sections follow the tab order', () => {
+    expect(WEALTH_SECTIONS.map((section) => section.type)).toEqual([
+      'accounts',
+      'bank',
+      'cash',
+      'deposits',
+      'bonds',
+      'securities',
+      'metals',
+    ]);
   });
 });

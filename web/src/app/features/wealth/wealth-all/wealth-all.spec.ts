@@ -2,10 +2,11 @@ import { OverlayContainer } from '@angular/cdk/overlay';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MATERIAL_ANIMATIONS } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router, UrlTree } from '@angular/router';
 import { of } from 'rxjs';
 
 import en from '../../../../i18n/en.json';
+import pl from '../../../../i18n/pl.json';
 import { menuItemLabel, rowMenuItems, showArchived } from '../../../../testing/archive';
 import { mediaBlock, readStylesheet, rulesFor } from '../../../../testing/stylesheet';
 import {
@@ -31,13 +32,13 @@ import { formatDate, formatMoney, formatPercent, formatSignedMoney } from '../..
 import { WealthAll } from './wealth-all';
 
 const SECTION_ORDER = [
-  'securities',
-  'bonds',
-  'deposits',
-  'bank',
   'accounts',
-  'metals',
+  'bank',
   'cash',
+  'deposits',
+  'bonds',
+  'securities',
+  'metals',
 ] as const;
 
 describe('WealthAll', () => {
@@ -183,6 +184,9 @@ describe('WealthAll', () => {
 
     expect(rowCount()).toBe(0);
     expect(toggles()).toHaveLength(SECTION_ORDER.length);
+    expect(
+      toggles().map((button) => button.closest('[data-section]')?.getAttribute('data-section')),
+    ).toEqual([...SECTION_ORDER]);
     for (const button of toggles()) {
       expect(button.getAttribute('aria-expanded')).toBe('false');
     }
@@ -199,12 +203,18 @@ describe('WealthAll', () => {
     toggle('bonds').click();
     await settle();
     expect(toggle('bonds').getAttribute('aria-label')).toBe(en.wealth.section.collapse);
+    expect(en.wealth).not.toHaveProperty('open');
+    expect(pl.wealth).not.toHaveProperty('open');
+    expect(
+      root().querySelector('.wealth-all__section a:not(.wealth-all__section-name)'),
+    ).toBeNull();
   });
 
   it('toggles a section', async () => {
     await setup();
 
     expect(toggle('bonds').tagName).toBe('BUTTON');
+    expect(toggle('bonds').querySelector('.wealth-all__section-name')).toBeNull();
     toggle('bonds').click();
     await settle();
     expect(toggle('bonds').getAttribute('aria-expanded')).toBe('true');
@@ -215,6 +225,36 @@ describe('WealthAll', () => {
     await settle();
     expect(toggle('bonds').getAttribute('aria-expanded')).toBe('false');
     expect(row('EDO0935')).toBeUndefined();
+  });
+
+  it('section name links to its tab', async () => {
+    await setup();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    toggle('bonds').click();
+    await settle();
+
+    const name = section('bonds')!.querySelector<HTMLAnchorElement>('a.wealth-all__section-name')!;
+    expect(name.getAttribute('href')).toBe('/wealth/bonds');
+    expect(toggle('bonds').contains(name)).toBe(false);
+
+    name.click();
+    await settle();
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(router.serializeUrl(navigate.mock.calls[0][0] as UrlTree)).toBe('/wealth/bonds');
+    expect(toggle('bonds').getAttribute('aria-expanded')).toBe('true');
+    expect(row('EDO0935')).toBeDefined();
+  });
+
+  it('hides an empty section and keeps the tab order', async () => {
+    const data = wealthApiData();
+    data.deposits = [];
+    await setup({ data });
+
+    expect(
+      toggles().map((button) => button.closest('[data-section]')?.getAttribute('data-section')),
+    ).toEqual(SECTION_ORDER.filter((type) => type !== 'deposits'));
+    expect(section('deposits')).toBeNull();
   });
 
   it('rapid toggles end in a consistent state', async () => {
@@ -255,8 +295,8 @@ describe('WealthAll', () => {
 
     component['search'].set('SANT');
     await settle();
-    expect(toggle('bank').getAttribute('aria-expanded')).toBe('true');
-    expect(row('Santander')).toBeDefined();
+    expect(toggle('bank').getAttribute('aria-expanded')).toBe('false');
+    expect(row('Santander')).toBeUndefined();
 
     component['search'].set('');
     await settle();
@@ -264,6 +304,31 @@ describe('WealthAll', () => {
     for (const button of toggles()) {
       expect(button.getAttribute('aria-expanded')).toBe('false');
     }
+
+    component['search'].set('SAN');
+    await settle();
+    expect(toggle('bank').getAttribute('aria-expanded')).toBe('true');
+    expect(row('Santander')).toBeDefined();
+  });
+
+  it('manual collapse survives further typing', async () => {
+    await setup();
+
+    component['search'].set('SAN');
+    await settle();
+    toggle('bank').click();
+    await settle();
+    expect(toggle('bank').getAttribute('aria-expanded')).toBe('false');
+
+    component['search'].set('SANT');
+    await settle();
+    expect(toggle('bank').getAttribute('aria-expanded')).toBe('false');
+    expect(row('Santander')).toBeUndefined();
+
+    toggle('bank').click();
+    await settle();
+    expect(toggle('bank').getAttribute('aria-expanded')).toBe('true');
+    expect(row('Santander')).toBeDefined();
   });
 
   it('stock gain', async () => {
@@ -564,10 +629,11 @@ describe('WealthAll', () => {
     await setup();
     const css = readStylesheet('src/app/features/wealth/wealth-all/wealth-all.scss');
     const button = toggle('securities');
-    const line = button.parentElement!;
-    const link = section('securities')!.querySelector<HTMLElement>('.wealth-all__section-link')!;
+    const line = button.closest<HTMLElement>('.wealth-all__section-line')!;
+    const name = section('securities')!.querySelector<HTMLElement>('.wealth-all__section-name')!;
 
-    expect(link.parentElement).toBe(line);
+    expect(name.tagName).toBe('A');
+    expect(name.closest('.wealth-all__section-line')).toBe(line);
     const lineClass = line.classList[0];
     expect(lineClass).toBeDefined();
     const lineRules = rulesFor(css, new RegExp(`\\.${lineClass}\\s*$`));
