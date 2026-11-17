@@ -19,7 +19,7 @@ RUN dotnet publish gateway/Skarbiec.Gateway/Skarbiec.Gateway.csproj \
     --no-restore \
     --output /app
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:11.0 AS runtime
 WORKDIR /app
 RUN useradd --uid 5678 --user-group --no-create-home --shell /usr/sbin/nologin appuser \
     && chown -R appuser /app
