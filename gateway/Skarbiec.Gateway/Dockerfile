@@ -2,7 +2,7 @@
 # Build context: repository root (contracts/ and Skarbiec.ServiceDefaults/ are project references
 # of Skarbiec.ServiceDefaults, which the Gateway itself references).
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 
 COPY Directory.Build.props Directory.Packages.props ./
