@@ -20,7 +20,7 @@
     <!-- Pinned above the transitive 2.5.302 that Aspire.Hosting 13.6 brings in, which NU1902 flags for GHSA-qhrr-8q5h-9q3h. -->
     <PackageVersion Include="MessagePack" Version="3.1.12" />
     <!-- Build-time OpenAPI generation, so gen:api needs no running stack. -->
-    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.11.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.20.1" />
